@@ -1,0 +1,2070 @@
+<title>Trace Canvas</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a transit map of your work. Threads are lines, records are stations, forks and merges are interchanges.
+   Full-height app: header with view tabs, a drawing surface, a detail drawer, and a capture bar docked at the bottom. */
+:root {
+  --bg: #ECEEEA;
+  --surface: #FFFFFF;
+  --surface-2: #F5F6F3;
+  --ink: #15181C;
+  --muted: #59616B;
+  --faint: #8A919A;
+  --rule: #D3D7D1;
+  --rule-soft: #E3E6E1;
+  --grid: #C9CEC6;
+  --accent: #1D4ED8;
+  --accent-soft: #DCE5FB;
+  --accent-ink: #FFFFFF;
+  --inbox: #7A828C;
+  --edge: #66707B;
+  --danger: #C2302A;
+  --ok: #1D7F4E;
+  --scrim: rgba(12, 14, 18, .38);
+  --shadow: 0 1px 2px rgba(20, 24, 28, .06), 0 8px 24px rgba(20, 24, 28, .10);
+  --f-display: "Barlow Condensed", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --f-body: "Barlow", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --r: 8px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101317; --surface: #191D23; --surface-2: #14181D; --ink: #E6E9ED; --muted: #9AA3AD; --faint: #6D7681;
+    --rule: #2B3139; --rule-soft: #22272E; --grid: #2A3038; --accent: #7397FF; --accent-soft: #1E2A48; --accent-ink: #0B1020;
+    --inbox: #8D96A1; --edge: #8C95A0; --danger: #FF6F63; --ok: #4CC38A; --scrim: rgba(0, 0, 0, .55);
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px rgba(0, 0, 0, .45);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101317; --surface: #191D23; --surface-2: #14181D; --ink: #E6E9ED; --muted: #9AA3AD; --faint: #6D7681;
+  --rule: #2B3139; --rule-soft: #22272E; --grid: #2A3038; --accent: #7397FF; --accent-soft: #1E2A48; --accent-ink: #0B1020;
+  --inbox: #8D96A1; --edge: #8C95A0; --danger: #FF6F63; --ok: #4CC38A; --scrim: rgba(0, 0, 0, .55);
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px rgba(0, 0, 0, .45);
+  color-scheme: dark;
+}
+
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 14px; line-height: 1.45; overflow: hidden; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mono { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+
+#app { height: 100%; display: flex; flex-direction: column; }
+
+/* ---------- header ---------- */
+.top {
+  display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap;
+  padding-block: 8px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: var(--surface); border-bottom: 1px solid var(--rule);
+  position: relative; z-index: 40;
+}
+.brand { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.brand-name { font-family: var(--f-display); font-weight: 700; font-size: 21px; letter-spacing: .01em; line-height: 1; }
+.brand-sub { font-size: 13px; color: var(--muted); font-weight: 500; }
+.sync { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.sync::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+.sync[data-mode="db"]::before, .sync[data-mode="server"]::before { background: var(--ok); }
+.sync[data-mode="offline"]::before { background: var(--danger); }
+.brand-sub:empty { display: none; }
+.lang-btn { min-width: 44px; justify-content: center; }
+.sync[data-mode="local"]::before { background: #E0A100; }
+.sync[data-mode="ro"]::before { background: var(--inbox); }
+.tabs { display: flex; gap: 2px; padding: 2px; background: var(--surface-2); border: 1px solid var(--rule); border-radius: var(--r); }
+.tab {
+  font-family: var(--f-display); font-weight: 600; font-size: 15px; letter-spacing: .03em;
+  padding: 4px 12px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer;
+}
+.tab:hover { color: var(--ink); }
+.tab[aria-selected="true"] { background: var(--ink); color: var(--surface); }
+.spacer { flex: 1 1 0; }
+.search { flex: 0 1 220px; min-width: 120px; position: relative; }
+.search input {
+  width: 100%; padding: 6px 10px 6px 28px; border: 1px solid var(--rule); border-radius: var(--r);
+  background: var(--surface-2);
+}
+.search svg { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--faint); pointer-events: none; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; font-size: 13px; font-weight: 500;
+  border: 1px solid var(--rule); border-radius: 7px; background: var(--surface); color: var(--ink); cursor: pointer; white-space: nowrap;
+}
+.btn:hover { border-color: var(--faint); }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn-primary { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+.btn-primary:hover { border-color: var(--ink); opacity: .9; }
+.btn-accent { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn-danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+.btn-quiet { border-color: transparent; background: transparent; color: var(--muted); }
+.btn-quiet:hover { color: var(--ink); border-color: var(--rule); }
+.btn-quiet-danger { border-color: transparent; background: transparent; color: var(--danger); }
+.icon-btn { width: 30px; height: 30px; display: inline-grid; place-items: center; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--muted); cursor: pointer; font-size: 18px; line-height: 1; }
+.icon-btn:hover { border-color: var(--rule); color: var(--ink); }
+
+.menu-wrap { position: relative; }
+.menu {
+  position: absolute; right: 0; top: calc(100% + 6px); min-width: 210px; padding: 6px;
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; box-shadow: var(--shadow); z-index: 60;
+}
+.menu button { display: flex; width: 100%; justify-content: space-between; gap: 12px; text-align: left; padding: 8px 10px; border: 0; border-radius: 6px; background: transparent; cursor: pointer; font-size: 13px; }
+.menu button:hover { background: var(--surface-2); }
+.menu hr { border: 0; border-top: 1px solid var(--rule-soft); margin: 4px 0; }
+.menu .k { color: var(--faint); font-family: var(--f-mono); font-size: 11px; }
+
+/* ---------- main ---------- */
+main { flex: 1 1 auto; position: relative; min-height: 0; }
+.view { position: absolute; inset: 0; }
+.banner {
+  position: absolute; left: 50%; top: 10px; transform: translateX(-50%); z-index: 25;
+  display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 12px; max-width: calc(100% - 32px);
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 999px; box-shadow: var(--shadow); font-size: 12.5px; color: var(--muted);
+}
+.banner b { color: var(--ink); font-weight: 600; }
+.ex-chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 3px 2px 9px; border: 1px dashed var(--faint); border-radius: 999px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.ex-chip button { border: 0; border-radius: 999px; padding: 2px 8px; background: var(--surface-2); color: var(--ink); font-size: 12px; cursor: pointer; }
+.ex-chip button:hover { background: var(--rule-soft); }
+.banner .btn { padding: 3px 10px; font-size: 12px; border-radius: 999px; }
+
+.empty { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; z-index: 5; padding: 16px; }
+.empty-card {
+  pointer-events: auto; max-width: 420px; padding: 22px 22px 18px; background: var(--surface); border: 1px solid var(--rule);
+  border-radius: 12px; box-shadow: var(--shadow);
+}
+.empty-card h2 { margin: 0 0 6px; font-family: var(--f-display); font-weight: 700; font-size: 22px; letter-spacing: .01em; text-wrap: balance; }
+.empty-card p { margin: 0 0 12px; color: var(--muted); }
+.empty-card ul { margin: 0 0 14px; padding-left: 18px; color: var(--muted); display: grid; gap: 4px; }
+.empty-card code { font-family: var(--f-mono); font-size: 12px; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; color: var(--ink); }
+
+/* ---------- canvas ---------- */
+.cv-viewport {
+  position: absolute; inset: 0; overflow: hidden; touch-action: none; cursor: grab;
+  background-image: radial-gradient(circle, var(--grid) 1px, transparent 1.4px);
+  background-size: 24px 24px;
+}
+.cv-viewport.panning { cursor: grabbing; }
+.cv-viewport.connecting, .cv-viewport.connecting .card { cursor: crosshair; }
+.cv-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.cv-edges { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
+.cv-edges .e-line { fill: none; stroke-width: 2.4; stroke-linecap: round; }
+.cv-edges .edge-fork .e-line { stroke-dasharray: 6 6; }
+.cv-edges .edge-rel .e-line { stroke: var(--edge); }
+.cv-edges .e-head { stroke: none; }
+.cv-edges .edge-rel .e-head { fill: var(--edge); }
+.cv-edges .e-label rect { fill: var(--surface); stroke: var(--rule); }
+.cv-edges .e-label text { fill: var(--muted); font-size: 12px; font-family: var(--f-body); text-anchor: middle; dominant-baseline: central; }
+.cv-edges .edge-rel { pointer-events: auto; cursor: pointer; }
+.cv-edges .edge-rel.is-sel .e-label rect { stroke: var(--accent); stroke-width: 2; }
+.cv-edges .edge-rel.is-sel .e-line { stroke: var(--accent); }
+.cv-edges .edge-rel.is-sel .e-head { fill: var(--accent); }
+
+.card {
+  position: absolute; width: 252px; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(20, 24, 28, .05); cursor: grab; user-select: none; -webkit-user-select: none;
+  transition: box-shadow .15s, opacity .15s;
+}
+.card:hover { box-shadow: var(--shadow); }
+.card.is-sel { outline: 2px solid var(--accent); outline-offset: 1px; }
+.card.is-from { outline: 2px dashed var(--accent); outline-offset: 3px; }
+.card.is-dim { opacity: .35; }
+.card.is-inbox { border-style: dashed; background: var(--surface-2); }
+.card.st-done, .card.st-merged { opacity: .72; }
+.card.dragging { box-shadow: var(--shadow); cursor: grabbing; z-index: 3; }
+.card-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px 6px; }
+.roundel { flex: none; width: 15px; height: 15px; border-radius: 50%; border: 4px solid var(--c); background: var(--surface); }
+.card-name { flex: 1; min-width: 0; font-family: var(--f-display); font-weight: 600; font-size: 17px; letter-spacing: .01em; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip { flex: none; font-size: 11px; font-weight: 500; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--rule); color: var(--muted); white-space: nowrap; }
+.chip-active { border-color: var(--accent); color: var(--accent); }
+.chip-parked { border-style: dashed; }
+.chip-done { background: var(--surface-2); }
+.chip-merged { background: var(--surface-2); }
+.strip { list-style: none; margin: 0; padding: 2px 10px 4px 4px; position: relative; }
+.strip::before { content: ""; position: absolute; left: 14.5px; top: 12px; bottom: 12px; width: 3px; border-radius: 2px; background: var(--c); }
+.is-inbox .strip::before { background: repeating-linear-gradient(to bottom, var(--c) 0 4px, transparent 4px 8px); }
+.strip li { position: relative; display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 6px; padding: 3px 0; border-radius: 6px; cursor: pointer; }
+.strip li:hover .s-title { color: var(--ink); text-decoration: underline; text-decoration-color: var(--faint); text-underline-offset: 2px; }
+.strip li.is-sel .s-title { color: var(--accent); font-weight: 600; }
+.strip li.hit .s-title { background: var(--accent-soft); border-radius: 3px; }
+.strip .g { justify-self: center; }
+.s-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 13px; }
+.s-time { font-family: var(--f-mono); font-size: 10.5px; color: var(--faint); }
+.strip .s-more { color: var(--faint); font-size: 12px; cursor: default; }
+.strip .s-empty { color: var(--faint); font-size: 12.5px; cursor: default; }
+.card-foot { display: flex; justify-content: space-between; gap: 8px; padding: 6px 12px 9px; border-top: 1px solid var(--rule-soft); font-size: 11.5px; color: var(--faint); }
+
+.hud {
+  position: absolute; z-index: 20; display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+  left: max(12px, env(safe-area-inset-left, 0px)); bottom: 12px; right: 12px; pointer-events: none;
+}
+.hud > * { pointer-events: auto; }
+.hud-group { display: inline-flex; align-items: center; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; box-shadow: 0 1px 2px rgba(20, 24, 28, .06); }
+.hud-group .btn { border: 0; border-radius: 0; background: transparent; padding: 6px 10px; }
+.hud-group .btn + .btn { border-left: 1px solid var(--rule-soft); }
+.hud-group .btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.hud-zoom { min-width: 48px; justify-content: center; font-family: var(--f-mono); font-size: 12px; }
+
+/* ---------- glyphs ---------- */
+.gl-open { fill: var(--surface); stroke-width: 2.4; }
+.gl-solid { stroke: var(--surface); stroke-width: 1.6; }
+.gl-ring { fill: var(--surface); stroke: var(--ink); stroke-width: 2.6; }
+.gl-hole { fill: var(--surface); }
+.gl-dim { opacity: .25; }
+
+/* ---------- git graph ---------- */
+.git-scroll { position: absolute; inset: 0; overflow: auto; }
+.git-legend {
+  position: sticky; top: 0; z-index: 3; display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+  padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: var(--bg); border-bottom: 1px solid var(--rule-soft);
+}
+.legend-label { font-family: var(--f-display); font-weight: 600; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); margin-right: 4px; }
+.lane-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px 3px 6px; border: 1px solid var(--rule); border-radius: 999px; background: var(--surface); font-size: 12.5px; cursor: pointer; }
+.lane-chip i { width: 10px; height: 10px; border-radius: 50%; border: 3px solid var(--c); background: var(--surface); }
+.lane-chip.is-sel { border-color: var(--accent); }
+.git-body { position: relative; padding-left: max(4px, env(safe-area-inset-left, 0px)); }
+.git-svg { position: absolute; top: 0; overflow: visible; }
+.git-svg .lane { stroke-width: 3; stroke-linecap: round; fill: none; }
+.git-svg .lane-open { stroke-width: 3; stroke-dasharray: 2 5; stroke-linecap: round; fill: none; }
+.git-svg .link { stroke-width: 3; fill: none; stroke-linecap: round; }
+.git-svg [data-cid] { cursor: pointer; }
+.g-row {
+  display: flex; align-items: center; gap: 10px; height: 44px; border-bottom: 1px solid var(--rule-soft);
+  padding-right: max(16px, env(safe-area-inset-right, 0px)); cursor: pointer; min-width: 0;
+}
+.g-row:hover { background: var(--surface-2); }
+.g-row.is-sel { background: var(--accent-soft); }
+.g-row.is-dim { opacity: .35; }
+.g-title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-row.k-fork .g-title, .g-row.k-merge .g-title { color: var(--muted); font-style: italic; }
+.g-row.done .g-title { text-decoration: line-through; text-decoration-color: var(--faint); color: var(--muted); }
+.pill { flex: none; display: inline-flex; align-items: center; gap: 5px; max-width: 160px; font-size: 12px; color: var(--muted); }
+.pill i { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.pill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kind-tag { flex: none; font-size: 11px; color: var(--faint); border: 1px solid var(--rule); border-radius: 4px; padding: 0 5px; }
+.agent-tag { flex: none; font-size: 11px; color: var(--muted); background: var(--surface-2); border-radius: 4px; padding: 1px 6px; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-time { flex: none; font-family: var(--f-mono); font-size: 11.5px; color: var(--faint); min-width: 78px; text-align: right; }
+
+/* ---------- timeline ---------- */
+.tl-wrap { position: absolute; inset: 0; display: flex; flex-direction: column; }
+.tl-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding-block: 8px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  border-bottom: 1px solid var(--rule-soft);
+}
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 7px; overflow: hidden; background: var(--surface); }
+.seg button { border: 0; background: transparent; padding: 4px 12px; cursor: pointer; font-size: 13px; color: var(--muted); }
+.seg button + button { border-left: 1px solid var(--rule-soft); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+.tl-hint { font-size: 12px; color: var(--faint); }
+.tl-scroll { flex: 1 1 auto; overflow: auto; position: relative; }
+.tl-inner { position: relative; }
+.tl-axis-row { display: flex; position: sticky; top: 0; z-index: 3; background: var(--surface); border-bottom: 1px solid var(--rule); }
+.tl-corner { flex: none; position: sticky; left: 0; z-index: 4; background: var(--surface); border-right: 1px solid var(--rule); display: flex; align-items: flex-end; padding: 0 0 8px 14px; font-family: var(--f-display); font-weight: 600; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); }
+.tl-axis text { font-size: 11px; fill: var(--muted); font-family: var(--f-mono); }
+.tl-axis .day text, .tl-axis text.day { fill: var(--ink); font-family: var(--f-body); font-weight: 600; font-size: 12px; }
+.tl-axis line { stroke: var(--rule); }
+.tl-axis .now-label { fill: var(--accent); font-family: var(--f-body); font-weight: 600; }
+.tl-body-row { display: flex; }
+.tl-labels { flex: none; position: sticky; left: 0; z-index: 2; background: var(--bg); border-right: 1px solid var(--rule); }
+.tl-label { display: flex; align-items: center; gap: 8px; padding: 0 10px 0 14px; border-bottom: 1px solid var(--rule-soft); cursor: pointer; min-width: 0; }
+.tl-label:hover { background: var(--surface-2); }
+.tl-label.is-sel { background: var(--accent-soft); }
+.tl-label .roundel { width: 13px; height: 13px; border-width: 3.5px; }
+.tl-label .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.tl-label .ct { font-family: var(--f-mono); font-size: 11px; color: var(--faint); }
+.tl-body .grid-l { stroke: var(--rule-soft); }
+.tl-body .grid-day { stroke: var(--rule); }
+.tl-body .row-sep { stroke: var(--rule-soft); }
+.tl-body .bar { stroke-width: 6; stroke-linecap: round; opacity: .32; fill: none; }
+.tl-body .bar.parked { stroke-dasharray: 1 9; opacity: .6; }
+.tl-body .base { stroke: var(--rule); stroke-width: 1.5; stroke-dasharray: 3 4; }
+.tl-body .link { fill: none; stroke-width: 2; stroke-dasharray: 4 4; }
+.tl-body .now { stroke: var(--accent); stroke-width: 1.5; }
+.tl-body .tip { font-size: 11.5px; fill: var(--muted); font-family: var(--f-body); dominant-baseline: central; }
+.tl-body [data-cid] { cursor: pointer; }
+.tl-body .is-sel circle, .tl-body .is-sel rect, .tl-body .is-sel polygon { stroke: var(--accent) !important; stroke-width: 3; }
+
+/* ---------- detail drawer ---------- */
+.detail {
+  position: absolute; z-index: 30; top: 12px; bottom: 12px; right: max(12px, env(safe-area-inset-right, 0px)); width: 372px;
+  display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden;
+}
+.d-head { display: flex; align-items: center; gap: 8px; padding: 10px 10px 8px 14px; border-bottom: 1px solid var(--rule-soft); }
+.d-eyebrow { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px; font-family: var(--f-display); font-weight: 600; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.d-eyebrow .mono { text-transform: none; letter-spacing: 0; font-weight: 400; font-size: 11.5px; color: var(--faint); }
+.d-scroll { flex: 1 1 auto; overflow: auto; padding: 12px 14px 16px; display: grid; gap: 12px; align-content: start; }
+.fld { display: grid; gap: 4px; min-width: 0; }
+.fld > span { font-size: 11.5px; color: var(--muted); font-weight: 500; }
+.fld input, .fld select, .fld textarea {
+  width: 100%; min-width: 0; padding: 7px 9px; border: 1px solid var(--rule); border-radius: 7px; background: var(--surface-2);
+}
+.fld textarea { resize: vertical; line-height: 1.5; }
+.fld input:focus, .fld select:focus, .fld textarea:focus { outline: none; border-color: var(--accent); background: var(--surface); }
+.fld-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.big-input { font-family: var(--f-display); font-weight: 600; font-size: 19px !important; letter-spacing: .01em; }
+.check { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; }
+.swatches { display: flex; gap: 6px; flex-wrap: wrap; }
+.swatch { width: 24px; height: 24px; border-radius: 50%; border: 5px solid var(--c); background: var(--surface); cursor: pointer; padding: 0; }
+.swatch[aria-pressed="true"] { outline: 2px solid var(--ink); outline-offset: 2px; }
+.d-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; border-top: 1px solid var(--rule-soft); padding-top: 12px; }
+.inline-form { display: flex; gap: 6px; flex-wrap: wrap; width: 100%; }
+.inline-form input, .inline-form select { flex: 1 1 140px; min-width: 0; padding: 6px 9px; border: 1px solid var(--rule); border-radius: 7px; background: var(--surface-2); }
+.confirm { font-size: 13px; color: var(--danger); }
+.meta { display: grid; gap: 4px; font-size: 12.5px; color: var(--muted); }
+.meta a, .linkish { color: var(--accent); cursor: pointer; text-decoration: none; background: none; border: 0; padding: 0; font: inherit; }
+.meta a:hover, .linkish:hover { text-decoration: underline; }
+.links { display: grid; gap: 4px; }
+.links a, .links code { font-size: 12.5px; overflow-wrap: anywhere; }
+.links a { color: var(--accent); }
+.links code { font-family: var(--f-mono); background: var(--surface-2); padding: 2px 6px; border-radius: 4px; }
+.d-strip { list-style: none; margin: 0; padding: 0 0 0 2px; position: relative; display: grid; }
+.d-strip::before { content: ""; position: absolute; left: 12.5px; top: 12px; bottom: 12px; width: 3px; border-radius: 2px; background: var(--c); }
+.d-strip li { position: relative; display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: center; padding: 4px 0; cursor: pointer; }
+.d-strip li:hover .s-title { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+.d-strip .g { justify-self: center; }
+.sec-label { font-family: var(--f-display); font-weight: 600; font-size: 12.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--faint); }
+.label-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.label-chips button { font-size: 12px; padding: 3px 9px; border: 1px solid var(--rule); border-radius: 999px; background: var(--surface); cursor: pointer; }
+.label-chips button:hover { border-color: var(--faint); }
+
+/* ---------- capture bar ---------- */
+.capture {
+  display: flex; gap: 8px 12px; flex-wrap: wrap; align-items: flex-end;
+  padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: var(--surface); border-top: 1px solid var(--rule); position: relative; z-index: 35;
+}
+.cap-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; min-width: 0; }
+.cap-thread { position: relative; display: inline-flex; align-items: center; }
+.cap-thread i { position: absolute; left: 10px; width: 11px; height: 11px; border-radius: 50%; border: 3px solid var(--c); background: var(--surface); pointer-events: none; }
+.cap-thread select { appearance: none; -webkit-appearance: none; padding: 7px 26px 7px 28px; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface-2); max-width: 190px; font-weight: 500; cursor: pointer; }
+.cap-thread::after { content: ""; position: absolute; right: 10px; width: 6px; height: 6px; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); transform: translateY(-2px) rotate(45deg); pointer-events: none; }
+.kinds { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface-2); }
+.kinds button { display: inline-flex; align-items: center; gap: 5px; border: 0; background: transparent; padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 12.5px; color: var(--muted); }
+.kinds button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--rule); }
+.cap-input { flex: 1 1 320px; display: flex; gap: 8px; align-items: flex-end; min-width: 0; }
+.cap-input textarea {
+  flex: 1; min-width: 0; resize: none; padding: 8px 12px; border: 1px solid var(--rule); border-radius: 9px; background: var(--surface-2);
+  line-height: 1.45; max-height: 150px; overflow-y: auto;
+}
+.cap-input textarea:focus { outline: none; border-color: var(--accent); background: var(--surface); }
+.cap-input .btn { padding: 8px 14px; }
+
+/* ---------- sheets ---------- */
+.scrim { position: fixed; inset: 0; z-index: 70; background: var(--scrim); display: grid; place-items: center; padding: 16px; }
+.sheet { width: min(660px, 100%); max-height: min(86vh, 100%); display: flex; flex-direction: column; background: var(--surface); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
+.sheet-head { display: flex; align-items: center; gap: 10px; padding: 14px 14px 10px 18px; border-bottom: 1px solid var(--rule-soft); }
+.sheet-head h3 { flex: 1; margin: 0; font-family: var(--f-display); font-weight: 700; font-size: 21px; letter-spacing: .01em; }
+.sheet-body { padding: 14px 18px 18px; overflow: auto; display: grid; gap: 14px; align-content: start; }
+.sheet-body p { margin: 0; color: var(--muted); max-width: 65ch; }
+.sheet-body h4 { margin: 4px 0 0; font-size: 14px; }
+.sheet-foot { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; padding: 12px 18px; border-top: 1px solid var(--rule-soft); }
+.codebox { position: relative; }
+.codebox pre { margin: 0; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--rule-soft); border-radius: 8px; font-family: var(--f-mono); font-size: 12px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow: auto; }
+.codebox .btn { position: absolute; right: 8px; top: 8px; padding: 3px 9px; font-size: 12px; }
+.sheet textarea.import { width: 100%; min-height: 140px; padding: 10px; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface-2); font-family: var(--f-mono); font-size: 12px; resize: vertical; }
+.ai-summary { padding: 12px 14px; background: var(--surface-2); border-radius: 8px; color: var(--ink) !important; }
+.ai-list { display: grid; gap: 6px; }
+.ai-item { display: grid; grid-template-columns: 20px 1fr; gap: 8px; align-items: start; padding: 8px 10px; border: 1px solid var(--rule-soft); border-radius: 8px; cursor: pointer; }
+.ai-item input { margin-top: 3px; }
+.ai-item .why { display: block; font-size: 12px; color: var(--faint); margin-top: 2px; }
+.ai-thinking { display: flex; align-items: center; gap: 10px; color: var(--muted); }
+.pulse { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); animation: pulse 1.1s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { opacity: .25; transform: scale(.8); } 50% { opacity: 1; transform: scale(1); } }
+
+.toast {
+  position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 90; max-width: calc(100% - 32px);
+  padding: 8px 14px; border-radius: 999px; background: var(--ink); color: var(--surface); font-size: 13px; box-shadow: var(--shadow);
+}
+.flash { animation: flash 1.4s ease-out; }
+@keyframes flash { 0% { box-shadow: 0 0 0 4px var(--accent); } 100% { box-shadow: 0 0 0 0 transparent; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .flash, .pulse { animation: none; }
+  .card { transition: none; }
+}
+
+/* ---------- narrow screens ---------- */
+@media (max-width: 760px) {
+  .brand-sub, .sync-text { display: none; }
+  .brand-name { font-size: 18px; }
+  .search { order: 10; flex: 1 1 100%; }
+  .tab { padding: 4px 10px; }
+  .detail { top: auto; left: 0; right: 0; bottom: 0; width: auto; max-height: 72%; border-radius: 14px 14px 0 0; border-bottom: 0; }
+  .g-row .kind-tag, .g-row .agent-tag { display: none; }
+  .pill { max-width: 96px; }
+  .g-time { min-width: 0; }
+  .cap-input { flex-basis: 100%; }
+  .kinds button span { display: none; }
+  .kinds button { padding: 5px 7px; }
+  .hud .btn-label { display: none; }
+  .toast { bottom: 140px; }
+}
+@media (max-width: 480px) {
+  .brand-name { display: none; }
+  .top { gap: 8px 10px; }
+}
+</style>
+
+<div id="app">
+  <header class="top">
+    <div class="brand">
+      <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M6 21V3" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none"/>
+        <path d="M6 14c0-4.5 12-3.5 12-9V3" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" fill="none"/>
+        <circle cx="6" cy="14" r="3.3" fill="var(--surface)" stroke="currentColor" stroke-width="2.2"/>
+        <circle cx="18" cy="5" r="2.6" fill="var(--surface)" stroke="var(--accent)" stroke-width="2.2"/>
+      </svg>
+      <span class="brand-name">Trace Canvas</span>
+      <span class="brand-sub" data-i18n="brandSub"></span>
+    </div>
+    <nav class="tabs" role="tablist" data-i18n-aria="viewsAria">
+      <button class="tab" role="tab" id="tab-canvas" data-view="canvas" aria-selected="true" data-i18n="tabCanvas">Canvas</button>
+      <button class="tab" role="tab" id="tab-git" data-view="git" aria-selected="false" data-i18n="tabGit">Branches</button>
+      <button class="tab" role="tab" id="tab-timeline" data-view="timeline" aria-selected="false" data-i18n="tabTimeline">Timeline</button>
+    </nav>
+    <span class="sync" id="sync" data-mode="loading"><span class="sync-text" id="sync-text"></span></span>
+    <span class="ex-chip" id="ex-banner" hidden data-i18n-title="exChipTitle"><span data-i18n="exChip">Example data</span><button id="ex-clear" data-i18n="exClear">Clear</button></span>
+    <span class="spacer"></span>
+    <label class="search" for="q">
+      <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="2" fill="none"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <input id="q" type="search" data-i18n-ph="searchPh" autocomplete="off">
+    </label>
+    <button class="btn btn-accent" id="ai-btn" hidden data-i18n="aiBtn" data-i18n-title="aiBtnTitle">AI tidy-up</button>
+    <button class="btn lang-btn" id="lang-btn" data-i18n="langBtn" data-i18n-title="langTitle">中文</button>
+    <div class="menu-wrap">
+      <button class="btn" id="more-btn" aria-haspopup="true" aria-expanded="false" data-i18n="more">More</button>
+      <div class="menu" id="menu" hidden>
+        <button data-menu="new-thread"><span data-i18n="menuNewThread">New thread</span> <span class="k">N</span></button>
+        <button data-menu="toggle-done"><span id="toggle-done-label"></span></button>
+        <hr>
+        <button data-menu="agent" data-i18n="menuAgent">Connect an AI agent</button>
+        <button data-menu="io" data-i18n="menuIO">Import / export</button>
+        <button data-menu="clear-examples" id="clear-ex-item" hidden data-i18n="menuClearEx">Clear example data</button>
+        <hr>
+        <button data-menu="help" data-i18n="menuHelp">Shortcuts and help</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="view" id="view-canvas">
+      <div class="cv-viewport" id="cv">
+        <div class="cv-world" id="cv-world">
+          <svg class="cv-edges" id="cv-edges"></svg>
+          <div id="cv-cards"></div>
+        </div>
+      </div>
+      <div class="banner" id="connect-banner" hidden></div>
+      <div class="hud">
+        <div class="hud-group">
+          <button class="btn" id="zoom-out" data-i18n-aria="zoomOut">−</button>
+          <button class="btn hud-zoom" id="zoom-reset" data-i18n-title="zoomReset">100%</button>
+          <button class="btn" id="zoom-in" data-i18n-aria="zoomIn">+</button>
+          <button class="btn" id="zoom-fit" data-i18n="fit">Fit</button>
+        </div>
+        <div class="hud-group">
+          <button class="btn" id="connect-btn" aria-pressed="false" data-i18n-title="connectTitle">
+            <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="12.5" r="2.3" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12.5" cy="3.5" r="2.3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5.3 10.7l5.4-5.4" stroke="currentColor" stroke-width="1.8"/></svg>
+            <span class="btn-label" data-i18n="connect">Connect</span>
+          </button>
+          <button class="btn" id="new-thread-btn">
+            <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            <span class="btn-label" data-i18n="newThread">New thread</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="view-git" hidden>
+      <div class="git-scroll" id="git-scroll">
+        <div class="git-legend" id="git-legend"></div>
+        <div class="git-body" id="git-body"></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-timeline" hidden>
+      <div class="tl-wrap">
+        <div class="tl-bar">
+          <div class="seg" id="tl-zoom">
+            <button data-z="day" aria-pressed="false" data-i18n="tlDay">Day</button>
+            <button data-z="week" aria-pressed="true" data-i18n="tlWeek">Week</button>
+            <button data-z="month" aria-pressed="false" data-i18n="tlMonth">Month</button>
+          </div>
+          <button class="btn" id="tl-now" data-i18n="tlNow">Now</button>
+          <span class="tl-hint" data-i18n="tlHint"></span>
+        </div>
+        <div class="tl-scroll" id="tl-scroll"><div class="tl-inner" id="tl-inner"></div></div>
+      </div>
+    </section>
+
+    <div class="empty" id="empty" hidden></div>
+    <aside class="detail" id="detail" hidden data-i18n-aria="detailAria"></aside>
+  </main>
+
+  <form class="capture" id="capture" autocomplete="off">
+    <div class="cap-meta">
+      <label class="cap-thread" id="cap-thread-wrap" data-i18n-title="capThreadAria">
+        <i></i>
+        <select id="cap-thread" data-i18n-aria="capThreadAria"></select>
+      </label>
+      <div class="kinds" id="kinds" role="group" data-i18n-aria="kindsAria"></div>
+    </div>
+    <div class="cap-input">
+      <textarea id="cap-text" rows="1" data-i18n-ph="capPh"></textarea>
+      <button class="btn btn-primary" type="submit" id="cap-submit" data-i18n="capSubmit">Log</button>
+    </div>
+  </form>
+
+  <div class="scrim" id="scrim" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+      <div class="sheet-head"><h3 id="sheet-title"></h3><button class="icon-btn" id="sheet-close" data-i18n-aria="close">×</button></div>
+      <div class="sheet-body" id="sheet-body"></div>
+      <div class="sheet-foot" id="sheet-foot" hidden></div>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status" hidden></div>
+  <datalist id="agent-list"><option value="Claude"></option><option value="Claude Code"></option><option value="ChatGPT"></option><option value="Codex"></option><option value="Cursor"></option></datalist>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* ================= constants & helpers ================= */
+const ARTIFACT_URL = 'https://claude.ai/artifact/Y7kykkrWyU4rH31MttYLMj';
+const SERVER = window.TRACE_CANVAS_SERVER || null;
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const ls = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+const pad2 = n => String(n).padStart(2, '0');
+
+/* ================= i18n ================= */
+const I18N = {
+  en: {
+    brandSub: '', viewsAria: 'Views', tabCanvas: 'Canvas', tabGit: 'Branches', tabTimeline: 'Timeline',
+    syncLoading: 'Connecting', syncDb: 'Synced', syncServer: 'Local', syncLocal: 'This browser only', syncRo: 'Read-only', syncOffline: 'Server stopped',
+    syncDbTitle: 'Saved in this page’s cloud storage, available on any device',
+    syncServerTitle: f => `Saved on this computer in ${f}. Claude Code hooks write to the same file.`,
+    syncLocalTitle: 'Not connected to any storage; data stays in this browser only',
+    syncRoTitle: 'You can view but not change this page', syncOfflineTitle: 'Lost the local server. Start it again with trace-canvas serve.',
+    exChip: 'Example data', exClear: 'Clear', exChipTitle: 'Records added to show how the views work',
+    searchPh: 'Search records…', aiBtn: 'AI tidy-up', aiBtnTitle: 'Ask Claude to sort the inbox and find links between threads',
+    langBtn: '中文', langTitle: '切换到中文', more: 'More',
+    menuNewThread: 'New thread', menuHideDone: 'Hide finished threads', menuShowDone: 'Show finished threads',
+    menuAgent: 'Connect an AI agent', menuIO: 'Import / export', menuClearEx: 'Clear example data', menuHelp: 'Shortcuts and help',
+    zoomOut: 'Zoom out', zoomIn: 'Zoom in', zoomReset: 'Reset to 100%', fit: 'Fit', connect: 'Connect', connectTitle: 'Draw a link between two threads', newThread: 'New thread',
+    tlDay: 'Day', tlWeek: 'Week', tlMonth: 'Month', tlNow: 'Now', tlHint: 'One row per thread. The band shows when it was active; dashed curves are forks and merges.',
+    detailAria: 'Details', capThreadAria: 'Thread to log to', kindsAria: 'Record type',
+    capPh: 'Log an idea, a task or what an agent produced…  Enter to save. Start with #thread to file it. Paste JSON to import.',
+    capSubmit: 'Log', close: 'Close', cancel: 'Cancel', copy: 'Copy',
+    loading: 'Loading your traces…',
+    emptyTitle: 'Turn scattered ideas and parallel work into one transit map',
+    emptyBody: 'Each <b>thread</b> is a piece of work in progress. Each <b>record</b> is a station on it. Type your first one below and press Enter.',
+    emptyTip1: 'Start with <code>#thread-name text</code> to file it on a thread (created if new)',
+    emptyTip2: 'Fork a new thread from any record, then merge it back when it’s done',
+    emptyTip3: 'Claude Code hooks and other agents can log here automatically',
+    emptyAgentBtn: 'Connect an agent', emptyDemoBtn: 'Load example data',
+    k_idea: 'Idea', k_task: 'Task', k_agent: 'Agent output', k_decision: 'Decision', k_note: 'Note', k_fork: 'Fork', k_merge: 'Merge',
+    st_active: 'Active', st_parked: 'Parked', st_done: 'Done', st_merged: 'Merged',
+    inbox: 'Inbox', unsorted: 'Unsorted', inboxEmpty: 'Quick ideas land here first', noRecords: 'No records yet',
+    moreEarlier: n => `${n} earlier record${n === 1 ? '' : 's'}`, countRecords: n => `${n} record${n === 1 ? '' : 's'}`, countAgent: n => ` · ${n} by agents`,
+    updated: r => `updated ${r}`,
+    justNow: 'just now', minAgo: n => `${n} min ago`, hAgo: n => `${n} h ago`, yesterday: 'yesterday', daysAgo: n => `${n} days ago`,
+    edgeRelated: 'related', edgeFork: 'fork', edgeMerge: 'merge', labelChips: ['depends on', 'references', 'derived from', 'blocks', 'conflicts', 'same goal'],
+    connectFrom: n => `From <b>${n}</b>: now pick a second thread`, connectPick: 'Pick the thread to start from',
+    legend: 'Lines', tlCorner: 'Threads', tlNowLabel: 'now',
+    week: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+    months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+    dayLabel: d => `${I18N.en.week[d.getDay()]} ${d.getMonth() + 1}/${d.getDate()}`,
+    monthLabel: d => `${I18N.en.months[d.getMonth()]} ${d.getFullYear()}`,
+    tickDay: d => `${I18N.en.week[d.getDay()]} ${d.getDate()}`,
+    dRecord: 'Record', dTitle: 'Title', dKind: 'Type', dThread: 'Thread', dDone: 'Done', dBody: 'Details', dBodyPh: 'Context, a summary of what the agent produced, next steps…',
+    dLinks: 'Links or file paths, one per line', dLinksPh: 'https://…  or  ~/Documents/plan.md', dAgent: 'Source', dAgentPh: 'me / Claude Code…', dTime: 'Time',
+    forkedFromRec: 'Forked from', mergedFromThread: 'Merged from thread', forkedHere: 'Forked from here:',
+    forkHere: 'Fork from here', viewThread: 'View thread', forkNamePh: 'Name of the new thread', createBranch: 'Create branch',
+    delRecordQ: 'Delete this record?', del: 'Delete',
+    inboxDesc: 'Quick ideas land here first. Open a record and pick a thread for it, or let AI tidy-up sort them in one go.',
+    threadLabel: 'Thread', threadName: 'Thread name', threadStatus: 'Status', threadColor: 'Line color', colorAria: c => `Color ${c}`,
+    threadGoal: 'Goal and context', threadGoalPh: 'What should this line achieve? When is it done?',
+    createdAt: d => `Created ${d}`, lastUpdate: r => ` · last update ${r}`,
+    forkedFromThread: 'Forked from', of: 'at', mergedInto: 'Merged into', stations: 'Stations', noRecordsYet: 'No records yet.',
+    only40: 'Showing the latest 40. The full history is in the Branches view.',
+    captureHere: 'Log on this line', mergeTo: 'Merge into…', merge: 'Merge', delThreadQ: 'Delete thread? Its records move to the inbox', delThread: 'Delete thread',
+    edgeHead: 'Link', edgeRel: 'Relationship', edgeRelPh: 'depends on, references…', flip: 'Reverse direction', delEdgeQ: 'Delete this link?',
+    newThreadName: n => `New thread ${n}`, branchDefault: n => `${n} · branch`,
+    forkTitle: (p, ti) => `Forked from ${p}: ${ti}`, mergeTitle: n => `Merged ${n}`,
+    tReadOnly: 'You can only view this page', tReadOnlyNotSaved: 'You can only view this page, so that change wasn’t saved',
+    tQuota: 'Storage is full: export a backup, then delete some old records', tSlow: 'Too many changes at once. Wait a few seconds and try again.',
+    tSaveFail: 'Couldn’t save. Check the connection and try again.', tConnLost: 'Lost the data connection. Reload the page to reconnect.',
+    tForked: ti => `Forked a new thread from “${ti}”`, tMerged: (a, b) => `Merged “${a}” into “${b}”`, tCleared: n => `Cleared ${n} example item${n === 1 ? '' : 's'}`,
+    tMoved: n => `Moved to “${n}”`, tLogged: n => `Logged to “${n}”`, tImported: n => `Imported ${n} record${n === 1 ? '' : 's'}`,
+    tDeleted: 'Deleted', tCopied: 'Copied', tCopyFail: 'Couldn’t write to the clipboard. Select the text and copy it by hand.',
+    tSaved: 'Saved', tCopiedAll: 'Copied all data', tSaveFallback: 'Saving didn’t work here, so the JSON is on your clipboard instead',
+    tApplied: n => `Applied ${n} suggestion${n === 1 ? '' : 's'}`, tNoneChecked: 'No suggestions were selected',
+    tImportFail: 'Nothing to import. Use an exported JSON file, or one {"title": …} record per line.', tDemoLoaded: 'Example data loaded',
+    agentTitle: 'Connect an AI agent',
+    agentIntro: 'Every agent session can log its key progress here, so when several lines run in parallel you can see who got where.',
+    agentHooksH: 'Claude Code: automatic, through hooks',
+    agentHooksP: 'Once installed, Claude Code logs the first instruction of each session, every turn that changed files, git commits, pushes, merges, pull requests and a summary when the session ends. Records go to one thread per repository and branch.',
+    agentHooksAll: 'Turn it on for every project on this computer:',
+    agentHooksProject: 'Or only for one project (writes .claude/settings.local.json there):',
+    agentCliH: 'Any agent or script: the log command', agentCliP: 'Codex, Cursor, shell scripts and cron jobs can all log one line:',
+    agentClaudeH: 'Claude (when it can use the ArtifactData tool)',
+    agentClaudeP: 'Send this to Claude Code or Claude on claude.ai. It writes straight into this page’s database and the canvas updates live.',
+    agentOtherH: 'Other agents (ChatGPT, Codex, Cursor…)',
+    agentOtherP: 'Ask them to end with JSON lines, then paste the whole output into the box at the bottom and press Enter. Threads that don’t exist yet are created.',
+    agentFieldsH: 'Fields',
+    agentFieldsP: '<b>threads</b> are lines of work, like git branches. <code class="mono">status</code> is active, parked, done or merged; <code class="mono">parent</code> and <code class="mono">forkOf</code> record which line and station it came from. <b>commits</b> are records, like git commits. <b>edges</b> are links you draw on the canvas.',
+    agentLocalP: 'Hooks need the local version. Run <code class="mono">node tools/trace-canvas/bin/trace-canvas.mjs</code> in the repository to start it.',
+    ioTitle: 'Import / export', ioIntro: 'The export holds every thread, record and link. Keep it as a backup or import it into another Trace Canvas.',
+    ioSave: 'Save as JSON file', ioCopy: 'Copy JSON', ioImportH: 'Import',
+    ioImportP: 'Paste an export or the JSON lines an agent produced. Records without a thread go to the thread selected in the box at the bottom.',
+    ioImport: 'Import', ioFile: 'Choose file…',
+    helpTitle: 'Shortcuts and help',
+    helpIntro: 'A <b>thread</b> is a piece of work in progress, like a git branch. A <b>record</b> is a station on it, like a commit. Loose ideas go to the <b>inbox</b> first and get sorted later.',
+    help: [
+      ['/', 'Focus the box at the bottom. Enter saves, Shift+Enter adds a line. The first line is the title, the rest are details.'],
+      ['#', '<code class="mono">#thread-name text</code> logs straight to that thread, creating it if needed'],
+      ['1 2 3', 'Switch between Canvas, Branches and Timeline'],
+      ['N', 'New thread'],
+      ['F', 'Fit all threads on the canvas. Drag empty space to pan; Ctrl/⌘ + scroll or pinch to zoom.'],
+      ['Esc', 'Close details or cancel a link'],
+    ],
+    helpShapes: 'Station shapes: hollow circle is an idea, a square is a task (filled when done), a diamond is agent output, a ring with a dot is a decision, a small dot is a note, a black ring is a fork or merge.',
+    aiTitle: 'AI tidy-up', aiNeedClaude: 'Open this page on claude.ai to let Claude tidy it up.',
+    aiNeedClaudeLocal: 'Install Claude Code (the claude command) on this computer and restart Trace Canvas to turn this on.',
+    aiNothing: 'Nothing to tidy yet. Log a few ideas or start a thread or two first.',
+    aiThinking: 'Claude is reading your threads and inbox. This usually takes 10–30 seconds…', aiStop: 'Stop',
+    aiErr: {
+      not_granted: 'This page isn’t allowed to use Claude. You can turn it back on in the page’s permissions.',
+      sampling_disabled: 'This account can’t use Claude from a page.',
+      rate_limited: 'Too many requests, or you’ve hit a usage limit. Try again later.',
+      invalid_json: 'Claude’s answer wasn’t in the expected format. Trying again usually works.',
+      session_expired: 'Your sign-in expired. Sign in to claude.ai again.',
+      local: 'The local claude command failed. Check that Claude Code is signed in, then try again.',
+    },
+    aiErrDefault: 'That didn’t work. Try again later.', aiRetry: 'Try again',
+    aiInbox: 'Sort the inbox', aiRelations: 'Links between threads', aiStale: 'Possibly stalled', aiStaleItem: n => `Mark <b>${n}</b> as parked`, aiNew: ' (new)',
+    aiNoChanges: 'Nothing needs changing.', aiCancel: 'Not now', aiClose: 'Close', aiApply: 'Apply selected',
+    aiLangName: 'English',
+    agentPrompt: url => `Please log the key progress of this task to my Trace Canvas: ${url}
+Use the ArtifactData tool to write to this artifact's database:
+1. First list the threads collection. Reuse the document id of a thread with the same name; otherwise create threads/<new id>:
+   {"name": "Thread name", "color": "#0072CE", "status": "active", "createdAt": <ms timestamp>, "x": <number>, "y": <number>, "parent": null, "forkOf": null, "mergedInto": null, "note": "What this line is for"}
+2. For each key moment, write commits/<new id>:
+   {"thread": "<thread document id, or inbox if unsure>", "kind": "agent", "title": "One sentence on what was done or decided", "body": "Key points, conclusions, next steps", "links": ["related links or file paths"], "agent": "Claude Code", "ts": <ms timestamp>, "parents": [], "done": false}
+   kind can be agent (output), idea, task, decision or note.
+Only log key moments, 1–5 per task. Don't log every step.`,
+    jsonlPrompt: `At the end of your answer, output a trace of this work, one JSON object per line, with no other text:
+{"thread": "Thread name", "kind": "agent", "title": "One-sentence outcome", "body": "Key points and next steps", "links": ["related links"], "agent": "ChatGPT"}
+kind can be agent, idea, task, decision or note. Use a short thread name and keep it the same for the same piece of work.`,
+  },
+  zh: {
+    brandSub: '留痕', viewsAria: '视图', tabCanvas: '画布', tabGit: '分支', tabTimeline: '时间线',
+    syncLoading: '连接中', syncDb: '已同步', syncServer: '本机', syncLocal: '仅存于此浏览器', syncRo: '只读', syncOffline: '服务已停止',
+    syncDbTitle: '数据保存在这个页面的云端存储里，换设备打开也在',
+    syncServerTitle: f => `数据保存在本机 ${f}，Claude Code hooks 写入的也是这个文件`,
+    syncLocalTitle: '没有连上任何存储，数据只保存在当前浏览器',
+    syncRoTitle: '你可以查看，但不能修改', syncOfflineTitle: '和本地服务断开了。用 trace-canvas serve 重新启动。',
+    exChip: '示例数据', exClear: '清除', exChipTitle: '这些是演示各个视图用的示例数据',
+    searchPh: '搜索记录…', aiBtn: 'AI 梳理', aiBtnTitle: '让 Claude 归类收件箱并找出线程间的关联',
+    langBtn: 'EN', langTitle: 'Switch to English', more: '更多',
+    menuNewThread: '新建线程', menuHideDone: '隐藏已完成的线程', menuShowDone: '显示已完成的线程',
+    menuAgent: '接入 AI agent', menuIO: '导入 / 导出', menuClearEx: '清除示例数据', menuHelp: '快捷键与用法',
+    zoomOut: '缩小', zoomIn: '放大', zoomReset: '重置为 100%', fit: '适配', connect: '连线', connectTitle: '在两个线程之间画一条关联', newThread: '新线程',
+    tlDay: '日', tlWeek: '周', tlMonth: '月', tlNow: '回到现在', tlHint: '每一行是一条线程，色带是它活跃的时段，虚线是分叉与合并',
+    detailAria: '详情', capThreadAria: '记到哪条线程', kindsAria: '记录类型',
+    capPh: '记下一个想法、任务或 agent 的产出…  回车留痕，#线程名 开头可直接归类，粘贴 JSON 可批量导入',
+    capSubmit: '留痕', close: '关闭', cancel: '取消', copy: '复制',
+    loading: '正在载入你的留痕…',
+    emptyTitle: '把零碎的想法和并行的工作，画成一张线路图',
+    emptyBody: '每条<b>线程</b>是一件在推进的事，每条<b>记录</b>是一个站点。在下方输入框写下第一条，回车即可留痕。',
+    emptyTip1: '用 <code>#线程名 内容</code> 开头，直接归入（或新建）一条线程',
+    emptyTip2: '在任意一条记录上可以「分叉」出新线程，做完再「合并」回去',
+    emptyTip3: 'Claude Code hooks 和其他 agent 都可以自动写进来',
+    emptyAgentBtn: '看看 agent 怎么接入', emptyDemoBtn: '载入示例数据',
+    k_idea: '想法', k_task: '任务', k_agent: 'Agent 产出', k_decision: '决策', k_note: '笔记', k_fork: '分叉', k_merge: '合并',
+    st_active: '进行中', st_parked: '搁置', st_done: '完成', st_merged: '已合并',
+    inbox: '收件箱', unsorted: '未归类', inboxEmpty: '随手的想法先落在这里', noRecords: '还没有记录',
+    moreEarlier: n => `还有 ${n} 条更早的记录`, countRecords: n => `${n} 条`, countAgent: n => ` · agent ${n}`,
+    updated: r => `${r}更新`,
+    justNow: '刚刚', minAgo: n => `${n} 分钟前`, hAgo: n => `${n} 小时前`, yesterday: '昨天', daysAgo: n => `${n} 天前`,
+    edgeRelated: '相关', edgeFork: '分叉', edgeMerge: '合并', labelChips: ['依赖', '参考', '衍生', '阻塞', '冲突', '同一目标'],
+    connectFrom: n => `从「<b>${n}</b>」出发，再点一条线程完成连线`, connectPick: '点一条线程作为起点',
+    legend: '线路', tlCorner: '线程', tlNowLabel: '现在',
+    week: ['日', '一', '二', '三', '四', '五', '六'],
+    dayLabel: d => `${d.getMonth() + 1}/${d.getDate()} 周${I18N.zh.week[d.getDay()]}`,
+    monthLabel: d => `${d.getFullYear()} 年 ${d.getMonth() + 1} 月`,
+    tickDay: d => `${d.getDate()} ${I18N.zh.week[d.getDay()]}`,
+    dRecord: '记录', dTitle: '标题', dKind: '类型', dThread: '所在线程', dDone: '已完成', dBody: '详情', dBodyPh: '背景、agent 的输出摘要、下一步要做什么…',
+    dLinks: '链接或文件路径，每行一个', dLinksPh: 'https://…  或  ~/Documents/方案.md', dAgent: '来源', dAgentPh: '自己 / Claude Code…', dTime: '时间',
+    forkedFromRec: '分叉自', mergedFromThread: '合并自线程', forkedHere: '从这里分出了',
+    forkHere: '从这里分叉', viewThread: '查看线程', forkNamePh: '新线程名称', createBranch: '创建分支',
+    delRecordQ: '删除这条记录？', del: '删除',
+    inboxDesc: '随手的想法先落在这里。打开一条记录，在「所在线程」里把它归进去，或者用「AI 梳理」一次性归类。',
+    threadLabel: '线程', threadName: '线程名称', threadStatus: '状态', threadColor: '线路颜色', colorAria: c => `颜色 ${c}`,
+    threadGoal: '目标与背景', threadGoalPh: '这条线要达成什么？做到什么程度算完成？',
+    createdAt: d => `创建于 ${d}`, lastUpdate: r => ` · 最近更新 ${r}`,
+    forkedFromThread: '分叉自', of: '的', mergedInto: '已合并到', stations: '站点', noRecordsYet: '还没有记录。',
+    only40: '只列出最近 40 条，完整历史在「分支」视图里。',
+    captureHere: '在这条线上记录', mergeTo: '合并到…', merge: '合并', delThreadQ: '删除线程？记录会移回收件箱', delThread: '删除线程',
+    edgeHead: '关联', edgeRel: '关系', edgeRelPh: '依赖、参考、衍生…', flip: '反转方向', delEdgeQ: '删除这条关联？',
+    newThreadName: n => `新线程 ${n}`, branchDefault: n => `${n} · 分支`,
+    forkTitle: (p, ti) => `从「${p}」分叉：${ti}`, mergeTitle: n => `合并「${n}」`,
+    tReadOnly: '你对这页只有查看权限', tReadOnlyNotSaved: '你对这页只有查看权限，刚才的修改没有保存',
+    tQuota: '存储已满：先导出备份，再删除一些旧记录', tSlow: '操作太快了，稍等几秒再试',
+    tSaveFail: '保存失败，请检查网络后重试', tConnLost: '数据连接中断，刷新页面可恢复',
+    tForked: ti => `已从「${ti}」分出新线程`, tMerged: (a, b) => `「${a}」已合并到「${b}」`, tCleared: n => `已清除 ${n} 条示例数据`,
+    tMoved: n => `已移到「${n}」`, tLogged: n => `已记到「${n}」`, tImported: n => `已导入 ${n} 条记录`,
+    tDeleted: '已删除', tCopied: '已复制', tCopyFail: '无法写入剪贴板，请手动选中复制',
+    tSaved: '已保存', tCopiedAll: '已复制全部数据', tSaveFallback: '这里不能直接保存文件，已把 JSON 复制到剪贴板',
+    tApplied: n => `已应用 ${n} 条建议`, tNoneChecked: '没有勾选任何建议',
+    tImportFail: '没有识别到可导入的内容：需要导出的 JSON，或每行一个 {"title": …} 的记录', tDemoLoaded: '已载入示例数据',
+    agentTitle: '接入 AI agent',
+    agentIntro: '每个 agent 会话都可以把关键进展写进来，几条线并行推进时也能一眼看清谁做到了哪一步。',
+    agentHooksH: 'Claude Code：通过 hooks 自动留痕',
+    agentHooksP: '装好之后，Claude Code 会自动记下：每个会话的第一条指令、每个改动了文件的回合、git 提交、推送、合并、创建 PR，以及会话结束时的总结。记录按「仓库 + 分支」归到各自的线程。',
+    agentHooksAll: '对这台电脑上的所有项目开启：',
+    agentHooksProject: '或者只对某个项目开启（写入该项目的 .claude/settings.local.json）：',
+    agentCliH: '任意 agent 或脚本：log 命令', agentCliP: 'Codex、Cursor、shell 脚本、定时任务都可以用一行命令留痕：',
+    agentClaudeH: 'Claude（能用 ArtifactData 工具时）',
+    agentClaudeP: '把下面这段话发给 Claude Code 或 claude.ai 里的 Claude，它会直接写进这个页面的数据库，画布会实时更新。',
+    agentOtherH: '其他 agent（ChatGPT、Codex、Cursor…）',
+    agentOtherP: '让它在回答末尾输出 JSON 行，然后把输出整段粘贴进底部输入框，回车即导入。线程名不存在时会自动新建。',
+    agentFieldsH: '字段说明',
+    agentFieldsP: '<b>threads</b>：线程，相当于 git 分支，<code class="mono">status</code> 为 active / parked / done / merged，<code class="mono">parent</code> 与 <code class="mono">forkOf</code> 记录它从哪条线、哪个站点分出来。<b>commits</b>：记录，相当于提交。<b>edges</b>：画布上手动画的关联。',
+    agentLocalP: 'hooks 需要本地版。在仓库里运行 <code class="mono">node tools/trace-canvas/bin/trace-canvas.mjs</code> 启动它。',
+    ioTitle: '导入 / 导出', ioIntro: '导出的 JSON 包含全部线程、记录和关联，可以当作备份，也可以导入到另一个 Trace Canvas。',
+    ioSave: '保存为 JSON 文件', ioCopy: '复制 JSON', ioImportH: '导入',
+    ioImportP: '粘贴导出的 JSON，或 agent 输出的 JSON 行。没有指定线程的记录会进入底部输入框当前选中的线程。',
+    ioImport: '导入', ioFile: '选择文件…',
+    helpTitle: '快捷键与用法',
+    helpIntro: '<b>线程</b>是一件在推进的事，像 git 的分支；<b>记录</b>是它上面的站点，像提交。零碎想法先进<b>收件箱</b>，之后再归类。',
+    help: [
+      ['/', '聚焦底部输入框。回车留痕，Shift+回车换行，第一行是标题，后面是详情'],
+      ['#', '<code class="mono">#线程名 内容</code> 直接记到那条线程，不存在就新建'],
+      ['1 2 3', '切换画布、分支、时间线'],
+      ['N', '新建线程'],
+      ['F', '画布适配全部线程。拖动空白处平移，Ctrl/⌘ + 滚轮或双指缩放'],
+      ['Esc', '关闭详情或取消连线'],
+    ],
+    helpShapes: '站点形状：空心圆是想法，方块是任务（完成后填满），菱形是 agent 产出，带孔的实心圆是决策，小圆点是笔记，黑圈是分叉与合并。',
+    aiTitle: 'AI 梳理', aiNeedClaude: '需要在 claude.ai 里打开这个页面才能让 Claude 帮你梳理。',
+    aiNeedClaudeLocal: '在这台电脑上安装 Claude Code（claude 命令）并重启 Trace Canvas 后即可使用。',
+    aiNothing: '还没有可以梳理的内容。先记几条想法，或建一两条线程再来。',
+    aiThinking: 'Claude 正在通读你的线程和收件箱，通常需要十几秒…', aiStop: '停止',
+    aiErr: {
+      not_granted: '你没有允许这个页面使用 Claude。可以在页面的权限设置里重新打开。',
+      sampling_disabled: '当前账号无法在页面里使用 Claude。',
+      rate_limited: '调用太频繁或已达到用量上限，过一会儿再试。',
+      invalid_json: 'Claude 的回答格式不对，再试一次通常就好。',
+      session_expired: '登录已过期，请重新登录 claude.ai。',
+      local: '本机的 claude 命令运行失败。确认 Claude Code 已登录后再试。',
+    },
+    aiErrDefault: '这次没有成功，稍后再试。', aiRetry: '再试一次',
+    aiInbox: '收件箱归类', aiRelations: '线程关联', aiStale: '可能停滞', aiStaleItem: n => `把 <b>${n}</b> 标为搁置`, aiNew: '（新建）',
+    aiNoChanges: '没有需要调整的地方。', aiCancel: '先不改', aiClose: '关闭', aiApply: '应用勾选的建议',
+    aiLangName: 'Simplified Chinese',
+    agentPrompt: url => `请把这次任务的关键进展留痕到我的 Trace Canvas：${url}
+用 ArtifactData 工具写入这个 artifact 的数据库：
+1. 先 list 一下 threads 集合。已有同名线程就复用它的文档 id；没有就新建 threads/<新id>：
+   {"name": "线程名", "color": "#0072CE", "status": "active", "createdAt": <毫秒时间戳>, "x": <数字>, "y": <数字>, "parent": null, "forkOf": null, "mergedInto": null, "note": "这条线的目标"}
+2. 每个关键节点写一条 commits/<新id>：
+   {"thread": "<线程文档 id，不确定就写 inbox>", "kind": "agent", "title": "一句话说清做了什么或得出什么", "body": "要点、结论、下一步", "links": ["相关链接或文件路径"], "agent": "Claude Code", "ts": <毫秒时间戳>, "parents": [], "done": false}
+   kind 可选 agent（产出）、idea（想法）、task（待办）、decision（决策）、note（笔记）。
+只写关键节点，一次任务 1–5 条即可，不要逐步刷屏。`,
+    jsonlPrompt: `在回答的最后，按下面的格式输出本次工作的留痕，每行一个 JSON，不要加其他文字：
+{"thread": "线程名", "kind": "agent", "title": "一句话结论", "body": "要点与下一步", "links": ["相关链接"], "agent": "ChatGPT"}
+kind 可选 agent / idea / task / decision / note；thread 用简短的中文名，同一件事保持同一个名字。`,
+  },
+};
+function initLang() {
+  let l = null;
+  try { l = new URLSearchParams(location.search).get('lang'); } catch {}
+  l = l || ls.get('tc.lang', null) || (SERVER && SERVER.lang) || 'en';
+  return l === 'zh' ? 'zh' : 'en';
+}
+let LANG = initLang();
+function t(key, ...args) {
+  const v = I18N[LANG][key] !== undefined ? I18N[LANG][key] : I18N.en[key];
+  return typeof v === 'function' ? v(...args) : (v === undefined ? key : v);
+}
+const kindLabel = k => t('k_' + k);
+const statusLabel = s => t('st_' + (s || 'active'));
+function applyStatic() {
+  document.documentElement.lang = LANG === 'zh' ? 'zh-CN' : 'en';
+  $$('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+  $$('[data-i18n-ph]').forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
+  $$('[data-i18n-title]').forEach(el => { el.title = t(el.dataset.i18nTitle); });
+  $$('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', t(el.dataset.i18nAria)); });
+}
+function setLang(l) {
+  LANG = l === 'zh' ? 'zh' : 'en';
+  ls.set('tc.lang', LANG);
+  if (SERVER) fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Trace-Canvas': '1' }, body: JSON.stringify({ lang: LANG }) }).catch(() => {});
+  applyStatic(); renderKinds(); capSig = ''; lastKey = '';
+  if (S.sheet && S.sheet !== 'ai') openSheet(S.sheet);
+  render();
+}
+
+const USER_KINDS = ['idea', 'task', 'agent', 'decision', 'note'];
+const LINE_COLORS = ['#E4002B', '#0072CE', '#00A651', '#F29F05', '#8E3A96', '#00A0B0', '#A0522D', '#E5007E', '#5B6B7F', '#6CA425'];
+const INBOX = 'inbox';
+const COLS = ['threads', 'commits', 'edges'];
+
+const S = {
+  threads: new Map(), commits: new Map(), edges: new Map(),
+  view: 'canvas', sel: null, ui: {}, q: '',
+  hideDone: ls.get('tc.hideDone', false),
+  cam: { x: 40, y: 40, z: 1 }, fitted: false,
+  inboxPos: ls.get('tc.inboxPos', { x: 0, y: 0 }),
+  tlZoom: ls.get('tc.tlZoom', 'week'), tlScroll: true,
+  connect: null,
+  captureKind: 'idea', captureThread: ls.get('tc.captureThread', INBOX),
+  mode: 'loading', readOnly: false, offline: false, got: new Set(), dragId: null,
+  ai: null, sheet: null,
+};
+
+function fmtAbs(ts) { const d = new Date(ts); return `${pad2(d.getMonth() + 1)}/${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
+function fmtRel(ts) {
+  const s = (Date.now() - ts) / 1000;
+  if (s < 60) return t('justNow');
+  if (s < 3600) return t('minAgo', Math.floor(s / 60));
+  if (s < 86400) return t('hAgo', Math.floor(s / 3600));
+  const days = Math.floor(s / 86400);
+  if (days === 1) return t('yesterday');
+  if (days < 7) return t('daysAgo', days);
+  const d = new Date(ts); return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+function fmtShort(ts) {
+  const s = (Date.now() - ts) / 1000;
+  if (s < 3600) return `${Math.max(1, Math.floor(s / 60))}m`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h`;
+  if (s < 86400 * 30) return `${Math.floor(s / 86400)}d`;
+  const d = new Date(ts); return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+function toLocalInput(ts) { const d = new Date(ts); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
+
+/* ================= model helpers ================= */
+const inboxThread = () => ({ id: INBOX, name: t('inbox'), color: 'var(--inbox)', status: 'active', createdAt: 0, x: S.inboxPos.x, y: S.inboxPos.y, system: true });
+function getThread(id) { if (!id || id === INBOX) return inboxThread(); return S.threads.get(id) || inboxThread(); }
+function tidOf(c) { return c && c.thread && S.threads.has(c.thread) ? c.thread : INBOX; }
+function byThread() {
+  const m = new Map();
+  for (const c of S.commits.values()) { const tid = tidOf(c); if (!m.has(tid)) m.set(tid, []); m.get(tid).push(c); }
+  for (const a of m.values()) a.sort((a, b) => a.ts - b.ts);
+  return m;
+}
+function orderedThreads() { return [...S.threads.values()].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)); }
+function isHidden(th) { return S.hideDone && (th.status === 'done' || th.status === 'merged'); }
+function lastCommit(tid) { let best = null; for (const c of S.commits.values()) if (tidOf(c) === tid && (!best || c.ts > best.ts)) best = c; return best; }
+function matches(c) {
+  if (!S.q) return true;
+  const q = S.q.toLowerCase();
+  return [c.title, c.body, c.agent, ...(c.links || [])].some(v => v && String(v).toLowerCase().includes(q));
+}
+function hasExamples() { return COLS.some(col => [...S[col].values()].some(d => d.example)); }
+function threadByName(name) {
+  const n = String(name).trim().toLowerCase();
+  if (!n) return null;
+  if (n === 'inbox' || n === '收件箱') return INBOX;
+  if (S.threads.has(name)) return name;
+  for (const th of S.threads.values()) if ((th.name || '').trim().toLowerCase() === n) return th.id;
+  return null;
+}
+
+/* ================= store ================= */
+let db = null;
+const timers = new Map();
+const chains = new Map();
+let active = 0; const waiters = [];
+async function withSlot(fn) {
+  while (active >= 4) await new Promise(r => waiters.push(r));
+  active++;
+  try { return await fn(); } finally { active--; const w = waiters.shift(); if (w) w(); }
+}
+function persist(col, id, delay = 300) {
+  const key = col + '/' + id;
+  clearTimeout(timers.get(key));
+  timers.set(key, setTimeout(() => { timers.delete(key); flush(col, id); }, delay));
+}
+function flush(col, id) {
+  const key = col + '/' + id;
+  const p = (chains.get(key) || Promise.resolve()).then(() => withSlot(() => writeDoc(col, id))).catch(onWriteError);
+  chains.set(key, p);
+  p.finally(() => { if (chains.get(key) === p) chains.delete(key); });
+}
+async function writeDoc(col, id, retried) {
+  if (S.mode === 'local') { saveLocal(); return; }
+  if (S.readOnly) return;
+  const doc = S[col].get(id);
+  if (S.mode === 'server') {
+    const r = await fetch(`/api/docs/${col}/${encodeURIComponent(id)}`, {
+      method: doc ? 'PUT' : 'DELETE',
+      headers: { 'Content-Type': 'application/json', 'X-Trace-Canvas': '1' },
+      body: doc ? JSON.stringify(doc) : undefined,
+    }).catch(() => null);
+    if (!r || !r.ok) throw { code: 'server' };
+    return;
+  }
+  if (S.mode !== 'db') return;
+  const ref = db.collection(col).doc(id);
+  try {
+    if (doc) { const { id: _drop, ...body } = doc; await ref.set(JSON.parse(JSON.stringify(body))); }
+    else await ref.delete();
+  } catch (e) {
+    if (e && e.code === 'unavailable' && !retried) { await new Promise(r => setTimeout(r, 400 + Math.random() * 800)); return writeDoc(col, id, true); }
+    throw e;
+  }
+}
+function saveLocal() { ls.set('tc.data', { threads: [...S.threads.values()], commits: [...S.commits.values()], edges: [...S.edges.values()] }); }
+function onWriteError(e) {
+  const code = e && e.code;
+  if (code === 'invalid_argument' || code === 'not_granted' || code === 'revoked') { S.readOnly = true; renderSync(); toast(t('tReadOnlyNotSaved')); }
+  else if (code === 'quota_exceeded') toast(t('tQuota'));
+  else if (code === 'resource_exhausted') toast(t('tSlow'));
+  else toast(t('tSaveFail'));
+}
+function canWrite() { if (S.readOnly) { toast(t('tReadOnly')); return false; } return true; }
+function putDoc(col, doc, delay) { S[col].set(doc.id, doc); persist(col, doc.id, delay); render(); }
+function patchDoc(col, id, patch, delay) { const cur = S[col].get(id); if (!cur) return; putDoc(col, { ...cur, ...patch }, delay); }
+function removeDoc(col, id) { S[col].delete(id); persist(col, id, 0); render(); }
+
+// Replace one collection with fresh rows, keeping local edits that haven't been written yet.
+function applyRows(col, rows) {
+  const m = new Map();
+  for (const r of rows) if (r && r.id) m.set(r.id, r);
+  for (const key of timers.keys()) {
+    const [c, id] = key.split('/');
+    if (c !== col) continue;
+    const local = S[col].get(id);
+    if (local) m.set(id, local); else m.delete(id);
+  }
+  if (col === 'threads' && S.dragId && S.threads.has(S.dragId)) m.set(S.dragId, S.threads.get(S.dragId));
+  S[col] = m;
+  S.got.add(col);
+  render();
+}
+function subscribe(col, attempt = 0) {
+  db.collection(col).onSnapshot(snap => applyRows(col, snap.docs.map(d => ({ ...d.data(), id: d.id }))), err => {
+    const code = err && err.code;
+    if (code === 'revoked') { S.readOnly = true; renderSync(); return; }
+    if (code === 'unavailable' && attempt < 3) { setTimeout(() => subscribe(col, attempt + 1), 1500 * (attempt + 1)); return; }
+    toast(t('tConnLost'));
+  });
+}
+let serverRefresh = 0;
+async function loadServer() {
+  try {
+    const r = await fetch('/api/data', { cache: 'no-store' });
+    const data = await r.json();
+    for (const col of COLS) applyRows(col, data[col] || []);
+    if (S.offline) { S.offline = false; renderSync(); }
+  } catch { S.offline = true; COLS.forEach(c => S.got.add(c)); renderSync(); render(); }
+}
+async function initStore() {
+  if (SERVER) {
+    S.mode = 'server';
+    await loadServer();
+    const es = new EventSource('/api/events');
+    es.addEventListener('change', () => { clearTimeout(serverRefresh); serverRefresh = setTimeout(loadServer, 120); });
+    es.addEventListener('open', () => { if (S.offline) loadServer(); });
+    es.addEventListener('error', () => { S.offline = true; renderSync(); });
+    return;
+  }
+  let d = null;
+  try { d = window.claude && typeof window.claude.use === 'function' ? await window.claude.use('db') : null; } catch { d = null; }
+  if (d) {
+    db = d; S.mode = 'db';
+    COLS.forEach(col => subscribe(col));
+    try {
+      const user = await window.claude.use('user');
+      if (user) { const can = await user.can('data.write'); if (can === false) S.readOnly = true; }
+    } catch {}
+  } else {
+    S.mode = 'local';
+    const data = ls.get('tc.data', null);
+    if (data) for (const col of COLS) for (const doc of data[col] || []) if (doc && doc.id) S[col].set(doc.id, doc);
+    COLS.forEach(c => S.got.add(c));
+  }
+  render();
+}
+const loaded = () => COLS.every(c => S.got.has(c));
+
+/* ================= mutations ================= */
+function freeSpot(near) {
+  const pts = [...S.threads.values()].map(th => [th.x || 0, th.y || 0]).concat([[S.inboxPos.x, S.inboxPos.y]]);
+  const free = (x, y) => pts.every(([px, py]) => Math.abs(px - x) > 220 || Math.abs(py - y) > 170);
+  if (near) {
+    for (let k = 0; k < 14; k++) {
+      const dy = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 190;
+      const x = (near.x || 0) + 300, y = (near.y || 0) + dy;
+      if (free(x, y)) return { x, y };
+    }
+  }
+  for (let r = 0; r < 60; r++) for (let c = 1; c <= 4; c++) { const x = c * 300, y = r * 250; if (free(x, y)) return { x, y }; }
+  return { x: 300, y: pts.length * 250 };
+}
+function newThread({ name, parent = null, forkOf = null, near = null }) {
+  const used = new Set([...S.threads.values()].map(th => th.color));
+  const color = LINE_COLORS.find(c => !used.has(c)) || LINE_COLORS[S.threads.size % LINE_COLORS.length];
+  const pos = freeSpot(near);
+  const th = { id: uid('t'), name: name || t('newThreadName', S.threads.size + 1), color, status: 'active', createdAt: Date.now(), parent, forkOf, mergedInto: null, x: pos.x, y: pos.y, note: '' };
+  putDoc('threads', th, 0);
+  return th;
+}
+function ensureThread(name) { return threadByName(name) || newThread({ name: String(name).trim() }).id; }
+function addCommit({ thread, kind = 'idea', title, body = '', links = [], agent = '', ts = Date.now(), parents, extra = {} }) {
+  const tid = thread && (thread === INBOX || S.threads.has(thread)) ? thread : INBOX;
+  const prev = lastCommit(tid);
+  const c = { id: uid('c'), thread: tid, kind, title: String(title || '').slice(0, 500), body, links, agent, ts, parents: parents || (prev ? [prev.id] : []), done: false, ...extra };
+  putDoc('commits', c, 0);
+  const th = S.threads.get(tid);
+  if (th && th.status === 'parked' && kind !== 'merge') patchDoc('threads', tid, { status: 'active' }, 0);
+  return c;
+}
+function forkFrom(cid, name) {
+  const c = S.commits.get(cid); if (!c) return;
+  const ptid = tidOf(c), pt = getThread(ptid);
+  const th = newThread({ name: name.trim() || t('branchDefault', pt.name), parent: ptid, forkOf: cid, near: ptid === INBOX ? S.inboxPos : pt });
+  addCommit({ thread: th.id, kind: 'fork', title: t('forkTitle', pt.name, c.title).slice(0, 120), parents: [cid], ts: Math.max(Date.now(), c.ts + 1) });
+  setCaptureThread(th.id);
+  select({ type: 'thread', id: th.id });
+  toast(t('tForked', c.title.slice(0, 18)));
+}
+function mergeThread(sid, tid) {
+  const s = S.threads.get(sid); if (!s || !tid || tid === sid) return;
+  const sTip = lastCommit(sid), tTip = lastCommit(tid);
+  addCommit({ thread: tid, kind: 'merge', title: t('mergeTitle', s.name), parents: [tTip && tTip.id, sTip && sTip.id].filter(Boolean), ts: Math.max(Date.now(), sTip ? sTip.ts + 1 : 0), extra: { mergeOf: sid } });
+  patchDoc('threads', sid, { status: 'merged', mergedInto: tid }, 0);
+  toast(t('tMerged', s.name, getThread(tid).name));
+}
+function deleteThread(id) {
+  for (const c of [...S.commits.values()]) if (c.thread === id) patchDoc('commits', c.id, { thread: INBOX }, 0);
+  for (const e of [...S.edges.values()]) if (e.from === id || e.to === id) removeDoc('edges', e.id);
+  for (const th of [...S.threads.values()]) {
+    if (th.parent === id) patchDoc('threads', th.id, { parent: INBOX }, 0);
+    if (th.mergedInto === id) patchDoc('threads', th.id, { mergedInto: null, status: th.status === 'merged' ? 'done' : th.status }, 0);
+  }
+  removeDoc('threads', id);
+  if (S.captureThread === id) setCaptureThread(INBOX);
+}
+function clearExamples() {
+  let n = 0;
+  for (const col of COLS) for (const d of [...S[col].values()]) if (d.example) { removeDoc(col, d.id); n++; }
+  if (S.captureThread !== INBOX && !S.threads.has(S.captureThread)) setCaptureThread(INBOX);
+  select(null);
+  toast(t('tCleared', n));
+}
+async function loadDemo() {
+  if (!SERVER) return;
+  try {
+    const r = await fetch('/api/demo', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Trace-Canvas': '1' }, body: JSON.stringify({ lang: LANG }) });
+    if (!r.ok) throw new Error();
+    S.fitted = false; await loadServer(); toast(t('tDemoLoaded'));
+  } catch { toast(t('tSaveFail')); }
+}
+
+/* ================= import / export ================= */
+function parseTs(v) {
+  if (typeof v === 'number' && isFinite(v)) return v < 1e12 ? v * 1000 : v;
+  if (typeof v === 'string') { const n = Date.parse(v); if (!isNaN(n)) return n; }
+  return Date.now();
+}
+function importText(text) {
+  text = String(text || '').trim();
+  let data = null;
+  try { data = JSON.parse(text); } catch { data = null; }
+  if (data && !Array.isArray(data) && typeof data === 'object' && (Array.isArray(data.threads) || Array.isArray(data.commits))) {
+    let n = 0;
+    for (const col of COLS) for (const d of data[col] || []) if (d && typeof d.id === 'string' && /^[\w\-.~:@+]{1,180}$/.test(d.id)) { putDoc(col, { ...d }, 0); n++; }
+    return n;
+  }
+  let recs = [];
+  if (Array.isArray(data)) recs = data;
+  else if (data && typeof data === 'object') recs = [data];
+  else recs = text.split('\n').map(l => { const s = l.trim().replace(/,$/, ''); if (!s.startsWith('{')) return null; try { return JSON.parse(s); } catch { return null; } }).filter(Boolean);
+  let n = 0;
+  for (const r of recs) {
+    if (!r || typeof r !== 'object') continue;
+    const title = String(r.title || r.summary || r.text || '').trim();
+    if (!title) continue;
+    const tid = r.thread ? ensureThread(String(r.thread)) : S.captureThread;
+    addCommit({
+      thread: tid, kind: USER_KINDS.includes(r.kind) ? r.kind : 'agent', title,
+      body: typeof r.body === 'string' ? r.body : (r.body ? JSON.stringify(r.body) : ''),
+      links: Array.isArray(r.links) ? r.links.map(String) : (r.link ? [String(r.link)] : []),
+      agent: r.agent ? String(r.agent) : '', ts: parseTs(r.ts),
+    });
+    n++;
+  }
+  if (!n) throw new Error('none');
+  return n;
+}
+function exportJSON() {
+  return JSON.stringify({ app: 'trace-canvas', version: 1, exportedAt: new Date().toISOString(), threads: [...S.threads.values()], commits: [...S.commits.values()], edges: [...S.edges.values()] }, null, 2);
+}
+
+/* ================= glyphs ================= */
+function glyph(kind, color, x, y, r, o = {}) {
+  const dim = o.dim ? ' gl-dim' : '';
+  const sty = `stroke:${color}`;
+  switch (kind) {
+    case 'task': {
+      const s = r * 0.9;
+      return o.done
+        ? `<rect class="gl-solid${dim}" x="${x - s}" y="${y - s}" width="${2 * s}" height="${2 * s}" rx="1.5" style="fill:${color}"/>`
+        : `<rect class="gl-open${dim}" x="${x - s}" y="${y - s}" width="${2 * s}" height="${2 * s}" rx="1.5" style="${sty}"/>`;
+    }
+    case 'agent': { const k = r * 1.25; return `<polygon class="gl-solid${dim}" points="${x},${y - k} ${x + k},${y} ${x},${y + k} ${x - k},${y}" style="fill:${color}"/>`; }
+    case 'decision': return `<g class="${dim}"><circle class="gl-solid" cx="${x}" cy="${y}" r="${r * 1.12}" style="fill:${color}"/><circle class="gl-hole" cx="${x}" cy="${y}" r="${r * 0.42}"/></g>`;
+    case 'note': return `<circle class="gl-solid${dim}" cx="${x}" cy="${y}" r="${r * 0.62}" style="fill:${color}"/>`;
+    case 'fork': case 'merge': return `<circle class="gl-ring${dim}" cx="${x}" cy="${y}" r="${r * 1.05}"/>`;
+    default: return `<circle class="gl-open${dim}" cx="${x}" cy="${y}" r="${r}" style="${sty}"/>`;
+  }
+}
+const mini = (kind, color, done) => `<svg class="g" width="16" height="16" viewBox="-8 -8 16 16" aria-hidden="true">${glyph(kind, color, 0, 0, 5, { done })}</svg>`;
+
+/* ================= render loop ================= */
+let rq = 0;
+function render() { if (rq) return; rq = requestAnimationFrame(() => { rq = 0; renderAll(); }); }
+function renderAll() {
+  renderSync();
+  renderCaptureThreads();
+  $('#ex-banner').hidden = !(loaded() && hasExamples());
+  $('#clear-ex-item').hidden = !hasExamples();
+  $('#toggle-done-label').textContent = S.hideDone ? t('menuShowDone') : t('menuHideDone');
+  if (S.view === 'canvas') renderCanvas();
+  else if (S.view === 'git') renderGit();
+  else renderTimeline();
+  renderEmpty();
+  renderDetail();
+}
+function renderSync() {
+  const el = $('#sync');
+  const mode = S.offline ? 'offline' : S.readOnly ? 'ro' : S.mode;
+  el.dataset.mode = mode;
+  $('#sync-text').textContent = { loading: t('syncLoading'), db: t('syncDb'), server: t('syncServer'), local: t('syncLocal'), ro: t('syncRo'), offline: t('syncOffline') }[mode] || '';
+  el.title = { db: t('syncDbTitle'), server: t('syncServerTitle', SERVER ? SERVER.dataFile : ''), local: t('syncLocalTitle'), ro: t('syncRoTitle'), offline: t('syncOfflineTitle') }[mode] || '';
+  $('#cap-text').disabled = S.readOnly;
+  $('#cap-submit').disabled = S.readOnly;
+}
+function renderEmpty() {
+  const el = $('#empty');
+  if (!loaded()) {
+    el.hidden = false;
+    el.innerHTML = `<div class="empty-card"><div class="ai-thinking"><span class="pulse"></span>${esc(t('loading'))}</div></div>`;
+    return;
+  }
+  const noCommits = S.commits.size === 0;
+  const show = S.view === 'canvas' ? (noCommits && S.threads.size === 0) : noCommits;
+  el.hidden = !show;
+  if (!show) return;
+  el.innerHTML = `<div class="empty-card">
+    <h2>${esc(t('emptyTitle'))}</h2>
+    <p>${t('emptyBody')}</p>
+    <ul><li>${t('emptyTip1')}</li><li>${esc(t('emptyTip2'))}</li><li>${esc(t('emptyTip3'))}</li></ul>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      ${SERVER ? `<button class="btn btn-primary" id="demo-btn">${esc(t('emptyDemoBtn'))}</button>` : ''}
+      <button class="btn" data-open="agent">${esc(t('emptyAgentBtn'))}</button>
+    </div>
+  </div>`;
+  const demo = $('#demo-btn'); if (demo) demo.onclick = loadDemo;
+}
+
+/* ================= canvas ================= */
+const vp = $('#cv'), cardsEl = $('#cv-cards'), edgesSvg = $('#cv-edges'), world = $('#cv-world');
+function applyCam() {
+  const { x, y, z } = S.cam;
+  world.style.transform = `translate(${x}px, ${y}px) scale(${z})`;
+  vp.style.backgroundSize = `${24 * z}px ${24 * z}px`;
+  vp.style.backgroundPosition = `${x}px ${y}px`;
+  $('#zoom-reset').textContent = Math.round(z * 100) + '%';
+}
+function selThreadId() {
+  if (!S.sel) return null;
+  if (S.sel.type === 'thread') return S.sel.id;
+  if (S.sel.type === 'commit') { const c = S.commits.get(S.sel.id); return c ? tidOf(c) : null; }
+  return null;
+}
+function renderCanvas() {
+  const by = byThread();
+  const ths = [inboxThread(), ...orderedThreads().filter(th => !isHidden(th))];
+  const selT = selThreadId();
+  cardsEl.innerHTML = ths.map(th => cardHTML(th, by.get(th.id) || [], selT)).join('');
+  drawEdges();
+  applyCam();
+  if (!S.fitted && loaded() && (S.threads.size || S.commits.size)) { S.fitted = true; fit(); }
+  vp.classList.toggle('connecting', !!S.connect);
+  $('#connect-btn').setAttribute('aria-pressed', S.connect ? 'true' : 'false');
+  const cb = $('#connect-banner');
+  cb.hidden = !S.connect;
+  if (S.connect) cb.innerHTML = `<span>${S.connect.from ? t('connectFrom', esc(getThread(S.connect.from).name)) : esc(t('connectPick'))}</span><button class="btn" id="connect-cancel">${esc(t('cancel'))}</button>`;
+}
+function cardHTML(th, cs, selT) {
+  const isInbox = th.id === INBOX;
+  const recent = cs.slice(-4).reverse();
+  const more = cs.length - recent.length;
+  const last = cs[cs.length - 1];
+  const anyHit = !S.q || cs.some(matches);
+  const selC = S.sel && S.sel.type === 'commit' ? S.sel.id : null;
+  const cls = ['card', isInbox ? 'is-inbox' : `st-${th.status || 'active'}`, selT === th.id ? 'is-sel' : '', S.q && !anyHit ? 'is-dim' : '', S.connect && S.connect.from === th.id ? 'is-from' : ''].filter(Boolean).join(' ');
+  const items = recent.length
+    ? recent.map(c => `<li data-cid="${esc(c.id)}" class="${c.id === selC ? 'is-sel' : ''} ${S.q && matches(c) ? 'hit' : ''}">${mini(c.kind, th.color, c.done)}<span class="s-title">${esc(c.title)}</span><time class="s-time">${fmtShort(c.ts)}</time></li>`).join('')
+      + (more > 0 ? `<li class="s-more"><span></span><span>${esc(t('moreEarlier', more))}</span><span></span></li>` : '')
+    : `<li class="s-empty"><span></span><span>${esc(isInbox ? t('inboxEmpty') : t('noRecords'))}</span><span></span></li>`;
+  const chip = isInbox ? `<span class="chip">${esc(t('unsorted'))}</span>` : `<span class="chip chip-${th.status || 'active'}">${esc(statusLabel(th.status))}</span>`;
+  const agents = cs.filter(c => c.kind === 'agent').length;
+  return `<div class="${cls}" data-tid="${esc(th.id)}" style="left:${th.x || 0}px;top:${th.y || 0}px;--c:${th.color}">
+    <div class="card-head"><span class="roundel"></span><span class="card-name">${esc(th.name)}</span>${chip}</div>
+    <ol class="strip">${items}</ol>
+    <div class="card-foot"><span>${esc(t('countRecords', cs.length))}${agents ? esc(t('countAgent', agents)) : ''}</span><span>${last ? esc(t('updated', fmtRel(last.ts))) : ''}</span></div>
+  </div>`;
+}
+function border(R, c, toward, gap) {
+  const dx = toward.x - c.x, dy = toward.y - c.y;
+  if (!dx && !dy) return { ...c };
+  const hw = R.w / 2 + gap, hh = R.h / 2 + gap;
+  const k = Math.min(dx ? hw / Math.abs(dx) : Infinity, dy ? hh / Math.abs(dy) : Infinity);
+  return { x: c.x + dx * k, y: c.y + dy * k };
+}
+function drawEdges() {
+  const rects = new Map();
+  for (const el of cardsEl.children) rects.set(el.dataset.tid, { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight });
+  const lines = [];
+  for (const th of S.threads.values()) {
+    if (th.parent && rects.has(th.parent) && rects.has(th.id)) lines.push({ a: th.parent, b: th.id, kind: 'fork', label: t('edgeFork'), color: th.color });
+    if (th.mergedInto && rects.has(th.mergedInto) && rects.has(th.id)) lines.push({ a: th.id, b: th.mergedInto, kind: 'merge', label: t('edgeMerge'), color: th.color });
+  }
+  for (const e of S.edges.values()) if (rects.has(e.from) && rects.has(e.to) && e.from !== e.to) lines.push({ a: e.from, b: e.to, kind: 'rel', label: e.label || t('edgeRelated'), id: e.id });
+  const selE = S.sel && S.sel.type === 'edge' ? S.sel.id : null;
+  edgesSvg.innerHTML = lines.map(L => {
+    const A = rects.get(L.a), B = rects.get(L.b);
+    const ca = { x: A.x + A.w / 2, y: A.y + A.h / 2 }, cb = { x: B.x + B.w / 2, y: B.y + B.h / 2 };
+    const p1 = border(A, ca, cb, 6), p2 = border(B, cb, ca, 8);
+    const ang = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+    const hx = p2.x - Math.cos(ang) * 11, hy = p2.y - Math.sin(ang) * 11;
+    const left = { x: hx + Math.cos(ang + Math.PI / 2) * 5.5, y: hy + Math.sin(ang + Math.PI / 2) * 5.5 };
+    const right = { x: hx - Math.cos(ang + Math.PI / 2) * 5.5, y: hy - Math.sin(ang + Math.PI / 2) * 5.5 };
+    const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
+    const w = [...L.label].reduce((s, ch) => s + (ch.charCodeAt(0) > 255 ? 12 : 7), 0) + 16;
+    const stroke = L.kind === 'rel' ? '' : `style="stroke:${L.color}"`;
+    const fill = L.kind === 'rel' ? '' : `style="fill:${L.color}"`;
+    return `<g class="edge edge-${L.kind} ${L.id && L.id === selE ? 'is-sel' : ''}" ${L.id ? `data-eid="${esc(L.id)}"` : ''}>
+      <path class="e-line" d="M${p1.x.toFixed(1)} ${p1.y.toFixed(1)} L${hx.toFixed(1)} ${hy.toFixed(1)}" ${stroke}/>
+      <polygon class="e-head" points="${p2.x.toFixed(1)},${p2.y.toFixed(1)} ${left.x.toFixed(1)},${left.y.toFixed(1)} ${right.x.toFixed(1)},${right.y.toFixed(1)}" ${fill}/>
+      <g class="e-label" transform="translate(${mx.toFixed(1)} ${my.toFixed(1)})"><rect x="${-w / 2}" y="-10" width="${w}" height="20" rx="10"/><text>${esc(L.label)}</text></g>
+    </g>`;
+  }).join('');
+}
+function zoomAt(cx, cy, f) {
+  const r = vp.getBoundingClientRect();
+  const px = cx - r.left, py = cy - r.top;
+  const z = clamp(S.cam.z * f, 0.25, 2);
+  const k = z / S.cam.z;
+  S.cam.x = px - (px - S.cam.x) * k; S.cam.y = py - (py - S.cam.y) * k; S.cam.z = z;
+  applyCam();
+}
+function fit() {
+  const els = [...cardsEl.children];
+  if (!els.length) return;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const el of els) { x0 = Math.min(x0, el.offsetLeft); y0 = Math.min(y0, el.offsetTop); x1 = Math.max(x1, el.offsetLeft + el.offsetWidth); y1 = Math.max(y1, el.offsetTop + el.offsetHeight); }
+  const r = vp.getBoundingClientRect();
+  const padX = 24, padTop = 24, padBottom = 70;
+  const availW = r.width - padX * 2, availH = r.height - padTop - padBottom;
+  const z = clamp(Math.min(availW / (x1 - x0), availH / (y1 - y0)), r.width < 600 ? 0.6 : 0.3, 1.1);
+  const w = (x1 - x0) * z, hgt = (y1 - y0) * z;
+  S.cam = {
+    z,
+    x: (w <= availW ? padX + (availW - w) / 2 : padX) - x0 * z,
+    y: (hgt <= availH ? padTop + (availH - hgt) / 2 : padTop) - y0 * z,
+  };
+  applyCam();
+}
+
+const ptrs = new Map();
+let gesture = null;
+vp.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  try { vp.setPointerCapture(e.pointerId); } catch {}
+  if (ptrs.size === 2) {
+    const [a, b] = [...ptrs.values()];
+    gesture = { type: 'pinch', d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, z0: S.cam.z, mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } };
+    return;
+  }
+  const card = e.target.closest('.card');
+  const edge = e.target.closest('.edge[data-eid]');
+  if (card) {
+    const th = getThread(card.dataset.tid);
+    gesture = { type: 'card', id: card.dataset.tid, sx: e.clientX, sy: e.clientY, ox: th.x || 0, oy: th.y || 0, moved: false, el: card, target: e.target };
+  } else if (edge) gesture = { type: 'edge', id: edge.dataset.eid };
+  else { gesture = { type: 'pan', sx: e.clientX, sy: e.clientY, cx: S.cam.x, cy: S.cam.y, moved: false }; vp.classList.add('panning'); }
+});
+vp.addEventListener('pointermove', e => {
+  if (!ptrs.has(e.pointerId)) return;
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  const g = gesture; if (!g) return;
+  if (g.type === 'pinch' && ptrs.size >= 2) {
+    const [a, b] = [...ptrs.values()];
+    const d = Math.hypot(a.x - b.x, a.y - b.y);
+    zoomAt(g.mid.x, g.mid.y, (g.z0 * d / g.d0) / S.cam.z);
+  } else if (g.type === 'pan') {
+    const dx = e.clientX - g.sx, dy = e.clientY - g.sy;
+    if (Math.abs(dx) + Math.abs(dy) > 3) g.moved = true;
+    S.cam.x = g.cx + dx; S.cam.y = g.cy + dy; applyCam();
+  } else if (g.type === 'card' && !S.connect && !S.readOnly) {
+    const dx = (e.clientX - g.sx) / S.cam.z, dy = (e.clientY - g.sy) / S.cam.z;
+    if (!g.moved && Math.abs(dx) + Math.abs(dy) < 4) return;
+    g.moved = true;
+    const x = Math.round(g.ox + dx), y = Math.round(g.oy + dy);
+    if (g.id === INBOX) S.inboxPos = { x, y };
+    else { const th = S.threads.get(g.id); if (!th) return; S.dragId = g.id; S.threads.set(g.id, { ...th, x, y }); }
+    if (!g.el.isConnected) g.el = cardsEl.querySelector(`[data-tid="${CSS.escape(g.id)}"]`);
+    if (g.el) { g.el.style.left = x + 'px'; g.el.style.top = y + 'px'; g.el.classList.add('dragging'); }
+    drawEdges();
+  }
+});
+function endPointer(e) {
+  if (!ptrs.has(e.pointerId)) return;
+  ptrs.delete(e.pointerId);
+  const g = gesture;
+  vp.classList.remove('panning');
+  if (!g) return;
+  if (g.type === 'pinch') { if (ptrs.size === 0) { gesture = null; S.dragId = null; } return; }
+  gesture = null;
+  if (e.type === 'pointercancel') { S.dragId = null; return; }
+  if (g.type === 'card') {
+    if (g.moved) {
+      if (g.id === INBOX) ls.set('tc.inboxPos', S.inboxPos); else persist('threads', g.id, 0);
+      S.dragId = null; render();
+      return;
+    }
+    if (S.connect) { connectTap(g.id); return; }
+    const li = g.target.closest && g.target.closest('li[data-cid]');
+    if (li) select({ type: 'commit', id: li.dataset.cid });
+    else select({ type: 'thread', id: g.id });
+  } else if (g.type === 'edge') {
+    select({ type: 'edge', id: g.id });
+  } else if (g.type === 'pan' && !g.moved) {
+    if (S.connect) { S.connect = null; render(); } else select(null);
+  }
+}
+vp.addEventListener('pointerup', endPointer);
+vp.addEventListener('pointercancel', endPointer);
+vp.addEventListener('wheel', e => {
+  e.preventDefault();
+  if (e.ctrlKey || e.metaKey) zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.01));
+  else { S.cam.x -= e.deltaX; S.cam.y -= e.deltaY; applyCam(); }
+}, { passive: false });
+const vpCenter = f => { const r = vp.getBoundingClientRect(); zoomAt(r.left + r.width / 2, r.top + r.height / 2, f); };
+$('#zoom-in').onclick = () => vpCenter(1.2);
+$('#zoom-out').onclick = () => vpCenter(1 / 1.2);
+$('#zoom-reset').onclick = () => vpCenter(1 / S.cam.z);
+$('#zoom-fit').onclick = fit;
+$('#connect-btn').onclick = () => { if (!canWrite()) return; S.connect = S.connect ? null : { from: null }; render(); };
+$('#connect-banner').addEventListener('click', e => { if (e.target.id === 'connect-cancel') { S.connect = null; render(); } });
+$('#new-thread-btn').onclick = () => createThreadAndEdit();
+function connectTap(id) {
+  if (!S.connect.from) { S.connect.from = id; render(); return; }
+  if (S.connect.from === id) { S.connect.from = null; render(); return; }
+  const e = { id: uid('e'), from: S.connect.from, to: id, label: t('edgeRelated'), createdAt: Date.now() };
+  S.connect = null;
+  putDoc('edges', e, 0);
+  select({ type: 'edge', id: e.id });
+}
+function createThreadAndEdit() {
+  if (!canWrite()) return;
+  const th = newThread({});
+  S.focusAfter = '#t-name';
+  select({ type: 'thread', id: th.id });
+}
+
+/* ================= git graph ================= */
+function renderGit() {
+  const by = byThread();
+  const visible = new Set([INBOX, ...orderedThreads().filter(th => !isHidden(th)).map(th => th.id)]);
+  const list = [...S.commits.values()].filter(c => visible.has(tidOf(c))).sort((a, b) => b.ts - a.ts);
+  const body = $('#git-body'), legend = $('#git-legend');
+  if (!list.length) { body.innerHTML = ''; legend.innerHTML = ''; return; }
+  const laneOrder = [INBOX, ...orderedThreads().map(th => th.id)].filter(id => visible.has(id) && by.has(id));
+  const lane = new Map(laneOrder.map((id, i) => [id, i]));
+  const row = new Map(list.map((c, i) => [c.id, i]));
+  const ROW = 44, LW = 20, PADX = 16;
+  const lx = i => PADX + i * LW, ry = i => i * ROW + ROW / 2;
+  const gw = PADX * 2 + Math.max(0, laneOrder.length - 1) * LW;
+  const selT = selThreadId();
+  const selC = S.sel && S.sel.type === 'commit' ? S.sel.id : null;
+  legend.innerHTML = `<span class="legend-label">${esc(t('legend'))}</span>` + laneOrder.map(id => {
+    const th = getThread(id);
+    return `<button class="lane-chip ${selT === id ? 'is-sel' : ''}" data-tid="${esc(id)}" style="--c:${th.color}"><i></i>${esc(th.name)}<span class="mono" style="color:var(--faint);font-size:11px">${by.get(id).length}</span></button>`;
+  }).join('');
+  let svg = '';
+  for (const id of laneOrder) {
+    const th = getThread(id);
+    const rs = by.get(id).map(c => row.get(c.id)).filter(v => v != null);
+    const top = Math.min(...rs), bot = Math.max(...rs);
+    if (bot > top) svg += `<line class="lane" x1="${lx(lane.get(id))}" y1="${ry(top)}" x2="${lx(lane.get(id))}" y2="${ry(bot)}" style="stroke:${th.color}"/>`;
+    if (id !== INBOX && (th.status === 'active' || th.status === 'parked')) svg += `<line class="lane-open" x1="${lx(lane.get(id))}" y1="${ry(top) - 9}" x2="${lx(lane.get(id))}" y2="${Math.max(4, ry(top) - ROW / 2 - 6)}" style="stroke:${th.color}"/>`;
+  }
+  for (const th of S.threads.values()) {
+    if (!th.forkOf || !lane.has(th.id)) continue;
+    const fc = S.commits.get(th.forkOf);
+    if (!fc || !row.has(fc.id) || !lane.has(tidOf(fc))) continue;
+    const child = by.get(th.id)[0];
+    const x1 = lx(lane.get(tidOf(fc))), y1 = ry(row.get(fc.id)), x2 = lx(lane.get(th.id)), y2 = ry(row.get(child.id));
+    if (x1 === x2) continue;
+    if (y2 >= y1) { svg += `<line class="link" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="stroke:${th.color}"/>`; continue; }
+    const bend = Math.max(y2, y1 - ROW);
+    svg += `<path class="link" d="M${x1} ${y1} C${x1} ${(y1 + bend) / 2} ${x2} ${(y1 + bend) / 2} ${x2} ${bend} L${x2} ${y2}" style="stroke:${th.color}"/>`;
+  }
+  for (const c of list) {
+    if (c.kind !== 'merge' || !c.mergeOf || !lane.has(c.mergeOf)) continue;
+    const src = by.get(c.mergeOf).filter(x => x.ts <= c.ts).pop();
+    if (!src) continue;
+    const st = getThread(c.mergeOf);
+    const x1 = lx(lane.get(c.mergeOf)), y1 = ry(row.get(src.id)), x2 = lx(lane.get(tidOf(c))), y2 = ry(row.get(c.id));
+    if (y1 <= y2) { svg += `<line class="link" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="stroke:${st.color}"/>`; continue; }
+    const bend = Math.min(y1, y2 + ROW);
+    svg += `<path class="link" d="M${x1} ${y1} L${x1} ${bend} C${x1} ${(bend + y2) / 2} ${x2} ${(bend + y2) / 2} ${x2} ${y2}" style="stroke:${st.color}"/>`;
+  }
+  for (const c of list) {
+    const th = getThread(tidOf(c));
+    const cx = lx(lane.get(tidOf(c))), cy = ry(row.get(c.id));
+    svg += `<g data-cid="${esc(c.id)}">${glyph(c.kind, th.color, cx, cy, 6, { done: c.done, dim: S.q && !matches(c) })}${c.id === selC ? `<circle cx="${cx}" cy="${cy}" r="11" fill="none" style="stroke:var(--accent)" stroke-width="2"/>` : ''}</g>`;
+  }
+  const rows = list.map(c => {
+    const th = getThread(tidOf(c));
+    return `<div class="g-row k-${c.kind} ${c.done ? 'done' : ''} ${c.id === selC ? 'is-sel' : ''} ${S.q && !matches(c) ? 'is-dim' : ''}" data-cid="${esc(c.id)}" style="padding-left:${gw + 6}px">
+      <span class="g-title">${esc(c.title)}</span>
+      ${c.agent ? `<span class="agent-tag">${esc(c.agent)}</span>` : ''}
+      <span class="kind-tag">${esc(kindLabel(c.kind))}</span>
+      <span class="pill" style="--c:${th.color}"><i></i><span>${esc(th.name)}</span></span>
+      <span class="g-time">${fmtAbs(c.ts)}</span>
+    </div>`;
+  }).join('');
+  body.innerHTML = `<svg class="git-svg" width="${gw}" height="${list.length * ROW}" style="left:max(4px, env(safe-area-inset-left, 0px))">${svg}</svg>${rows}`;
+}
+$('#git-scroll').addEventListener('click', e => {
+  const chip = e.target.closest('[data-tid]');
+  if (chip) { select({ type: 'thread', id: chip.dataset.tid }); return; }
+  const r = e.target.closest('[data-cid]');
+  if (r) select({ type: 'commit', id: r.dataset.cid });
+});
+
+/* ================= timeline ================= */
+const TLZ = { day: 56, week: 9, month: 2.4 };
+function renderTimeline() {
+  const wrap = $('#tl-scroll'), inner = $('#tl-inner');
+  $$('#tl-zoom button').forEach(b => b.setAttribute('aria-pressed', b.dataset.z === S.tlZoom ? 'true' : 'false'));
+  const by = byThread();
+  const ids = [INBOX, ...orderedThreads().filter(th => !isHidden(th)).map(th => th.id)].filter(id => by.has(id));
+  if (!ids.length) { inner.innerHTML = ''; return; }
+  const H = 3600e3, pph = TLZ[S.tlZoom] || 9, now = Date.now();
+  let min = Infinity, max = -Infinity;
+  for (const id of ids) for (const c of by.get(id)) { min = Math.min(min, c.ts); max = Math.max(max, c.ts); }
+  const LW = window.innerWidth < 760 ? 118 : 184;
+  const viewW = Math.max(240, wrap.clientWidth - LW);
+  let t0 = min - (70 / pph) * H;
+  const t1 = Math.max(max, now) + (290 / pph) * H;
+  if ((t1 - t0) / H * pph < viewW) t0 = t1 - (viewW / pph) * H;
+  const W = Math.round((t1 - t0) / H * pph);
+  const X = ts => (ts - t0) / H * pph;
+  const RH = 52, AH = 46, BH = ids.length * RH;
+
+  const step = [1, 2, 3, 6, 12, 24, 48, 168].find(s => s * pph >= 64) || 168;
+  const ticks = [], days = [];
+  const d = new Date(t0); d.setMinutes(0, 0, 0);
+  if (step < 24) d.setHours(Math.ceil(d.getHours() / step) * step);
+  else { d.setHours(24, 0, 0, 0); if (step === 168) while (d.getDay() !== 1) d.setDate(d.getDate() + 1); }
+  while (d.getTime() <= t1) { ticks.push(d.getTime()); if (step < 24) d.setHours(d.getHours() + step); else d.setDate(d.getDate() + step / 24); }
+  const m = new Date(t0); m.setHours(24, 0, 0, 0);
+  while (m.getTime() <= t1) { days.push(m.getTime()); m.setDate(m.getDate() + 1); }
+
+  let axis = '';
+  if (step < 24) {
+    for (const ts of days) axis += `<line x1="${X(ts)}" y1="0" x2="${X(ts)}" y2="${AH}"/><text class="day" x="${X(ts) + 6}" y="17">${esc(t('dayLabel', new Date(ts)))}</text>`;
+    for (const ts of ticks) axis += `<text x="${X(ts) + 4}" y="37">${pad2(new Date(ts).getHours())}:00</text>`;
+  } else {
+    let lastMonth = -1;
+    for (const ts of ticks) {
+      const dt = new Date(ts);
+      if (dt.getMonth() !== lastMonth) { axis += `<text class="day" x="${X(ts) + 4}" y="17">${esc(t('monthLabel', dt))}</text>`; lastMonth = dt.getMonth(); }
+      axis += `<line x1="${X(ts)}" y1="24" x2="${X(ts)}" y2="${AH}"/><text x="${X(ts) + 4}" y="37">${esc(t('tickDay', dt))}</text>`;
+    }
+  }
+  axis += `<line x1="${X(now)}" y1="${AH - 10}" x2="${X(now)}" y2="${AH}" style="stroke:var(--accent)" stroke-width="2"/>`;
+
+  let b = '';
+  for (const ts of ticks) b += `<line class="grid-l" x1="${X(ts)}" y1="0" x2="${X(ts)}" y2="${BH}"/>`;
+  if (step < 24) for (const ts of days) b += `<line class="grid-day" x1="${X(ts)}" y1="0" x2="${X(ts)}" y2="${BH}"/>`;
+  ids.forEach((id, i) => { b += `<line class="row-sep" x1="0" y1="${(i + 1) * RH - 0.5}" x2="${W}" y2="${(i + 1) * RH - 0.5}"/>`; });
+  const rowY = new Map(ids.map((id, i) => [id, i * RH + RH / 2]));
+  const selC = S.sel && S.sel.type === 'commit' ? S.sel.id : null;
+  const mergeTs = new Map();
+  for (const c of S.commits.values()) if (c.kind === 'merge' && c.mergeOf) mergeTs.set(c.mergeOf, Math.max(mergeTs.get(c.mergeOf) || 0, c.ts));
+  for (const id of ids) {
+    const th = getThread(id), cs = by.get(id), y = rowY.get(id);
+    if (id === INBOX) { b += `<line class="base" x1="${X(cs[0].ts)}" y1="${y}" x2="${X(now)}" y2="${y}"/>`; continue; }
+    const open = th.status === 'active' || th.status === 'parked';
+    const end = open ? now : Math.max(cs[cs.length - 1].ts, mergeTs.get(id) || 0);
+    b += `<line class="bar ${th.status === 'parked' ? 'parked' : ''}" x1="${X(cs[0].ts)}" y1="${y}" x2="${Math.max(X(end), X(cs[0].ts) + 1)}" y2="${y}" style="stroke:${th.color}"/>`;
+  }
+  for (const th of S.threads.values()) {
+    if (!th.forkOf || !rowY.has(th.id)) continue;
+    const fc = S.commits.get(th.forkOf); if (!fc || !rowY.has(tidOf(fc))) continue;
+    const child = by.get(th.id)[0];
+    const x1 = X(fc.ts), y1 = rowY.get(tidOf(fc)), x2 = X(child.ts), y2 = rowY.get(th.id);
+    b += `<path class="link" d="M${x1} ${y1} C${x1} ${(y1 + y2) / 2} ${x2} ${(y1 + y2) / 2} ${x2} ${y2}" style="stroke:${th.color}"/>`;
+  }
+  for (const c of S.commits.values()) {
+    if (c.kind !== 'merge' || !c.mergeOf || !rowY.has(c.mergeOf) || !rowY.has(tidOf(c))) continue;
+    const src = by.get(c.mergeOf).filter(x => x.ts <= c.ts).pop(); if (!src) continue;
+    const x1 = X(src.ts), y1 = rowY.get(c.mergeOf), x2 = X(c.ts), y2 = rowY.get(tidOf(c));
+    b += `<path class="link" d="M${x1} ${y1} C${x2} ${y1} ${x2} ${(y1 + y2) / 2} ${x2} ${y2}" style="stroke:${getThread(c.mergeOf).color}"/>`;
+  }
+  b += `<line class="now" x1="${X(now)}" y1="0" x2="${X(now)}" y2="${BH}"/>`;
+  for (const id of ids) {
+    const th = getThread(id), cs = by.get(id), y = rowY.get(id);
+    for (const c of cs) b += `<g data-cid="${esc(c.id)}" class="${c.id === selC ? 'is-sel' : ''}"><title>${esc(fmtAbs(c.ts) + ' · ' + kindLabel(c.kind) + ' · ' + c.title)}</title>${glyph(c.kind, th.color, X(c.ts), y, 6, { done: c.done, dim: S.q && !matches(c) })}</g>`;
+    const tip = cs[cs.length - 1];
+    const label = tip.title.length > 26 ? tip.title.slice(0, 25) + '…' : tip.title;
+    b += `<text class="tip" x="${X(tip.ts) + 12}" y="${y - 14}">${esc(label)}</text>`;
+  }
+  const selT = selThreadId();
+  const labels = ids.map(id => {
+    const th = getThread(id);
+    return `<div class="tl-label ${selT === id ? 'is-sel' : ''}" data-tid="${esc(id)}" style="height:${RH}px;--c:${th.color}" title="${esc(th.name)}"><span class="roundel"></span><span class="nm">${esc(th.name)}</span><span class="ct">${by.get(id).length}</span></div>`;
+  }).join('');
+  inner.style.width = (LW + W) + 'px';
+  inner.innerHTML = `
+    <div class="tl-axis-row"><div class="tl-corner" style="width:${LW}px;height:${AH}px">${esc(t('tlCorner'))}</div><svg class="tl-axis" width="${W}" height="${AH}">${axis}<text class="now-label" x="${X(now) + 5}" y="${AH - 3}" style="font-size:10px">${esc(t('tlNowLabel'))}</text></svg></div>
+    <div class="tl-body-row"><div class="tl-labels" style="width:${LW}px">${labels}</div><svg class="tl-body" width="${W}" height="${BH}">${b}</svg></div>`;
+  if (S.tlScroll) { S.tlScroll = false; wrap.scrollLeft = Math.max(0, LW + X(now) - wrap.clientWidth * 0.72); }
+}
+$('#tl-zoom').addEventListener('click', e => {
+  const z = e.target.closest('[data-z]'); if (!z) return;
+  S.tlZoom = z.dataset.z; ls.set('tc.tlZoom', S.tlZoom); S.tlScroll = true; render();
+});
+$('#tl-now').onclick = () => { S.tlScroll = true; render(); };
+$('#tl-scroll').addEventListener('click', e => {
+  const c = e.target.closest('[data-cid]'); if (c) { select({ type: 'commit', id: c.dataset.cid }); return; }
+  const th = e.target.closest('[data-tid]'); if (th) select({ type: 'thread', id: th.dataset.tid });
+});
+
+/* ================= detail drawer ================= */
+const detail = $('#detail');
+let lastKey = '', lastHTML = '', detailHold = false;
+detail.addEventListener('pointerdown', () => { detailHold = true; });
+window.addEventListener('pointerup', () => { if (detailHold) { detailHold = false; setTimeout(render, 0); } }, true);
+function select(sel) {
+  S.sel = sel; S.ui = {};
+  render();
+}
+function threadOptions(selected, { excludeId, onlyOpen } = {}) {
+  const opts = [{ id: INBOX, name: t('inbox') }, ...orderedThreads().filter(th => th.id !== excludeId && (!onlyOpen || th.status === 'active' || th.status === 'parked' || th.id === selected))];
+  return opts.map(th => `<option value="${esc(th.id)}" ${th.id === selected ? 'selected' : ''}>${esc(th.name)}${th.status && th.status !== 'active' && th.id !== INBOX ? ` (${esc(statusLabel(th.status))})` : ''}</option>`).join('');
+}
+function linksView(links) {
+  if (!links || !links.length) return '';
+  return `<div class="links">${links.map(l => /^https?:\/\//i.test(l)
+    ? `<a href="${esc(l)}" target="_blank" rel="noopener noreferrer">${esc(l)}</a>`
+    : `<code>${esc(l)}</code>`).join('')}</div>`;
+}
+const delUI = q => S.ui.del
+  ? `<span class="confirm">${esc(q)}</span><button class="btn btn-danger" data-act="del-confirm">${esc(t('del'))}</button><button class="btn" data-act="del-cancel">${esc(t('cancel'))}</button>`
+  : '';
+function commitDetail(c) {
+  const th = getThread(tidOf(c));
+  const sys = c.kind === 'fork' || c.kind === 'merge';
+  const forkSrc = c.kind === 'fork' && c.parents && c.parents[0] ? S.commits.get(c.parents[0]) : null;
+  const children = [...S.threads.values()].filter(x => x.forkOf === c.id);
+  return `<div class="d-head">
+      <span class="d-eyebrow">${mini(c.kind, th.color, c.done)}${esc(kindLabel(c.kind))}<span class="mono">${fmtAbs(c.ts)}</span></span>
+      <button class="icon-btn" data-act="close" aria-label="${esc(t('close'))}">×</button>
+    </div>
+    <div class="d-scroll">
+      <label class="fld"><span>${esc(t('dTitle'))}</span><input id="d-title" class="big-input" value="${esc(c.title)}"></label>
+      <div class="fld-row">
+        <label class="fld"><span>${esc(t('dKind'))}</span>${sys ? `<input disabled value="${esc(kindLabel(c.kind))}">` : `<select id="d-kind">${USER_KINDS.map(k => `<option value="${k}" ${k === c.kind ? 'selected' : ''}>${esc(kindLabel(k))}</option>`).join('')}</select>`}</label>
+        <label class="fld"><span>${esc(t('dThread'))}</span><select id="d-thread">${threadOptions(tidOf(c))}</select></label>
+      </div>
+      ${c.kind === 'task' ? `<label class="check"><input type="checkbox" id="d-done" ${c.done ? 'checked' : ''}>${esc(t('dDone'))}</label>` : ''}
+      <label class="fld"><span>${esc(t('dBody'))}</span><textarea id="d-body" rows="5" placeholder="${esc(t('dBodyPh'))}">${esc(c.body || '')}</textarea></label>
+      <label class="fld"><span>${esc(t('dLinks'))}</span><textarea id="d-links" rows="2" placeholder="${esc(t('dLinksPh'))}">${esc((c.links || []).join('\n'))}</textarea></label>
+      ${linksView(c.links)}
+      <div class="fld-row">
+        <label class="fld"><span>${esc(t('dAgent'))}</span><input id="d-agent" list="agent-list" value="${esc(c.agent || '')}" placeholder="${esc(t('dAgentPh'))}"></label>
+        <label class="fld"><span>${esc(t('dTime'))}</span><input id="d-ts" type="datetime-local" value="${toLocalInput(c.ts)}"></label>
+      </div>
+      ${(forkSrc || children.length || c.mergeOf) ? `<div class="meta">
+        ${forkSrc ? `<span>${esc(t('forkedFromRec'))} <button class="linkish" data-act="goto-commit" data-cid="${esc(forkSrc.id)}">${esc(forkSrc.title)}</button></span>` : ''}
+        ${c.mergeOf && S.threads.has(c.mergeOf) ? `<span>${esc(t('mergedFromThread'))} <button class="linkish" data-act="goto-thread" data-tid="${esc(c.mergeOf)}">${esc(getThread(c.mergeOf).name)}</button></span>` : ''}
+        ${children.map(x => `<span>${esc(t('forkedHere'))} <button class="linkish" data-act="goto-thread" data-tid="${esc(x.id)}">${esc(x.name)}</button></span>`).join('')}
+      </div>` : ''}
+      <div class="d-actions">
+        ${S.ui.fork
+          ? `<div class="inline-form"><input id="d-fork-name" placeholder="${esc(t('forkNamePh'))}"><button class="btn btn-primary" data-act="fork-create">${esc(t('createBranch'))}</button><button class="btn" data-act="fork-cancel">${esc(t('cancel'))}</button></div>`
+          : `<button class="btn" data-act="fork-open">${esc(t('forkHere'))}</button><button class="btn btn-quiet" data-act="goto-thread" data-tid="${esc(tidOf(c))}">${esc(t('viewThread'))}</button>`}
+        <span class="spacer"></span>
+        ${S.ui.del ? delUI(t('delRecordQ')) : `<button class="btn btn-quiet-danger" data-act="del-open">${esc(t('del'))}</button>`}
+      </div>
+    </div>`;
+}
+function threadDetail(th) {
+  const cs = (byThread().get(th.id) || []).slice().reverse();
+  const isInbox = th.id === INBOX;
+  const forkC = th.forkOf ? S.commits.get(th.forkOf) : null;
+  const items = cs.slice(0, 40).map(c => `<li data-act="goto-commit" data-cid="${esc(c.id)}">${mini(c.kind, th.color, c.done)}<span class="s-title">${esc(c.title)}</span><time class="s-time">${fmtShort(c.ts)}</time></li>`).join('');
+  return `<div class="d-head">
+      <span class="d-eyebrow"><span class="roundel" style="--c:${th.color}"></span>${esc(isInbox ? t('inbox') : t('threadLabel'))}<span class="mono">${esc(t('countRecords', cs.length))}</span></span>
+      <button class="icon-btn" data-act="close" aria-label="${esc(t('close'))}">×</button>
+    </div>
+    <div class="d-scroll">
+      ${isInbox ? `<p style="margin:0;color:var(--muted)">${esc(t('inboxDesc'))}</p>` : `
+      <label class="fld"><span>${esc(t('threadName'))}</span><input id="t-name" class="big-input" value="${esc(th.name)}"></label>
+      <div class="fld"><span>${esc(t('threadStatus'))}</span><div class="seg">${['active', 'parked', 'done'].map(s => `<button data-act="status" data-status="${s}" aria-pressed="${th.status === s}">${esc(statusLabel(s))}</button>`).join('')}${th.status === 'merged' ? `<button aria-pressed="true" disabled>${esc(statusLabel('merged'))}</button>` : ''}</div></div>
+      <div class="fld"><span>${esc(t('threadColor'))}</span><div class="swatches">${LINE_COLORS.map(c => `<button class="swatch" data-act="color" data-color="${c}" style="--c:${c}" aria-pressed="${th.color === c}" aria-label="${esc(t('colorAria', c))}"></button>`).join('')}</div></div>
+      <label class="fld"><span>${esc(t('threadGoal'))}</span><textarea id="t-note" rows="3" placeholder="${esc(t('threadGoalPh'))}">${esc(th.note || '')}</textarea></label>
+      <div class="meta">
+        <span>${esc(t('createdAt', fmtAbs(th.createdAt || Date.now())))}${cs[0] ? esc(t('lastUpdate', fmtRel(cs[0].ts))) : ''}</span>
+        ${th.parent ? `<span>${esc(t('forkedFromThread'))} <button class="linkish" data-act="goto-thread" data-tid="${esc(th.parent)}">${esc(getThread(th.parent).name)}</button>${forkC ? ` ${esc(t('of'))} <button class="linkish" data-act="goto-commit" data-cid="${esc(forkC.id)}">${esc(forkC.title.slice(0, 40))}</button>` : ''}</span>` : ''}
+        ${th.mergedInto ? `<span>${esc(t('mergedInto'))} <button class="linkish" data-act="goto-thread" data-tid="${esc(th.mergedInto)}">${esc(getThread(th.mergedInto).name)}</button></span>` : ''}
+      </div>`}
+      <div class="sec-label">${esc(t('stations'))}</div>
+      ${items ? `<ol class="d-strip" style="--c:${th.color}">${items}</ol>` : `<p style="margin:0;color:var(--faint)">${esc(t('noRecordsYet'))}</p>`}
+      ${cs.length > 40 ? `<p style="margin:0;color:var(--faint);font-size:12px">${esc(t('only40'))}</p>` : ''}
+      <div class="d-actions">
+        <button class="btn btn-primary" data-act="capture-here">${esc(t('captureHere'))}</button>
+        ${!isInbox && th.status !== 'merged' ? (S.ui.merge
+          ? `<div class="inline-form"><select id="t-merge">${threadOptions(th.parent && th.parent !== th.id ? th.parent : INBOX, { excludeId: th.id, onlyOpen: true })}</select><button class="btn btn-primary" data-act="merge">${esc(t('merge'))}</button><button class="btn" data-act="merge-cancel">${esc(t('cancel'))}</button></div>`
+          : `<button class="btn" data-act="merge-open">${esc(t('mergeTo'))}</button>`) : ''}
+        ${!isInbox ? `<span class="spacer"></span>${S.ui.del ? delUI(t('delThreadQ')) : `<button class="btn btn-quiet-danger" data-act="del-open">${esc(t('delThread'))}</button>`}` : ''}
+      </div>
+    </div>`;
+}
+function edgeDetail(e) {
+  return `<div class="d-head">
+      <span class="d-eyebrow">${esc(t('edgeHead'))}</span>
+      <button class="icon-btn" data-act="close" aria-label="${esc(t('close'))}">×</button>
+    </div>
+    <div class="d-scroll">
+      <div class="meta"><span><button class="linkish" data-act="goto-thread" data-tid="${esc(e.from)}">${esc(getThread(e.from).name)}</button> → <button class="linkish" data-act="goto-thread" data-tid="${esc(e.to)}">${esc(getThread(e.to).name)}</button></span></div>
+      <label class="fld"><span>${esc(t('edgeRel'))}</span><input id="e-label" value="${esc(e.label || '')}" placeholder="${esc(t('edgeRelPh'))}"></label>
+      <div class="label-chips">${t('labelChips').map(l => `<button data-act="label" data-label="${esc(l)}">${esc(l)}</button>`).join('')}</div>
+      <div class="d-actions">
+        <button class="btn" data-act="flip">${esc(t('flip'))}</button>
+        <span class="spacer"></span>
+        ${S.ui.del ? delUI(t('delEdgeQ')) : `<button class="btn btn-quiet-danger" data-act="del-open">${esc(t('del'))}</button>`}
+      </div>
+    </div>`;
+}
+function renderDetail() {
+  let sel = S.sel;
+  if (sel) {
+    const ok = sel.type === 'commit' ? S.commits.has(sel.id) : sel.type === 'thread' ? (sel.id === INBOX || S.threads.has(sel.id)) : S.edges.has(sel.id);
+    if (!ok) { S.sel = sel = null; }
+  }
+  if (!sel) { detail.hidden = true; detail.innerHTML = ''; lastKey = ''; lastHTML = ''; return; }
+  const key = LANG + ':' + sel.type + ':' + sel.id + ':' + JSON.stringify(S.ui);
+  const ae = document.activeElement;
+  if (key === lastKey && (detailHold || (detail.contains(ae) && ae.matches('input, textarea, select')))) return;
+  const html = sel.type === 'commit' ? commitDetail(S.commits.get(sel.id)) : sel.type === 'thread' ? threadDetail(getThread(sel.id)) : edgeDetail(S.edges.get(sel.id));
+  if (key === lastKey && html === lastHTML && !S.focusAfter) return;
+  lastKey = key; lastHTML = html;
+  const sc = $('.d-scroll', detail);
+  const top = sc ? sc.scrollTop : 0;
+  detail.hidden = false;
+  detail.innerHTML = html;
+  const sc2 = $('.d-scroll', detail);
+  if (sc2) sc2.scrollTop = top;
+  if (S.readOnly) $$('input, textarea, select', detail).forEach(el => { el.disabled = true; });
+  if (S.focusAfter) { const f = $(S.focusAfter, detail); S.focusAfter = null; if (f) { f.focus(); if (f.select) f.select(); } }
+}
+detail.addEventListener('input', e => {
+  const el = e.target, s = S.sel; if (!s || S.readOnly) return;
+  if (s.type === 'commit') {
+    if (el.id === 'd-title') patchDoc('commits', s.id, { title: el.value }, 600);
+    else if (el.id === 'd-body') patchDoc('commits', s.id, { body: el.value }, 700);
+    else if (el.id === 'd-links') patchDoc('commits', s.id, { links: el.value.split('\n').map(x => x.trim()).filter(Boolean) }, 700);
+    else if (el.id === 'd-agent') patchDoc('commits', s.id, { agent: el.value }, 700);
+  } else if (s.type === 'thread') {
+    if (el.id === 't-name') patchDoc('threads', s.id, { name: el.value }, 600);
+    else if (el.id === 't-note') patchDoc('threads', s.id, { note: el.value }, 700);
+  } else if (s.type === 'edge' && el.id === 'e-label') patchDoc('edges', s.id, { label: el.value }, 600);
+});
+detail.addEventListener('change', e => {
+  const el = e.target, s = S.sel; if (!s || S.readOnly) return;
+  if (s.type !== 'commit') return;
+  if (el.id === 'd-kind') patchDoc('commits', s.id, { kind: el.value }, 0);
+  else if (el.id === 'd-thread') { patchDoc('commits', s.id, { thread: el.value }, 0); toast(t('tMoved', getThread(el.value).name)); }
+  else if (el.id === 'd-done') patchDoc('commits', s.id, { done: el.checked }, 0);
+  else if (el.id === 'd-ts') { const n = new Date(el.value).getTime(); if (!isNaN(n)) patchDoc('commits', s.id, { ts: n }, 0); }
+  el.blur();
+});
+detail.addEventListener('focusout', () => setTimeout(render, 0));
+detail.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.id === 'd-fork-name' && !e.isComposing) { e.preventDefault(); forkFrom(S.sel.id, e.target.value); }
+});
+detail.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const act = b.dataset.act, s = S.sel;
+  const writeActs = ['fork-open', 'fork-create', 'del-open', 'del-confirm', 'status', 'color', 'merge-open', 'merge', 'label', 'flip'];
+  if (writeActs.includes(act) && !canWrite()) return;
+  switch (act) {
+    case 'close': select(null); break;
+    case 'goto-commit': select({ type: 'commit', id: b.dataset.cid }); break;
+    case 'goto-thread': select({ type: 'thread', id: b.dataset.tid }); break;
+    case 'fork-open': S.ui = { fork: true }; S.focusAfter = '#d-fork-name'; render(); break;
+    case 'fork-cancel': case 'del-cancel': case 'merge-cancel': S.ui = {}; render(); break;
+    case 'fork-create': forkFrom(s.id, $('#d-fork-name').value); break;
+    case 'del-open': S.ui = { del: true }; render(); break;
+    case 'del-confirm':
+      if (s.type === 'commit') removeDoc('commits', s.id);
+      else if (s.type === 'thread') deleteThread(s.id);
+      else removeDoc('edges', s.id);
+      select(null); toast(t('tDeleted')); break;
+    case 'status': patchDoc('threads', s.id, { status: b.dataset.status }, 0); break;
+    case 'color': patchDoc('threads', s.id, { color: b.dataset.color }, 0); break;
+    case 'capture-here': setCaptureThread(s.id); $('#cap-text').focus(); break;
+    case 'merge-open': S.ui = { merge: true }; render(); break;
+    case 'merge': mergeThread(s.id, $('#t-merge').value); S.ui = {}; render(); break;
+    case 'label': patchDoc('edges', s.id, { label: b.dataset.label }, 0); lastKey = ''; render(); break;
+    case 'flip': { const ed = S.edges.get(s.id); if (ed) patchDoc('edges', s.id, { from: ed.to, to: ed.from }, 0); break; }
+  }
+});
+
+/* ================= capture bar ================= */
+const capText = $('#cap-text'), capThread = $('#cap-thread');
+let capSig = '';
+function renderCaptureThreads() {
+  if (S.captureThread !== INBOX && !S.threads.has(S.captureThread)) S.captureThread = INBOX;
+  const opts = threadOptions(S.captureThread, { onlyOpen: true });
+  if (opts !== capSig && document.activeElement !== capThread) { capThread.innerHTML = opts; capSig = opts; }
+  capThread.value = S.captureThread;
+  $('#cap-thread-wrap').style.setProperty('--c', getThread(S.captureThread).color);
+}
+function setCaptureThread(id) { S.captureThread = id; ls.set('tc.captureThread', id); render(); }
+capThread.addEventListener('change', () => setCaptureThread(capThread.value));
+function renderKinds() {
+  $('#kinds').innerHTML = USER_KINDS.map(k => `<button type="button" data-kind="${k}" aria-pressed="${S.captureKind === k}" title="${esc(kindLabel(k))}">${mini(k, 'var(--ink)', false)}<span>${esc(kindLabel(k))}</span></button>`).join('');
+}
+$('#kinds').addEventListener('click', e => { const b = e.target.closest('[data-kind]'); if (!b) return; S.captureKind = b.dataset.kind; renderKinds(); capText.focus(); });
+function autosize() { capText.style.height = 'auto'; capText.style.height = Math.min(150, capText.scrollHeight + 2) + 'px'; }
+capText.addEventListener('input', autosize);
+capText.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); doCapture(); }
+  if (e.key === 'Escape') capText.blur();
+});
+$('#capture').addEventListener('submit', e => { e.preventDefault(); doCapture(); });
+function doCapture() {
+  if (!canWrite()) return;
+  let text = capText.value.trim(); if (!text) { capText.focus(); return; }
+  if (/^[\[{]/.test(text)) {
+    try { const n = importText(text); capText.value = ''; autosize(); toast(t('tImported', n)); return; } catch {}
+  }
+  let tid = S.captureThread;
+  const m = text.match(/^#([^\s#]+)\s+([\s\S]+)$/);
+  if (m) { tid = ensureThread(m[1]); text = m[2].trim(); }
+  const lines = text.split('\n');
+  const c = addCommit({ thread: tid, kind: S.captureKind, title: lines[0].trim(), body: lines.slice(1).join('\n').trim() });
+  capText.value = ''; autosize();
+  toast(t('tLogged', getThread(tidOf(c)).name));
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const el = document.querySelector(`[data-cid="${CSS.escape(c.id)}"]`);
+    const host = el && (el.closest('.card') || el);
+    if (host && host.classList) { host.classList.remove('flash'); void host.offsetWidth; host.classList.add('flash'); }
+  }));
+}
+
+/* ================= views, menu, keys ================= */
+function setView(v) {
+  if (!['canvas', 'git', 'timeline'].includes(v)) v = 'canvas';
+  S.view = v;
+  $$('.tab').forEach(el => el.setAttribute('aria-selected', el.dataset.view === v ? 'true' : 'false'));
+  $('#view-canvas').hidden = v !== 'canvas';
+  $('#view-git').hidden = v !== 'git';
+  $('#view-timeline').hidden = v !== 'timeline';
+  if (v === 'timeline') S.tlScroll = true;
+  if (v !== 'canvas') S.connect = null;
+  try { history.replaceState(null, '', location.pathname + location.search + '#' + v); } catch {}
+  render();
+}
+$$('.tab').forEach(el => el.addEventListener('click', () => setView(el.dataset.view)));
+let qTimer = 0;
+$('#q').addEventListener('input', e => { clearTimeout(qTimer); qTimer = setTimeout(() => { S.q = e.target.value.trim(); render(); }, 120); });
+$('#lang-btn').onclick = () => setLang(LANG === 'en' ? 'zh' : 'en');
+
+const menu = $('#menu'), moreBtn = $('#more-btn');
+function closeMenu() { menu.hidden = true; moreBtn.setAttribute('aria-expanded', 'false'); }
+moreBtn.addEventListener('click', e => { e.stopPropagation(); menu.hidden = !menu.hidden; moreBtn.setAttribute('aria-expanded', String(!menu.hidden)); });
+document.addEventListener('click', e => { if (!menu.hidden && !e.target.closest('.menu-wrap')) closeMenu(); });
+menu.addEventListener('click', e => {
+  const b = e.target.closest('[data-menu]'); if (!b) return;
+  closeMenu();
+  const k = b.dataset.menu;
+  if (k === 'new-thread') { setView('canvas'); createThreadAndEdit(); }
+  else if (k === 'toggle-done') { S.hideDone = !S.hideDone; ls.set('tc.hideDone', S.hideDone); render(); }
+  else if (k === 'clear-examples') { if (canWrite()) clearExamples(); }
+  else openSheet(k);
+});
+$('#ex-clear').onclick = () => { if (canWrite()) clearExamples(); };
+document.addEventListener('click', e => { const o = e.target.closest('[data-open]'); if (o) openSheet(o.dataset.open); });
+
+document.addEventListener('keydown', e => {
+  const typing = e.target.matches && e.target.matches('input, textarea, select');
+  if (e.key === 'Escape') {
+    if (!$('#scrim').hidden) { closeSheet(); return; }
+    if (S.connect) { S.connect = null; render(); return; }
+    if (typing) { e.target.blur(); return; }
+    if (S.sel) { select(null); return; }
+  }
+  if (typing || e.metaKey || e.ctrlKey || e.altKey || !$('#scrim').hidden) return;
+  if (e.key === '/') { e.preventDefault(); capText.focus(); }
+  else if (e.key === '1') setView('canvas');
+  else if (e.key === '2') setView('git');
+  else if (e.key === '3') setView('timeline');
+  else if (e.key === 'n' || e.key === 'N') { e.preventDefault(); setView('canvas'); createThreadAndEdit(); }
+  else if (e.key === 'f' && S.view === 'canvas') fit();
+});
+window.addEventListener('resize', () => render());
+
+/* ================= sheets ================= */
+const scrim = $('#scrim');
+function closeSheet() {
+  scrim.hidden = true; S.sheet = null;
+  if (S.ai && S.ai.ctl && S.ai.status === 'thinking') S.ai.ctl.abort();
+}
+$('#sheet-close').onclick = closeSheet;
+scrim.addEventListener('click', e => { if (e.target === scrim) closeSheet(); });
+function setSheet(title, body, foot) {
+  $('#sheet-title').textContent = title;
+  $('#sheet-body').innerHTML = body;
+  const f = $('#sheet-foot');
+  f.hidden = !foot; f.innerHTML = foot || '';
+  scrim.hidden = false;
+}
+function codebox(text, id) { return `<div class="codebox"><pre id="${id}">${esc(text)}</pre><button class="btn" data-copy-from="${id}">${esc(t('copy'))}</button></div>`; }
+async function copyText(text, okMsg) {
+  try { await navigator.clipboard.writeText(text); toast(okMsg || t('tCopied')); }
+  catch { toast(t('tCopyFail')); }
+}
+scrim.addEventListener('click', e => {
+  const b = e.target.closest('[data-copy-from]');
+  if (b) {
+    const pre = document.getElementById(b.dataset.copyFrom);
+    copyText(pre.textContent);
+    const r = document.createRange(); r.selectNodeContents(pre); const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+  }
+});
+
+function agentSheet() {
+  let body = `<p>${esc(t('agentIntro'))}</p>`;
+  if (SERVER) {
+    const cli = `node "${SERVER.cli}"`;
+    body += `<h4>${esc(t('agentHooksH'))}</h4><p>${esc(t('agentHooksP'))}</p>
+      <p>${esc(t('agentHooksAll'))}</p>${codebox(`${cli} install-hooks --user`, 'p-hooks-user')}
+      <p>${esc(t('agentHooksProject'))}</p>${codebox(`${cli} install-hooks --project /path/to/project`, 'p-hooks-proj')}
+      <h4>${esc(t('agentCliH'))}</h4><p>${esc(t('agentCliP'))}</p>
+      ${codebox(`${cli} log "Finished the literature table" --thread "Proposal" --kind agent --agent Codex`, 'p-cli')}`;
+  } else if (window.claude) {
+    body += `<h4>${esc(t('agentClaudeH'))}</h4><p>${esc(t('agentClaudeP'))}</p>${codebox(t('agentPrompt', ARTIFACT_URL), 'p-claude')}`;
+  } else {
+    body += `<p>${t('agentLocalP')}</p>`;
+  }
+  body += `<h4>${esc(t('agentOtherH'))}</h4><p>${esc(t('agentOtherP'))}</p>${codebox(t('jsonlPrompt'), 'p-jsonl')}
+    <h4>${esc(t('agentFieldsH'))}</h4><p>${t('agentFieldsP')}</p>`;
+  setSheet(t('agentTitle'), body);
+}
+function openSheet(kind) {
+  S.sheet = kind;
+  if (kind === 'agent') agentSheet();
+  else if (kind === 'io') {
+    setSheet(t('ioTitle'), `
+      <p>${esc(t('ioIntro'))}</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" id="io-save">${esc(t('ioSave'))}</button><button class="btn" id="io-copy">${esc(t('ioCopy'))}</button></div>
+      <h4>${esc(t('ioImportH'))}</h4>
+      <p>${esc(t('ioImportP'))}</p>
+      <textarea class="import" id="io-text" placeholder='{"thread": "Proposal", "kind": "agent", "title": "…"}'></textarea>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn btn-primary" id="io-import">${esc(t('ioImport'))}</button><label class="btn" for="io-file">${esc(t('ioFile'))}</label><input type="file" id="io-file" accept=".json,.jsonl,.txt,application/json" hidden></div>`);
+    $('#io-save').onclick = saveExport;
+    $('#io-copy').onclick = () => copyText(exportJSON(), t('tCopiedAll'));
+    $('#io-import').onclick = () => {
+      if (!canWrite()) return;
+      try { const n = importText($('#io-text').value); toast(t('tImported', n)); closeSheet(); }
+      catch { toast(t('tImportFail')); }
+    };
+    $('#io-file').onchange = async e => {
+      const f = e.target.files && e.target.files[0]; if (!f) return;
+      $('#io-text').value = await f.text();
+    };
+  } else if (kind === 'help') {
+    setSheet(t('helpTitle'), `
+      <p>${t('helpIntro')}</p>
+      <div class="ai-list">${t('help').map(([k, v]) => `<div class="ai-item" style="cursor:default"><span class="mono">${esc(k)}</span><span>${v}</span></div>`).join('')}</div>
+      <p>${esc(t('helpShapes'))}</p>`);
+  } else if (kind === 'ai') runAI();
+}
+async function saveExport() {
+  const d = new Date();
+  const filename = `trace-canvas-${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}.json`;
+  if (!window.claude) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([exportJSON()], { type: 'application/json' }));
+    a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    toast(t('tSaved'));
+    return;
+  }
+  let dl = null;
+  try { dl = await window.claude.use('downloads'); } catch {}
+  if (!dl) { copyText(exportJSON(), t('tSaveFallback')); return; }
+  try { await dl.save({ filename, data: exportJSON() }); toast(t('tSaved')); }
+  catch (e) { if (!e || e.code !== 'declined') copyText(exportJSON(), t('tSaveFallback')); }
+}
+
+/* ================= AI tidy-up ================= */
+let sampleFn = null;
+const aiAvailable = () => SERVER ? !!SERVER.ai : !!sampleFn;
+async function initSample() {
+  if (!SERVER) {
+    try { sampleFn = window.claude && window.claude.use ? await window.claude.use('sample') : null; } catch { sampleFn = null; }
+  }
+  $('#ai-btn').hidden = !aiAvailable();
+}
+$('#ai-btn').onclick = () => openSheet('ai');
+function parseLooseJSON(text) {
+  const s = String(text || '').trim();
+  try { return JSON.parse(s); } catch {}
+  const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fence) { try { return JSON.parse(fence[1]); } catch {} }
+  const a = s.indexOf('{'), b = s.lastIndexOf('}');
+  if (a !== -1 && b > a) { try { return JSON.parse(s.slice(a, b + 1)); } catch {} }
+  throw { code: 'invalid_json' };
+}
+async function askAI(prompt, signal) {
+  if (SERVER) {
+    const r = await fetch('/api/ai', { method: 'POST', signal, headers: { 'Content-Type': 'application/json', 'X-Trace-Canvas': '1' }, body: JSON.stringify({ prompt }) })
+      .catch(e => { throw (e && e.name === 'AbortError') ? { code: 'cancelled' } : { code: 'local' }; });
+    if (!r.ok) throw { code: 'local' };
+    return parseLooseJSON((await r.json()).text);
+  }
+  return sampleFn.json(prompt, { signal, cache: false });
+}
+function buildAIPrompt() {
+  const by = byThread(), now = Date.now();
+  const threads = orderedThreads().filter(th => th.status !== 'merged').map(th => {
+    const cs = by.get(th.id) || [];
+    const last = cs[cs.length - 1];
+    return { id: th.id, name: th.name, status: th.status || 'active', goal: (th.note || '').slice(0, 160), idleDays: last ? Math.floor((now - last.ts) / 864e5) : null, recent: cs.slice(-6).map(c => `[${c.kind}] ${c.title.slice(0, 70)}`) };
+  });
+  const inbox = (by.get(INBOX) || []).slice(-60).map(c => ({ id: c.id, kind: c.kind, title: c.title.slice(0, 120), body: (c.body || '').slice(0, 160) }));
+  const edges = [...S.edges.values()].map(e => ({ from: e.from, to: e.to, label: e.label }));
+  const d = new Date();
+  return `You are helping someone who works with AI agents tidy up the trace of their scattered work. A "thread" is like a git branch: one piece of work moving forward in parallel with others. The "inbox" holds ideas and records that haven't been filed yet. Today is ${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}.
+
+Reply with only one JSON object:
+{"summary": "...", "assign": [], "relations": [], "stale": []}
+- summary: 2-3 sentences on what the main work is now, what has been left aside, and what could be wrapped up.
+- assign: where inbox records belong. For an existing thread: {"commit": "record id", "thread": "thread id", "why": "one-line reason"}. For a new thread: {"commit": "record id", "newThread": "short thread name", "why": "…"}; several records may point to the same new thread name.
+- relations: links between threads worth drawing on the canvas: {"from": "thread id", "to": "thread id", "label": "a 1-3 word relationship such as depends on, references, derived from, conflicts", "why": "…"}. Don't repeat existing links.
+- stale: active threads that look stalled and should be marked parked: {"thread": "thread id", "why": "…"}.
+Leave out anything you're unsure about; arrays may be empty. Use the ids exactly as given. Write summary, newThread, label and why in ${t('aiLangName')}.
+
+Threads: ${JSON.stringify(threads)}
+Existing links: ${JSON.stringify(edges)}
+Inbox: ${JSON.stringify(inbox)}`;
+}
+async function runAI() {
+  if (!aiAvailable()) { setSheet(t('aiTitle'), `<p>${esc(SERVER ? t('aiNeedClaudeLocal') : t('aiNeedClaude'))}</p>`); return; }
+  const by = byThread();
+  if (!S.threads.size && !(by.get(INBOX) || []).length) { setSheet(t('aiTitle'), `<p>${esc(t('aiNothing'))}</p>`); return; }
+  const ctl = new AbortController();
+  S.ai = { status: 'thinking', ctl };
+  setSheet(t('aiTitle'), `<div class="ai-thinking"><span class="pulse"></span>${esc(t('aiThinking'))}</div>`, `<button class="btn" id="ai-stop">${esc(t('aiStop'))}</button>`);
+  $('#ai-stop').onclick = () => ctl.abort();
+  try {
+    const res = await askAI(buildAIPrompt(), ctl.signal);
+    S.ai = { status: 'done', res };
+    if (S.sheet === 'ai') renderAI(res);
+  } catch (e) {
+    S.ai = { status: 'error' };
+    if (S.sheet !== 'ai') return;
+    const code = e && e.code;
+    if (code === 'cancelled') { closeSheet(); return; }
+    const msg = t('aiErr')[code] || t('aiErrDefault');
+    setSheet(t('aiTitle'), `<p>${esc(msg)}</p>`, ['invalid_json', 'upstream_error', 'local'].includes(code) ? `<button class="btn btn-primary" id="ai-retry">${esc(t('aiRetry'))}</button>` : '');
+    const r = $('#ai-retry'); if (r) r.onclick = runAI;
+  }
+}
+function renderAI(res) {
+  res = res && typeof res === 'object' ? res : {};
+  const tName = id => id === INBOX ? t('inbox') : (S.threads.get(id) || {}).name;
+  const assign = (Array.isArray(res.assign) ? res.assign : []).filter(a => a && S.commits.has(a.commit) && ((a.thread && S.threads.has(a.thread)) || (a.newThread && String(a.newThread).trim())));
+  const rels = (Array.isArray(res.relations) ? res.relations : []).filter(r => r && S.threads.has(r.from) && S.threads.has(r.to) && r.from !== r.to && ![...S.edges.values()].some(e => e.from === r.from && e.to === r.to));
+  const stale = (Array.isArray(res.stale) ? res.stale : []).filter(s => s && S.threads.has(s.thread) && S.threads.get(s.thread).status === 'active');
+  const item = (attrs, html, why) => `<label class="ai-item"><input type="checkbox" checked ${attrs}><span>${html}${why ? `<span class="why">${esc(why)}</span>` : ''}</span></label>`;
+  let body = res.summary ? `<p class="ai-summary">${esc(res.summary)}</p>` : '';
+  if (assign.length) body += `<div class="sec-label">${esc(t('aiInbox'))}</div><div class="ai-list">${assign.map(a => {
+    const existing = a.thread && S.threads.has(a.thread);
+    const target = existing ? tName(a.thread) : String(a.newThread).trim();
+    return item(`data-type="assign" data-commit="${esc(a.commit)}" ${existing ? `data-thread="${esc(a.thread)}"` : `data-new-thread="${esc(target)}"`}`,
+      `“${esc(S.commits.get(a.commit).title.slice(0, 40))}” → <b>${esc(target)}</b>${existing ? '' : esc(t('aiNew'))}`, a.why);
+  }).join('')}</div>`;
+  if (rels.length) body += `<div class="sec-label">${esc(t('aiRelations'))}</div><div class="ai-list">${rels.map(r => {
+    const label = String(r.label || t('edgeRelated')).slice(0, 24);
+    return item(`data-type="rel" data-from="${esc(r.from)}" data-to="${esc(r.to)}" data-label="${esc(label)}"`,
+      `<b>${esc(tName(r.from))}</b> —${esc(label)}→ <b>${esc(tName(r.to))}</b>`, r.why);
+  }).join('')}</div>`;
+  if (stale.length) body += `<div class="sec-label">${esc(t('aiStale'))}</div><div class="ai-list">${stale.map(s =>
+    item(`data-type="stale" data-thread="${esc(s.thread)}"`, t('aiStaleItem', esc(tName(s.thread))), s.why)).join('')}</div>`;
+  const any = assign.length || rels.length || stale.length;
+  if (!any) body += `<p>${esc(t('aiNoChanges'))}</p>`;
+  setSheet(t('aiTitle'), body, any ? `<button class="btn" id="ai-cancel">${esc(t('aiCancel'))}</button><button class="btn btn-primary" id="ai-apply">${esc(t('aiApply'))}</button>` : `<button class="btn" id="ai-cancel">${esc(t('aiClose'))}</button>`);
+  $('#ai-cancel').onclick = closeSheet;
+  const ap = $('#ai-apply'); if (ap) ap.onclick = applyAI;
+}
+function applyAI() {
+  if (!canWrite()) return;
+  const created = new Map();
+  let n = 0;
+  for (const box of $$('#sheet-body input[type=checkbox]:checked')) {
+    const d = box.dataset;
+    if (d.type === 'assign' && S.commits.has(d.commit)) {
+      let tid = d.thread;
+      if (!tid) { const name = d.newThread; if (!created.has(name)) created.set(name, ensureThread(name)); tid = created.get(name); }
+      patchDoc('commits', d.commit, { thread: tid }, 0); n++;
+    } else if (d.type === 'rel') { putDoc('edges', { id: uid('e'), from: d.from, to: d.to, label: d.label, createdAt: Date.now(), byAI: true }, 0); n++; }
+    else if (d.type === 'stale') { patchDoc('threads', d.thread, { status: 'parked' }, 0); n++; }
+  }
+  closeSheet();
+  toast(n ? t('tApplied', n) : t('tNoneChecked'));
+}
+
+/* ================= toast & boot ================= */
+let toastT = 0;
+function toast(msg) {
+  const el = $('#toast');
+  el.textContent = msg; el.hidden = false;
+  clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; }, 2600);
+}
+
+applyStatic();
+renderKinds();
+autosize();
+const h = (location.hash || '').slice(1);
+setView(h === 'git' || h === 'timeline' ? h : 'canvas');
+initStore();
+initSample();
+})();
+</script>

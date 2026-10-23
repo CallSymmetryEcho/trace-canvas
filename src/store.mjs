@@ -1,0 +1,189 @@
+// File-backed store shared by the local server, the CLI and the Claude Code hooks.
+// Everything lives in one JSON file guarded by a directory lock, so concurrent
+// hook processes from parallel sessions never clobber each other.
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+export const COLS = ['threads', 'commits', 'edges'];
+export const INBOX = 'inbox';
+export const KINDS = ['idea', 'task', 'agent', 'decision', 'note', 'fork', 'merge'];
+export const LINE_COLORS = ['#E4002B', '#0072CE', '#00A651', '#F29F05', '#8E3A96', '#00A0B0', '#A0522D', '#E5007E', '#5B6B7F', '#6CA425'];
+
+export function home(env = process.env) {
+  return env.TRACE_CANVAS_HOME || path.join(os.homedir(), '.trace-canvas');
+}
+export const dataFile = env => path.join(home(env), 'data.json');
+const lockDir = env => path.join(home(env), '.lock');
+const configFile = env => path.join(home(env), 'config.json');
+
+export const uid = prefix => prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+function sleepSync(ms) { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); }
+
+export function emptyData() { return { version: 1, threads: {}, commits: {}, edges: {} }; }
+
+export function readData(env) {
+  try {
+    const d = JSON.parse(fs.readFileSync(dataFile(env), 'utf8'));
+    for (const c of COLS) if (!d[c] || typeof d[c] !== 'object' || Array.isArray(d[c])) d[c] = {};
+    return d;
+  } catch {
+    return emptyData();
+  }
+}
+
+function writeData(d, env) {
+  const file = dataFile(env);
+  const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(d));
+  fs.renameSync(tmp, file);
+}
+
+export function withLock(fn, env) {
+  fs.mkdirSync(home(env), { recursive: true });
+  const dir = lockDir(env);
+  const start = Date.now();
+  for (;;) {
+    try { fs.mkdirSync(dir); break; } catch (e) {
+      if (e.code !== 'EEXIST') throw e;
+      let stale = false;
+      try { stale = Date.now() - fs.statSync(dir).mtimeMs > 5000; } catch {}
+      if (stale || Date.now() - start > 4000) { try { fs.rmdirSync(dir); } catch {} continue; }
+      sleepSync(10);
+    }
+  }
+  try { return fn(); } finally { try { fs.rmdirSync(dir); } catch {} }
+}
+
+// Runs fn(data) under the lock. fn returns false to skip the write.
+export function mutate(fn, env) {
+  return withLock(() => {
+    const d = readData(env);
+    const r = fn(d);
+    if (r !== false) writeData(d, env);
+    return r;
+  }, env);
+}
+
+export function readConfig(env = process.env) {
+  let file = {};
+  try { file = JSON.parse(fs.readFileSync(configFile(env), 'utf8')); } catch {}
+  return {
+    lang: env.TRACE_CANVAS_LANG || file.lang || 'en',
+    group: env.TRACE_CANVAS_GROUP || file.group || 'branch',
+    prompts: env.TRACE_CANVAS_PROMPTS || file.prompts || 'first',
+    turns: env.TRACE_CANVAS_TURNS || file.turns || 'changes',
+  };
+}
+export function writeConfig(patch, env) {
+  fs.mkdirSync(home(env), { recursive: true });
+  let file = {};
+  try { file = JSON.parse(fs.readFileSync(configFile(env), 'utf8')); } catch {}
+  fs.writeFileSync(configFile(env), JSON.stringify({ ...file, ...patch }, null, 2));
+}
+
+export function toArrays(d) {
+  return { threads: Object.values(d.threads), commits: Object.values(d.commits), edges: Object.values(d.edges) };
+}
+
+export function threadIdOf(d, c) { return c && c.thread && d.threads[c.thread] ? c.thread : INBOX; }
+
+export function lastCommit(d, tid) {
+  let best = null;
+  for (const c of Object.values(d.commits)) if (threadIdOf(d, c) === tid && (!best || c.ts > best.ts)) best = c;
+  return best;
+}
+
+export function findThreadByName(d, name) {
+  const n = String(name || '').trim().toLowerCase();
+  if (!n) return null;
+  if (n === INBOX || n === '收件箱') return INBOX;
+  if (d.threads[name]) return name;
+  for (const t of Object.values(d.threads)) if ((t.name || '').trim().toLowerCase() === n) return t.id;
+  return null;
+}
+
+// Same placement rule as the page: inbox sits at (0,0), threads fill columns to its right.
+function freeSpot(d, near) {
+  const pts = Object.values(d.threads).map(t => [t.x || 0, t.y || 0]).concat([[0, 0]]);
+  const free = (x, y) => pts.every(([px, py]) => Math.abs(px - x) > 220 || Math.abs(py - y) > 170);
+  if (near) {
+    for (let k = 0; k < 14; k++) {
+      const dy = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 190;
+      const x = (near.x || 0) + 300, y = (near.y || 0) + dy;
+      if (free(x, y)) return { x, y };
+    }
+  }
+  for (let r = 0; r < 200; r++) for (let c = 1; c <= 4; c++) { const x = c * 300, y = r * 250; if (free(x, y)) return { x, y }; }
+  return { x: 300, y: pts.length * 250 };
+}
+
+export function createThread(d, { name, key = null, parent = null, forkOf = null, note = '', extra = {} }) {
+  const used = new Set(Object.values(d.threads).map(t => t.color));
+  const color = LINE_COLORS.find(c => !used.has(c)) || LINE_COLORS[Object.keys(d.threads).length % LINE_COLORS.length];
+  const near = parent && d.threads[parent] ? d.threads[parent] : null;
+  const pos = freeSpot(d, near);
+  const t = { id: uid('t'), name: String(name || 'Thread').slice(0, 120), color, status: 'active', createdAt: Date.now(), parent, forkOf, mergedInto: null, x: pos.x, y: pos.y, note, ...(key ? { key } : {}), ...extra };
+  d.threads[t.id] = t;
+  return t;
+}
+
+export function ensureThread(d, name) {
+  return findThreadByName(d, name) || createThread(d, { name: String(name).trim() }).id;
+}
+
+export function addCommit(d, { thread, kind = 'idea', title, body = '', links = [], agent = '', ts = Date.now(), parents, extra = {} }) {
+  const tid = thread && (thread === INBOX || d.threads[thread]) ? thread : INBOX;
+  const prev = lastCommit(d, tid);
+  const c = {
+    id: uid('c'), thread: tid, kind: KINDS.includes(kind) ? kind : 'agent',
+    title: String(title || '').slice(0, 500), body: String(body || '').slice(0, 8000),
+    links: (links || []).map(String).slice(0, 20), agent: String(agent || ''), ts,
+    parents: parents || (prev ? [prev.id] : []), done: false, ...extra,
+  };
+  d.commits[c.id] = c;
+  const t = d.threads[tid];
+  if (t && t.status === 'parked' && kind !== 'merge') t.status = 'active';
+  return c;
+}
+
+export function parseTs(v) {
+  if (typeof v === 'number' && isFinite(v)) return v < 1e12 ? v * 1000 : v;
+  if (typeof v === 'string') { const t = Date.parse(v); if (!isNaN(t)) return t; }
+  return Date.now();
+}
+
+// Accepts a full export ({threads, commits, edges}) or agent records
+// (one JSON object, an array of them, or JSON lines).
+export function importText(d, text, { defaultThread = INBOX } = {}) {
+  text = String(text || '').trim();
+  let data = null;
+  try { data = JSON.parse(text); } catch {}
+  const validId = id => typeof id === 'string' && /^[\w\-.~:@+]{1,180}$/.test(id);
+  if (data && !Array.isArray(data) && typeof data === 'object' && (Array.isArray(data.threads) || Array.isArray(data.commits))) {
+    let n = 0;
+    for (const col of COLS) for (const doc of data[col] || []) if (doc && validId(doc.id)) { d[col][doc.id] = { ...doc }; n++; }
+    return n;
+  }
+  let recs;
+  if (Array.isArray(data)) recs = data;
+  else if (data && typeof data === 'object') recs = [data];
+  else recs = text.split('\n').map(l => { const s = l.trim().replace(/,$/, ''); if (!s.startsWith('{')) return null; try { return JSON.parse(s); } catch { return null; } }).filter(Boolean);
+  let n = 0;
+  for (const r of recs) {
+    if (!r || typeof r !== 'object') continue;
+    const title = String(r.title || r.summary || r.text || '').trim();
+    if (!title) continue;
+    addCommit(d, {
+      thread: r.thread ? ensureThread(d, String(r.thread)) : defaultThread,
+      kind: ['idea', 'task', 'agent', 'decision', 'note'].includes(r.kind) ? r.kind : 'agent',
+      title,
+      body: typeof r.body === 'string' ? r.body : (r.body ? JSON.stringify(r.body) : ''),
+      links: Array.isArray(r.links) ? r.links : (r.link ? [r.link] : []),
+      agent: r.agent || '', ts: parseTs(r.ts),
+    });
+    n++;
+  }
+  return n;
+}

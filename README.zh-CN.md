@@ -21,6 +21,8 @@
 
 页面默认英文，点右上角 **中文 / EN** 切换。
 
+**它能用来做什么？** 用虚构数据演示的三个场景（四个 agent 并行做一个应用、一个研究生的三周、一项分析分散在三个 agent 和两台电脑上），它在 vibe coding 和 AI 协作中的优势，以及还没解决的问题：[docs/why.zh-CN.md](docs/why.zh-CN.md)。
+
 ## 在 Mac 上运行
 
 只需要 Node.js 18.17 以上，不用 `npm install`。
@@ -171,6 +173,8 @@ node tools/trace-canvas/bin/trace-canvas.mjs log "文献对比表完成" \
 
 ## 实现
 
+![架构图](docs/architecture.zh-CN.svg)
+
 ```text
 app/index.html        页面。可以连本地服务、claude.ai artifact 数据库或浏览器存储
 bin/trace-canvas.mjs  命令行入口
@@ -185,6 +189,8 @@ src/store.mjs         数据文件读写，用目录锁防止并行进程互相�
 src/install.mjs       添加或移除 hooks、MCP 服务、skill 和权限
 src/demo.mjs          中英文示例数据
 test/                 node --test 测试（npm test），含会话记录样例
+docs/architecture.mjs 生成架构图（中英文两版 SVG）
+docs/scenarios/       虚构的场景数据，以及生成场景截图的脚本
 ```
 
 数据结构（一个 JSON 文件）：

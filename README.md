@@ -21,6 +21,8 @@ Three views of the same data:
 
 The page is in English by default. Switch with the **中文 / EN** button in the header.
 
+**What is it good for?** Three scenarios with made-up data (four agents building an app in parallel, three weeks of a PhD student's life, one analysis spread over three agents and two computers), the advantages for vibe coding and AI collaboration, and the open problems: [docs/why.md](docs/why.md).
+
 ## Run it on your Mac
 
 Needs Node.js 18.17 or newer and nothing else (no `npm install`).
@@ -171,6 +173,8 @@ The same page also runs as a claude.ai artifact, with its data in the artifact's
 
 ## How it works
 
+![Architecture](docs/architecture.svg)
+
 ```text
 app/index.html        The page. Works against the local server, a claude.ai artifact database, or browser storage.
 bin/trace-canvas.mjs  Command line entry point.
@@ -185,6 +189,8 @@ src/store.mjs         The data file. A directory lock keeps parallel processes f
 src/install.mjs       Adds or removes hooks, the MCP server, the skill and permissions.
 src/demo.mjs          Example data in English and Chinese.
 test/                 node --test suites (npm test), with transcript fixtures.
+docs/architecture.mjs Draws the architecture diagram (English and Chinese SVG).
+docs/scenarios/       Made-up scenario data and the script that renders their screenshots.
 ```
 
 Data model, stored as one JSON file:

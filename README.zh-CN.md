@@ -28,8 +28,8 @@
 只需要 Node.js 18.17 以上，不用 `npm install`。
 
 ```bash
-cd graduation-affair
-node tools/trace-canvas/bin/trace-canvas.mjs
+cd trace-canvas
+node bin/trace-canvas.mjs
 ```
 
 会在 <http://localhost:4777/> 启动本地服务并自动打开浏览器。数据保存在 `~/.trace-canvas/data.json`。空页面上点 **Load example data（载入示例数据）** 可以先看效果，看完在顶栏点「清除」。
@@ -37,7 +37,7 @@ node tools/trace-canvas/bin/trace-canvas.mjs
 可选：加个快捷命令。
 
 ```bash
-echo "alias trace-canvas='node \"$PWD/tools/trace-canvas/bin/trace-canvas.mjs\"'" >> ~/.zshrc
+echo "alias trace-canvas='node \"$PWD/bin/trace-canvas.mjs\"'" >> ~/.zshrc
 ```
 
 ## Claude Code 写入画布的三种方式
@@ -48,15 +48,15 @@ echo "alias trace-canvas='node \"$PWD/tools/trace-canvas/bin/trace-canvas.mjs\"'
 | **`/trace-canvas` skill** | 你主动调用时 | 输入 `/trace-canvas`，或者直接说「把这次会话放进画布」 |
 | **MCP 工具** | Claude 判断合适时，或 skill 调用时 | 什么都不用做，Claude 自己用 |
 
-**这个仓库里三样都已配好**：`.claude/settings.json`（hooks 和权限）、`.mcp.json`（MCP 服务）、`.claude/skills/trace-canvas`（skill）。拉下分支，在仓库里启动 Claude Code。第一次会让你信任这个文件夹、并批准 `trace-canvas` MCP 服务，两个都同意即可。
+在这个文件夹里运行一条命令，三样都会配好。
 
 要对这台电脑上的所有项目开启，运行一次：
 
 ```bash
-node tools/trace-canvas/bin/trace-canvas.mjs setup --user
+node bin/trace-canvas.mjs setup --user
 ```
 
-它会把 hooks 写进 `~/.claude/settings.json`，用 `claude mcp add --scope user` 注册 MCP 服务，把 skill 链接到 `~/.claude/skills/`，并让「放进画布、记录、读取」这几个工具不用每次确认。合并和导入始终会先问你。只对某个项目开启时，把 `--user` 换成 `--project <目录>`。
+它会把 hooks 写进 `~/.claude/settings.json`，用 `claude mcp add --scope user` 注册 MCP 服务，把 skill 链接到 `~/.claude/skills/`，并让「放进画布、记录、读取」这几个工具不用每次确认。合并和导入始终会先问你。只对某个项目开启时，把 `--user` 换成 `--project <目录>`；之后 Claude Code 会在那个项目里问一次是否批准 `trace-canvas` MCP 服务。
 
 ### Hooks：自动留痕
 
@@ -132,7 +132,7 @@ node tools/trace-canvas/bin/trace-canvas.mjs setup --user
 任何 agent、脚本、定时任务都可以一行命令留痕：
 
 ```bash
-node tools/trace-canvas/bin/trace-canvas.mjs log "文献对比表完成" \
+node bin/trace-canvas.mjs log "文献对比表完成" \
   --thread "开题报告" --kind agent --agent Codex --link https://example.com/doc
 ```
 
@@ -205,4 +205,4 @@ edges/<id>    from, to, label
 
 服务只监听 127.0.0.1，校验 `Host` 头，所有写操作都要带 `X-Trace-Canvas` 头，所以浏览器里打开的其他网站改不了你的数据。
 
-在 `tools/trace-canvas` 目录里运行 `npm test` 跑测试。
+在这个文件夹里运行 `npm test` 跑测试。

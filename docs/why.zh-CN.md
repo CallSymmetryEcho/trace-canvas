@@ -126,7 +126,7 @@
 | 问题 | 现状 | 改进方向 |
 | --- | --- | --- |
 | hooks 对 Claude Code 的输入格式很敏感 | 后台任务的通知会走 `UserPromptSubmit`，曾被当成用户指令记下（已修）；macOS 的 `/var` 链接导致路径比较出错（已修） | 只认真正由人输入的消息；为每种新出现的消息类型加样例测试 |
-| 只按 `repo@branch` 分线 | 在 main 上做的几件不同的事挤在同一条线上 | 增加"主题"维度：按改动目录或提交前缀自动归线（仓库里的 `tools/git_to_canvas.mjs` 是一个原型），或者让 Claude 在 `Stop` 时给出主题 |
+| 只按 `repo@branch` 分线 | 在 main 上做的几件不同的事挤在同一条线上 | 增加"主题"维度：按改动目录或提交前缀自动归线（已为一个论文仓库写过原型脚本 `git_to_canvas.mjs`），或者让 Claude 在 `Stop` 时给出主题 |
 | 一个 JSON 文件整体读写 | 几千条记录没问题，几万条会变慢 | 换成 Node 22 内置的 `node:sqlite`，接口保持 `mutate(fn)` 不变 |
 | 目录锁超过 5 秒视为失效 | 极端情况下，一次很慢的写入可能被另一个进程覆盖 | 改用文件锁，或随存储一起换成 SQLite 的事务 |
 | 隐私 | 第一条指令的全文（最多 3000 字）明文保存 | 写入前去掉看起来像密钥或令牌的内容；可配置只存标题 |
@@ -149,12 +149,12 @@
 把一个场景导入自己的画布：场景数据都带有"示例数据"标记，页面上点一下"清除"就能全部删掉。
 
 ```bash
-node tools/trace-canvas/docs/scenarios/scenarios.mjs vibe zh > /tmp/vibe.json
-node tools/trace-canvas/bin/trace-canvas.mjs import /tmp/vibe.json
+node docs/scenarios/scenarios.mjs vibe zh > /tmp/vibe.json
+node bin/trace-canvas.mjs import /tmp/vibe.json
 ```
 
 场景名可以是 `vibe`、`life` 或 `agents`。重新生成截图：
 
 ```bash
-node tools/trace-canvas/docs/scenarios/shoot.mjs
+node docs/scenarios/shoot.mjs
 ```

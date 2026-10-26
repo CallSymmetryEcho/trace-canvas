@@ -126,7 +126,7 @@ What is known to be missing today, and what to improve next, in order of priorit
 | Problem | Today | Direction |
 | --- | --- | --- |
 | Hooks are sensitive to Claude Code's input format | Background-task notifications arrive as `UserPromptSubmit` and were once logged as a user instruction (fixed); the macOS `/var` link broke path comparison (fixed) | Accept only messages a person actually typed; add a fixture test for every new message type |
-| Lines are split only by `repo@branch` | Different pieces of work done on `main` share one line | Add a *topic* dimension: file records by changed folder or commit prefix (`tools/git_to_canvas.mjs` in this repository is a prototype), or let Claude name the topic at `Stop` |
+| Lines are split only by `repo@branch` | Different pieces of work done on `main` share one line | Add a *topic* dimension: file records by changed folder or commit prefix (a prototype, `git_to_canvas.mjs`, was written for one thesis repository), or let Claude name the topic at `Stop` |
 | One JSON file, read and written whole | Fine for thousands of records, slow for tens of thousands | Move to Node 22's built-in `node:sqlite`, keeping the `mutate(fn)` interface |
 | A directory lock older than 5 seconds is treated as stale | In rare cases a very slow write can be overwritten by another process | A real file lock, or SQLite transactions together with the storage change |
 | Privacy | The first instruction is stored in full (up to 3,000 characters) as plain text | Strip anything that looks like a key or token before writing; an option to store titles only |
@@ -149,12 +149,12 @@ What is known to be missing today, and what to improve next, in order of priorit
 Import a scenario into your own canvas. Scenario data is marked as example data, so one click on **Clear** in the page removes all of it.
 
 ```bash
-node tools/trace-canvas/docs/scenarios/scenarios.mjs vibe en > /tmp/vibe.json
-node tools/trace-canvas/bin/trace-canvas.mjs import /tmp/vibe.json
+node docs/scenarios/scenarios.mjs vibe en > /tmp/vibe.json
+node bin/trace-canvas.mjs import /tmp/vibe.json
 ```
 
 The scenario can be `vibe`, `life` or `agents`. To regenerate the screenshots:
 
 ```bash
-node tools/trace-canvas/docs/scenarios/shoot.mjs
+node docs/scenarios/shoot.mjs
 ```

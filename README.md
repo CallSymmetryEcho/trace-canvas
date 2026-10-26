@@ -28,8 +28,8 @@ The page is in English by default. Switch with the **中文 / EN** button in the
 Needs Node.js 18.17 or newer and nothing else (no `npm install`).
 
 ```bash
-cd graduation-affair
-node tools/trace-canvas/bin/trace-canvas.mjs
+cd trace-canvas
+node bin/trace-canvas.mjs
 ```
 
 This starts a local server on <http://localhost:4777/> and opens it in your browser. Data is stored in `~/.trace-canvas/data.json`. Click **Load example data** on the empty page for a first look, then **Clear** it from the header when you're done.
@@ -37,7 +37,7 @@ This starts a local server on <http://localhost:4777/> and opens it in your brow
 Optional: make `trace-canvas` a command.
 
 ```bash
-echo "alias trace-canvas='node \"$PWD/tools/trace-canvas/bin/trace-canvas.mjs\"'" >> ~/.zshrc
+echo "alias trace-canvas='node \"$PWD/bin/trace-canvas.mjs\"'" >> ~/.zshrc
 ```
 
 ## Three ways Claude Code fills the canvas
@@ -48,15 +48,15 @@ echo "alias trace-canvas='node \"$PWD/tools/trace-canvas/bin/trace-canvas.mjs\"'
 | **`/trace-canvas` skill** | When you ask | Type `/trace-canvas`, or say "put this session on the canvas" |
 | **MCP tools** | Whenever Claude decides it fits, or the skill calls them | Nothing; Claude uses them |
 
-**In this repository all three are already set up**: `.claude/settings.json` (hooks and permissions), `.mcp.json` (MCP server) and `.claude/skills/trace-canvas` (skill). Pull the branch and start Claude Code in the repo. The first time, Claude Code asks you to trust the folder and to approve the `trace-canvas` MCP server; accept both.
+One command, run from this folder, sets up all three.
 
 For every project on this computer, run once:
 
 ```bash
-node tools/trace-canvas/bin/trace-canvas.mjs setup --user
+node bin/trace-canvas.mjs setup --user
 ```
 
-This adds the hooks to `~/.claude/settings.json`, registers the MCP server with `claude mcp add --scope user`, links the skill into `~/.claude/skills/`, and lets the capture, log and read tools run without asking. Merging and importing always ask first. Use `--project <dir>` instead of `--user` for one project only.
+This adds the hooks to `~/.claude/settings.json`, registers the MCP server with `claude mcp add --scope user`, links the skill into `~/.claude/skills/`, and lets the capture, log and read tools run without asking. Merging and importing always ask first. Use `--project <dir>` instead of `--user` for one project only; Claude Code then asks once, in that project, to approve the `trace-canvas` MCP server.
 
 ### Hooks: automatic traces
 
@@ -132,7 +132,7 @@ Set these in `~/.trace-canvas/config.json` or as environment variables:
 Any agent, script or cron job can log one line:
 
 ```bash
-node tools/trace-canvas/bin/trace-canvas.mjs log "Finished the literature table" \
+node bin/trace-canvas.mjs log "Finished the literature table" \
   --thread "Proposal" --kind agent --agent Codex --link https://example.com/doc
 ```
 
@@ -205,4 +205,4 @@ edges/<id>    from, to, label
 
 The server only listens on 127.0.0.1, checks the `Host` header, and requires an `X-Trace-Canvas` header on every write, so other websites open in your browser cannot change your data.
 
-Run the tests with `npm test` inside `tools/trace-canvas`.
+Run the tests with `npm test` in this folder.

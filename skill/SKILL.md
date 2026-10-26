@@ -56,11 +56,11 @@ Call `trace_log` with the text as `title`. Use `thread` if the user named one, a
 If the `trace_*` tools are not available, the MCP server is not set up. Tell the user to run this in the folder that holds Trace Canvas, then start a new session:
 
 ```bash
-node tools/trace-canvas/bin/trace-canvas.mjs setup --user
+node bin/trace-canvas.mjs setup --user
 ```
 
 Until then, single records can still be logged with the command line:
 
 ```bash
-node tools/trace-canvas/bin/trace-canvas.mjs log "title" --thread "name" --kind agent --agent "Claude Code"
+node bin/trace-canvas.mjs log "title" --thread "name" --kind agent --agent "Claude Code"
 ```

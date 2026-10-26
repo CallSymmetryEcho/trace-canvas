@@ -14,5 +14,6 @@
   "engines": {
     "node": ">=18.17"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "repository": "github:CallSymmetryEcho/trace-canvas"
 }

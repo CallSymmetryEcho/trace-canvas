@@ -9,7 +9,7 @@
 - 可以从任意记录**分叉**出新线程，做完再**合并**回去，分叉与合并画成换乘站。
 - **收件箱**放还没归类的零碎想法。
 
-![时间线视图](docs/timeline-zh.png)
+![画布视图：四个 agent 并行开发一个应用（虚构数据）](docs/scenarios/vibe-canvas.zh.png)
 
 同一份数据，三个视图：
 
@@ -28,6 +28,7 @@
 只需要 Node.js 18.17 以上，不用 `npm install`。
 
 ```bash
+git clone https://github.com/CallSymmetryEcho/trace-canvas.git
 cd trace-canvas
 node bin/trace-canvas.mjs
 ```
@@ -206,3 +207,7 @@ edges/<id>    from, to, label
 服务只监听 127.0.0.1，校验 `Host` 头，所有写操作都要带 `X-Trace-Canvas` 头，所以浏览器里打开的其他网站改不了你的数据。
 
 在这个文件夹里运行 `npm test` 跑测试。
+
+## 许可
+
+MIT，见 [LICENSE](LICENSE)。

@@ -9,7 +9,7 @@ A transit map of your work. When you work with AI agents, ideas and tasks run in
 - **Fork** a new thread from any record and **merge** it back when it is done. Forks and merges are drawn as interchanges.
 - The **inbox** holds loose ideas until you file them.
 
-![Canvas view](docs/canvas.png)
+![Canvas view: four agents building an app in parallel (made-up data)](docs/scenarios/vibe-canvas.en.png)
 
 Three views of the same data:
 
@@ -28,6 +28,7 @@ The page is in English by default. Switch with the **中文 / EN** button in the
 Needs Node.js 18.17 or newer and nothing else (no `npm install`).
 
 ```bash
+git clone https://github.com/CallSymmetryEcho/trace-canvas.git
 cd trace-canvas
 node bin/trace-canvas.mjs
 ```
@@ -206,3 +207,7 @@ edges/<id>    from, to, label
 The server only listens on 127.0.0.1, checks the `Host` header, and requires an `X-Trace-Canvas` header on every write, so other websites open in your browser cannot change your data.
 
 Run the tests with `npm test` in this folder.
+
+## License
+
+MIT, see [LICENSE](LICENSE).

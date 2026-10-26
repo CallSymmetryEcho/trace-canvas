@@ -124,6 +124,11 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
   background: var(--surface); border: 1px solid var(--rule); border-radius: 999px; box-shadow: var(--shadow); font-size: 12.5px; color: var(--muted);
 }
 .banner b { color: var(--ink); font-weight: 600; }
+.multi-banner { flex-wrap: wrap; justify-content: center; border-radius: 14px; padding: 8px 10px; gap: 8px; }
+.multi-banner select, .multi-banner input { padding: 4px 8px; border: 1px solid var(--rule); border-radius: 7px; background: var(--surface-2); font-size: 12.5px; max-width: 180px; }
+.multi-banner .btn { border-radius: 7px; }
+.card.is-multi { outline: 2px dashed var(--accent); outline-offset: 2px; }
+.card.is-multi .roundel { box-shadow: 0 0 0 3px var(--accent-soft); }
 .ex-chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 3px 2px 9px; border: 1px dashed var(--faint); border-radius: 999px; font-size: 12px; color: var(--muted); white-space: nowrap; }
 .ex-chip button { border: 0; border-radius: 999px; padding: 2px 8px; background: var(--surface-2); color: var(--ink); font-size: 12px; cursor: pointer; }
 .ex-chip button:hover { background: var(--rule-soft); }
@@ -458,6 +463,7 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
         </div>
       </div>
       <div class="banner" id="connect-banner" hidden></div>
+      <div class="banner multi-banner" id="multi-banner" hidden></div>
       <div class="hud">
         <div class="hud-group">
           <button class="btn" id="zoom-out" data-i18n-aria="zoomOut">−</button>
@@ -469,6 +475,10 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
           <button class="btn" id="connect-btn" aria-pressed="false" data-i18n-title="connectTitle">
             <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="12.5" r="2.3" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12.5" cy="3.5" r="2.3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5.3 10.7l5.4-5.4" stroke="currentColor" stroke-width="1.8"/></svg>
             <span class="btn-label" data-i18n="connect">Connect</span>
+          </button>
+          <button class="btn" id="select-btn" aria-pressed="false" data-i18n-title="selectTitle">
+            <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="1.5" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="6.5" y="6.5" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+            <span class="btn-label" data-i18n="selectMode">Select</span>
           </button>
           <button class="btn" id="new-thread-btn">
             <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -562,6 +572,13 @@ const I18N = {
     menuNewThread: 'New thread', menuHideDone: 'Hide finished threads', menuShowDone: 'Show finished threads',
     menuAgent: 'Connect an AI agent', menuIO: 'Import / export', menuClearEx: 'Clear example data', menuHelp: 'Shortcuts and help',
     zoomOut: 'Zoom out', zoomIn: 'Zoom in', zoomReset: 'Reset to 100%', fit: 'Fit', connect: 'Connect', connectTitle: 'Draw a link between two threads', newThread: 'New thread',
+    selectMode: 'Select', selectTitle: 'Pick several threads (or Shift-click cards), then merge them',
+    multiCount: n => `${n} thread${n === 1 ? '' : 's'} selected`, multiInto: 'into', multiNew: 'New thread…', multiNamePh: 'Name of the new thread',
+    multiMerge: 'Merge', multiMergeTitle: 'Keep every line and draw the merges, like git',
+    multiCombine: 'Combine', multiCombineTitle: 'Move every record onto one line and remove the other threads',
+    multiClear: 'Clear', multiNeedMore: 'Pick at least two threads, or one thread and an existing target',
+    tMergedMany: (n, name) => `Merged ${n} thread${n === 1 ? '' : 's'} into “${name}”`, tCombinedMany: (n, name) => `Combined ${n} thread${n === 1 ? '' : 's'} into “${name}”`,
+    combinedFrom: names => `Combined from ${names}`,
     tlDay: 'Day', tlWeek: 'Week', tlMonth: 'Month', tlNow: 'Now', tlHint: 'One row per thread. The band shows when it was active; dashed curves are forks and merges.',
     detailAria: 'Details', capThreadAria: 'Thread to log to', kindsAria: 'Record type',
     capPh: 'Log an idea, a task or what an agent produced…  Enter to save. Start with #thread to file it. Paste JSON to import.',
@@ -618,6 +635,8 @@ const I18N = {
     agentHooksAll: 'Turn it on for every project on this computer:',
     agentHooksProject: 'Or only for one project (writes .claude/settings.local.json there):',
     agentCliH: 'Any agent or script: the log command', agentCliP: 'Codex, Cursor, shell scripts and cron jobs can all log one line:',
+    agentSkillH: 'Claude Code: the /trace-canvas skill and MCP tools',
+    agentSkillP: 'Type /trace-canvas in a session to put it on the canvas with Claude’s own highlights and summary. /trace-canvas merge folds several sessions or threads together; /trace-canvas sessions lists past sessions. One command sets up hooks, MCP server and skill for every project:',
     agentClaudeH: 'Claude (when it can use the ArtifactData tool)',
     agentClaudeP: 'Send this to Claude Code or Claude on claude.ai. It writes straight into this page’s database and the canvas updates live.',
     agentOtherH: 'Other agents (ChatGPT, Codex, Cursor…)',
@@ -636,6 +655,7 @@ const I18N = {
       ['#', '<code class="mono">#thread-name text</code> logs straight to that thread, creating it if needed'],
       ['1 2 3', 'Switch between Canvas, Branches and Timeline'],
       ['N', 'New thread'],
+      ['Shift', 'Shift-click cards (or turn on Select) to pick several threads, then Merge or Combine them. Combine is handy for folding several sessions into one line.'],
       ['F', 'Fit all threads on the canvas. Drag empty space to pan; Ctrl/⌘ + scroll or pinch to zoom.'],
       ['Esc', 'Close details or cancel a link'],
     ],
@@ -681,6 +701,13 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     menuNewThread: '新建线程', menuHideDone: '隐藏已完成的线程', menuShowDone: '显示已完成的线程',
     menuAgent: '接入 AI agent', menuIO: '导入 / 导出', menuClearEx: '清除示例数据', menuHelp: '快捷键与用法',
     zoomOut: '缩小', zoomIn: '放大', zoomReset: '重置为 100%', fit: '适配', connect: '连线', connectTitle: '在两个线程之间画一条关联', newThread: '新线程',
+    selectMode: '多选', selectTitle: '点选多条线程（或 Shift+点击卡片），然后合并',
+    multiCount: n => `已选 ${n} 条线程`, multiInto: '合并到', multiNew: '新线程…', multiNamePh: '新线程名称',
+    multiMerge: '合并', multiMergeTitle: '保留每条线路，像 git 一样画出合并',
+    multiCombine: '并成一条', multiCombineTitle: '把所有记录移到一条线上，删除其余线程',
+    multiClear: '取消', multiNeedMore: '至少选两条线程，或选一条并指定一条已有的目标线程',
+    tMergedMany: (n, name) => `已把 ${n} 条线程合并到「${name}」`, tCombinedMany: (n, name) => `已把 ${n} 条线程并成「${name}」`,
+    combinedFrom: names => `由 ${names} 合并而来`,
     tlDay: '日', tlWeek: '周', tlMonth: '月', tlNow: '回到现在', tlHint: '每一行是一条线程，色带是它活跃的时段，虚线是分叉与合并',
     detailAria: '详情', capThreadAria: '记到哪条线程', kindsAria: '记录类型',
     capPh: '记下一个想法、任务或 agent 的产出…  回车留痕，#线程名 开头可直接归类，粘贴 JSON 可批量导入',
@@ -736,6 +763,8 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     agentHooksAll: '对这台电脑上的所有项目开启：',
     agentHooksProject: '或者只对某个项目开启（写入该项目的 .claude/settings.local.json）：',
     agentCliH: '任意 agent 或脚本：log 命令', agentCliP: 'Codex、Cursor、shell 脚本、定时任务都可以用一行命令留痕：',
+    agentSkillH: 'Claude Code：/trace-canvas skill 和 MCP 工具',
+    agentSkillP: '在会话里输入 /trace-canvas，就会把当前会话连同 Claude 写的要点和总结放进画布。/trace-canvas merge 把多次会话或多条线程合并，/trace-canvas sessions 列出过去的会话。一条命令为所有项目装好 hooks、MCP 和 skill：',
     agentClaudeH: 'Claude（能用 ArtifactData 工具时）',
     agentClaudeP: '把下面这段话发给 Claude Code 或 claude.ai 里的 Claude，它会直接写进这个页面的数据库，画布会实时更新。',
     agentOtherH: '其他 agent（ChatGPT、Codex、Cursor…）',
@@ -754,6 +783,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
       ['#', '<code class="mono">#线程名 内容</code> 直接记到那条线程，不存在就新建'],
       ['1 2 3', '切换画布、分支、时间线'],
       ['N', '新建线程'],
+      ['Shift', 'Shift+点击卡片（或打开「多选」）选中多条线程，再「合并」或「并成一条」。把几次会话并成一条线时很方便'],
       ['F', '画布适配全部线程。拖动空白处平移，Ctrl/⌘ + 滚轮或双指缩放'],
       ['Esc', '关闭详情或取消连线'],
     ],
@@ -828,7 +858,7 @@ const S = {
   cam: { x: 40, y: 40, z: 1 }, fitted: false,
   inboxPos: ls.get('tc.inboxPos', { x: 0, y: 0 }),
   tlZoom: ls.get('tc.tlZoom', 'week'), tlScroll: true,
-  connect: null,
+  connect: null, multi: new Set(), selectMode: false, multiName: '',
   captureKind: 'idea', captureThread: ls.get('tc.captureThread', INBOX),
   mode: 'loading', readOnly: false, offline: false, got: new Set(), dragId: null,
   ai: null, sheet: null,
@@ -1209,6 +1239,94 @@ function renderCanvas() {
   const cb = $('#connect-banner');
   cb.hidden = !S.connect;
   if (S.connect) cb.innerHTML = `<span>${S.connect.from ? t('connectFrom', esc(getThread(S.connect.from).name)) : esc(t('connectPick'))}</span><button class="btn" id="connect-cancel">${esc(t('cancel'))}</button>`;
+  $('#select-btn').setAttribute('aria-pressed', S.selectMode ? 'true' : 'false');
+  renderMulti();
+}
+
+/* ---- several threads at once ---- */
+let multiSig = '';
+function renderMulti() {
+  for (const id of [...S.multi]) if (!S.threads.has(id)) S.multi.delete(id);
+  const mb = $('#multi-banner');
+  const show = !S.connect && (S.multi.size > 0 || S.selectMode);
+  mb.hidden = !show;
+  if (!show) { multiSig = ''; return; }
+  const targets = orderedThreads().filter(th => !S.multi.has(th.id) && th.status !== 'merged');
+  const sig = LANG + [...S.multi].join(',') + '|' + targets.map(th => th.id + th.name).join(',');
+  if (sig === multiSig && mb.contains(document.activeElement)) return;
+  const prevTarget = $('#multi-target') ? $('#multi-target').value : '__new';
+  multiSig = sig;
+  mb.innerHTML = `<span>${esc(t('multiCount', S.multi.size))}</span>
+    <span>${esc(t('multiInto'))}</span>
+    <select id="multi-target"><option value="__new">${esc(t('multiNew'))}</option>${targets.map(th => `<option value="${esc(th.id)}">${esc(th.name)}</option>`).join('')}</select>
+    <input id="multi-name" placeholder="${esc(t('multiNamePh'))}" value="${esc(S.multiName)}">
+    <button class="btn btn-primary" data-multi="merge" title="${esc(t('multiMergeTitle'))}">${esc(t('multiMerge'))}</button>
+    <button class="btn" data-multi="combine" title="${esc(t('multiCombineTitle'))}">${esc(t('multiCombine'))}</button>
+    <button class="btn btn-quiet" data-multi="clear">${esc(t('multiClear'))}</button>`;
+  const sel = $('#multi-target');
+  if ([...sel.options].some(o => o.value === prevTarget)) sel.value = prevTarget;
+  $('#multi-name').hidden = sel.value !== '__new';
+}
+function toggleMulti(id) {
+  if (id === INBOX) return;
+  if (S.multi.has(id)) S.multi.delete(id); else S.multi.add(id);
+  render();
+}
+function clearMulti() { S.multi.clear(); S.selectMode = false; S.multiName = ''; render(); }
+$('#multi-banner').addEventListener('input', e => { if (e.target.id === 'multi-name') S.multiName = e.target.value; });
+$('#multi-banner').addEventListener('change', e => { if (e.target.id === 'multi-target') $('#multi-name').hidden = e.target.value !== '__new'; });
+$('#multi-banner').addEventListener('click', e => {
+  const b = e.target.closest('[data-multi]'); if (!b) return;
+  if (b.dataset.multi === 'clear') { clearMulti(); return; }
+  if (!canWrite()) return;
+  mergeMany(b.dataset.multi, $('#multi-target').value);
+});
+$('#select-btn').onclick = () => { S.selectMode = !S.selectMode; if (!S.selectMode && !S.multi.size) S.multiName = ''; S.connect = null; render(); };
+
+// Same rules as `trace-canvas merge`: merge keeps every line, combine folds them into one.
+function mergeMany(mode, targetVal) {
+  const sources = [...S.multi].filter(id => S.threads.has(id) && id !== targetVal);
+  const isNew = targetVal === '__new';
+  if (sources.length < (isNew ? 2 : 1)) { toast(t('multiNeedMore')); return; }
+  const names = sources.map(id => S.threads.get(id).name);
+  let tid = targetVal;
+  if (isNew) {
+    const first = S.threads.get(sources[0]);
+    tid = newThread({ name: S.multiName.trim() || names.join(' + '), near: first }).id;
+  }
+  if (mode === 'combine') {
+    for (const c of [...S.commits.values()]) if (sources.includes(c.thread)) patchDoc('commits', c.id, { thread: tid }, 0);
+    for (const th of [...S.threads.values()]) {
+      const patch = {};
+      if (sources.includes(th.parent)) patch.parent = th.id === tid ? null : tid;
+      if (sources.includes(th.mergedInto)) patch.mergedInto = tid;
+      if (Object.keys(patch).length) patchDoc('threads', th.id, patch, 0);
+    }
+    const seen = new Set();
+    for (const e of [...S.edges.values()]) {
+      const from = sources.includes(e.from) ? tid : e.from, to = sources.includes(e.to) ? tid : e.to;
+      const k = `${from}>${to}:${e.label}`;
+      if (from === to || seen.has(k)) { removeDoc('edges', e.id); continue; }
+      seen.add(k);
+      if (from !== e.from || to !== e.to) patchDoc('edges', e.id, { from, to }, 0);
+    }
+    for (const id of sources) removeDoc('threads', id);
+    const target = S.threads.get(tid);
+    const note = t('combinedFrom', names.join(', '));
+    patchDoc('threads', tid, { note: target.note ? `${target.note}\n${note}` : note, ...(target.status === 'merged' ? { status: 'active', mergedInto: null } : {}) }, 0);
+    if (sources.includes(S.captureThread)) setCaptureThread(tid);
+  } else {
+    for (const sid of sources) {
+      const s = S.threads.get(sid);
+      const sTip = lastCommit(sid), tTip = lastCommit(tid);
+      addCommit({ thread: tid, kind: 'merge', title: t('mergeTitle', s.name), parents: [tTip && tTip.id, sTip && sTip.id].filter(Boolean), ts: Math.max(Date.now(), sTip ? sTip.ts + 1 : 0), extra: { mergeOf: sid } });
+      patchDoc('threads', sid, { status: 'merged', mergedInto: tid }, 0);
+    }
+  }
+  const targetName = S.threads.get(tid).name;
+  S.multi.clear(); S.selectMode = false; S.multiName = '';
+  select({ type: 'thread', id: tid });
+  toast(mode === 'combine' ? t('tCombinedMany', sources.length, targetName) : t('tMergedMany', sources.length, targetName));
 }
 function cardHTML(th, cs, selT) {
   const isInbox = th.id === INBOX;
@@ -1217,7 +1335,7 @@ function cardHTML(th, cs, selT) {
   const last = cs[cs.length - 1];
   const anyHit = !S.q || cs.some(matches);
   const selC = S.sel && S.sel.type === 'commit' ? S.sel.id : null;
-  const cls = ['card', isInbox ? 'is-inbox' : `st-${th.status || 'active'}`, selT === th.id ? 'is-sel' : '', S.q && !anyHit ? 'is-dim' : '', S.connect && S.connect.from === th.id ? 'is-from' : ''].filter(Boolean).join(' ');
+  const cls = ['card', isInbox ? 'is-inbox' : `st-${th.status || 'active'}`, selT === th.id ? 'is-sel' : '', S.q && !anyHit ? 'is-dim' : '', S.connect && S.connect.from === th.id ? 'is-from' : '', S.multi.has(th.id) ? 'is-multi' : ''].filter(Boolean).join(' ');
   const items = recent.length
     ? recent.map(c => `<li data-cid="${esc(c.id)}" class="${c.id === selC ? 'is-sel' : ''} ${S.q && matches(c) ? 'hit' : ''}">${mini(c.kind, th.color, c.done)}<span class="s-title">${esc(c.title)}</span><time class="s-time">${fmtShort(c.ts)}</time></li>`).join('')
       + (more > 0 ? `<li class="s-more"><span></span><span>${esc(t('moreEarlier', more))}</span><span></span></li>` : '')
@@ -1307,7 +1425,7 @@ vp.addEventListener('pointerdown', e => {
   const edge = e.target.closest('.edge[data-eid]');
   if (card) {
     const th = getThread(card.dataset.tid);
-    gesture = { type: 'card', id: card.dataset.tid, sx: e.clientX, sy: e.clientY, ox: th.x || 0, oy: th.y || 0, moved: false, el: card, target: e.target };
+    gesture = { type: 'card', id: card.dataset.tid, sx: e.clientX, sy: e.clientY, ox: th.x || 0, oy: th.y || 0, moved: false, el: card, target: e.target, multiKey: e.shiftKey || e.metaKey || e.ctrlKey };
   } else if (edge) gesture = { type: 'edge', id: edge.dataset.eid };
   else { gesture = { type: 'pan', sx: e.clientX, sy: e.clientY, cx: S.cam.x, cy: S.cam.y, moved: false }; vp.classList.add('panning'); }
 });
@@ -1351,6 +1469,7 @@ function endPointer(e) {
       return;
     }
     if (S.connect) { connectTap(g.id); return; }
+    if ((g.multiKey || S.selectMode) && g.id !== INBOX) { toggleMulti(g.id); return; }
     const li = g.target.closest && g.target.closest('li[data-cid]');
     if (li) select({ type: 'commit', id: li.dataset.cid });
     else select({ type: 'thread', id: g.id });
@@ -1826,6 +1945,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     if (!$('#scrim').hidden) { closeSheet(); return; }
     if (S.connect) { S.connect = null; render(); return; }
+    if (S.multi.size || S.selectMode) { clearMulti(); return; }
     if (typing) { e.target.blur(); return; }
     if (S.sel) { select(null); return; }
   }
@@ -1872,7 +1992,8 @@ function agentSheet() {
   let body = `<p>${esc(t('agentIntro'))}</p>`;
   if (SERVER) {
     const cli = `node "${SERVER.cli}"`;
-    body += `<h4>${esc(t('agentHooksH'))}</h4><p>${esc(t('agentHooksP'))}</p>
+    body += `<h4>${esc(t('agentSkillH'))}</h4><p>${esc(t('agentSkillP'))}</p>${codebox(`${cli} setup --user`, 'p-setup')}
+      <h4>${esc(t('agentHooksH'))}</h4><p>${esc(t('agentHooksP'))}</p>
       <p>${esc(t('agentHooksAll'))}</p>${codebox(`${cli} install-hooks --user`, 'p-hooks-user')}
       <p>${esc(t('agentHooksProject'))}</p>${codebox(`${cli} install-hooks --project /path/to/project`, 'p-hooks-proj')}
       <h4>${esc(t('agentCliH'))}</h4><p>${esc(t('agentCliP'))}</p>

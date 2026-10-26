@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { importText, emptyData, mutate, readData } from '../src/store.mjs';
-import { install, uninstall } from '../src/install.mjs';
+import { allowSafeTools, install, uninstall } from '../src/install.mjs';
 
 test('importText reads agent JSON lines and creates missing threads', () => {
   const d = emptyData();
@@ -42,9 +42,14 @@ test('install keeps other settings and hooks, uninstall removes only ours', () =
   assert.equal(s.hooks.PostToolUse.length, 1);
   assert.equal(s.hooks.PostToolUse[0].hooks[0].async, true);
   assert.ok(fs.existsSync(file + '.bak'));
+  allowSafeTools(file);
+  s = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.ok(s.permissions.allow.includes('mcp__trace-canvas__trace_capture_session'));
+  assert.ok(!s.permissions.allow.includes('mcp__trace-canvas__trace_merge'));
   uninstall(file);
   s = JSON.parse(fs.readFileSync(file, 'utf8'));
   assert.deepEqual(s.hooks, { Stop: [{ hooks: [{ type: 'command', command: 'say done' }] }] });
+  assert.equal(s.permissions, undefined);
 });
 
 test('server serves the page and data, and refuses writes without its header', async () => {

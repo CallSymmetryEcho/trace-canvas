@@ -15,7 +15,7 @@
 
 | 视图 | 用途 |
 | --- | --- |
-| 画布 | 每条线程是一张带迷你线路图的卡片，可拖拽、缩放，线程之间可以画带标签的关联 |
+| 画布 | 每条线程是一张带迷你线路图的卡片，可拖拽、缩放、画带标签的关联，也可以多选线程一起合并 |
 | 分支 | git graph：所有记录按时间排列，每条线程一条泳道，分叉与合并画成曲线 |
 | 时间线 | 横向时间轴（日 / 周 / 月），每行一条线程，色带是它活跃的时段 |
 
@@ -38,9 +38,25 @@ node tools/trace-canvas/bin/trace-canvas.mjs
 echo "alias trace-canvas='node \"$PWD/tools/trace-canvas/bin/trace-canvas.mjs\"'" >> ~/.zshrc
 ```
 
-## Claude Code 自动留痕
+## Claude Code 写入画布的三种方式
 
-hooks 会把 Claude Code 会话里的关键节点自动变成记录，不需要你做任何事：
+| | 什么时候发生 | 你要做什么 |
+| --- | --- | --- |
+| **Hooks** | 每个会话的关键节点自动记录 | 什么都不用做 |
+| **`/trace-canvas` skill** | 你主动调用时 | 输入 `/trace-canvas`，或者直接说「把这次会话放进画布」 |
+| **MCP 工具** | Claude 判断合适时，或 skill 调用时 | 什么都不用做，Claude 自己用 |
+
+**这个仓库里三样都已配好**：`.claude/settings.json`（hooks 和权限）、`.mcp.json`（MCP 服务）、`.claude/skills/trace-canvas`（skill）。拉下分支，在仓库里启动 Claude Code。第一次会让你信任这个文件夹、并批准 `trace-canvas` MCP 服务，两个都同意即可。
+
+要对这台电脑上的所有项目开启，运行一次：
+
+```bash
+node tools/trace-canvas/bin/trace-canvas.mjs setup --user
+```
+
+它会把 hooks 写进 `~/.claude/settings.json`，用 `claude mcp add --scope user` 注册 MCP 服务，把 skill 链接到 `~/.claude/skills/`，并让「放进画布、记录、读取」这几个工具不用每次确认。合并和导入始终会先问你。只对某个项目开启时，把 `--user` 换成 `--project <目录>`。
+
+### Hooks：自动留痕
 
 | 时机 | 记下什么 |
 | --- | --- |
@@ -52,25 +68,51 @@ hooks 会把 Claude Code 会话里的关键节点自动变成记录，不需要�
 | `git merge <分支>` | 当前线程上一条**合并**，被合并的分支线程标为已合并 |
 | 会话结束 | **笔记**：时长、指令数、文件数、提交数，以及 `claude --resume <id>` |
 
-记录按「仓库 + 分支」归到线程。在 `main` 上工作记到 `graduation-affair`；切到分支 `lit-review` 时，会从当前位置分叉出新线程 `graduation-affair · lit-review`。这样不同分支上并行的会话会落在不同的线路上。只是回答问题、没有改动文件的回合不记录。
+记录按「仓库 + 分支」归到线程。在 `main` 上工作记到 `graduation-affair`；切到分支 `lit-review` 时，会从当前位置分叉出新线程 `graduation-affair · lit-review`。这样不同分支上并行的会话会落在不同的线路上。只是回答问题的回合不记录；用 shell 写文件（`>`、`tee`、`sed -i` 等）也算改动。
 
-**这个仓库里 hooks 已经开启**：`.claude/settings.json` 里注册好了。拉下这个分支，在仓库里开一个新的 Claude Code 会话，记录就会出现。没装 Node 的机器上 hook 什么也不做。
+### `/trace-canvas`：把当前会话放进画布
 
-对这台电脑上的所有项目开启：
+| 你输入 | 发生什么 |
+| --- | --- |
+| `/trace-canvas` | Claude 为这次会话写 2–6 条要点（决策、产出、下一步）、一段简短总结和一个线程名，再加上从会话记录里读出的关键节点，一起放进画布 |
+| `/trace-canvas sessions` | 列出这个项目过去的会话，标出哪些已经在画布上，可以挑着加进去 |
+| `/trace-canvas merge <线程…>` | 合并会话或线程。Claude 会先跟你确认来源、目标和合并方式 |
+| `/trace-canvas open` | 启动并打开页面 |
+| `/trace-canvas log <内容>` | 记一条 |
 
-```bash
-node tools/trace-canvas/bin/trace-canvas.mjs install-hooks --user
-```
+直接用自然语言也行：「把这次会话放进画布」「put this session on the canvas」「把两次问卷分析的会话合并」。
 
-只对另一个项目开启（写入该项目的 `.claude/settings.local.json`）：
+重复放进去没关系，已经在画布上的记录会跳过。如果 hooks 已经记过这次会话，会补全到那条线程上；想让这次会话「单独成一条线」时（`separate`），会把它的记录移到新线程里。
 
-```bash
-node tools/trace-canvas/bin/trace-canvas.mjs install-hooks --project ~/code/some-project
-```
+### MCP 工具
 
-用同样的参数运行 `uninstall-hooks` 可以移除。配置文件里的其他设置和 hooks 会保留，修改前会先写一份 `.bak`。在多个地方重复安装也没关系，同一个事件只会记一次。
+| 工具 | 作用 |
+| --- | --- |
+| `trace_capture_session` | 把当前会话（或用 `session_id` 指定的过去会话）放进画布，附上 Claude 写的要点、总结和线程名 |
+| `trace_list_sessions` | 从会话记录文件列出某个项目的 Claude Code 会话 |
+| `trace_list_threads` | 列出线程：状态、记录数、最近更新；`query` 可搜索 |
+| `trace_read_thread` | 读取一条线程上的记录 |
+| `trace_merge` | 合并任意多条线程，`merge` 或 `combine` 两种方式（见下） |
+| `trace_log` | 记一条 |
+| `trace_import_data` | 合并另一份数据：导出文件、另一台电脑的 `data.json`、或 JSON 行 |
+| `trace_open` | 必要时启动页面，返回地址 |
 
-### 调整
+## 合并会话与线程
+
+同一件事的多次会话可以并成一条线，有两种方式：
+
+- **合并（merge）**：保留每条来源线路，标为已合并，像 git 一样画出合并到目标的曲线，历史都还看得见。
+- **并成一条（combine）**：把所有记录按时间移到目标线程上，删除来源线程，指向它们的关联改为指向目标。
+
+目标可以是已有线程，也可以新建。三个地方都能做：
+
+- **画布上**：Shift+点击卡片（触屏上可以先打开工具栏的「多选」），选目标或输入新名字，点「合并」或「并成一条」。
+- **Claude Code 里**：`/trace-canvas merge`，或直接说。
+- **命令行**：`trace-canvas merge "问卷 A" "问卷 B" --into "问卷分析" --combine`。
+
+另一台电脑（比如工作站）上的数据用 `trace-canvas import other-data.json` 合并进来。仓库/分支或会话的 key 相同、或名字相同的线程会并成一条，已有的记录会跳过。
+
+## 调整 hooks
 
 写在 `~/.trace-canvas/config.json` 里，或用环境变量：
 
@@ -79,9 +121,9 @@ node tools/trace-canvas/bin/trace-canvas.mjs install-hooks --project ~/code/some
 | `lang` | `TRACE_CANVAS_LANG` | `en`、`zh`：hooks 写入的记录用什么语言 | `en`（在页面上切换语言会一起切换） |
 | `group` | `TRACE_CANVAS_GROUP` | `branch`、`repo`、`session`：一条线程代表什么 | `branch` |
 | `prompts` | `TRACE_CANVAS_PROMPTS` | `first`、`long`（60 字符以上）、`all`、`none` | `first` |
-| `turns` | `TRACE_CANVAS_TURNS` | `changes`（改了文件的回合）、`all`、`none` | `changes` |
+| `turns` | `TRACE_CANVAS_TURNS` | `changes`（有改动的回合）、`all`、`none` | `changes` |
 
-`TRACE_CANVAS_DISABLE=1` 可以让某个会话不留痕，`TRACE_CANVAS_HOME` 可以换数据目录。
+`TRACE_CANVAS_DISABLE=1` 可以让某个会话不留痕，`TRACE_CANVAS_HOME` 可以换数据目录，`TRACE_CANVAS_DEBUG=1` 会把每个 hook 事件写进 `~/.trace-canvas/debug.log`。
 
 ## 其他 agent 和脚本
 
@@ -105,13 +147,22 @@ node tools/trace-canvas/bin/trace-canvas.mjs log "文献对比表完成" \
 ## 命令
 
 ```text
-trace-canvas [serve] [--port 4777] [--no-open]   启动页面
-trace-canvas log "标题" [--thread 线程] [--kind 类型] [--body 详情] [--link 链接] [--agent 来源]
-trace-canvas import <文件|->                     导入导出文件或 JSON 行
-trace-canvas install-hooks [--user | --project 目录]
-trace-canvas uninstall-hooks [--user | --project 目录]
-trace-canvas lang <en|zh>                        hooks 写入记录的语言
-trace-canvas where                               显示数据存放位置
+页面
+  trace-canvas [serve] [--port 4777] [--no-open]   启动并打开页面
+
+记录
+  trace-canvas log "标题" [--thread 线程] [--kind 类型] [--body 详情] [--link 链接] [--agent 来源]
+  trace-canvas capture [--session ID] [--project 目录] [--thread 线程] [--separate] [--all]
+  trace-canvas sessions [--project 目录]           列出某个项目的 Claude Code 会话
+  trace-canvas merge <线程>... --into <线程> [--combine]
+  trace-canvas import <文件|->                     合并导出文件、另一份 data.json 或 JSON 行
+
+安装（--user 对所有项目，--project 目录 只对一个项目）
+  trace-canvas setup            hooks + MCP 服务 + skill
+  trace-canvas install-hooks | install-mcp | install-skill | uninstall-hooks
+  trace-canvas mcp              以 stdio 运行 MCP 服务（由 Claude Code 启动）
+  trace-canvas lang <en|zh>     hooks 写入记录的语言
+  trace-canvas where            显示数据存放位置
 ```
 
 ## 在线版
@@ -123,18 +174,24 @@ trace-canvas where                               显示数据存放位置
 ```text
 app/index.html        页面。可以连本地服务、claude.ai artifact 数据库或浏览器存储
 bin/trace-canvas.mjs  命令行入口
+skill/SKILL.md        /trace-canvas skill
 src/server.mjs        只监听 127.0.0.1 的本地服务：页面、JSON API、用 SSE 实时推送更新
+src/mcp.mjs           MCP 服务（stdio JSON-RPC，无依赖）
 src/hook.mjs          Claude Code hook 处理
-src/store.mjs         数据文件读写，用目录锁防止并行的 hook 进程互相覆盖
-src/install.mjs       在 Claude Code 配置文件里添加或移除 hooks
+src/transcript.mjs    读取 Claude Code 会话记录（~/.claude/projects/…/<session>.jsonl）
+src/ops.mjs           放入会话、合并线程、合并数据集
+src/git-events.mjs    从 shell 命令及其输出里识别提交、推送、合并和 PR
+src/store.mjs         数据文件读写，用目录锁防止并行进程互相覆盖
+src/install.mjs       添加或移除 hooks、MCP 服务、skill 和权限
 src/demo.mjs          中英文示例数据
-test/                 node --test 测试（npm test）
+test/                 node --test 测试（npm test），含会话记录样例
 ```
 
 数据结构（一个 JSON 文件）：
 
 ```text
-threads/<id>  name, color, status (active | parked | done | merged), parent, forkOf, mergedInto, x, y, note, key
+threads/<id>  name, color, status (active | parked | done | merged), parent, forkOf, mergedInto, x, y, note,
+              key（repo、repo@branch 或 session:<id>）
 commits/<id>  thread（或 "inbox"）, kind (idea | task | agent | decision | note | fork | merge), title, body,
               links[], agent, ts, parents[], done, mergeOf?, session?
 edges/<id>    from, to, label

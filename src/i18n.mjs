@@ -14,6 +14,7 @@ const S = {
     reason: r => `Reason: ${r}`,
     resume: 'Resume',
     sessionThread: (repo, date) => `${repo} session ${date}`,
+    combinedFrom: names => `Combined from ${names}`,
   },
   zh: {
     branchedFrom: (branch, parent) => `从 ${parent} 分出分支 ${branch}`,
@@ -29,6 +30,7 @@ const S = {
     reason: r => `结束原因：${r}`,
     resume: '恢复会话',
     sessionThread: (repo, date) => `${repo} 会话 ${date}`,
+    combinedFrom: names => `由 ${names} 合并而来`,
   },
 };
 export function tr(lang, key, ...args) {

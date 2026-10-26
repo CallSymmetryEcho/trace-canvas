@@ -67,10 +67,12 @@ export const firstLine = (s, n) => {
   return line.length > n ? line.slice(0, n - 1) + '…' : line;
 };
 
-// User prompts arrive with pasted blocks, reminders and command wrappers; keep what the person typed.
+// User prompts arrive with pasted blocks, reminders, background-task notifications and
+// command wrappers; keep what the person typed.
 export function cleanPrompt(p) {
   return String(p || '')
     .replace(/<pasted_content[^>]*>[\s\S]*?<\/pasted_content>/g, '[pasted]')
     .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '')
+    .replace(/<task-notification>[\s\S]*?<\/task-notification>/g, '')
     .trim();
 }

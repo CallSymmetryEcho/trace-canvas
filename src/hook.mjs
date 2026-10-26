@@ -47,7 +47,10 @@ function saveState(sid, state, env) {
 }
 function dropState(sid, env) { try { fs.unlinkSync(stateFile(sid, env)); } catch {} }
 
-export const rel = (root, f) => { try { const r = path.relative(root, f); return r && !r.startsWith('..') ? r : f; } catch { return f; } };
+// git reports the real path, while cwd and tool paths may go through a link (on macOS /var and
+// /tmp point into /private), so compare real paths. f itself may not exist yet; its folder does.
+const real = p => { try { return fs.realpathSync(p); } catch { return p; } };
+export const rel = (root, f) => { try { const r = path.relative(real(root), path.join(real(path.dirname(f)), path.basename(f))); return r && !r.startsWith('..') ? r : f; } catch { return f; } };
 const pushUnique = (arr, v) => { if (v && !arr.includes(v)) arr.push(v); };
 export const resumeLink = sid => `claude --resume ${sid}`;
 

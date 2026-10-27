@@ -731,6 +731,31 @@ const GIFS = [
       await h.camera('#detail .gx-list', 1.5, 500); // the list moved with the scroll; follow it
       await h.wait(1500);
     } },
+  // Several machines: hand a to-do to Codex and sync; the workstation does it off screen; sync again: ticked by Codex, on workstation.
+  { name: 'machines', page: 'app', fresh: true, view: 'canvas', zoom: 1, focus: { x: 640, y: 360 }, text: [],
+    preload: h => machinesDemo(h.lang),
+    run: async h => {
+      const fast = { ms: 350 }, sync = async () => { await h.click('#more-btn', fast); await h.click('#sync-item', fast); await h.wait(900); };
+      await mchGoals(h);
+      await h.move(`.gl-who[data-who="${MCH.todo}"]`, 0, 350);
+      await mchAssign(h);
+      await h.wait(500);
+      await h.key('Escape');
+      await sync();
+      runSync(MCH.ws); workstationTurn(h.lang); runSync(MCH.ws); // the workstation, off screen
+      await sync();
+      await mchGoals(h);
+      await h.click('#gl-show-done', fast);
+      await h.move('.gl-tasks li.done .gl-by', 0, 350);
+      await h.wait(1000);
+      await h.key('Escape');
+      await h.wait(300);
+      await h.click(`#cv-cards li[data-cid="${MCH.result}"]`, fast);
+      await h.wait(400);
+      const i = await mchOnMachine(h);
+      if (i >= 0) await h.move('#detail .meta', i, 350);
+      await h.wait(1400);
+    } },
 ];
 // TC_GIFS=branches,merge records only those GIFs.
 const VIDEOS = { tutorial: SCENES, promo: PROMO, hook: HOOK, agents: AGENTS, goals: GOALS, gifs: process.env.TC_GIFS ? GIFS.filter(g => process.env.TC_GIFS.split(',').includes(g.name)) : GIFS };
@@ -820,8 +845,133 @@ const CHANGES = [
     text: [['The canvas keeps only the commit and its repository; the diff comes from git when you open it.', '画布只记提交和它所在的仓库，diff 在你打开时直接向 git 要。']] },
 ];
 VIDEOS.changes = CHANGES;
+
+// Several machines, one canvas: this page is the laptop, and a workstation shares the canvas with it through a
+// private git repository. Made-up, as in test/sync.test.mjs: a bare repository in the build's temp folder, one
+// clone per machine, and the workstation's own data folder. Its side runs the real sync, session-start context and hooks.
+const MCH = {}, MCH_DIR = '/home/dev/tripsplit', MCH_CODEX = '019a3f7e-5c21-7d40-b8e6-2a9d4c71f0b3';
+const MCH_TODO = ['Try a vision model for receipt totals', '试试用视觉模型读小票总额'];
+function machinesDemo(lang) {
+  const root = path.join(home, 'machines'), bare = path.join(root, 'canvas.git'), seed = path.join(root, 'seed');
+  fs.rmSync(root, { recursive: true, force: true });
+  fs.mkdirSync(root, { recursive: true });
+  const git = (dir, ...a) => run('git', ['-C', dir, '-c', 'user.name=dev', '-c', 'user.email=dev@example.com', ...a]);
+  run('git', ['init', '-q', '--bare', '-b', 'main', bare]);
+  run('git', ['clone', '-q', bare, seed]);
+  fs.mkdirSync(path.join(seed, 'canvas'));
+  fs.writeFileSync(path.join(seed, 'canvas', 'README.md'), 'canvas\n');
+  git(seed, 'add', '-A'); git(seed, 'commit', '-q', '-m', 'init'); git(seed, 'push', '-q', 'origin', 'main');
+  const clone = name => {
+    const map = path.join(root, `map-${name}`);
+    run('git', ['clone', '-q', bare, map]);
+    run('git', ['-C', map, 'config', 'user.name', name]); run('git', ['-C', map, 'config', 'user.email', `${name}@example.com`]);
+    return map;
+  };
+  // Set before anything stamps records with this data folder's machine name (never the real host's).
+  Object.assign(process.env, { TRACE_CANVAS_MACHINE: 'laptop', TRACE_CANVAS_MAP: clone('laptop') });
+  MCH.ws = { ...process.env, TRACE_CANVAS_HOME: path.join(root, 'home-workstation'), TRACE_CANVAS_MAP: clone('workstation'), TRACE_CANVAS_MACHINE: 'workstation' };
+  fs.mkdirSync(MCH.ws.TRACE_CANVAS_HOME, { recursive: true });
+  fs.writeFileSync(path.join(MCH.ws.TRACE_CANVAS_HOME, 'config.json'), JSON.stringify({ lang }));
+  fs.writeFileSync(dataFile(), JSON.stringify(scenarioData('vibe', lang)));
+  mutate(d => { MCH.todo = addCommit(d, { thread: 'sc_ocr', kind: 'task', title: pick(MCH_TODO, lang), ts: Date.now() - 2 * 3600e3 }).id; });
+  // The first sync gives lines stable ids (so a repository's line is one line on every machine); do it before the page loads.
+  runSync(process.env);
+  MCH.ocr = Object.values(readData().threads).find(t => t.key === 'tripsplit@receipt-ocr').id;
+}
+// What the CLI prints for a sync.
+const syncLine = r => `${r.machine}: ${r.imported} change${r.imported === 1 ? '' : 's'} from other machines, ${r.changed} here. ${r.offline ? 'Offline: pushes next time.' : r.pushed ? 'Pushed.' : r.committed ? 'Committed.' : 'Up to date.'}`;
+// The workstation: Codex starts on the line it was handed, does the work, ticks the to-do; the session ends and syncs.
+function workstationTurn(lang) {
+  const env = { ...MCH.ws, TRACE_CANVAS_THREAD: MCH.ocr }, base = { session_id: MCH_CODEX, cwd: MCH_DIR, _agent: 'codex' };
+  const ctx = sessionStartContext({ ...base, hook_event_name: 'SessionStart' }, env);
+  for (const ev of [{ hook_event_name: 'SessionStart', session_title: pick(MCH_TODO, lang) },
+    { hook_event_name: 'UserPromptSubmit', prompt: pick(['Do the to-do on receipt-ocr: try a vision model for receipt totals', '做 receipt-ocr 上的待办：试试用视觉模型读小票总额'], lang) },
+    { hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: `${MCH_DIR}/src/ocr.js` } },
+    { hook_event_name: 'Stop', last_assistant_message: pick(['The vision model reads 94% of receipt totals; Tesseract read 61%.', '视觉模型认对 94% 的小票总额，Tesseract 只有 61%。'], lang) }])
+    handleHook({ ...base, ...ev }, env);
+  const c = mutate(d => setTaskDone(d, { task: MCH.todo, by: 'Codex' }), MCH.ws);
+  MCH.result = Object.values(readData(MCH.ws).commits).filter(x => x.session === MCH_CODEX && x.kind === 'agent').sort((a, b) => b.ts - a.ts)[0].id;
+  return { ctx, ticked: c.title };
+}
+const mchMenuSync = async h => { await h.click('#more-btn'); await h.click('#sync-item'); await h.wait(1300); };
+// Goals and to-dos is a dialog: open it without its intro tip; close it before using the More menu.
+const mchGoals = async h => { await h.js(`localStorage.setItem('tc.goalsTipHidden', '1')`); await h.click('#goals-btn'); await h.wait(600); };
+const mchAssign = h => h.js(`(() => { const s = document.querySelector('.gl-who[data-who="${MCH.todo}"]'); s.value = 'codex'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+const mchOnMachine = h => h.js(`[...document.querySelectorAll('#detail .meta')].findIndex(e => e.textContent.includes('workstation'))`);
+const MACHINES = [
+  { page: 'app', zoom: 1.3, preload: h => machinesDemo(h.lang),
+    text: [['On the laptop, hand a to-do to Codex and sync: the canvas travels through your own private git repository.', '在笔记本上把一条待办交给 Codex，再同步：画布经由你自己的私有 git 仓库传过去。']],
+    run: async h => {
+      const p = h.speak(0);
+      await mchGoals(h);
+      await h.move(`.gl-t[data-cid="${MCH.todo}"]`);
+      await h.move(`.gl-who[data-who="${MCH.todo}"]`);
+      await mchAssign(h);
+      await h.wait(600);
+      await h.key('Escape');
+      await mchMenuSync(h);
+      await p;
+    } },
+  { page: { terminal: 'codex — workstation:~/tripsplit' },
+    text: [
+      ['On the workstation, a sync brings it over, and Codex finds the to-do as its session starts.', '在工作站上同步一下，待办就过来了；Codex 一开会话就看到它。'],
+      ['It does the work and ticks the to-do off; when the session ends, it syncs back.', '它做完就把待办勾掉；会话结束时，自动同步回去。'],
+    ],
+    run: async h => {
+      const p = h.speak(0);
+      await h.cmd('trace-canvas sync');
+      h.out(syncLine(runSync(MCH.ws)));
+      await h.wait(400);
+      await h.cmd(`TRACE_CANVAS_THREAD=${MCH.ocr} codex "${pick(['Do the to-do on receipt-ocr', '做 receipt-ocr 上的待办'], h.lang)}"`);
+      const t = workstationTurn(h.lang);
+      for (const l of t.ctx.split('\n').slice(0, 3)) h.out(l);
+      await p;
+      const q = h.speak(1);
+      h.out('⏺ trace-canvas - trace_task_done (MCP)', 'k');
+      h.out(`  ⎿  Ticked "${t.ticked}".`);
+      await h.wait(500);
+      h.out(`⏺ ${syncLine(runSync(MCH.ws))}`, 'p');
+      await q;
+    } },
+  { page: 'app', zoom: 1.3,
+    text: [
+      ['Back on the laptop, one more sync: the to-do is ticked by Codex, and its result says On workstation.', '回到笔记本再同步一次：待办显示由 Codex 勾选，它的产出标着「在 workstation 上」。'],
+      ['Its session resumes where it ran, over ssh.', '这个会话的恢复命令会通过 ssh 回到它运行的那台电脑。'],
+    ],
+    run: async h => {
+      const p = h.speak(0);
+      await mchMenuSync(h);
+      await mchGoals(h);
+      await h.click('#gl-show-done');
+      await h.wait(500);
+      await h.move(`.gl-tasks li.done .gl-by`);
+      await h.wait(600);
+      await h.key('Escape');
+      await h.wait(400);
+      await h.click(`#cv-cards li[data-cid="${MCH.result}"]`);
+      await h.wait(600);
+      const i = await mchOnMachine(h);
+      if (i >= 0) await h.move('#detail .meta', i);
+      await p;
+      const q = h.speak(1);
+      await h.key('Escape');
+      await h.click(`#cv-cards [data-tid="${MCH.ocr}"] .card-head`);
+      await h.wait(400);
+      await h.js(`document.querySelector('#detail .s-list').scrollIntoView({ behavior: 'smooth', block: 'center' })`);
+      await h.wait(700);
+      await h.move('#detail .s-list li .s-name', 0);
+      await h.js('navigator.clipboard.writeText = () => Promise.resolve()'); // headless Chrome has no clipboard to write to
+      await h.click('#detail .s-list li .btn');
+      await q;
+    } },
+  { page: { terminal: 'zsh — laptop:~/code/tripsplit' }, text: [],
+    run: async h => { await h.cmd(threadSessions(readData(), MCH.ocr).find(s => s.id === MCH_CODEX).command); await h.wait(900); } },
+  { page: { card: { big: 'Trace Canvas', small: ['Several machines, one canvas · open source · MIT', '多台电脑，同一张画布 · 开源 · MIT'], foot: `${REPO} ⭐` } },
+    text: [['One canvas, several machines; each one writes only its own file.', '一张画布，几台电脑；每台只写自己的那份。']] },
+];
+VIDEOS.machines = MACHINES;
 // Feature shorts carry their number from the to-do list (功能短视频 N), so a file and its to-do match: 08-sessions.zh.mp4.
-const NUMBER = { sessions: 8, story: 9, tutorial: 10, changes: 11 };
+const NUMBER = { sessions: 8, story: 9, tutorial: 10, changes: 11, machines: 12 };
 const fileName = video => (NUMBER[video] ? `${String(NUMBER[video]).padStart(2, '0')}-${video}` : `trace-canvas-${video}`);
 
 /* ---------- narration ---------- */
@@ -867,7 +1017,8 @@ const { mutate, dataFile, emptyData, readData, readConfig, addCommit } = await i
 const { listThreads, readThread, listTasks, setTaskDone } = await import('../../src/ops.mjs');
 const { updateLive } = await import('../../src/live.mjs');
 const { writeAgentsDemo } = await import('../scenarios/agents.mjs');
-const { handleHook } = await import('../../src/hook.mjs');
+const { handleHook, sessionStartContext } = await import('../../src/hook.mjs');
+const { runSync } = await import('../../src/sync.mjs');
 const { threadSessions } = await import('../../src/ops.mjs');
 const { server } = await startServer({ port: 0 }); // free ports here and for Chrome, so two builds can run at once
 const PORT = server.address().port;
@@ -965,8 +1116,8 @@ async function record(video, lang) {
         await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p.x, y: p.y });
         return p;
       },
-      async click(sel, { shift = false } = {}) {
-        const p = await h.move(sel);
+      async click(sel, { shift = false, ms = 650 } = {}) {
+        const p = await h.move(sel, 0, ms);
         sc.cursor.push({ t: now(), x: p.x, y: p.y, click: true });
         for (const type of ['mousePressed', 'mouseReleased']) { await cdp('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: 'left', clickCount: 1, modifiers: shift ? 8 : 0 }); await sleep(60); }
         await sleep(300);

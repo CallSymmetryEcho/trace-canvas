@@ -219,6 +219,8 @@ Each machine writes only its own `canvas/<machine>.jsonl` there: every line, rec
 - **Whose is what:** records and sessions from another machine show its name, and their resume command runs over `ssh -t <machine>`, so name machines after their ssh aliases.
 - **A new machine:** if the repository also holds a location map (`tools/where.py`, which knows where code, data and NAS folders live on each machine), a session there is told where things are, `trace_where` and `trace-canvas where <words>` look things up, and a `bootstrap.sh` next to it can set a machine up in one go. `setup` refuses a name another computer already writes under.
 
+![On the laptop a to-do goes to Codex; after a sync it comes back ticked by Codex, with its result marked On workstation (made-up data)](docs/gif-machines.en.gif)
+
 ## See what changed
 
 A commit station opens with a **Changes** list: every file the commit touched, the biggest change first, with the lines added and removed; lock files, build output and binary files are folded at the end. Click a file for its diff. **Compare with** picks another commit station on the line or in the same repository and shows what differs between the two. An agent's turn that changed files points to the session's next commit.

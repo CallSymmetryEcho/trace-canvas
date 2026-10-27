@@ -2275,7 +2275,7 @@ function changesHTML(c) {
     return `<li class="${f.binary || f.generated ? 'gx-quiet' : ''}"><button class="gx-file" data-act="gx-file" data-dk="${esc(dk)}" title="${esc(f.path)}" ${f.binary ? 'disabled' : ''}><span class="gx-path">${esc(f.path)}</span><span>${f.binary ? esc(t('gxBinary')) : `<b class="gx-add">+${f.add}</b> <b class="gx-del">−${f.del}</b>`}</span><span class="gx-bar"><i style="width:${w(f.add)}"></i><u style="width:${w(f.del)}"></u></span></button>${diff}</li>`;
   };
   // Other commit stations to compare with: this line's first, then the same repository's, newest first.
-  const others = [...S.commits.values()].filter(x => x.id !== c.id && gitSha(x) && (x.repo ? x.repo === info.repo : tidOf(x) === tidOf(c)))
+  const others = [...S.commits.values()].filter(x => x.id !== c.id && gitSha(x) && (x.repo === info.repo || (x.repo && x.repo === c.repo) || tidOf(x) === tidOf(c)))
     .sort((a, b) => (tidOf(b) === tidOf(c)) - (tidOf(a) === tidOf(c)) || b.ts - a.ts).slice(0, 40);
   const pick = others.length ? `<label>${esc(t('gxCompare'))} <select class="gx-against" data-cid="${esc(c.id)}"><option value="">${esc(t('gxThisOnly'))}</option>${others.map(x => `<option value="${esc(x.id)}" ${x.id === against ? 'selected' : ''}>${esc(gitSha(x).slice(0, 7))} · ${esc(x.title.replace(/^[^:：]*[:：]\s*/, '').slice(0, 40))}</option>`).join('')}</select></label>` : '';
   const sum = `${esc(info.against && info.against.short ? `${info.short} ↔ ${info.against.short}` : info.short)} · ${esc(t('gxFiles', files.length))} · <b class="gx-add">+${add}</b> <b class="gx-del">−${del}</b>${quiet.length ? ` · ${esc(t('gxQuiet', quiet.length))}` : ''}`;

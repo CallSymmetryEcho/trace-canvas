@@ -56,7 +56,8 @@ function remoteName(cwd) {
 export function gitRoot(dir) {
   const common = git(dir, ['rev-parse', '--path-format=absolute', '--git-common-dir']);
   if (!common) return null;
-  return path.basename(common) === '.git' ? path.dirname(common) : git(dir, ['rev-parse', '--show-toplevel']) || null;
+  const root = path.basename(common) === '.git' ? path.dirname(common) : git(dir, ['rev-parse', '--show-toplevel']);
+  return root ? real(root) : null; // the real path, so records of one repository compare equal
 }
 
 const stateFile = (sid, env) => path.join(home(env), 'sessions', String(sid).replace(/[^\w.-]/g, '_') + '.json');

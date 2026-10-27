@@ -6,7 +6,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { commitDiff, commitInfo } from '../src/git-view.mjs';
 import { GIT_COMMIT, commandDir } from '../src/git-events.mjs';
-import { handleHook } from '../src/hook.mjs';
+import { gitRoot, handleHook } from '../src/hook.mjs';
 import { createThread, emptyData, mutate, readData } from '../src/store.mjs';
 
 const ENV = { GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' };
@@ -72,6 +72,9 @@ test('a commit made in another folder or a worktree records the repository it la
   commitIn(`git -C ${wt} commit -m Work`, '5d6e7f8', 2);
   const repos = Object.values(readData(env).commits).sort((a, b) => a.ts - b.ts).map(c => c.repo);
   assert.deepEqual(repos, [other.dir, other.dir]); // the worktree points back to its main repository
+  // A folder reached through a link records the repository's real path.
+  const link = path.join(root, 'link-to-other'); fs.symlinkSync(other.dir, link);
+  assert.equal(gitRoot(link), other.dir);
 });
 
 test('the page reads a commit and a diff through the server', async () => {

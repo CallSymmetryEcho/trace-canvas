@@ -1,0 +1,1 @@
+一条命令接入 Claude Code：hooks、MCP 服务和 trace-canvas skill。

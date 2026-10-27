@@ -29,8 +29,19 @@ const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/M
 const W = 1280, H = 720, SCALE = 1.5;
 const CHAR = 0.042; // seconds per typed character in the terminal scenes
 const REPO = 'github.com/CallSymmetryEcho/trace-canvas';
-const MODELS = { kokoro: 'mlx-community/Kokoro-82M-bf16', qwen: 'mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16' };
-const VOICE = { en: process.env.TC_VOICE_EN || 'kokoro:af_heart', zh: process.env.TC_VOICE_ZH || 'qwen:Ryan' };
+const MODELS = { kokoro: 'mlx-community/Kokoro-82M-bf16', qwen: 'mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16', cosyvoice: 'FunAudioLLM/Fun-CosyVoice3-0.5B-2512' };
+// Chinese: CosyVoice 3 reads every line in the voice of one reference clip, voices/<name>.wav with its transcript in
+// <name>.txt; v1ryan-cc is a line of the first tutorial that says "Claude Code". It runs on a CUDA machine over ssh.
+const VOICE = { en: process.env.TC_VOICE_EN || 'kokoro:af_heart', zh: process.env.TC_VOICE_ZH || 'cosyvoice:v1ryan-cc' };
+const COSYVOICE_HOST = process.env.TC_COSYVOICE_HOST || 'bsuperstation'; // with CosyVoice in ~/cosyvoice
+// Key English words that CosyVoice reads with a Chinese accent, spelled in CMU phonemes (any case, so trace-canvas too).
+// GitHub and receipt-ocr came out garbled when read as plain text and Whisper heard them right only in phonemes;
+// agent, hooks, MCP, git, diff, MIT, Node.js, Tesseract, tripsplit and resume came out right as plain text.
+const PRONOUNCE = {
+  claude: '[K][L][AO1][D]', codex: '[K][OW1][D][EH0][K][S]', code: '[K][OW1][D]', trace: '[T][R][EY1][S]', canvas: '[K][AE1][N][V][AH0][S]',
+  github: '[G][IH1][T][HH][AH2][B]', receipt: '[R][IH0][S][IY1][T]', ocr: '[OW1] [S][IY1] [AA1][R]',
+};
+const pronounce = s => s.replace(new RegExp(`\\b(${Object.keys(PRONOUNCE).join('|')})\\b`, 'gi'), w => PRONOUNCE[w.toLowerCase()]);
 // Style instruction for Qwen3-TTS voices (Kokoro takes none).
 const STYLE = {
   en: 'Clear, crisp and upbeat, at a brisk pace, confident and energetic, like a tech product launch.',
@@ -319,6 +330,100 @@ const HOOK = [
     } },
   { page: { card: { big: 'Trace Canvas', small: ['Free and open source · Claude Code', '免费开源 · 支持 Claude Code'], foot: `${REPO} ⭐` } },
     text: [['Give your agents a map. Free on GitHub.', '给你的 agent 一张地图。Trace Canvas，免费开源。']] }, // the Chinese voice garbles "GitHub"
+];
+// The story: five Claude Code and two Codex windows → the skill puts every session on the canvas →
+// an agent tidies the canvas up. Made-up data (the tripsplit scenario: 5 Claude Code lines, 2 Codex lines).
+const STORY_WINDOWS = [
+  ['Claude Code', 'tripsplit', ['Plan the v0.2 release', '规划 v0.2 发布']],
+  ['Claude Code', 'tripsplit · auth', ['Add magic-link sign-in', '加上邮箱魔法链接登录']],
+  ['Claude Code', 'tripsplit · ui-polish', ['Polish the mobile layout', '优化手机端布局']],
+  ['Claude Code', 'tripsplit · fix-rounding', ['Fix rounding: amounts in integer cents', '修复舍入：金额一律用整数分']],
+  ['Claude Code', 'tripsplit · share-link', ['Share a trip without an account', '不注册也能分享行程']],
+  ['Codex', 'tripsplit · receipt-ocr', ['Read receipt totals from photos', '从照片里识别小票总额']],
+  ['Codex', 'tripsplit · currencies', ['Multi-currency trips', '支持多币种行程']],
+];
+const STORY_HEAD = {
+  windows: ['5 Claude Code + 2 Codex, all at once', '5 个 Claude Code + 2 个 Codex 同时在跑'],
+  build: ['One /trace-canvas, and the map draws itself', '一条 /trace-canvas，画布自动生成'],
+  tidy: ['Then let the agent tidy it up', '再让 agent 帮你精简画布'],
+};
+const STORY = [
+  { page: { windows: STORY_WINDOWS }, head: STORY_HEAD.windows,
+    text: [
+      ['Five Claude Code windows and two Codex windows, all working on one project.', '五个 Claude Code 窗口，两个 Codex 窗口，同时在改一个项目。'],
+      ['An hour later: who did what, and how far did each one get?', '过一个小时，谁做了什么、做到哪了，还记得吗？'],
+    ] },
+  { page: { terminal: 'claude — ~/code/tripsplit' }, head: STORY_HEAD.build,
+    text: [
+      [['In any window, call the Trace Canvas skill: /trace-canvas sessions.', 'In any window, call the Trace Canvas skill.'],
+        ['在任意一个窗口调用 Trace Canvas 的 skill：/trace-canvas sessions。', '在任意一个窗口，调用 Trace Canvas 的 skill。']],
+      ['It finds every session and asks whether to put them all on the map.', '它会找出所有会话，问你要不要都放上去。'],
+    ],
+    run: async h => {
+      const p = h.speak(0);
+      await h.cmd('/trace-canvas sessions', '> ');
+      await h.wait(500);
+      h.out('⏺ trace-canvas - trace_list_sessions (MCP)', 'k');
+      h.out('  ⎿  5 sessions in ~/code/tripsplit, none on the canvas yet.');
+      await h.wait(500);
+      h.out(pick(['⏺ 5 Claude Code sessions are not on the canvas yet; the 2 Codex sessions are already there from its hooks. Put them all on?',
+        '⏺ 有 5 个 Claude Code 会话还没上画布；2 个 Codex 会话已经由它的 hooks 记上了。要都放进去吗？'], h.lang), 'p');
+      await p;
+      const q = h.speak(1);
+      await h.cmd(pick(['Yes, all of them', '都放上去'], h.lang), '> ');
+      await h.wait(400);
+      h.out('⏺ trace-canvas - trace_capture_session (MCP) × 5', 'k');
+      h.out('  ⎿  Added 5 sessions. The page is open at http://localhost:4777/');
+      await q;
+    } },
+  { page: 'app', head: STORY_HEAD.build,
+    text: [['The canvas draws itself: one line per session, with where it branched off, what it did and what it committed.', '画布自动生成：每个会话一条线，从哪分出来、做了什么、交了哪些提交，一眼看清。']],
+    run: async h => {
+      const p = h.speak(0);
+      await h.wait(400);
+      h.loadScenario();
+      h.addSessions();
+      await h.wait(1300);
+      await h.click('#zoom-fit');
+      for (const id of ['sc_main', 'sc_share', 'sc_cur', 'sc_ocr']) await h.move(`#cv-cards [data-tid="${id}"]`);
+      await p;
+    } },
+  { page: { terminal: 'claude — ~/code/tripsplit' }, head: STORY_HEAD.tidy,
+    text: [
+      ['Then ask Claude or Codex to simplify the canvas, say, to fold finished branches into the main line.', '接着让 Claude 或 Codex 帮你精简画布，比如把做完的分支并进主线。'],
+      ['It checks with you first.', '它会先跟你确认，再动手。'],
+    ],
+    run: async h => {
+      const p = h.speak(0);
+      await h.cmd(pick(['Simplify the canvas: share-link and currencies are in main now, fold them into tripsplit',
+        '帮我精简一下画布：share-link 和 currencies 都合进 main 了，把它们并进 tripsplit'], h.lang), '> ');
+      await h.wait(400);
+      h.out('⏺ trace-canvas - trace_list_threads (MCP)', 'k');
+      h.out(`  ⎿  ${h.tools.list()}`);
+      await h.wait(400);
+      h.out(pick(['⏺ Combine "tripsplit · share-link" and "tripsplit · currencies" into "tripsplit": their records move onto it and the two lines go away. OK?',
+        '⏺ 把「tripsplit · share-link」和「tripsplit · currencies」并进「tripsplit」：记录挪到主线上，这两条线从图上去掉。可以吗？'], h.lang), 'p');
+      await p;
+      const q = h.speak(1);
+      await h.cmd(pick(['OK', '可以'], h.lang), '> ');
+      await h.wait(300);
+      h.out('⏺ trace-canvas - trace_merge (MCP)(sources: ["tripsplit · share-link", "tripsplit · currencies"], target: "tripsplit", mode: "combine")', 'k');
+      h.out('  ⎿  Combined 2 threads into "tripsplit".');
+      await q;
+    } },
+  { page: 'app', head: STORY_HEAD.tidy,
+    text: [['Two lines fewer: their records now sit on the main line, in time order.', '画布上少了两条线，它们的记录按时间排进了主线。']],
+    run: async h => {
+      const p = h.speak(0);
+      await h.wait(300);
+      mutate(d => mergeThreads(d, { sources: ['sc_share', 'sc_cur'], target: 'sc_main', mode: 'combine' }));
+      await h.wait(1200);
+      await h.click('#zoom-fit');
+      await h.move('#cv-cards [data-tid="sc_main"]');
+      await p;
+    } },
+  { page: { card: { big: 'Trace Canvas', small: ['One map for you and your agents', '人和 agent 都看得懂的一张地图 · 开源'], foot: `${REPO} ⭐` } },
+    text: [['One map that both you and your agents can read. Trace Canvas is free on GitHub.', '一张人和 agent 都看得懂的地图。Trace Canvas，免费开源。']] },
 ];
 // The Agents view: who started whom, and who needs you. Data from docs/scenarios/agents.mjs.
 const AGENTS = [
@@ -758,7 +863,7 @@ const GIFS = [
     } },
 ];
 // TC_GIFS=branches,merge records only those GIFs.
-const VIDEOS = { tutorial: SCENES, promo: PROMO, hook: HOOK, agents: AGENTS, goals: GOALS, gifs: process.env.TC_GIFS ? GIFS.filter(g => process.env.TC_GIFS.split(',').includes(g.name)) : GIFS };
+const VIDEOS = { tutorial: SCENES, promo: PROMO, hook: HOOK, story: STORY, agents: AGENTS, goals: GOALS, gifs: process.env.TC_GIFS ? GIFS.filter(g => process.env.TC_GIFS.split(',').includes(g.name)) : GIFS };
 
 VIDEOS.sessions = SESSIONS;
 // See what changed: a made-up tripsplit repository with three real commits in the build's temp folder, so the
@@ -982,20 +1087,32 @@ const duration = file => Number(run('ffprobe', ['-v', 'error', '-show_entries', 
 function narrate(scenes, lang) {
   if (!scenes.some(s => s.text.length)) return scenes.map(() => []); // nothing to say, no voices needed
   const [engine, voice] = VOICE[lang].split(':');
-  if (!MODELS[engine]) throw new Error(`TC_VOICE_${lang.toUpperCase()} must look like kokoro:af_heart or qwen:Serena`);
-  if (!fs.existsSync(PY)) throw new Error('No voice environment yet; see "Setup" in docs/video/README.md');
-  const v = { model: MODELS[engine], voice, ...(engine === 'qwen' ? { instruct: STYLE[lang], ...SAMPLING } : {}) };
+  if (!MODELS[engine]) throw new Error(`TC_VOICE_${lang.toUpperCase()} must look like kokoro:af_heart, qwen:Serena or cosyvoice:v1ryan-cc`);
+  const cosy = engine === 'cosyvoice';
+  if (!cosy && !fs.existsSync(PY)) throw new Error('No voice environment yet; see "Setup" in docs/video/README.md');
+  const ref = cosy && { wav: path.join(here, 'voices', `${voice}.wav`), text: fs.readFileSync(path.join(here, 'voices', `${voice}.txt`), 'utf8').trim() };
+  const v = { model: MODELS[engine], voice, ...(engine === 'qwen' ? { instruct: STYLE[lang], ...SAMPLING } : {}), ...(cosy ? { ref: ref.text } : {}) };
   const dir = path.join(PUB, 'audio', lang);
   fs.mkdirSync(dir, { recursive: true });
   const lines = scenes.map(s => s.text.map(pair => {
-    const x = pick(pair, lang), spoken = Array.isArray(x) ? x[1] : x;
-    const id = crypto.createHash('sha1').update(JSON.stringify([v, spoken])).digest('hex').slice(0, 12);
-    return { caption: pick(x, 'en'), spoken, file: `audio/${lang}/${id}.wav`, abs: path.join(dir, `${id}.wav`) };
+    const x = pick(pair, lang), spoken = Array.isArray(x) ? x[1] : x, said = cosy ? pronounce(spoken) : spoken;
+    const id = crypto.createHash('sha1').update(JSON.stringify([v, said])).digest('hex').slice(0, 12);
+    return { caption: pick(x, 'en'), spoken: said, id, file: `audio/${lang}/${id}.wav`, abs: path.join(dir, `${id}.wav`) };
   }));
   const todo = lines.flat().filter(l => !fs.existsSync(l.abs));
   console.log(`[${lang}] voice ${VOICE[lang]}: ${todo.length} of ${lines.flat().length} lines to read`);
-  if (todo.length) {
+  if (todo.length && cosy) {
+    // One ssh run reads every new line (the model loads once), then the files come back as .raw.wav.
+    const work = 'cosyvoice/trace-canvas-voice';
+    execFileSync('ssh', [COSYVOICE_HOST, `mkdir -p ${work}/out`]);
+    execFileSync('scp', ['-q', path.join(here, 'cosy.py'), ref.wav, `${COSYVOICE_HOST}:${work}/`]);
+    const req = { prompt_wav: `trace-canvas-voice/${path.basename(ref.wav)}`, prompt_text: ref.text, jobs: todo.map(l => ({ text: l.spoken, out: `trace-canvas-voice/out/${l.id}.wav` })) };
+    execFileSync('ssh', [COSYVOICE_HOST, 'cd cosyvoice && .venv/bin/python -W ignore trace-canvas-voice/cosy.py'], { input: JSON.stringify(req), stdio: ['pipe', 'inherit', 'inherit'] });
+    for (const l of todo) execFileSync('scp', ['-q', `${COSYVOICE_HOST}:${work}/out/${l.id}.wav`, `${l.abs}.raw.wav`]);
+  } else if (todo.length) {
     execFileSync(PY, [path.join(here, 'tts.py')], { input: JSON.stringify(todo.map(l => ({ ...v, ...(engine === 'qwen' ? TAKES[lang] : {}), lang, text: l.spoken, out: `${l.abs}.raw.wav` }))), stdio: ['pipe', 'inherit', 'inherit'] });
+  }
+  if (todo.length) {
     // Even loudness across lines and voices.
     for (const l of todo) {
       run('ffmpeg', ['-v', 'error', '-y', '-i', `${l.abs}.raw.wav`, '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11', '-ar', '48000', l.abs]);
@@ -1014,7 +1131,7 @@ process.env.TRACE_CANVAS_DESKTOP_DIR = path.join(home, 'desktop'); // never the 
 fs.mkdirSync(process.env.TRACE_CANVAS_HOME, { recursive: true });
 const { startServer } = await import('../../src/server.mjs');
 const { mutate, dataFile, emptyData, readData, readConfig, addCommit } = await import('../../src/store.mjs');
-const { listThreads, readThread, listTasks, setTaskDone } = await import('../../src/ops.mjs');
+const { listThreads, readThread, listTasks, setTaskDone, mergeThreads } = await import('../../src/ops.mjs');
 const { updateLive } = await import('../../src/live.mjs');
 const { writeAgentsDemo } = await import('../scenarios/agents.mjs');
 const { handleHook, sessionStartContext } = await import('../../src/hook.mjs');
@@ -1092,6 +1209,7 @@ async function record(video, lang) {
     const wait = ms => waitUntil(now() + ms / 1000);
     const sc = app ? { kind: 'app', clip: `${base}/clips/s${String(si + 1).padStart(2, '0')}.mp4`, start: { ...cur }, cursor: [] }
       : scene.page.card ? { kind: 'card', big: scene.page.card.big, small: pick(scene.page.card.small, lang), foot: scene.page.card.foot || '' }
+      : scene.page.windows ? { kind: 'windows', wins: scene.page.windows.map(([agent, title, task]) => ({ agent, title, task: pick(task, lang) })) }
       : { kind: 'terminal', title: scene.page.terminal, steps: [] };
     sc.lines = [];
     if (scene.captionAt) sc.captionAt = scene.captionAt;

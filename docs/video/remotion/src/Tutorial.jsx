@@ -44,6 +44,7 @@ const Scene = ({ s, len, joinPrev, joinNext, charSec, bare, tall }) => {
   const body = (
     <>
       {s.kind === 'terminal' && <Terminal s={s} t={t} f={f} fps={fps} charSec={charSec} tall={tall} />}
+      {s.kind === 'windows' && <Windows s={s} t={t} f={f} fps={fps} charSec={charSec} tall={tall} />}
       {s.kind === 'app' && <App s={s} t={t} T={len / fps} zoomIn={!joinPrev} zoomOut={!joinNext} view={tall ? VIEW : { w: W, h: H }} />}
     </>
   );
@@ -76,7 +77,7 @@ const Card = ({ s, f, fps, tall }) => {
           <circle key={i} cx={x} cy={y} r={13} fill="#fff" stroke={C.lines[line]} strokeWidth={7} opacity={p > x / 1000 ? 1 : 0} />
         ))}
       </svg>
-      <div style={{ fontSize: 132, fontWeight: 700, letterSpacing: -3, opacity: q, transform: `translateY(${(1 - q) * 30}px)` }}>{s.big}</div>
+      <div style={{ fontSize: tall ? 100 : 132, fontWeight: 700, letterSpacing: -3, opacity: q, transform: `translateY(${(1 - q) * 30}px)` }}>{s.big}</div>
       <div style={{ fontSize: 46, color: C.muted, marginTop: 20, opacity: r }}>{s.small}</div>
       {s.foot && <div style={{ fontFamily: MONO, fontSize: tall ? 34 : 42, color: C.link, marginTop: 52, opacity: r }}>{s.foot}</div>}
     </AbsoluteFill>
@@ -106,6 +107,32 @@ const Terminal = ({ s, t, f, fps, charSec, tall }) => {
           {parts.map(([c, x], i) => <span key={i} style={{ color: TERM[c] }}>{x}</span>)}
           <span style={{ display: 'inline-block', width: 15, height: 32, verticalAlign: -6, background: '#e6e6e6', opacity: Math.floor(t * 2) % 2 ? 0 : 1 }} />
         </pre>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+/* ---------- several agent windows at once: each pops in and types its task ---------- */
+const Windows = ({ s, t, f, fps, charSec, tall }) => {
+  const cols = tall ? 2 : 4, w = tall ? 500 : 440, h = tall ? 228 : 380;
+  return (
+    <AbsoluteFill style={{ alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, ${w}px)`, gap: 22 }}>
+        {s.wins.map((x, i) => {
+          const k = spring({ frame: f - i * 6, fps, config: { damping: 200 }, durationInFrames: 18 });
+          const n = Math.max(0, Math.floor((t - 0.5 - i * 0.2) / charSec));
+          return (
+            <div key={i} style={{ height: h, borderRadius: 14, background: '#16181d', overflow: 'hidden', boxShadow: '0 16px 40px rgba(0,0,0,.2)', opacity: k, transform: `scale(${0.92 + 0.08 * k})` }}>
+              <div style={{ height: 38, background: '#2a2d34', display: 'flex', alignItems: 'center', gap: 8, padding: '0 14px', color: '#aab', fontSize: 16 }}>
+                {['#ff5f57', '#febc2e', '#28c840'].map(c => <i key={c} style={{ width: 11, height: 11, borderRadius: 6, background: c }} />)}
+                <span style={{ flex: 1, textAlign: 'center', marginRight: 50 }}>{x.title}</span>
+              </div>
+              <pre style={{ margin: 0, padding: '16px 18px', font: `22px/1.5 ${MONO}`, color: TERM[''], whiteSpace: 'pre-wrap' }}>
+                <span style={{ color: TERM.k }}>{x.agent}</span>{'\n'}<span style={{ color: TERM.p }}>{'> '}</span>{x.task.slice(0, n)}
+              </pre>
+            </div>
+          );
+        })}
       </div>
     </AbsoluteFill>
   );

@@ -46,11 +46,12 @@ The first run downloads the voice models from Hugging Face: Kokoro-82M (about 37
 
 ## Voices
 
-Defaults: Kokoro `af_heart` (warm female) for English and Qwen3-TTS `Ryan` (male, speaking Chinese) for Chinese. Pick others with:
+Defaults: Kokoro `af_heart` (warm female) for English and CosyVoice 3 `v1ryan-cc` for Chinese. Pick others with:
 
 ```bash
 TC_VOICE_EN=kokoro:am_fenrir TC_VOICE_ZH=qwen:Serena node docs/video/make.mjs
 ```
 
 - Kokoro, English: `af_heart`, `af_bella`, `am_michael`, `am_fenrir`, `bm_george` and more.
+- CosyVoice 3 ([Fun-CosyVoice3-0.5B-2512](https://huggingface.co/FunAudioLLM/Fun-CosyVoice3-0.5B-2512), Apache-2.0), Chinese: `cosyvoice:<name>` reads every line in the voice of one reference clip, `voices/<name>.wav`, whose transcript is `voices/<name>.txt`. One clip for every line keeps the tone even from line to line. `v1ryan-cc` is a line of the first tutorial that says "Claude Code"; `PRONOUNCE` in `make.mjs` spells the key English words (Claude, Code, Codex, Trace, Canvas, in any case) in CMU phonemes so they are not read with a Chinese accent; add a word there when another one comes out wrong. It needs a CUDA machine: `make.mjs` sends the lines over ssh to `TC_COSYVOICE_HOST` (default `bsuperstation`), where `cosy.py` reads them in `~/cosyvoice`. Setting up that machine once: clone [FunAudioLLM/CosyVoice](https://github.com/FunAudioLLM/CosyVoice) with `--recursive` into `~/cosyvoice`, make a Python 3.10 venv `.venv` there with uv, install `setuptools<70`, then `openai-whisper==20231117` with `--no-build-isolation`, then `requirements.txt` without deepspeed, tensorrt, gradio, fastapi, uvicorn, tensorboard and grpcio (`--index-strategy unsafe-best-match`), and download the model into `pretrained_models/Fun-CosyVoice3-0.5B` with `huggingface_hub.snapshot_download`.
 - Qwen3-TTS, both languages: `Serena`, `Vivian`, `Uncle_Fu`, `Dylan` (native Chinese), `Ryan`, `Aiden` (native English). These voices also get a style instruction (`STYLE` in `make.mjs`: calm and even for Chinese, crisp for English) and a sampling temperature of 0.5 instead of 0.9 (`SAMPLING`), which keeps the delivery from swinging from line to line. At low temperatures a voice can fail to end a line; `tts.py` caps each line at about twice its expected length and reads it again if it hits the cap.

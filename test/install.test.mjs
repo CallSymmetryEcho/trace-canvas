@@ -101,3 +101,12 @@ test('hooks and MCP servers start node by its full path, and replace the old bar
   installAgentMcp('gemini', cli, root);
   assert.equal(JSON.parse(fs.readFileSync(path.join(root, '.gemini', 'settings.json'), 'utf8')).mcpServers['trace-canvas'].command, process.execPath);
 });
+
+test('setup --machine and --map are saved as given', t => {
+  const { root, run } = sandbox(t);
+  const map = path.join(root, 'agent-map');
+  fs.mkdirSync(path.join(map, 'canvas'), { recursive: true });
+  run('setup', '--user', '--machine', 'lab', '--map', map);
+  const cfg = JSON.parse(fs.readFileSync(path.join(root, 'data', 'config.json'), 'utf8'));
+  assert.deepEqual([cfg.machine, cfg.map], ['lab', map]);
+});

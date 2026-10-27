@@ -322,7 +322,8 @@ async function main() {
         const { machineOwner } = await import('../src/sync.mjs');
         let saved = '';
         try { saved = JSON.parse(fs.readFileSync(path.join(home(), 'config.json'), 'utf8')).machine || ''; } catch {}
-        if (flag('map', '')) writeConfig({ map: path.resolve(str(flag('map', ''))) });
+        const mapArg = str(flag('map', '')); // flag() takes the option out of argv, so read it once
+        if (mapArg) writeConfig({ map: path.resolve(mapArg) });
         const cfg = readConfig(), machine = str(flag('machine', '')) || saved || whoami(cfg.map) || cfg.machine;
         const owner = cfg.map && machineOwner(cfg.map, machine);
         if (owner && !flag('force', false)) { console.error(`   "${machine}" is ${owner}'s name in ${cfg.map}/canvas. Pick another with --machine (or --force).`); process.exit(1); }

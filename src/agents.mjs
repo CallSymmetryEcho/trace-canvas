@@ -11,6 +11,8 @@ export const AGENTS = {
   gemini: { name: 'Gemini CLI', resume: id => `gemini --resume ${id}`, launch: p => `gemini -i ${q(p)}` },
 };
 export const agentOf = key => AGENTS[key] || AGENTS.claude;
+// AppleScript that runs cmd in a new Terminal window and brings it forward (macOS, "Open in Terminal").
+export const terminalScript = cmd => `tell application "Terminal"\n  do script "${String(cmd).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"\n  activate\nend tell`;
 // Which agent the current process serves: set in each CLI's MCP config; Claude Code needs none.
 export const agentKey = (env = process.env) => (AGENTS[env.TRACE_CANVAS_AGENT] ? env.TRACE_CANVAS_AGENT : 'claude');
 

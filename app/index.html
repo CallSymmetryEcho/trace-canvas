@@ -602,6 +602,7 @@ body.sheet-open .top { z-index: 80; }
         </div>
       </div>
       <div class="banner" id="connect-banner" hidden></div>
+      <div class="banner" id="focus-banner" hidden></div>
       <div class="banner multi-banner" id="multi-banner" hidden></div>
       <div class="hud">
         <div class="hud-group">
@@ -718,7 +719,7 @@ const I18N = {
     langBtn: '中文', langTitle: '切换到中文', more: 'More',
     menuNewThread: 'New thread', menuHideDone: 'Hide finished threads', menuShowDone: 'Show finished threads',
     arrange: 'Arrange', arrangeTitle: 'Lay the lines out by group, forks next to the lines they came from', tArranged: 'Arranged', tUndo: 'Undo',
-    groupLabel: 'Group', groupName: 'Name', groupLines: 'Lines in this group', groupCount: n => `${n} line${n === 1 ? '' : 's'}`, groupArrange: 'Arrange this group', groupUngroup: 'Ungroup',
+    groupLabel: 'Group', groupName: 'Name', groupLines: 'Lines in this group', groupCount: n => `${n} line${n === 1 ? '' : 's'}`, groupArrange: 'Arrange this group', groupFocus: 'Show only this group', focusOn: g => `Only "${g}"`, focusOff: 'Show all', groupUngroup: 'Ungroup',
     threadGroup: 'Group', threadGroupPh: 'None', multiGroup: 'Group', multiGroupPh: 'Group name', tGroupNeedName: 'Type a group name first',
     tGrouped: (n, g) => `${n} line${n === 1 ? '' : 's'} in "${g}"`, tUngrouped: 'Group dissolved; the lines stay',
     menuSync: 'Sync with other machines', tSyncing: 'Syncing…', tSyncBusy: 'A sync is already running', tSyncFailed: e => `Sync failed: ${e}`,
@@ -846,7 +847,7 @@ const I18N = {
     goalsNoGoal: 'No goal yet. Write one in the line\'s panel.', goalsAdd: '+ Add a to-do, Enter to save', goalsOpenLine: 'Open line',
     goalsOthers: n => `${n} more line${n === 1 ? ' has' : 's have'} no goal or to-do yet.`, goalsEmpty: 'No goals or to-dos yet. Open a line, write its goal, and add to-dos here or with the □ kind below.',
     goalsBy: name => `ticked by ${name}`, tTaskAdded: 'To-do added',
-    handNeedsLine: 'Move the to-do onto a line first', goalsWho: 'Who does it', goalsAnyone: 'Anyone', goalsHand: 'Hand to it', tHandCopied: 'Command copied: paste it in a terminal to start the agent on this line',
+    handNeedsLine: 'Move the to-do onto a line first', goalsWho: 'Who does it', goalsAnyone: 'Anyone', goalsHand: 'Hand to it', openInTerminal: 'Open in Terminal', tOpenedTerminal: 'Opened in Terminal: the agent starts on this line', tHandCopied: 'Command copied: paste it in a terminal to start the agent on this line',
     handPrompt: (name, tid, title) => `You are taking over the Trace Canvas line "${name}" (thread ${tid}). First call the MCP tool trace_bind with thread "${tid}". Then call trace_tasks with mine: true for the goal and your to-dos, work through them, and tick each one with trace_task_done when it is done. Log decisions and results with trace_log.${title ? ` Start with: ${title}` : ''}`,
     tabAgents: 'Agents', agHint: 'Who started whom: each session starts the sessions to its right; the small dashed cards are its subagents.',
     agEmpty: 'No agents are running right now. Claude Code sessions appear here as soon as they run with the Trace Canvas hooks.',
@@ -876,7 +877,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     langBtn: 'EN', langTitle: 'Switch to English', more: '更多',
     menuNewThread: '新建线程', menuHideDone: '隐藏已完成的线程', menuShowDone: '显示已完成的线程',
     arrange: '整理', arrangeTitle: '按分组排好线程，分叉排在原线旁边', tArranged: '已整理', tUndo: '撤销',
-    groupLabel: '分组', groupName: '名称', groupLines: '组里的线', groupCount: n => `${n} 条线`, groupArrange: '整理这一组', groupUngroup: '解散分组',
+    groupLabel: '分组', groupName: '名称', groupLines: '组里的线', groupCount: n => `${n} 条线`, groupArrange: '整理这一组', groupFocus: '只看这一组', focusOn: g => `只看「${g}」`, focusOff: '显示全部', groupUngroup: '解散分组',
     threadGroup: '分组', threadGroupPh: '无', multiGroup: '编组', multiGroupPh: '分组名称', tGroupNeedName: '先填分组名称',
     tGrouped: (n, g) => `${n} 条线已放进「${g}」`, tUngrouped: '分组已解散，线都还在',
     menuSync: '和其他电脑同步', tSyncing: '正在同步…', tSyncBusy: '已经有一个同步在进行', tSyncFailed: e => `同步失败：${e}`,
@@ -1003,7 +1004,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     goalsNoGoal: '还没写目标，可以在这条线的面板里填写。', goalsAdd: '+ 添加待办，回车保存', goalsOpenLine: '打开这条线',
     goalsOthers: n => `另外 ${n} 条线还没有目标或待办。`, goalsEmpty: '还没有目标或待办。打开一条线写下目标，再在这里或用下方的 □ 类型添加待办。',
     goalsBy: name => `由 ${name} 勾选`, tTaskAdded: '已添加待办',
-    handNeedsLine: '先把这项待办放到一条线上', goalsWho: '由谁做', goalsAnyone: '任何人', goalsHand: '交给它', tHandCopied: '命令已复制：粘贴到终端运行，agent 就会在这条线上开工',
+    handNeedsLine: '先把这项待办放到一条线上', goalsWho: '由谁做', goalsAnyone: '任何人', goalsHand: '交给它', openInTerminal: '在终端打开', tOpenedTerminal: '已在终端打开：agent 会在这条线上开工', tHandCopied: '命令已复制：粘贴到终端运行，agent 就会在这条线上开工',
     handPrompt: (name, tid, title) => `你接手 Trace Canvas 上的线「${name}」（thread ${tid}）。先调用 MCP 工具 trace_bind，thread 填 "${tid}"；再用 trace_tasks（mine: true）读取目标和分给你的待办，逐项完成，每做完一项就用 trace_task_done 勾上；决定和结果用 trace_log 记下来。${title ? `先从这一项开始：${title}` : ''}`,
     tabAgents: 'Agent', agHint: '谁启动了谁：每个会话启动它右边的会话，虚线小卡片是它的子 agent。',
     agEmpty: '现在没有运行中的 agent。装好 Trace Canvas hooks 的 Claude Code 会话一运行就会出现在这里。',
@@ -1067,7 +1068,7 @@ const S = {
   captureKind: 'idea', captureThread: ls.get('tc.captureThread', INBOX),
   mode: 'loading', readOnly: false, offline: false, got: new Set(), dragId: null,
   ai: null, sheet: null,
-  live: [], liveOthers: [], sessions: [], machine: '', goalsShowDone: false, multiGroup: '', dragMembers: null,
+  live: [], liveOthers: [], sessions: [], machine: '', goalsShowDone: false, multiGroup: '', dragMembers: null, focusGroup: null, platform: '',
 };
 
 function fmtAbs(ts) { const d = new Date(ts); return `${pad2(d.getMonth() + 1)}/${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
@@ -1373,7 +1374,7 @@ async function loadServer() {
     const data = await r.json();
     for (const col of COLS) applyRows(col, data[col] || []);
     S.sessions = data.sessions || [];
-    S.machine = data.machine || '';
+    S.machine = data.machine || ''; S.platform = data.platform || '';
     if (S.offline) { S.offline = false; renderSync(); }
   } catch { S.offline = true; COLS.forEach(c => S.got.add(c)); renderSync(); render(); }
 }
@@ -1621,7 +1622,12 @@ function selThreadId() {
 }
 function renderCanvas() {
   const by = byThread();
-  const ths = [inboxThread(), ...orderedThreads().filter(th => !isHidden(th))];
+  if (S.focusGroup && !groupNames().includes(S.focusGroup)) S.focusGroup = null;
+  // Only one group: a canvas of its own, without the inbox and the other lines.
+  const ths = [...(S.focusGroup ? [] : [inboxThread()]), ...orderedThreads().filter(th => !isHidden(th) && (!S.focusGroup || th.group === S.focusGroup))];
+  const fb = $('#focus-banner');
+  fb.hidden = !S.focusGroup;
+  if (S.focusGroup) fb.innerHTML = `<span>${esc(t('focusOn', S.focusGroup))}</span><button class="btn" id="focus-off">${esc(t('focusOff'))}</button>`;
   const selT = selThreadId();
   cardsEl.innerHTML = ths.map(th => cardHTML(th, by.get(th.id) || [], selT)).join('');
   drawGroups();
@@ -1796,7 +1802,8 @@ function doArrange(only) {
   } });
   if (!only) requestAnimationFrame(() => requestAnimationFrame(fit)); // after the cards are redrawn
 }
-$('#arrange-btn').onclick = () => doArrange();
+$('#arrange-btn').onclick = () => doArrange(S.focusGroup || undefined);
+$('#focus-banner').addEventListener('click', e => { if (e.target.id === 'focus-off') { S.focusGroup = null; render(); requestAnimationFrame(() => requestAnimationFrame(fit)); } });
 function setGroup(ids, name) { for (const id of ids) patchDoc('threads', id, { group: name }, 0); }
 function groupDetail(name) {
   const ths = orderedThreads().filter(th => th.group === name);
@@ -1810,6 +1817,7 @@ function groupDetail(name) {
       <ul class="l-list">${ths.map(th => `<li data-act="goto-thread" data-tid="${esc(th.id)}"><span class="ldot" style="background:${th.color}"></span><span>${esc(th.name)}</span></li>`).join('')}</ul>
       <div class="d-actions">
         <button class="btn btn-primary" data-act="g-arrange">${esc(t('groupArrange'))}</button>
+        <button class="btn" data-act="g-focus">${esc(t('groupFocus'))}</button>
         <span class="spacer"></span>
         <button class="btn btn-quiet-danger" data-act="g-ungroup">${esc(t('groupUngroup'))}</button>
       </div>
@@ -2461,6 +2469,7 @@ detail.addEventListener('click', e => {
     case 'gx-more': GX.more.add(b.dataset.key); render(); break;
     case 'goto-thread': select({ type: 'thread', id: b.dataset.tid }); break;
     case 'g-arrange': doArrange(s.id); break;
+    case 'g-focus': S.focusGroup = s.id; select(null); requestAnimationFrame(() => requestAnimationFrame(fit)); break;
     case 'g-ungroup': setGroup(orderedThreads().filter(th => th.group === s.id).map(th => th.id), ''); select(null); toast(t('tUngrouped')); break;
     case 'goto-live': select({ type: 'live', id: b.dataset.sid }); break;
     case 'copy-cmd': copyText(b.dataset.cmd); break;
@@ -2722,7 +2731,7 @@ function renderGoals() {
   const totalOpen = groups.reduce((n, g) => n + g.open.length, 0);
   const row = c => {
     const by = c.done && c.doneBy && c.doneBy !== 'human' ? `<span class="gl-by"><span class="actor a-agent">${ACTOR_ICON.agent}</span>${esc(t('goalsBy', c.doneBy))}</span>` : '';
-    const who = c.done ? '' : `<select class="gl-who" data-who="${esc(c.id)}" title="${esc(t('goalsWho'))}"><option value="">${esc(t('goalsAnyone'))}</option>${Object.entries(AGENT_NAMES).map(([k, n]) => `<option value="${k}" ${c.assignee === k ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>${c.assignee ? `<button class="btn gl-hand" data-hand="${esc(c.id)}">${esc(t('goalsHand'))}</button>` : ''}`;
+    const who = c.done ? '' : `<select class="gl-who" data-who="${esc(c.id)}" title="${esc(t('goalsWho'))}"><option value="">${esc(t('goalsAnyone'))}</option>${Object.entries(AGENT_NAMES).map(([k, n]) => `<option value="${k}" ${c.assignee === k ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>${c.assignee ? `<button class="btn gl-hand" data-hand="${esc(c.id)}">${esc(t('goalsHand'))}</button>${S.mode === 'server' && S.platform === 'darwin' ? `<button class="btn gl-hand" data-hand-open="${esc(c.id)}">${esc(t('openInTerminal'))}</button>` : ''}` : ''}`;
     return `<li class="${c.done ? 'done' : ''}"><input type="checkbox" data-task="${esc(c.id)}" ${c.done ? 'checked' : ''} aria-label="${esc(c.title)}"><span class="gl-t" data-cid="${esc(c.id)}">${esc(c.title)}</span>${who}${by}<time>${fmtShort(c.doneAt || c.ts)}</time></li>`;
   };
   const body = (tipHidden ? '' : `<div class="gl-tip"><span>${t('goalsTip')}</span><button class="btn" id="gl-tip-hide">${esc(t('goalsTipHide'))}</button></div>`)
@@ -2778,6 +2787,13 @@ sheetBody.addEventListener('keydown', e => {
 sheetBody.addEventListener('click', e => {
   if (S.sheet !== 'goals') return;
   if (e.target.id === 'gl-tip-hide') { try { localStorage.setItem('tc.goalsTipHidden', '1'); } catch {} renderGoals(); return; }
+  const open = e.target.closest('[data-hand-open]');
+  if (open) {
+    const c = S.commits.get(open.dataset.handOpen);
+    fetch('/api/hand', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Trace-Canvas': '1' }, body: JSON.stringify({ todo: c.id, to: c.assignee }) })
+      .then(r => r.json()).catch(() => ({ error: t('syncOfflineTitle') })).then(r => toast(r.error || t('tOpenedTerminal')));
+    return;
+  }
   const hand = e.target.closest('[data-hand]');
   if (hand) { const cmd = handCommand(S.commits.get(hand.dataset.hand)); if (cmd) copyText(cmd, t('tHandCopied')); return; }
   const go = e.target.closest('[data-goto]'), rec = e.target.closest('.gl-t');

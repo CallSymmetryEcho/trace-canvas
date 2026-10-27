@@ -10,7 +10,7 @@ Trace Canvas shows work as a transit map. A **thread** is one piece of work in p
 
 In Claude Code, invoke `/trace-canvas` (arguments: `$ARGUMENTS`). In Codex, invoke `$trace-canvas` and read the action from the user's request.
 
-Actions: `capture`, `all`, `sessions`, `tasks`, `live`, `bind <thread>`, `fork <thread>`, `merge <threads…>`, `open`, `log <text>`.
+Actions: `capture`, `all`, `sessions`, `tasks`, `pick`, `live`, `bind <thread>`, `fork <thread>`, `merge <threads…>`, `open`, `log <text>`.
 
 Pick the matching action below. With no arguments, capture the current session.
 
@@ -61,6 +61,12 @@ Call `trace_fork` with `from` (the thread or record the user named) and `name`. 
 ## tasks: goals and to-dos
 
 Call `trace_tasks` (pass `thread` if the user named one) and show each thread's goal, its progress (done/total) and its open to-dos. When you finish a to-do during the session, call `trace_task_done` with its id. To add a to-do, call `trace_log` with `kind: "task"` and the thread.
+
+## pick: take the next to-do and do it
+
+1. Call `trace_tasks` with `mine: true`. If nothing is assigned to you, call `trace_tasks` for the line you work on and take its oldest open to-do that nobody has.
+2. Say in one line which to-do you take, then do it.
+3. When it is done, call `trace_task_done` with its id and `trace_log` the result on the same line.
 
 ## live: what is running now
 

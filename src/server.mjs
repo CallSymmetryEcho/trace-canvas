@@ -11,7 +11,8 @@ import { fileURLToPath } from 'node:url';
 import { COLS, dataFile, home, mutate, readConfig, readData, toArrays, writeConfig } from './store.mjs';
 import { demoData } from './demo.mjs';
 import { liveDir } from './live.mjs';
-import { bindLiveSession, liveSessions, sessionList } from './ops.mjs';
+import { bindLiveSession, handTo, liveSessions, sessionList } from './ops.mjs';
+import { terminalScript } from './agents.mjs';
 import { commitDiff, commitInfo } from './git-view.mjs';
 import { runSync } from './sync.mjs';
 import { desktopSessions } from './desktop.mjs';
@@ -86,7 +87,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
       if (req.method === 'GET' && p === '/api/data') {
         // desktopId: the Claude desktop app's id of a session, so the page can open its chat (claude://…).
         const d = readData(), desk = desktopSessions();
-        return send(res, 200, { ...toArrays(d), sessions: sessionList(d).map(s => ({ ...s, desktopId: (desk.get(s.id) || {}).desktopId || null })), machine: readConfig().machine });
+        return send(res, 200, { ...toArrays(d), sessions: sessionList(d).map(s => ({ ...s, desktopId: (desk.get(s.id) || {}).desktopId || null })), machine: readConfig().machine, platform: process.platform });
       }
       if (req.method === 'GET' && p === '/api/live') return send(res, 200, liveSessions(readData()));
       // What a commit record changed, read from git on demand (src/git-view.mjs).
@@ -109,6 +110,15 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         }
         mutate(d => { if (doc) d[col][id] = { ...doc, id }; else delete d[col][id]; });
         return send(res, 200, { ok: true });
+      }
+      // Open in Terminal: the command is built here from the to-do, never taken from the request.
+      if (req.method === 'POST' && p === '/api/hand') {
+        if (process.platform !== 'darwin') return send(res, 200, { error: 'Opening a terminal works on macOS only; copy the command instead' });
+        const body = JSON.parse(await readBody(req));
+        const r = mutate(d => handTo(d, { ref: String(body.todo || ''), to: String(body.to || '') }));
+        spawn('osascript', ['-e', terminalScript(r.command)], { stdio: 'ignore', detached: true }).unref();
+        broadcast('change');
+        return send(res, 200, { ok: true, command: r.command });
       }
       if (req.method === 'POST' && p === '/api/sync') { const r = runSync(); broadcast('change'); return send(res, 200, r); }
       if (req.method === 'POST' && p === '/api/bind') {

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { normalize } from '../src/agents.mjs';
+import { normalize, terminalScript } from '../src/agents.mjs';
 import { handleHook, sessionStartContext, sessionThread } from '../src/hook.mjs';
 import { readLive } from '../src/live.mjs';
 import { codexHooks, codexWritable, install } from '../src/install.mjs';
@@ -141,4 +141,9 @@ test('a new session is told its line, goal, its own to-dos and where things are 
   assert.match(ctx, /1 open to-do is not assigned/);
   assert.match(ctx, new RegExp(`tripsplit: clone ${s.repo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} — Heavy runs on bsuperstation`));
   assert.deepEqual(sessionThread(readData(s.env), { id: 'cx2' }, s.env), { threadId: tid, bound: true });
+});
+
+test('Open in Terminal runs the hand-off command in a new Terminal window, quoted for AppleScript', () => {
+  const s = terminalScript(`cd '/x y' && TRACE_CANVAS_THREAD=t1 codex 'Say "hi" \\ then work'`);
+  assert.equal(s, `tell application "Terminal"\n  do script "cd '/x y' && TRACE_CANVAS_THREAD=t1 codex 'Say \\"hi\\" \\\\ then work'"\n  activate\nend tell`);
 });

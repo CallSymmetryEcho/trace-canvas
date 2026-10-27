@@ -201,6 +201,12 @@ This adds the hooks to `~/.codex/hooks.json` and `~/.gemini/settings.json` (afte
 
 Codex has no notification event, so a permission request stands in for "needs you". Checked against real Codex 0.164 sessions (`test/fixtures/codex/`): prompts, shell commands, `apply_patch` edits, commits, permission requests, the context at session start and ticking a to-do over MCP. Gemini CLI support follows its documented hook events and will be checked against a current `@google/gemini-cli`.
 
+## See what changed
+
+A commit station opens with a **Changes** list: every file the commit touched, the biggest change first, with the lines added and removed; lock files, build output and binary files are folded at the end. Click a file for its diff. **Compare with** picks another commit station on the line or in the same repository and shows what differs between the two. An agent's turn that changed files points to the session's next commit.
+
+Nothing is copied into the canvas: a record keeps the commit's sha and its repository, and the page asks git when you open it, so the data file stays small and the diff always matches the repository. If the repository is not on this computer or the commit is gone (rewritten history), the panel says so. Agents get the same sha and repository from `trace_read_thread` and can run git themselves.
+
 ## Merging sessions and threads
 
 Several sessions about the same piece of work can become one line, in two ways:

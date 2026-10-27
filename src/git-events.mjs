@@ -1,12 +1,33 @@
 // Reads what a shell command did to git from the command line and its output.
 // Shared by the live hooks and by transcript import so both log the same moments.
+import os from 'node:os';
+import path from 'node:path';
+
+// `git commit`, also with options before the subcommand (`git -C dir -c k=v commit`), as a command
+// of its own: not `git log --grep commit`, and not code that merely mentions git and commit.
+export const GIT_COMMIT = /(?:^|[\s;&|(`])git(?:\s+(?:-[cC]\s+(?:"[^"]*"|'[^']*'|[^\s;&|]+)|--?[\w-]+(?:=\S*)?))*\s+commit\b/m;
+
+// The folder a commit command ran in: `git -C <dir>`, else after the `cd <dir>`s before the commit,
+// else cwd. Quotes, ~ and $HOME are handled; anything cleverer (other variables, subshells) gives cwd.
+export function commandDir(cmd, cwd) {
+  cmd = String(cmd || '');
+  const unq = s => s.replace(/^(['"])(.*)\1$/, '$2').replace(/^(~|\$HOME)(?=\/|$)/, os.homedir());
+  const hit = GIT_COMMIT.exec(cmd), at = hit ? hit.index + hit[0].indexOf('git') : -1;
+  let dir = cwd || process.cwd();
+  for (const m of (at >= 0 ? cmd.slice(0, at) : '').matchAll(/(?:^|[;&|(]|\s)cd\s+("[^"]*"|'[^']*'|[^\s;&|)]+)/g)) {
+    const to = unq(m[1]);
+    if (to !== '-' && !to.includes('$')) dir = path.resolve(dir, to);
+  }
+  const c = at >= 0 && cmd.slice(at).match(/^git\b[^\n;&|]*?\s-C\s+("[^"]*"|'[^']*'|[^\s;&|]+)/);
+  return c && !c[1].includes('$') ? path.resolve(dir, unq(c[1])) : dir;
+}
 
 export function gitEvents(cmd, stdout = '', stderr = '', gitOperation = null) {
   cmd = String(cmd || '');
   const out = `${stdout || ''}\n${stderr || ''}`;
   const ev = { commits: [], push: null, pr: null, merge: null };
 
-  if (/\bgit\b[^\n;&|]*\bcommit\b/.test(cmd) && !/--dry-run/.test(cmd)) {
+  if (GIT_COMMIT.test(cmd) && !/--dry-run/.test(cmd)) {
     for (const m of out.matchAll(/^\[([^\]\s]+)(?: \(root-commit\))? ([0-9a-f]{7,40})\] (.+)$/gm)) ev.commits.push({ sha: m[2], subject: m[3] });
     // Newer Claude Code versions also report the commit as structured data, which survives `| tail` and quiet flags.
     const op = gitOperation && gitOperation.commit;

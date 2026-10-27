@@ -468,6 +468,20 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .l-list li.st-off .ldot { opacity: .35; }
 .l-list .act { grid-column: 2; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .l-cmd { display: flex; gap: 6px; align-items: center; }
+.gx-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
+.gx-head select { font-size: 12px; max-width: 60%; }
+.gx-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+.gx-file { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto 56px; gap: 8px; align-items: center; padding: 3px 6px; border: 0; border-radius: 6px; background: none; color: var(--ink); font: 12px var(--f-mono); text-align: left; cursor: pointer; }
+.gx-file:hover:not(:disabled) { background: var(--rule-soft); }
+.gx-file:disabled { cursor: default; }
+.gx-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gx-add { color: var(--ok); font-weight: 500; } .gx-del { color: var(--danger); font-weight: 500; }
+.gx-bar { display: flex; height: 5px; border-radius: 3px; overflow: hidden; background: var(--rule-soft); }
+.gx-bar i { background: var(--ok); } .gx-bar u { background: var(--danger); }
+.gx-quiet { opacity: .6; }
+.gx-diff { margin: 2px 0 8px; padding: 8px 10px; max-height: 380px; overflow: auto; font: 11.5px/1.5 var(--f-mono); background: var(--rule-soft); border-radius: 6px; white-space: pre; }
+.gx-diff .a { color: var(--ok); } .gx-diff .d { color: var(--danger); } .gx-diff .h { color: var(--faint); }
+.gx-note { margin: 0; color: var(--faint); font-size: 12px; }
 .l-cmd code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--f-mono); font-size: 12px; padding: 6px 8px; background: var(--surface-2); border: 1px solid var(--rule-soft); border-radius: 6px; }
 
 /* ---------- agents view ---------- */
@@ -799,7 +813,11 @@ const I18N = {
     stWorking: 'Working', stWaiting: 'Needs you', stIdle: 'Idle',
     liveHead: 'Running session', liveUntitled: 'Untitled session', liveStarted: x => `Started ${x}`, liveSeen: x => ` · last activity ${x}`,
     livePrompt: 'Latest instruction', liveThread: 'Thread', liveAuto: 'Automatic (repository and branch)', liveNow: 'Now on',
-    liveResume: 'Resume in a terminal', liveRunning: 'Running now', lineSessions: 'Sessions on this line', copyResume: 'Copy resume command', lineSessionsHint: 'Resume one to keep working on this line instead of starting a new session.', liveBadge: (n, w) => `${n} running${w ? `, ${w} need${w === 1 ? 's' : ''} you` : ''}`,
+    liveResume: 'Resume in a terminal', liveRunning: 'Running now', lineSessions: 'Sessions on this line',
+    gxChanges: 'Changes', gxLoading: 'Reading from git…', gxNoRepo: 'This repository is not on this computer.', gxNoCommit: 'This commit is no longer in its repository (rewritten or cleaned up).',
+    gxFiles: n => `${n} file${n === 1 ? '' : 's'}`, gxMore: n => `${n} more`, gxQuiet: n => `${n} binary or generated`, gxBinary: 'binary',
+    gxCompare: 'Compare with', gxThisOnly: 'this commit only', gxOtherRepo: 'That station is in another repository.', gxTruncated: 'Cut at 200 KB.',
+    gxLater: 'Committed later in', gxUncommitted: 'Not committed yet.', copyResume: 'Copy resume command', lineSessionsHint: 'Resume one to keep working on this line instead of starting a new session.', liveBadge: (n, w) => `${n} running${w ? `, ${w} need${w === 1 ? 's' : ''} you` : ''}`,
     tBound: n => `Bound to “${n}”`, tUnbound: 'Back to the repository and branch line',
     actorHuman: 'You', actorAgent: 'Agent', liveTipTime: 'now',
     goalsBtn: 'Goals', goalsBtnTitle: 'Goals and to-dos of every line', goalsTitle: 'Goals and to-dos',
@@ -946,7 +964,11 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     stWorking: '工作中', stWaiting: '等你', stIdle: '空闲',
     liveHead: '运行中的会话', liveUntitled: '未命名会话', liveStarted: x => `开始于 ${x}`, liveSeen: x => ` · 最近活动 ${x}`,
     livePrompt: '最近的指令', liveThread: '所属线', liveAuto: '自动（按仓库和分支）', liveNow: '当前在',
-    liveResume: '在终端里恢复', liveRunning: '正在运行', lineSessions: '这条线上的会话', copyResume: '复制恢复命令', lineSessionsHint: '恢复其中一个就能接着在这条线上做，不用新开会话。', liveBadge: (n, w) => `${n} 个运行中${w ? `，${w} 个等你` : ''}`,
+    liveResume: '在终端里恢复', liveRunning: '正在运行', lineSessions: '这条线上的会话',
+    gxChanges: '改动', gxLoading: '正在从 git 读取…', gxNoRepo: '这台电脑上没有这个仓库。', gxNoCommit: '仓库里已经没有这个提交，可能被改写或清理了。',
+    gxFiles: n => `${n} 个文件`, gxMore: n => `还有 ${n} 个`, gxQuiet: n => `${n} 个二进制或生成文件`, gxBinary: '二进制',
+    gxCompare: '对比', gxThisOnly: '只看这次提交', gxOtherRepo: '那个站点不在同一个仓库。', gxTruncated: '超过 200 KB，已截断。',
+    gxLater: '之后提交于', gxUncommitted: '尚未提交。', copyResume: '复制恢复命令', lineSessionsHint: '恢复其中一个就能接着在这条线上做，不用新开会话。', liveBadge: (n, w) => `${n} 个运行中${w ? `，${w} 个等你` : ''}`,
     tBound: n => `已绑定到「${n}」`, tUnbound: '已改回按仓库和分支自动归线',
     actorHuman: '你', actorAgent: 'Agent', liveTipTime: '此刻',
     goalsBtn: '目标', goalsBtnTitle: '每条线的目标和待办', goalsTitle: '目标和待办',
@@ -2069,6 +2091,53 @@ function linksView(links) {
 const delUI = q => S.ui.del
   ? `<span class="confirm">${esc(q)}</span><button class="btn btn-danger" data-act="del-confirm">${esc(t('del'))}</button><button class="btn" data-act="del-cancel">${esc(t('cancel'))}</button>`
   : '';
+// What a commit record changed, read from git through /api/git (src/git-view.mjs). Each answer is
+// fetched once and kept here, so the panel can redraw from it on every render.
+const GX = { info: new Map(), diff: new Map(), open: new Set(), more: new Set(), against: new Map() };
+const gitSha = c => c.gitCommit || ((c.id || '').match(/^c-git-([0-9a-f]{7,40})$/) || [])[1] || '';
+function gxGet(map, key, url) {
+  if (map.has(key)) return map.get(key);
+  map.set(key, null);
+  fetch(url, { cache: 'no-store' }).then(r => r.json()).catch(() => ({ error: t('syncOfflineTitle') })).then(j => { map.set(key, j); render(); });
+  return null;
+}
+function diffHTML(r) {
+  if (!r) return `<p class="gx-note">${esc(t('gxLoading'))}</p>`;
+  if (r.error || r.missing) return `<p class="gx-note">${esc(r.error || t('gxNoCommit'))}</p>`;
+  const lines = r.diff.split('\n').filter(l => !/^(diff --git|index |--- |\+\+\+ |new file mode|deleted file mode)/.test(l)).slice(0, 3000);
+  return `<pre class="gx-diff">${lines.map(l => `<span class="${l[0] === '+' ? 'a' : l[0] === '-' ? 'd' : l.startsWith('@@') ? 'h' : ''}">${esc(l)}</span>`).join('\n')}</pre>${r.truncated ? `<p class="gx-note">${esc(t('gxTruncated'))}</p>` : ''}`;
+}
+function changesHTML(c) {
+  if (S.mode !== 'server') return '';
+  const head = `<div class="sec-label">${esc(t('gxChanges'))}</div>`;
+  if (!gitSha(c)) {
+    // An agent turn: its files may not be committed yet; point at the session's next commit if there is one.
+    if (!c.files || !c.files.length || !c.session) return '';
+    const later = [...S.commits.values()].filter(x => x.session === c.session && gitSha(x) && x.ts >= c.ts).sort((a, b) => a.ts - b.ts)[0];
+    return head + `<p class="gx-note">${later ? `${esc(t('gxLater'))} <button class="linkish" data-act="goto-commit" data-cid="${esc(later.id)}">${esc(gitSha(later).slice(0, 7))}</button>` : esc(t('gxUncommitted'))}</p>`;
+  }
+  const against = GX.against.get(c.id) || '', key = `${c.id}|${against}`, q = `record=${encodeURIComponent(c.id)}${against ? `&against=${encodeURIComponent(against)}` : ''}`;
+  const info = gxGet(GX.info, key, `/api/git/commit?${q}`);
+  if (!info) return head + `<p class="gx-note">${esc(t('gxLoading'))}</p>`;
+  if (info.missing || info.error) return head + `<p class="gx-note">${esc(info.error || t(info.missing === 'no-repo' ? 'gxNoRepo' : 'gxNoCommit'))}</p>`;
+  const files = info.files || [], main = files.filter(f => !f.binary && !f.generated), quiet = files.filter(f => f.binary || f.generated);
+  const add = files.reduce((n, f) => n + f.add, 0), del = files.reduce((n, f) => n + f.del, 0), max = Math.max(1, ...main.map(f => f.add + f.del));
+  const all = GX.more.has(key), shown = all ? [...main, ...quiet] : main.slice(0, 8), hidden = files.length - shown.length;
+  const row = f => {
+    const dk = `${key}|${f.path}`, open = GX.open.has(dk), w = n => `${Math.round(56 * n / max)}px`;
+    const diff = open ? diffHTML(gxGet(GX.diff, dk, `/api/git/diff?${q}&file=${encodeURIComponent(f.path)}`)) : '';
+    return `<li class="${f.binary || f.generated ? 'gx-quiet' : ''}"><button class="gx-file" data-act="gx-file" data-dk="${esc(dk)}" title="${esc(f.path)}" ${f.binary ? 'disabled' : ''}><span class="gx-path">${esc(f.path)}</span><span>${f.binary ? esc(t('gxBinary')) : `<b class="gx-add">+${f.add}</b> <b class="gx-del">−${f.del}</b>`}</span><span class="gx-bar"><i style="width:${w(f.add)}"></i><u style="width:${w(f.del)}"></u></span></button>${diff}</li>`;
+  };
+  // Other commit stations to compare with: this line's first, then the same repository's, newest first.
+  const others = [...S.commits.values()].filter(x => x.id !== c.id && gitSha(x) && (x.repo ? x.repo === info.repo : tidOf(x) === tidOf(c)))
+    .sort((a, b) => (tidOf(b) === tidOf(c)) - (tidOf(a) === tidOf(c)) || b.ts - a.ts).slice(0, 40);
+  const pick = others.length ? `<label>${esc(t('gxCompare'))} <select class="gx-against" data-cid="${esc(c.id)}"><option value="">${esc(t('gxThisOnly'))}</option>${others.map(x => `<option value="${esc(x.id)}" ${x.id === against ? 'selected' : ''}>${esc(gitSha(x).slice(0, 7))} · ${esc(x.title.replace(/^[^:：]*[:：]\s*/, '').slice(0, 40))}</option>`).join('')}</select></label>` : '';
+  const sum = `${esc(info.against && info.against.short ? `${info.short} ↔ ${info.against.short}` : info.short)} · ${esc(t('gxFiles', files.length))} · <b class="gx-add">+${add}</b> <b class="gx-del">−${del}</b>${quiet.length ? ` · ${esc(t('gxQuiet', quiet.length))}` : ''}`;
+  const cross = info.against && info.against.missing;
+  return head + `<div class="gx-head"><span>${cross ? esc(info.short) : sum}</span>${pick}</div>`
+    + (cross ? `<p class="gx-note">${esc(t('gxOtherRepo'))}</p>` : `<ul class="gx-list">${shown.map(row).join('')}</ul>`)
+    + (hidden > 0 ? `<button class="linkish" data-act="gx-more" data-key="${esc(key)}">${esc(t('gxMore', hidden))}</button>` : '');
+}
 function commitDetail(c) {
   const th = getThread(tidOf(c));
   const sys = c.kind === 'fork' || c.kind === 'merge';
@@ -2097,6 +2166,7 @@ function commitDetail(c) {
         ${c.mergeOf && S.threads.has(c.mergeOf) ? `<span>${esc(t('mergedFromThread'))} <button class="linkish" data-act="goto-thread" data-tid="${esc(c.mergeOf)}">${esc(getThread(c.mergeOf).name)}</button></span>` : ''}
         ${children.map(x => `<span>${esc(t('forkedHere'))} <button class="linkish" data-act="goto-thread" data-tid="${esc(x.id)}">${esc(x.name)}</button></span>`).join('')}
       </div>` : ''}
+      ${changesHTML(c)}
       <div class="d-actions">
         ${S.ui.fork
           ? `<div class="inline-form"><input id="d-fork-name" placeholder="${esc(t('forkNamePh'))}"><button class="btn btn-primary" data-act="fork-create">${esc(t('createBranch'))}</button><button class="btn" data-act="fork-cancel">${esc(t('cancel'))}</button></div>`
@@ -2207,6 +2277,7 @@ detail.addEventListener('input', e => {
   } else if (s.type === 'edge' && el.id === 'e-label') patchDoc('edges', s.id, { label: el.value }, 600);
 });
 detail.addEventListener('change', e => {
+  if (e.target.classList.contains('gx-against')) { GX.against.set(e.target.dataset.cid, e.target.value); e.target.blur(); render(); return; }
   const el = e.target, s = S.sel; if (!s || S.readOnly) return;
   if (s.type === 'live' && el.id === 'l-thread') { bindLive(s.id, el.value); el.blur(); return; }
   if (s.type !== 'commit') return;
@@ -2228,6 +2299,8 @@ detail.addEventListener('click', e => {
   switch (act) {
     case 'close': select(null); break;
     case 'goto-commit': select({ type: 'commit', id: b.dataset.cid }); break;
+    case 'gx-file': { const k = b.dataset.dk; if (GX.open.has(k)) GX.open.delete(k); else GX.open.add(k); render(); break; }
+    case 'gx-more': GX.more.add(b.dataset.key); render(); break;
     case 'goto-thread': select({ type: 'thread', id: b.dataset.tid }); break;
     case 'goto-live': select({ type: 'live', id: b.dataset.sid }); break;
     case 'copy-cmd': copyText(b.dataset.cmd); break;

@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { home, mutate, readConfig, readData, createThread, addCommit, lastCommit, goalOf, threadById, threadByKey } from './store.mjs';
-import { gitEvents, redirectTargets, BASH_WRITES, EDIT_TOOLS, headline, firstLine, cleanPrompt } from './git-events.mjs';
+import { gitEvents, redirectTargets, BASH_WRITES, EDIT_TOOLS, GIT_COMMIT, commandDir, headline, firstLine, cleanPrompt } from './git-events.mjs';
 import { tr } from './i18n.mjs';
 const threadIdOfLocal = (d, c) => (c && c.thread && d.threads[c.thread] ? c.thread : 'inbox');
 import { readLive, updateLive, listLive as listLiveLocal } from './live.mjs';
@@ -40,6 +40,14 @@ export function repoInfo(cwd) {
   const common = git(cwd, ['rev-parse', '--path-format=absolute', '--git-common-dir']);
   const repo = common && path.basename(common) === '.git' ? path.basename(path.dirname(common)) : path.basename(top);
   return { repo, root: top, branch };
+}
+
+// The main repository a folder belongs to (a worktree points back to it), so a commit made in a
+// worktree stays readable after the worktree is gone.
+export function gitRoot(dir) {
+  const common = git(dir, ['rev-parse', '--path-format=absolute', '--git-common-dir']);
+  if (!common) return null;
+  return path.basename(common) === '.git' ? path.dirname(common) : git(dir, ['rev-parse', '--show-toplevel']) || null;
 }
 
 const stateFile = (sid, env) => path.join(home(env), 'sessions', String(sid).replace(/[^\w.-]/g, '_') + '.json');
@@ -109,6 +117,9 @@ export function handleHook(input, env = process.env) {
   const relevantTool = ev !== 'PostToolUse' || input.tool_name === 'Bash' || EDIT_TOOLS.has(input.tool_name) || input.tool_name === 'TodoWrite';
   const quick = ['PreToolUse', 'Notification', 'SubagentStart', 'SubagentStop'].includes(ev);
   const info = ev !== 'SessionEnd' && relevantTool && !(quick && readLive(sid, env)) ? repoInfo(cwd) : null;
+  // The repository a commit landed in, which is often not cwd's (`cd other && git commit`).
+  const bashCmd = ev === 'PostToolUse' && input.tool_name === 'Bash' ? String((input.tool_input || {}).command || '') : '';
+  const commitRepo = GIT_COMMIT.test(bashCmd) ? gitRoot(commandDir(bashCmd, cwd)) : null;
   try { updateLive(input, { info, key: info ? threadKey(info, cfg, sid) : null, env, agent: ag.name, agentKey: input._agent || 'claude', resume: ag.resume(sid) }); } catch {}
   if (!LOG_EVENTS.includes(ev)) return { live: ev };
 
@@ -157,7 +168,7 @@ export function handleHook(input, env = process.env) {
         const targets = redirectTargets(cmd).map(f => rel(root, path.resolve(cwd, f)));
         for (const f of targets) { pushUnique(state.turnFiles, f); pushUnique(state.files, f); }
         if (targets.length || BASH_WRITES.test(cmd)) state.turnActions = (state.turnActions || 0) + 1;
-        const g = gitEvents(cmd, out.stdout, out.stderr, out.gitOperation);
+        const g = { ...gitEvents(cmd, out.stdout, out.stderr, out.gitOperation), repo: commitRepo };
         if (logGitEvents(d, g, { info, cfg, sid, thread, state, agent: ag.name })) state.turnActions = (state.turnActions || 0) + 1;
       }
     } else if (ev === 'Stop') {
@@ -298,7 +309,7 @@ export function logGitEvents(d, g, { info, cfg, sid, thread, state, ts, agent = 
   const at = ts ? { ts } : {};
   for (const { sha, subject } of g.commits) {
     const t = thread();
-    addCommit(d, { thread: t.id, kind: 'agent', title: tr(cfg.lang, 'commit', sha.slice(0, 7), subject.slice(0, 160)), agent, ...at, extra: { session: sid, gitCommit: sha } });
+    addCommit(d, { thread: t.id, kind: 'agent', title: tr(cfg.lang, 'commit', sha.slice(0, 7), subject.slice(0, 160)), agent, ...at, extra: { session: sid, gitCommit: sha, ...(g.repo ? { repo: g.repo } : {}) } });
     if (state) state.commits.push(`${sha.slice(0, 7)} ${subject.slice(0, 100)}`);
     changed = true;
   }

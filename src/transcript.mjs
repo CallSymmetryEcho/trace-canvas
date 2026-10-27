@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { gitEvents, redirectTargets, BASH_WRITES, EDIT_TOOLS, cleanPrompt } from './git-events.mjs';
+import { gitEvents, commandDir, redirectTargets, BASH_WRITES, EDIT_TOOLS, cleanPrompt } from './git-events.mjs';
 import { listLive } from './live.mjs';
 
 export function projectsRoot(env = process.env) {
@@ -114,7 +114,7 @@ export function parseTranscript(file) {
           if (use.name === 'Bash') {
             const r = j.toolUseResult && typeof j.toolUseResult === 'object' ? j.toolUseResult : {};
             const g = gitEvents(use.input.command, r.stdout ?? toolResultText(b), r.stderr, r.gitOperation);
-            if (g.commits.length || g.push || g.pr || g.merge) turn.git.push({ ...g, ts: ts || turn.ts });
+            if (g.commits.length || g.push || g.pr || g.merge) turn.git.push({ ...g, ts: ts || turn.ts, ...(g.commits.length ? { dir: commandDir(use.input.command, j.cwd || s.cwd) } : {}) });
           }
         }
         continue;

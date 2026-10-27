@@ -3,7 +3,7 @@ import fs from 'node:fs';
 // putting a session on the canvas, merging threads, and merging data sets.
 import { INBOX, COLS, absorb, addCommit, createThread, findThreadByName, goalOf, lastCommit, readConfig, threadById, threadIdOf } from './store.mjs';
 import { headline, firstLine } from './git-events.mjs';
-import { AGENT, bindSession, logGitEvents, repoInfo, resumeLink, sessionThread, turnBody, rel } from './hook.mjs';
+import { AGENT, bindSession, gitRoot, logGitEvents, repoInfo, resumeLink, sessionThread, turnBody, rel } from './hook.mjs';
 import { listLive } from './live.mjs';
 import { AGENTS, q } from './agents.mjs';
 import { desktopSessions } from './desktop.mjs';
@@ -230,13 +230,15 @@ export function captureSession(d, parsed, { sessionId, thread, separate = false,
     const root = parsed.cwd || '';
     const info = parsed.cwd ? repoInfo(parsed.cwd) : null;
     const links = [resumeLink(sid)];
+    const roots = new Map(); // folder → its repository, so each commit records where it lives
+    const rootOf = dir => { if (!roots.has(dir)) roots.set(dir, gitRoot(dir)); return roots.get(dir); };
     parsed.turns.forEach((t, i) => {
       const last = i === parsed.turns.length - 1;
       if (i === 0) put(hashId('c', `${sid}:${t.uuid}:prompt`), { kind: 'task', title: firstLine(t.prompt, 120), body: t.prompt.slice(0, 3000), agent: AGENT, ts: t.ts, links, extra: { actor: 'human' } });
       for (const g of t.git) {
         // Git moments go through the same writer as the hooks, keyed by their content.
         const before = new Set(Object.keys(d.commits));
-        logGitEvents(d, g, { info, cfg, sid, ts: g.ts, thread: () => d.threads[tid] || { id: tid } });
+        logGitEvents(d, { ...g, repo: g.dir ? rootOf(g.dir) : null }, { info, cfg, sid, ts: g.ts, thread: () => d.threads[tid] || { id: tid } });
         for (const id of Object.keys(d.commits)) if (!before.has(id)) {
           const c = d.commits[id];
           delete d.commits[id];
@@ -408,6 +410,6 @@ export function readThread(d, ref, { limit = 50 } = {}, env = process.env) {
   return {
     id: t.id, name: t.name, status: t.status, goal: goalOf(t), note: t.note || '', total: cs.length,
     sessions: threadSessions(d, id, env).slice(0, 10).map(s => ({ id: s.id, agent: s.agent, title: s.title, status: s.status, last: new Date(s.last).toISOString(), resume: s.command })),
-    records: cs.slice(-limit).map(c => ({ id: c.id, at: new Date(c.ts).toISOString(), kind: c.kind, title: c.title, ...(c.body ? { body: c.body.slice(0, 600) } : {}), ...(c.agent ? { agent: c.agent } : {}), ...(c.session ? { session: c.session } : {}), ...(c.links && c.links.length ? { links: c.links } : {}) })),
+    records: cs.slice(-limit).map(c => ({ id: c.id, at: new Date(c.ts).toISOString(), kind: c.kind, title: c.title, ...(c.body ? { body: c.body.slice(0, 600) } : {}), ...(c.agent ? { agent: c.agent } : {}), ...(c.session ? { session: c.session } : {}), ...(c.gitCommit ? { commit: c.gitCommit, ...(c.repo ? { repo: c.repo } : {}) } : {}), ...(c.links && c.links.length ? { links: c.links } : {}) })),
   };
 }

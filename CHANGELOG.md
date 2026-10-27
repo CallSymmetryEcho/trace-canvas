@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **See what changed.** A commit station lists the files it changed, biggest first, with a diff for each, and compares with another commit station. The diffs are read from git when you open them (`/api/git/commit`, `/api/git/diff`); the canvas keeps only each commit's sha and repository, which commit records now carry, also for commits made with `cd other && git commit` or in a worktree.
+
 ## 0.2.0 (2026-10-27)
 
 Trace Canvas now follows your agents while they work, not only after: live sessions, several agents on one machine, goals and to-dos they share with you, and sessions that stay on their line.

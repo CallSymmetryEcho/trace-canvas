@@ -207,7 +207,9 @@ function whereHere(cfg, cwd) {
   try {
     const rows = JSON.parse(execFileSync('python3', [py, '--json'], { encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'] }));
     const here = path.resolve(cwd);
-    return rows.filter(r => (r.where || []).some(w => w.local && (here.startsWith(w.local) || w.local.startsWith(here + path.sep))));
+    // Most specific first: the entry whose matching path is longest (the repo itself before "the Mac").
+    const score = r => Math.max(0, ...(r.where || []).filter(w => w.local && (here.startsWith(w.local) || w.local.startsWith(here + path.sep))).map(w => w.local.length));
+    return rows.map(r => [score(r), r]).filter(([n]) => n > 0).sort((a, b) => b[0] - a[0]).map(([, r]) => r);
   } catch { return []; }
 }
 

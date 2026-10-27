@@ -11,7 +11,7 @@ import { addCommit, createThread, emptyData, mutate, readData } from '../src/sto
 
 // The page's own arrange(), taken out of app/index.html between its markers.
 const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
-const arrange = new Function(`${page.slice(page.indexOf('// <arrange>'), page.indexOf('// </arrange>'))}; return arrange;`)();
+const { arrange, perColFor } = new Function(`${page.slice(page.indexOf('// <arrange>'), page.indexOf('// </arrange>'))}; return { arrange, perColFor };`)();
 
 test('arrange puts each group in its own block, forks right after their line, lines without a group last', () => {
   const L = (id, createdAt, group, parent = null) => ({ id, createdAt, group, parent });
@@ -61,4 +61,11 @@ test('a fork joins the group of the line it came from, also a branch line made b
   assert.equal(Object.values(readData(env).threads).find(t => t.name === 'tripsplit').group, 'Side projects');
   run('group', 'tripsplit', '--clear');
   assert.equal(Object.values(readData(env).threads).find(t => t.name === 'tripsplit').group, undefined);
+});
+
+test('Arrange stacks fewer cards a column in a wide window and more in a tall one', () => {
+  const lines = Array.from({ length: 24 }, (_, i) => ({ id: `t${i}`, createdAt: i, group: `G${i % 3}` }));
+  const wide = perColFor(lines, 1800, 700), tall = perColFor(lines, 500, 1400);
+  assert.ok(wide < tall, `${wide} < ${tall}`);
+  assert.ok(wide >= 2 && tall <= 12);
 });

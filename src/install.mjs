@@ -49,6 +49,10 @@ export function settingsPath({ user, project }) {
   return path.join(path.resolve(project || process.cwd()), '.claude', 'settings.local.json');
 }
 
+// Hooks and MCP servers start node by its full path: sessions started by a desktop app or over ssh
+// often have a PATH without it (on bsuperstation only the system folders).
+export const NODE = process.execPath;
+export const hookCommand = (cli, agent) => `"${NODE}" "${cli}" hook${agent ? ` --agent ${agent}` : ''}`;
 const isOurs = group => (group.hooks || []).some(x => typeof x.command === 'string' && x.command.includes(MARK));
 
 export function install(file, command, events = hookConfig(command)) {
@@ -88,16 +92,16 @@ export function installMcp({ user, project }, cli) {
   if (user) {
     try { execFileSync('claude', ['mcp', 'remove', '--scope', 'user', 'trace-canvas'], { stdio: 'ignore' }); } catch {}
     try {
-      execFileSync('claude', ['mcp', 'add', '--scope', 'user', 'trace-canvas', '--', 'node', cli, 'mcp'], { stdio: 'pipe' });
+      execFileSync('claude', ['mcp', 'add', '--scope', 'user', 'trace-canvas', '--', NODE, cli, 'mcp'], { stdio: 'pipe' });
       return { ok: true, where: 'user scope (claude mcp add)' };
     } catch (e) {
-      return { ok: false, where: 'user scope', hint: `claude mcp add --scope user trace-canvas -- node "${cli}" mcp`, error: String(e.stderr || e.message || e).trim() };
+      return { ok: false, where: 'user scope', hint: `claude mcp add --scope user trace-canvas -- "${NODE}" "${cli}" mcp`, error: String(e.stderr || e.message || e).trim() };
     }
   }
   const file = path.join(path.resolve(project || process.cwd()), '.mcp.json');
   let cfg = {};
   if (fs.existsSync(file)) { const raw = fs.readFileSync(file, 'utf8'); cfg = raw.trim() ? JSON.parse(raw) : {}; fs.writeFileSync(file + '.bak', raw); }
-  cfg.mcpServers = { ...(cfg.mcpServers || {}), 'trace-canvas': { command: 'node', args: [cli, 'mcp'] } };
+  cfg.mcpServers = { ...(cfg.mcpServers || {}), 'trace-canvas': { command: NODE, args: [cli, 'mcp'] } };
   fs.writeFileSync(file, JSON.stringify(cfg, null, 2) + '\n');
   return { ok: true, where: file };
 }
@@ -106,12 +110,12 @@ export function installMcp({ user, project }, cli) {
 export function installAgentMcp(agent, cli, home = os.homedir()) {
   if (agent === 'codex') {
     try { execFileSync('codex', ['mcp', 'remove', 'trace-canvas'], { stdio: 'ignore' }); } catch {}
-    try { execFileSync('codex', ['mcp', 'add', 'trace-canvas', '--env', 'TRACE_CANVAS_AGENT=codex', '--', 'node', cli, 'mcp'], { stdio: 'pipe' }); return { ok: true }; }
-    catch (e) { return { ok: false, hint: `codex mcp add trace-canvas --env TRACE_CANVAS_AGENT=codex -- node "${cli}" mcp` }; }
+    try { execFileSync('codex', ['mcp', 'add', 'trace-canvas', '--env', 'TRACE_CANVAS_AGENT=codex', '--', NODE, cli, 'mcp'], { stdio: 'pipe' }); return { ok: true }; }
+    catch (e) { return { ok: false, hint: `codex mcp add trace-canvas --env TRACE_CANVAS_AGENT=codex -- "${NODE}" "${cli}" mcp` }; }
   }
   const file = agentFiles(home).gemini;
   const s = fs.existsSync(file) && fs.readFileSync(file, 'utf8').trim() ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
-  s.mcpServers = { ...(s.mcpServers || {}), 'trace-canvas': { command: 'node', args: [cli, 'mcp'], env: { TRACE_CANVAS_AGENT: 'gemini' } } };
+  s.mcpServers = { ...(s.mcpServers || {}), 'trace-canvas': { command: NODE, args: [cli, 'mcp'], env: { TRACE_CANVAS_AGENT: 'gemini' } } };
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify(s, null, 2) + '\n');
   return { ok: true };

@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { addCommit, dataFile, ensureThread, home, importText, INBOX, mutate, readConfig, writeConfig } from '../src/store.mjs';
 import { execFileSync } from 'node:child_process';
 import { handleHook, readStdin } from '../src/hook.mjs';
-import { agentFiles, allowSafeTools, codexHooks, codexWritable, geminiHooks, install, installAgentMcp, installMcp, installSkill, onPath, settingsPath, uninstall } from '../src/install.mjs';
+import { agentFiles, allowSafeTools, codexHooks, codexWritable, geminiHooks, hookCommand, install, installAgentMcp, installMcp, installSkill, onPath, settingsPath, uninstall } from '../src/install.mjs';
 import { normalize } from '../src/agents.mjs';
 import os from 'node:os';
 
@@ -287,7 +287,7 @@ async function main() {
     case 'uninstall-hooks': {
       const s = scope();
       const file = settingsPath(s);
-      if (cmd === 'install-hooks') { install(file, `node "${SELF}" hook`); console.log(`Hooks added to ${file}`); }
+      if (cmd === 'install-hooks') { install(file, hookCommand(SELF)); console.log(`Hooks added to ${file}`); }
       else console.log(uninstall(file) ? `Hooks removed from ${file}` : `No Trace Canvas hooks in ${file}`);
       break;
     }
@@ -310,7 +310,7 @@ async function main() {
       const s = scope();
       if (!s.user && !s.project) { console.error('Usage: trace-canvas setup --user   (or --project <dir>)'); process.exit(1); }
       const file = settingsPath(s);
-      install(file, `node "${SELF}" hook`);
+      install(file, hookCommand(SELF));
       console.log(`1. Hooks added to ${file}`);
       const m = installMcp(s, SELF);
       allowSafeTools(file);
@@ -333,7 +333,7 @@ async function main() {
       const others = str(flag('agents', '')).split(',').map(x => x.trim()).filter(x => x === 'codex' || x === 'gemini');
       for (const a of s.user ? others : []) {
         if (!onPath(a)) { console.log(`   ${a}: not found on PATH, skipped${a === 'gemini' ? ' (install a current @google/gemini-cli, then run setup again)' : ''}`); continue; }
-        const f = agentFiles(os.homedir())[a], cmd = `node "${SELF}" hook --agent ${a}`;
+        const f = agentFiles(os.homedir())[a], cmd = hookCommand(SELF, a);
         install(f, cmd, a === 'codex' ? codexHooks(cmd) : geminiHooks(cmd));
         const r = installAgentMcp(a, SELF);
         console.log(`   ${a}: hooks in ${f}; MCP ${r.ok ? 'registered' : `not registered, run: ${r.hint}`}`);

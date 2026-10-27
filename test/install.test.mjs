@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { installSkill } from '../src/install.mjs';
+import { hookCommand, install, installAgentMcp, installMcp, installSkill } from '../src/install.mjs';
 
 const cli = new URL('../bin/trace-canvas.mjs', import.meta.url);
 const source = fileURLToPath(new URL('../skill', import.meta.url));
@@ -83,4 +83,21 @@ test('replacing a locally edited Codex skill preserves it in a backup', t => {
   const backup = fs.readdirSync(base).find(name => name.startsWith('trace-canvas.bak-'));
   assert.ok(backup);
   assert.equal(fs.readFileSync(path.join(base, backup, 'SKILL.md'), 'utf8'), 'Local edits');
+});
+
+test('hooks and MCP servers start node by its full path, and replace the old bare `node` entries', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-node-'));
+  const cli = '/opt/trace-canvas/bin/trace-canvas.mjs';
+  assert.equal(hookCommand(cli), `"${process.execPath}" "${cli}" hook`);
+  assert.equal(hookCommand(cli, 'codex'), `"${process.execPath}" "${cli}" hook --agent codex`);
+  // A settings file from before: our hook under the bare name, next to someone else's.
+  const file = path.join(root, 'settings.json');
+  fs.writeFileSync(file, JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: 'say done' }] }, { hooks: [{ type: 'command', command: `node "${cli}" hook`, timeout: 10 }] }] } }));
+  install(file, hookCommand(cli));
+  const stop = JSON.parse(fs.readFileSync(file, 'utf8')).hooks.Stop.map(g => g.hooks[0].command);
+  assert.deepEqual(stop, ['say done', hookCommand(cli)]);
+  installMcp({ project: root }, cli);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(root, '.mcp.json'), 'utf8')).mcpServers['trace-canvas'].command, process.execPath);
+  installAgentMcp('gemini', cli, root);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(root, '.gemini', 'settings.json'), 'utf8')).mcpServers['trace-canvas'].command, process.execPath);
 });

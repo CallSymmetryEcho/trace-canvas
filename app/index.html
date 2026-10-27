@@ -482,6 +482,18 @@ body.sheet-open .top { z-index: 80; }
   padding-block: 6px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
   background: var(--surface-2); border-bottom: 1px solid var(--rule); }
 .live-bar[hidden] { display: none; }
+/* Focus mode: which group every view is narrowed to */
+.focus-bar { display: flex; align-items: center; gap: 8px; position: relative; z-index: 30; font-size: 13px;
+  padding-block: 6px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: var(--accent-soft); border-bottom: 1px solid var(--rule); }
+.focus-bar[hidden] { display: none; }
+.focus-bar b { flex: none; }
+.focus-bar .fb-name { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.focus-bar .fb-n { color: var(--muted); white-space: nowrap; }
+.focus-bar .btn { flex: none; padding: 3px 9px; font-size: 12.5px; }
+.focus-list { display: grid; gap: 8px; }
+.focus-list .btn { justify-content: space-between; padding: 10px 12px; font-size: 14px; }
+.focus-list .btn span { opacity: .7; }
 .live-bar::-webkit-scrollbar { display: none; }
 .live-label { flex: none; font-family: var(--f-display); font-weight: 600; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .live-count { flex: none; font-size: 12px; color: var(--faint); margin-right: 4px; }
@@ -645,6 +657,7 @@ body.sheet-open .top { z-index: 80; }
       <div class="menu" id="menu" hidden>
         <button data-menu="new-thread"><span data-i18n="menuNewThread">New thread</span> <span class="k">N</span></button>
         <button data-menu="toggle-done"><span id="toggle-done-label"></span></button>
+        <button data-menu="focus" data-i18n="menuFocus">Focus on a group…</button>
         <hr>
         <button data-menu="agent" data-i18n="menuAgent">Connect an AI agent</button>
         <button data-menu="io" data-i18n="menuIO">Import / export</button>
@@ -655,6 +668,7 @@ body.sheet-open .top { z-index: 80; }
       </div>
     </div>
   </header>
+  <div class="focus-bar" id="focus-banner" hidden></div>
   <div class="live-bar" id="live-bar" hidden></div>
 
   <main id="main">
@@ -667,7 +681,6 @@ body.sheet-open .top { z-index: 80; }
         </div>
       </div>
       <div class="banner" id="connect-banner" hidden></div>
-      <div class="banner" id="focus-banner" hidden></div>
       <div class="banner multi-banner" id="multi-banner" hidden></div>
       <div class="hud">
         <div class="hud-group">
@@ -786,7 +799,9 @@ const I18N = {
     langBtn: '中文', langTitle: '切换到中文', more: 'More',
     menuNewThread: 'New thread', menuHideDone: 'Hide finished threads', menuShowDone: 'Show finished threads',
     arrange: 'Arrange', arrangeTitle: 'Lay the lines out by group, forks next to the lines they came from', tArranged: 'Arranged', tUndo: 'Undo',
-    groupLabel: 'Group', groupName: 'Name', groupLines: 'Lines in this group', groupCount: n => `${n} line${n === 1 ? '' : 's'}`, groupArrange: 'Arrange this group', groupFocus: 'Show only this group', focusOn: g => `Only "${g}"`, focusOff: 'Show all', groupUngroup: 'Ungroup',
+    groupLabel: 'Group', groupName: 'Name', groupLines: 'Lines in this group', groupCount: n => `${n} line${n === 1 ? '' : 's'}`, groupArrange: 'Arrange this group', groupFocus: 'Focus on this group', menuFocus: 'Focus on a group…', focusTitle: 'Focus on a group', focusLabel: 'Focus', focusPick: 'Change', focusExit: 'Leave focus',
+    focusIntro: 'Every view then shows only the lines of the group you pick: the canvas, the branches, the timeline and the goals. It stays on, also after a reload, until you leave it.',
+    focusNoGroups: 'No groups yet. Select lines on the canvas and press Group, or fill in a group in a line\'s panel.', groupUngroup: 'Ungroup',
     threadGroup: 'Group', threadGroupPh: 'None', multiGroup: 'Group', multiGroupPh: 'Group name', tGroupNeedName: 'Type a group name first',
     tGrouped: (n, g) => `${n} line${n === 1 ? '' : 's'} in "${g}"`, tUngrouped: 'Group dissolved; the lines stay',
     menuSync: 'Sync with other machines', tSyncing: 'Syncing…', tSyncBusy: 'A sync is already running', tSyncFailed: e => `Sync failed: ${e}`,
@@ -944,7 +959,9 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     langBtn: 'EN', langTitle: 'Switch to English', more: '更多',
     menuNewThread: '新建线程', menuHideDone: '隐藏已完成的线程', menuShowDone: '显示已完成的线程',
     arrange: '整理', arrangeTitle: '按分组排好线程，分叉排在原线旁边', tArranged: '已整理', tUndo: '撤销',
-    groupLabel: '分组', groupName: '名称', groupLines: '组里的线', groupCount: n => `${n} 条线`, groupArrange: '整理这一组', groupFocus: '只看这一组', focusOn: g => `只看「${g}」`, focusOff: '显示全部', groupUngroup: '解散分组',
+    groupLabel: '分组', groupName: '名称', groupLines: '组里的线', groupCount: n => `${n} 条线`, groupArrange: '整理这一组', groupFocus: '专注这一组', menuFocus: '专注某个分组…', focusTitle: '专注模式', focusLabel: '专注', focusPick: '换一个', focusExit: '退出专注',
+    focusIntro: '选一个分组后，画布、分支、时间线和目标都只显示这个组里的线。刷新后也保持，直到你退出。',
+    focusNoGroups: '还没有分组。在画布上选中几条线点「编组」，或者在线面板里填写分组。', groupUngroup: '解散分组',
     threadGroup: '分组', threadGroupPh: '无', multiGroup: '编组', multiGroupPh: '分组名称', tGroupNeedName: '先填分组名称',
     tGrouped: (n, g) => `${n} 条线已放进「${g}」`, tUngrouped: '分组已解散，线都还在',
     menuSync: '和其他电脑同步', tSyncing: '正在同步…', tSyncBusy: '已经有一个同步在进行', tSyncFailed: e => `同步失败：${e}`,
@@ -1135,7 +1152,7 @@ const S = {
   captureKind: 'idea', captureThread: ls.get('tc.captureThread', INBOX),
   mode: 'loading', readOnly: false, offline: false, got: new Set(), dragId: null,
   ai: null, sheet: null,
-  live: [], liveOthers: [], sessions: [], machine: '', goalsShowDone: false, multiGroup: '', dragMembers: null, focusGroup: null, platform: '',
+  live: [], liveOthers: [], sessions: [], machine: '', goalsShowDone: false, multiGroup: '', dragMembers: null, focusGroup: ls.get('tc.focusGroup', null), platform: '',
 };
 
 function fmtAbs(ts) { const d = new Date(ts); return `${pad2(d.getMonth() + 1)}/${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
@@ -1185,6 +1202,15 @@ function byThread() {
 }
 function orderedThreads() { return [...S.threads.values()].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)); }
 function isHidden(th) { return S.hideDone && (th.status === 'done' || th.status === 'merged'); }
+// Focus mode: every view shows only one group's lines (More → Focus on a group, or the group's panel). Kept per device.
+function inFocus(th) { return !S.focusGroup || th.group === S.focusGroup; }
+// The lines a view shows: the inbox and every line, or in focus mode the group's lines only.
+function viewLines(keep = th => !isHidden(th)) { return [...(S.focusGroup ? [] : [inboxThread()]), ...orderedThreads().filter(th => inFocus(th) && keep(th))]; }
+function setFocus(g) {
+  S.focusGroup = g || null; ls.set('tc.focusGroup', S.focusGroup);
+  select(null); render();
+  if (S.view === 'canvas') requestAnimationFrame(() => requestAnimationFrame(fit));
+}
 function lastCommit(tid) { let best = null; for (const c of S.commits.values()) if (tidOf(c) === tid && (!best || c.ts > best.ts)) best = c; return best; }
 function matches(c) {
   if (!S.q) return true;
@@ -1615,11 +1641,19 @@ const mini = (kind, color, done) => `<svg class="g" width="16" height="16" viewB
 
 /* ================= render loop ================= */
 let rq = 0;
+function renderFocus() {
+  // A group that was renamed or ungrouped ends the focus, once the data has arrived.
+  if (S.focusGroup && COLS.every(c => S.got.has(c)) && !groupNames().includes(S.focusGroup)) { S.focusGroup = null; ls.set('tc.focusGroup', null); }
+  const fb = $('#focus-banner'), n = orderedThreads().filter(th => th.group === S.focusGroup).length;
+  fb.hidden = !S.focusGroup;
+  if (S.focusGroup) fb.innerHTML = `<b>${esc(t('focusLabel'))}</b><span class="fb-name">${esc(S.focusGroup)}</span><span class="fb-n">${esc(t('groupCount', n))}</span><span class="spacer"></span><button class="btn" id="focus-pick">${esc(t('focusPick'))}</button><button class="btn" id="focus-off">${esc(t('focusExit'))}</button>`;
+}
 function render() { if (rq) return; rq = requestAnimationFrame(() => { rq = 0; renderAll(); }); }
 function renderAll() {
   $('#group-list').innerHTML = groupNames().map(g => `<option value="${esc(g)}">`).join('');
   renderSync();
   renderLive();
+  renderFocus();
   // The goals list holds still only while a to-do is being typed: a checkbox or menu keeps focus
   // after a click, and that must not stop new to-dos from showing.
   const f = document.activeElement, adding = f && f.classList.contains('gl-add') ? f.dataset.thread : null;
@@ -1689,12 +1723,8 @@ function selThreadId() {
 }
 function renderCanvas() {
   const by = byThread();
-  if (S.focusGroup && !groupNames().includes(S.focusGroup)) S.focusGroup = null;
-  // Only one group: a canvas of its own, without the inbox and the other lines.
-  const ths = [...(S.focusGroup ? [] : [inboxThread()]), ...orderedThreads().filter(th => !isHidden(th) && (!S.focusGroup || th.group === S.focusGroup))];
-  const fb = $('#focus-banner');
-  fb.hidden = !S.focusGroup;
-  if (S.focusGroup) fb.innerHTML = `<span>${esc(t('focusOn', S.focusGroup))}</span><button class="btn" id="focus-off">${esc(t('focusOff'))}</button>`;
+  // In focus mode, a canvas of its own: without the inbox and the other lines.
+  const ths = viewLines();
   const selT = selThreadId();
   cardsEl.innerHTML = ths.map(th => cardHTML(th, by.get(th.id) || [], selT)).join('');
   drawGroups();
@@ -1885,7 +1915,7 @@ function doArrange(only) {
   if (!only) requestAnimationFrame(() => requestAnimationFrame(fit)); // after the cards are redrawn
 }
 $('#arrange-btn').onclick = () => doArrange(S.focusGroup || undefined);
-$('#focus-banner').addEventListener('click', e => { if (e.target.id === 'focus-off') { S.focusGroup = null; render(); requestAnimationFrame(() => requestAnimationFrame(fit)); } });
+$('#focus-banner').addEventListener('click', e => { if (e.target.id === 'focus-off') setFocus(null); else if (e.target.id === 'focus-pick') openSheet('focus'); });
 function setGroup(ids, name) { for (const id of ids) patchDoc('threads', id, { group: name }, 0); }
 function groupDetail(name) {
   const ths = orderedThreads().filter(th => th.group === name);
@@ -2114,7 +2144,7 @@ function createThreadAndEdit() {
 /* ================= git graph ================= */
 function renderGit() {
   const by = byThread();
-  const visible = new Set([INBOX, ...orderedThreads().filter(th => !isHidden(th)).map(th => th.id)]);
+  const visible = new Set(viewLines().map(th => th.id));
   const list = [...S.commits.values()].filter(c => visible.has(tidOf(c))).sort((a, b) => b.ts - a.ts);
   // Live tips: sessions working on a visible line right now take the top rows, above its newest record.
   const tips = S.live.filter(s => s.threadId && visible.has(s.threadId));
@@ -2216,7 +2246,7 @@ function renderTimeline() {
   const wrap = $('#tl-scroll'), inner = $('#tl-inner');
   $$('#tl-zoom button').forEach(b => b.setAttribute('aria-pressed', b.dataset.z === S.tlZoom ? 'true' : 'false'));
   const by = byThread();
-  const ids = [INBOX, ...orderedThreads().filter(th => !isHidden(th)).map(th => th.id)].filter(id => by.has(id));
+  const ids = viewLines().map(th => th.id).filter(id => by.has(id));
   if (!ids.length) { inner.innerHTML = ''; return; }
   const H = 3600e3, pph = TLZ[S.tlZoom] || 9, now = Date.now();
   let min = Infinity, max = -Infinity;
@@ -2558,7 +2588,7 @@ detail.addEventListener('click', e => {
     case 'gx-more': GX.more.add(b.dataset.key); render(); break;
     case 'goto-thread': select({ type: 'thread', id: b.dataset.tid }); break;
     case 'g-arrange': doArrange(s.id); break;
-    case 'g-focus': S.focusGroup = s.id; select(null); requestAnimationFrame(() => requestAnimationFrame(fit)); break;
+    case 'g-focus': setFocus(s.id); break;
     case 'g-ungroup': setGroup(orderedThreads().filter(th => th.group === s.id).map(th => th.id), ''); select(null); toast(t('tUngrouped')); break;
     case 'goto-live': select({ type: 'live', id: b.dataset.sid }); break;
     case 'copy-cmd': copyText(b.dataset.cmd); break;
@@ -2690,8 +2720,9 @@ document.addEventListener('keydown', e => {
 });
 window.addEventListener('resize', () => render());
 PHONE.addEventListener('change', () => { markTabs(); if (S.sheet === 'goals') renderGoals(); });
-// The Goals page starts where the header ends, whatever its height.
-new ResizeObserver(([e]) => document.documentElement.style.setProperty('--top-h', `${e.target.offsetHeight}px`)).observe($('.top'));
+// The Goals page starts where the header ends (or the focus bar under it), whatever their height.
+const topH = new ResizeObserver(() => document.documentElement.style.setProperty('--top-h', `${($('#focus-banner').hidden ? $('.top') : $('#focus-banner')).getBoundingClientRect().bottom}px`));
+topH.observe($('.top')); topH.observe($('#focus-banner'));
 
 /* ================= sheets ================= */
 const scrim = $('#scrim');
@@ -2770,6 +2801,12 @@ function openSheet(kind) {
       <p>${esc(t('helpShapes'))}</p>`);
   } else if (kind === 'ai') runAI();
   else if (kind === 'goals') renderGoals();
+  else if (kind === 'focus') {
+    const gs = groupNames();
+    setSheet(t('focusTitle'), `<p>${esc(t('focusIntro'))}</p>` + (gs.length
+      ? `<div class="focus-list">${gs.map(g => `<button class="btn ${g === S.focusGroup ? 'btn-primary' : ''}" data-focus="${esc(g)}"><b>${esc(g)}</b><span>${esc(t('groupCount', orderedThreads().filter(th => th.group === g).length))}</span></button>`).join('')}</div>`
+      : `<p>${esc(t('focusNoGroups'))}</p>`) + (S.focusGroup ? `<div><button class="btn" data-focus="">${esc(t('focusExit'))}</button></div>` : ''));
+  }
 }
 async function saveExport() {
   const d = new Date();
@@ -2815,14 +2852,14 @@ const goalOf = th => {
 };
 function renderGoals() {
   const by = byThread();
-  const groups = [inboxThread(), ...orderedThreads()].map(th => {
+  const groups = viewLines(() => true).map(th => {
     const tasks = (by.get(th.id) || []).filter(isTodo);
     const open = tasks.filter(c => !c.done);
     return { th, tasks, open, goal: th.id === INBOX ? '' : goalOf(th) };
   }).filter(g => (g.tasks.length || g.goal) && (!['done', 'merged'].includes(g.th.status) || g.open.length));
   // Lines that still have open to-dos first, then the ones with a running session, then by most open.
   groups.sort((a, b) => (b.open.length > 0) - (a.open.length > 0) || liveOn(b.th.id).length - liveOn(a.th.id).length || b.open.length - a.open.length);
-  const others = orderedThreads().filter(th => !['done', 'merged'].includes(th.status)).length - groups.filter(g => g.th.id !== INBOX).length;
+  const others = orderedThreads().filter(th => inFocus(th) && !['done', 'merged'].includes(th.status)).length - groups.filter(g => g.th.id !== INBOX).length;
   let tipHidden = false;
   try { tipHidden = localStorage.getItem('tc.goalsTipHidden') === '1'; } catch {}
   const totalOpen = groups.reduce((n, g) => n + g.open.length, 0);
@@ -2861,6 +2898,7 @@ function handCommand(c) {
   return `${dir ? `cd ${shq(dir)} && ` : ''}TRACE_CANVAS_THREAD=${tid} ${AGENT_LAUNCH[c.assignee](t('handPrompt', th.name, tid, c.title))}`;
 }
 const sheetBody = $('#sheet-body');
+sheetBody.addEventListener('click', e => { const f = e.target.closest('[data-focus]'); if (f && S.sheet === 'focus') { closeSheet(); setFocus(f.dataset.focus); } });
 sheetBody.addEventListener('change', e => {
   if (S.sheet !== 'goals') return;
   const el = e.target;

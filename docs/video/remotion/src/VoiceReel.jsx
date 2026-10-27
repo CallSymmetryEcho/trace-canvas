@@ -22,7 +22,7 @@ export const VoiceReel = ({ items, lang }) => {
         <Sequence key={s.file} from={s.from} durationInFrames={s.len}><Html5Audio src={staticFile(`samples/${s.file}`)} /></Sequence>
       ))}
       <div style={{ width: 640 }}>
-        <div style={{ fontSize: 30, color: '#666', marginBottom: 28 }}>{lang === 'zh' ? '配音试听 · 中文' : 'Voice samples · English'}</div>
+        <div style={{ fontSize: 30, color: '#666', marginBottom: 28 }}>{lang.endsWith('zh') ? '配音试听 · 中文' : 'Voice samples · English'}</div>
         {spans.map((s, k) => (
           <div key={s.file} style={{ fontSize: 32, padding: '10px 20px', borderRadius: 14, marginBottom: 6, background: k === i ? '#141414' : 'transparent', color: k === i ? '#fff' : '#444' }}>
             {k + 1}. {s.name} <span style={{ opacity: 0.6, fontSize: 24 }}>· {s.engine}</span>

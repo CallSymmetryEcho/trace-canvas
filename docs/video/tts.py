@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Neural narration with mlx-audio on Apple Silicon, for make.mjs and for voice samples.
 
-Reads a JSON list of jobs on stdin, {"text", "out", "model", "voice", "lang", "instruct"?},
+Reads a JSON list of jobs on stdin, {"text", "out", "model", "voice", "lang", "instruct"?, "speed"? (Kokoro)},
 and writes one WAV file per job. Each model is loaded once.
 """
 import json
@@ -19,7 +19,7 @@ for job in json.load(sys.stdin):
         models[job['model']] = load_model(job['model'])
     m = models[job['model']]
     if 'Kokoro' in job['model']:
-        results = m.generate(text=job['text'], voice=job['voice'], lang_code=LANG_CODE[job['lang']])
+        results = m.generate(text=job['text'], voice=job['voice'], lang_code=LANG_CODE[job['lang']], speed=job.get('speed', 1.0))
     else:
         results = m.generate_custom_voice(text=job['text'], speaker=job['voice'], language=LANGUAGE[job['lang']], instruct=job.get('instruct'))
     audio = np.concatenate([np.array(r.audio) for r in results])

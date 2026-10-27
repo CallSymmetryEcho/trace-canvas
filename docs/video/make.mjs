@@ -31,8 +31,8 @@ const MODELS = { kokoro: 'mlx-community/Kokoro-82M-bf16', qwen: 'mlx-community/Q
 const VOICE = { en: process.env.TC_VOICE_EN || 'kokoro:af_heart', zh: process.env.TC_VOICE_ZH || 'qwen:Ryan' };
 // Style instruction for Qwen3-TTS voices (Kokoro takes none).
 const STYLE = {
-  en: 'Warm, low and relaxed, with a calm, confident and slightly intimate tone, like a late-night radio host.',
-  zh: '声音低沉有磁性，语气从容、温和而自信，语速舒缓，像深夜电台主持人。',
+  en: 'Clear, crisp and upbeat, at a brisk pace, confident and energetic, like a tech product launch.',
+  zh: '吐字清晰，干净利落，语速稍快，语气自信有精神，像科技产品发布会的讲解。',
 };
 const pick = (v, lang) => (Array.isArray(v) ? v[lang === 'zh' ? 1 : 0] : v);
 

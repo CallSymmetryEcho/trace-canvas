@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { bindSession, handleHook } from '../src/hook.mjs';
-import { bindLiveSession, mergeThreads, readThread } from '../src/ops.mjs';
+import { bindLiveSession, mergeThreads, readThread, threadSessions } from '../src/ops.mjs';
 import { addCommit, createThread, mutate, readData } from '../src/store.mjs';
 
 function sandbox() {
@@ -81,4 +81,7 @@ test('a session bound through the tools says which agent and machine it is, befo
   mutate(d => { createThread(d, { name: 'Cross-machine test' }); bindLiveSession(d, { sessionId: 'cx9', thread: 'Cross-machine test', agent: 'codex' }, env); }, env);
   const e = readData(env).sessions.cx9;
   assert.deepEqual([e.agent, e.agentKey, e.resume, e.machine, e.bound], ['Codex', 'codex', 'codex resume cx9', 'bsuperstation', true]);
+  // Seen from the Mac, it resumes over ssh.
+  const d = readData(env), tid = Object.values(d.threads)[0].id;
+  assert.equal(threadSessions(d, tid, { ...s.env, TRACE_CANVAS_MACHINE: 'mac' })[0].command, `ssh -t bsuperstation 'codex resume cx9'`);
 });

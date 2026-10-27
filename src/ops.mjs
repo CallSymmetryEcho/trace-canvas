@@ -394,10 +394,11 @@ export function listThreads(d, { query, includeDone = true } = {}) {
 
 // A line's sessions with their live status ('off' when not running).
 export function threadSessions(d, tid, env = process.env) {
-  const live = new Map(listLive(env).map(s => [s.id, s]));
+  const live = new Map(listLive(env).map(s => [s.id, s])), me = readConfig(env).machine;
   return sessionList(d, tid).map(s => {
-    const l = live.get(s.id), cwd = s.cwd || (l && l.cwd) || '';
-    return { ...s, status: l ? l.status : 'off', cwd, command: `${cwd ? `cd ${q(cwd)} && ` : ''}${s.resume}` };
+    const l = live.get(s.id), cwd = s.cwd || (l && l.cwd) || '', here = `${cwd ? `cd ${q(cwd)} && ` : ''}${s.resume}`;
+    // Another machine's session resumes there, over ssh (machine names are the ssh aliases).
+    return { ...s, status: l ? l.status : 'off', cwd, command: s.machine && s.machine !== me ? `ssh -t ${s.machine} ${q(here)}` : here };
   });
 }
 

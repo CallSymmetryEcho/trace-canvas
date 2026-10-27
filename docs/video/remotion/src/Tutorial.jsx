@@ -118,11 +118,14 @@ function cursorAt(s, t) {
 
 const App = ({ s, t, T, zoomIn, zoomOut }) => {
   const pos = cursorAt(s, t);
-  // The camera looks at the average cursor position of the last 0.7 s, so it drifts instead of jumping.
+  // The camera looks at the average cursor position of the last 0.7 s, so it drifts instead of jumping;
+  // a scene with `focus` holds it still there instead.
   let cx = 0, cy = 0;
-  for (let k = 0; k < 10; k++) { const p = cursorAt(s, Math.max(0, t - k * 0.07)); cx += p.x / 10; cy += p.y / 10; }
+  if (s.focus) ({ x: cx, y: cy } = s.focus);
+  else for (let k = 0; k < 10; k++) { const p = cursorAt(s, Math.max(0, t - k * 0.07)); cx += p.x / 10; cy += p.y / 10; }
   const ramp = Math.min(0.9, T / 3);
-  const z = interpolate(t, [0, ramp, T - ramp, T], [zoomIn ? 1 : ZOOM, ZOOM, ZOOM, zoomOut ? 1 : ZOOM], { ...CLAMP, easing: ease });
+  const Z = s.zoom || ZOOM;
+  const z = s.focus ? Z : interpolate(t, [0, ramp, T - ramp, T], [zoomIn ? 1 : Z, Z, Z, zoomOut ? 1 : Z], { ...CLAMP, easing: ease });
   const ox = Math.min(0, Math.max(W - W * z, W / 2 - cx * S * z));
   const oy = Math.min(0, Math.max(H - H * z, H / 2 - cy * S * z));
   return (

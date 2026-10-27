@@ -7,7 +7,9 @@
 //     camera from that log, and renders the MP4.
 //   node docs/video/make.mjs                # both videos, both languages
 //   node docs/video/make.mjs promo zh       # one video, one language
-// Writes docs/video/out/trace-canvas-<tutorial|promo>.<lang>.mp4 and .srt (git-ignored).
+//   node docs/video/make.mjs gifs --render-only   # animate the last recording again
+// Writes docs/video/out/trace-canvas-<tutorial|promo|agents>.<lang>.mp4 and .srt (git-ignored), and with
+// `gifs` the feature GIFs docs/gif-<agents|merge|timeline>.<lang>.gif that the READMEs show.
 // Voices: TC_VOICE_EN / TC_VOICE_ZH as "kokoro:<voice>" or "qwen:<speaker>"; see README.md.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -225,14 +227,14 @@ const SCENES = [
     ] },
 ];
 
-// The promo: Trace Canvas as the entry point for agents. `preload` puts the full map in place before the first shot.
+// The promo: Trace Canvas as the entry point for agents. `preload` puts the data in place before the first shot.
 const PROMO = [
   { page: { card: { big: 'Trace Canvas', small: ['The entry point for your agents', '你的 agent 的入口'] } },
     text: [
       ['Every new agent session starts from zero, and so do you when you come back to a project.', '每开一个新的 agent 会话，都要从头讲一遍项目；你自己隔几天回来，也一样。'],
       ['Trace Canvas gives you and your agents one shared map of all your work.', 'Trace Canvas 给你和你的 agent 一张共享的地图，装下你手上的所有工作。'],
     ] },
-  { page: 'app', preload: true,
+  { page: 'app', preload: h => { h.loadScenario(); h.addSessions(); },
     text: [
       ['Every project, branch, decision and agent session sits on one transit map.', '每个项目、分支、决策和 agent 会话，都在同一张线路图上。'],
       ['While Claude Code works, its hooks, skill and MCP tools keep the map up to date.', 'Claude Code 工作时，hooks、skill 和 MCP 工具会自动更新这张图。'],
@@ -284,7 +286,137 @@ const PROMO = [
   { page: { card: { big: 'Trace Canvas', small: ['Open source · MIT · works with Claude Code', '开源 · MIT · 支持 Claude Code'], foot: `${REPO} ⭐` } },
     text: [['Give your agents a map. Trace Canvas is free on GitHub.', '给你的 agent 一张地图。Trace Canvas 在 GitHub 上免费开源。']] },
 ];
-const VIDEOS = { tutorial: SCENES, promo: PROMO };
+// The Agents view: who started whom, and who needs you. Data from docs/scenarios/agents.mjs.
+const AGENTS = [
+  { page: { card: { big: 'Trace Canvas', small: ['Who started whom, and who needs you', '谁启动了谁，谁在等你'] } },
+    text: [
+      ['Run enough agents at once, and two questions come up: which session started which, and which one is waiting for you?', '同时跑的 agent 一多，就会冒出两个问题：哪个会话是谁启动的？哪个正在等你？'],
+      ['The Agents view answers both, live.', '「Agent」视图实时回答这两个问题。'],
+    ] },
+  { page: 'app', preload: h => { h.loadScenario(); h.loadAgents(); },
+    text: [['The live bar at the top counts the running sessions and the ones that need you.', '顶部的实时栏显示有几个会话在跑，有几个在等你。']],
+    run: async h => {
+      const p = h.speak(0);
+      await h.move('#live-bar');
+      await h.move('#live-bar .live-chip.st-waiting');
+      await p;
+    } },
+  { page: 'app',
+    text: [
+      ['The Agents tab draws the running Claude Code sessions as a tree: each session starts the ones to its right.', '「Agent」标签页把正在运行的 Claude Code 会话画成一棵树：每个会话启动它右边的会话。'],
+      ['A session that has stopped stays in the chain as a dashed card, so the tree still makes sense.', '已经停下的会话以虚线卡片留在链上，整棵树依然完整。'],
+    ],
+    run: async h => {
+      const p = h.speak(0);
+      await h.click('#tab-agents');
+      await h.wait(900);
+      for (const id of ['release', 'post', 'video']) await h.move(`#ag-inner .ag-session[data-sid="demo-${id}"]`);
+      await p;
+      const q = h.speak(1);
+      await h.move('#ag-inner .ag-session.st-off');
+      await q;
+    } },
+  { page: 'app',
+    text: [['The orange session is waiting for your permission. Its subagents hang off it: green while running, faded when done.', '橙色的会话在等你批准。它的子 agent 挂在旁边：运行中是绿色，完成后变淡。']],
+    run: async h => {
+      const p = h.speak(0);
+      await h.move('#ag-inner .ag-session[data-sid="demo-ocr"]');
+      await h.wait(800);
+      await h.move('#ag-inner .ag-agent.st-running');
+      await h.move('#ag-inner .ag-agent.st-done');
+      await p;
+    } },
+  { page: 'app',
+    text: [['Click a session to see what it is doing, who started it, the sessions and subagents it started, and the command that resumes it.', '点开一个会话，可以看到它在做什么、由谁启动、它启动了哪些会话和子 agent，以及恢复它的命令。']],
+    run: async h => {
+      const p = h.speak(0);
+      await h.click('#ag-inner .ag-session[data-sid="demo-ocr"]');
+      await h.wait(500);
+      await h.move('#detail .l-status');
+      await h.move('#detail [data-act="goto-live"]');
+      await h.js(`document.querySelector('#detail .l-cmd').scrollIntoView({ behavior: 'smooth', block: 'center' })`);
+      await h.wait(700);
+      await h.move('#detail .l-cmd code');
+      await p;
+      await h.key('Escape');
+    } },
+  { page: 'app',
+    text: [
+      ['It changes as the hooks report. Approve the request, and the session turns green.', '画面随 hooks 上报实时变化：批准请求后，会话变成绿色。'],
+      ['When a subagent finishes, it fades and keeps its last message.', '子 agent 完成后变淡，并留下它最后的消息。'],
+    ],
+    run: async h => {
+      const p = h.speak(0);
+      await h.move('#ag-inner .ag-session[data-sid="demo-ocr"]');
+      await h.wait(600);
+      h.live({ session_id: 'demo-ocr', hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_input: { command: 'python eval_receipts.py --model vision --set blurry' } });
+      h.live({ session_id: 'demo-ocr', hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'python eval_receipts.py --model vision --set all' } }); // approved: the next step runs
+      await p;
+      const q = h.speak(1);
+      await h.move('#ag-inner .ag-agent.st-running');
+      await h.wait(500);
+      h.live({ session_id: 'demo-ocr', hook_event_name: 'SubagentStop', agent_id: 'a-bench', agent_type: 'general-purpose',
+        last_assistant_message: pick(['All 120 receipts read; the totals are right in 94% of them.', '120 张小票全部读完，94% 的总额正确。'], h.lang) });
+      await q;
+      await h.wait(600);
+    } },
+  { page: { card: { big: 'Trace Canvas', small: ['Agents view · open source · MIT', 'Agent 视图 · 开源 · MIT'], foot: `${REPO} ⭐` } },
+    text: [['See all your agents at a glance. Trace Canvas is free on GitHub.', '所有 agent 一目了然。Trace Canvas 在 GitHub 上免费开源。']] },
+];
+// Feature GIFs for the READMEs: no narration, a closer camera, each on its own data and view.
+// `fresh` reloads the page on `view` after `preload`; `zoom` overrides the camera's 1.15, and `focus` (page px)
+// holds the camera still there, which keeps a GIF small: only what changes on the page differs between frames.
+const GIFS = [
+  { name: 'agents', page: 'app', fresh: true, view: 'agents', zoom: 1.2, focus: { x: 700, y: 330 }, text: [],
+    preload: h => { h.loadScenario(); h.loadAgents(); },
+    run: async h => {
+      await h.move('#ag-inner .ag-session[data-sid="demo-ocr"]');
+      await h.wait(700);
+      h.live({ session_id: 'demo-ocr', hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_input: { command: 'python eval_receipts.py --model vision --set blurry' } });
+      h.live({ session_id: 'demo-ocr', hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'python eval_receipts.py --model vision --set all' } }); // approved: the next step runs
+      await h.wait(1300);
+      await h.move('#ag-inner .ag-agent.st-running');
+      h.live({ session_id: 'demo-ocr', hook_event_name: 'SubagentStop', agent_id: 'a-bench', agent_type: 'general-purpose',
+        last_assistant_message: pick(['All 120 receipts read; the totals are right in 94% of them.', '120 张小票全部读完，94% 的总额正确。'], h.lang) });
+      await h.wait(1300);
+      await h.click('#ag-inner .ag-session[data-sid="demo-ocr"]');
+      await h.wait(500);
+      await h.move('#detail [data-act="goto-live"]');
+      await h.wait(1400);
+    } },
+  { name: 'merge', page: 'app', fresh: true, view: 'canvas', zoom: 1.2, focus: { x: 640, y: 330 }, text: [],
+    preload: h => { h.loadScenario(); h.addSessions(); },
+    run: async h => {
+      await h.click('#zoom-fit');
+      await h.click('#select-btn');
+      await h.click('#cv-cards [data-tid="sc_share"]');
+      await h.click('#cv-cards [data-tid="sc_cur"]');
+      await h.move('#multi-target');
+      await h.js(`(() => { const s = document.getElementById('multi-target'); s.value = 'sc_main'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+      await h.wait(300);
+      await h.click('[data-multi="merge"]');
+      await h.wait(700);
+      await h.key('Escape');
+      await h.click('#zoom-fit');
+      await h.move('#cv-cards [data-tid="sc_main"]');
+      await h.wait(1500);
+    } },
+  { name: 'timeline', page: 'app', fresh: true, view: 'timeline', zoom: 1.35, text: [],
+    preload: h => h.loadScenario('life'),
+    run: async h => {
+      await h.click('#tl-zoom [data-z="day"]');
+      await h.wait(700);
+      await h.click('#tl-zoom [data-z="week"]');
+      await h.wait(700);
+      await h.click('#tl-zoom [data-z="month"]');
+      await h.wait(600);
+      await h.move('#tl-now');
+      await h.wait(500);
+      await h.move('.tl-label', 2);
+      await h.wait(1500);
+    } },
+];
+const VIDEOS = { tutorial: SCENES, promo: PROMO, agents: AGENTS, gifs: GIFS };
 
 /* ---------- narration ---------- */
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -320,10 +452,13 @@ function narrate(scenes, lang) {
 /* ---------- recording ---------- */
 const home = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-video-'));
 process.env.TRACE_CANVAS_HOME = path.join(home, 'data');
+process.env.TRACE_CANVAS_DESKTOP_DIR = path.join(home, 'desktop'); // never the real desktop app's records
 fs.mkdirSync(process.env.TRACE_CANVAS_HOME, { recursive: true });
 const { startServer } = await import('../../src/server.mjs');
 const { mutate, dataFile, emptyData, readData } = await import('../../src/store.mjs');
 const { listThreads, readThread } = await import('../../src/ops.mjs');
+const { updateLive } = await import('../../src/live.mjs');
+const { writeAgentsDemo } = await import('../scenarios/agents.mjs');
 const { server } = await startServer({ port: PORT });
 const chrome = spawn(CHROME, ['--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run', '--no-default-browser-check',
   `--remote-debugging-port=${DEBUG}`, `--user-data-dir=${path.join(home, 'chrome')}`, 'about:blank'], { stdio: 'ignore' });
@@ -372,6 +507,11 @@ async function record(video, lang) {
   fs.rmSync(path.join(PUB, base), { recursive: true, force: true });
   fs.mkdirSync(path.join(PUB, base, 'clips'), { recursive: true });
   fs.writeFileSync(dataFile(), JSON.stringify(emptyData()));
+  // Empty live/ but keep the folder: the server watches it, and a new folder would stop its updates.
+  const liveDir = path.join(process.env.TRACE_CANVAS_HOME, 'live');
+  fs.mkdirSync(liveDir, { recursive: true });
+  for (const e of fs.readdirSync(liveDir)) fs.rmSync(path.join(liveDir, e), { recursive: true, force: true });
+  fs.rmSync(process.env.TRACE_CANVAS_DESKTOP_DIR, { recursive: true, force: true });
   fs.writeFileSync(path.join(process.env.TRACE_CANVAS_HOME, 'config.json'), JSON.stringify({ lang }));
   await cdp('Page.navigate', { url: `http://localhost:${PORT}/api/health` });
   await sleep(300);
@@ -391,6 +531,8 @@ async function record(video, lang) {
       : { kind: 'terminal', title: scene.page.terminal, steps: [] };
     sc.lines = [];
     if (scene.captionAt) sc.captionAt = scene.captionAt;
+    if (scene.zoom) sc.zoom = scene.zoom;
+    if (scene.focus) sc.focus = scene.focus;
     const center = (sel, n) => js(`(() => { const all = document.querySelectorAll(${JSON.stringify(sel)}); const e = all[${n} < 0 ? all.length + ${n} : ${n}]; if (!e) return null; const r = e.getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + Math.min(r.height / 2, 22)) }; })()`);
     const h = {
       lang, js, wait,
@@ -423,8 +565,11 @@ async function record(video, lang) {
       },
       async cmd(s, prompt = '$ ') { sc.steps.push({ t: now(), cmd: s, prompt }); await wait(s.length * CHAR * 1000 + 150); },
       out(s, cls = '') { sc.steps.push({ t: now(), out: s, cls }); },
-      loadScenario: () => fs.writeFileSync(dataFile(), JSON.stringify(scenarioData('vibe', lang))),
+      loadScenario: (name = 'vibe') => fs.writeFileSync(dataFile(), JSON.stringify(scenarioData(name, lang))),
       addSessions: () => addSessions(lang),
+      loadAgents: () => writeAgentsDemo({ home: process.env.TRACE_CANVAS_HOME, desktop: process.env.TRACE_CANVAS_DESKTOP_DIR, lang }),
+      // A hook event for one of the demo sessions, through the same updateLive() the hooks use.
+      live: input => updateLive({ cwd: '/Users/dev/tripsplit', transcript_path: path.join(process.env.TRACE_CANVAS_HOME, 'demo-transcripts', `${input.session_id}.jsonl`), ...input }),
       // The text the MCP tools return for the current map.
       tools: {
         list: () => { const n = listThreads(readData()).length; return `${n} thread${n === 1 ? '' : 's'}.`; },
@@ -432,9 +577,17 @@ async function record(video, lang) {
       },
     };
 
-    if (scene.preload) { h.loadScenario(); h.addSessions(); }
+    if (scene.preload) scene.preload(h);
     if (app) {
-      if (!loaded) { await cdp('Page.navigate', { url: `http://localhost:${PORT}/#canvas` }); await sleep(1500); loaded = true; }
+      if (!loaded || scene.fresh) {
+        // Leave the page first: a navigation that only changes the hash would keep the old view.
+        await cdp('Page.navigate', { url: `http://localhost:${PORT}/api/health` });
+        await sleep(300);
+        await js('localStorage.clear()');
+        await cdp('Page.navigate', { url: `http://localhost:${PORT}/#${scene.view || 'canvas'}` });
+        await sleep(1500);
+        loaded = true;
+      }
       cast = { dir: fs.mkdtempSync(path.join(home, 'frames-')), frames: [] };
       t0 = cast.t0 = Date.now();
       await cdp('Page.startScreencast', { format: 'jpeg', quality: 90, maxWidth: W * SCALE, maxHeight: H * SCALE });
@@ -454,7 +607,7 @@ async function record(video, lang) {
     console.log(`[${video} ${lang}] scene ${si + 1}/${SCENES.length}: ${sc.kind}, ${sc.dur.toFixed(1)} s`);
   }
   fs.writeFileSync(path.join(PUB, base, 'manifest.json'), JSON.stringify({ lang, charSec: CHAR, scenes }, null, 1));
-  writeSrt(video, lang, scenes);
+  if (video !== 'gifs') writeSrt(video, lang, scenes);
 }
 
 // The two new sessions that the /trace-canvas scene puts on the canvas.
@@ -491,12 +644,26 @@ function render(video, lang) {
   console.log(`${path.relative(process.cwd(), mp4)}  ${duration(mp4).toFixed(1)} s`);
 }
 
+// Each GIF scene alone, without captions or sound, then a palette GIF next to the READMEs.
+function renderGifs(lang) {
+  GIFS.forEach((g, i) => {
+    const mp4 = path.join(OUT, `gif-${g.name}.${lang}.mp4`), gif = path.join(here, '..', `gif-${g.name}.${lang}.gif`);
+    execFileSync('npx', ['remotion', 'render', 'src/index.jsx', 'Tutorial', mp4, `--props=${JSON.stringify({ video: 'gifs', lang, only: [i], bare: true })}`,
+      `--browser-executable=${CHROME}`, `--concurrency=${process.env.TC_CONCURRENCY || 2}`, '--muted', '--log=error'], { cwd: REMOTION, stdio: 'inherit' });
+    run('ffmpeg', ['-y', '-v', 'error', '-i', mp4, '-filter_complex',
+      'fps=12,scale=1000:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=64:stats_mode=diff[p];[b][p]paletteuse=dither=none:diff_mode=rectangle', '-loop', '0', gif]);
+    console.log(`${path.relative(process.cwd(), gif)}  ${(fs.statSync(gif).size / 2 ** 20).toFixed(1)} MB, ${duration(gif).toFixed(1)} s`);
+  });
+}
+
 const args = process.argv.slice(2);
+// --render-only: animate the last recordings again, e.g. after changing the Remotion compositions.
+const renderOnly = args.includes('--render-only');
 const videos = Object.keys(VIDEOS).filter(v => !args.some(a => a in VIDEOS) || args.includes(v));
 const langs = ['en', 'zh'].filter(l => !args.some(a => a === 'en' || a === 'zh') || args.includes(l));
 const jobs = videos.flatMap(v => langs.map(l => [v, l]));
 try {
-  for (const [v, l] of jobs) await record(v, l);
+  if (!renderOnly) for (const [v, l] of jobs) await record(v, l);
 } finally {
   ws.close();
   chrome.kill();
@@ -504,5 +671,5 @@ try {
   server.close();
   fs.rmSync(home, { recursive: true, force: true });
 }
-for (const [v, l] of jobs) render(v, l);
+for (const [v, l] of jobs) (v === 'gifs' ? renderGifs(l) : render(v, l));
 process.exit(0);

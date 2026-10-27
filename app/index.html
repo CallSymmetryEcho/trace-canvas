@@ -83,7 +83,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .tab:hover { color: var(--ink); }
 .tab[aria-selected="true"] { background: var(--ink); color: var(--surface); }
-.tab-goals, .gl-acts .gl-view { display: none; } /* phone only (narrow screens below) */
+.tab-goals, .gl-acts .gl-view, .gl-acts .gl-edit { display: none; } /* phone only (narrow screens below) */
 .gl-acts { display: contents; }
 .spacer { flex: 1 1 0; }
 .search { flex: 0 1 220px; min-width: 120px; position: relative; }
@@ -594,7 +594,11 @@ body.sheet-open .top { z-index: 80; }
 .gl-tasks time { flex: none; font-family: var(--f-mono); font-size: 11px; color: var(--faint); }
 .gl-who { flex: none; font-size: 11.5px; padding: 1px 4px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); color: var(--muted); }
 .gl-hand { flex: none; font-size: 11.5px; padding: 1px 7px; }
-.gl-add { width: 100%; padding: 6px 9px; border: 1px dashed var(--rule); border-radius: 7px; background: transparent; font-size: 13px; }
+.gl-add-row { display: flex; gap: 6px; }
+.gl-add { flex: 1; min-width: 0; width: 100%; padding: 6px 9px; border: 1px dashed var(--rule); border-radius: 7px; background: transparent; font-size: 13px; }
+.gl-add:placeholder-shown + .gl-add-go { display: none; }
+.gl-goal[data-goal-edit] { cursor: text; }
+.gl-goal-in, .gl-t-in { box-sizing: border-box; width: 100%; min-width: 0; padding: 5px 8px; border: 1px solid var(--accent); border-radius: 7px; background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; resize: vertical; }
 .gl-add:focus { outline: none; border-style: solid; border-color: var(--accent); background: var(--surface); }
 @media (max-width: 760px) {
   /* Goals on a phone (after the rules above, so it wins): one to-do per row, checkbox and title as big targets; tapping the title opens its actions in place. */
@@ -618,8 +622,11 @@ body.sheet-open .top { z-index: 80; }
   .gl-tasks .gl-by { grid-column: 2 / -1; }
   .gl-acts { display: none; }
   .gl-tasks li.open .gl-acts { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 8px; padding-top: 6px; }
-  .gl-acts .gl-who, .gl-acts .gl-hand, .gl-acts .gl-view { display: inline-flex; min-height: 36px; font-size: 14px; padding: 4px 10px; }
+  .gl-acts .gl-who, .gl-acts .gl-hand, .gl-acts .gl-view, .gl-acts .gl-edit { display: inline-flex; min-height: 36px; font-size: 14px; padding: 4px 10px; }
   .gl-add { box-sizing: border-box; padding: 10px 12px; }
+  .gl-add, .gl-goal-in, .gl-t-in { font-size: 16px; } /* 16px keeps iOS from zooming in on focus */
+  .gl-tasks .gl-t-in { grid-column: 2; padding: 8px 10px; }
+  .gl-add-go { min-height: 40px; padding: 0 14px; font-size: 15px; }
 }
 </style>
 
@@ -925,8 +932,8 @@ const I18N = {
     actorHuman: 'You', actorAgent: 'Agent', liveTipTime: 'now',
     goalsBtn: 'Goals', goalsBtnTitle: 'Goals and to-dos of every line', goalsTitle: 'Goals and to-dos',
     goalsTip: 'How it fits together: the <b>inbox</b> holds loose ideas you have not thought through; a <b>to-do</b> □ belongs to a line and is a next step you or an agent can take; a line\'s <b>goal</b> is the outcome it is working towards (write it in the line\'s panel). Agents read goals and to-dos with the MCP tool <b>trace_tasks</b> and tick what they finish with <b>trace_task_done</b>, so you can see progress here without asking.',
-    goalsTipHide: 'Got it', goalsHelp: 'How it works', goalsView: 'Open the record', goalsShowDone: 'Show done', goalsSummary: (open, lines) => `${open} open to-do${open === 1 ? '' : 's'} on ${lines} line${lines === 1 ? '' : 's'}`,
-    goalsNoGoal: 'No goal yet. Write one in the line\'s panel.', goalsAdd: '+ Add a to-do, Enter to save', goalsOpenLine: 'Open line',
+    goalsTipHide: 'Got it', goalsHelp: 'How it works', goalsView: 'Open the record', goalsEdit: 'Edit', goalsAddBtn: 'Add', goalsShowDone: 'Show done', goalsSummary: (open, lines) => `${open} open to-do${open === 1 ? '' : 's'} on ${lines} line${lines === 1 ? '' : 's'}`,
+    goalsNoGoal: 'No goal yet. Tap to write one.', goalsAdd: '+ Add a to-do', goalsOpenLine: 'Open line',
     goalsOthers: n => `${n} more line${n === 1 ? ' has' : 's have'} no goal or to-do yet.`, goalsEmpty: 'No goals or to-dos yet. Open a line, write its goal, and add to-dos here or with the □ kind below.',
     goalsBy: name => `ticked by ${name}`, tTaskAdded: 'To-do added',
     handNeedsLine: 'Move the to-do onto a line first', goalsWho: 'Who does it', goalsAnyone: 'Anyone', goalsHand: 'Hand to it', openInTerminal: 'Open in Terminal', tOpenedTerminal: 'Opened in Terminal: the agent starts on this line', tHandCopied: 'Command copied: paste it in a terminal to start the agent on this line',
@@ -1084,8 +1091,8 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     actorHuman: '你', actorAgent: 'Agent', liveTipTime: '此刻',
     goalsBtn: '目标', goalsBtnTitle: '每条线的目标和待办', goalsTitle: '目标和待办',
     goalsTip: '怎么用：<b>收件箱</b>放还没想清楚的零散想法；<b>待办</b> □ 挂在具体的线上，是你或 agent 可以去做的下一步；线的<b>目标</b>是它要达到的结果，写在这条线的面板里。agent 用 MCP 工具 <b>trace_tasks</b> 读取目标和待办，做完用 <b>trace_task_done</b> 勾上，你在这里就能看到进度，不用去问。',
-    goalsTipHide: '知道了', goalsHelp: '怎么用？', goalsView: '查看记录', goalsShowDone: '显示已完成', goalsSummary: (open, lines) => `${lines} 条线上还有 ${open} 项待办`,
-    goalsNoGoal: '还没写目标，可以在这条线的面板里填写。', goalsAdd: '+ 添加待办，回车保存', goalsOpenLine: '打开这条线',
+    goalsTipHide: '知道了', goalsHelp: '怎么用？', goalsView: '查看记录', goalsEdit: '编辑', goalsAddBtn: '添加', goalsShowDone: '显示已完成', goalsSummary: (open, lines) => `${lines} 条线上还有 ${open} 项待办`,
+    goalsNoGoal: '还没写目标，点这里填写。', goalsAdd: '+ 添加待办', goalsOpenLine: '打开这条线',
     goalsOthers: n => `另外 ${n} 条线还没有目标或待办。`, goalsEmpty: '还没有目标或待办。打开一条线写下目标，再在这里或用下方的 □ 类型添加待办。',
     goalsBy: name => `由 ${name} 勾选`, tTaskAdded: '已添加待办',
     handNeedsLine: '先把这项待办放到一条线上', goalsWho: '由谁做', goalsAnyone: '任何人', goalsHand: '交给它', openInTerminal: '在终端打开', tOpenedTerminal: '已在终端打开：agent 会在这条线上开工', tHandCopied: '命令已复制：粘贴到终端运行，agent 就会在这条线上开工',
@@ -1144,6 +1151,7 @@ const COLS = ['threads', 'commits', 'edges'];
 const S = {
   threads: new Map(), commits: new Map(), edges: new Map(),
   view: 'canvas', sel: null, ui: {}, q: '',
+  glDraft: {}, glEdit: null, // Goals page: half-typed to-dos per line; the to-do id (or goal:<line>) being edited
   hideDone: ls.get('tc.hideDone', false),
   cam: { x: 40, y: 40, z: 1 }, fitted: false,
   inboxPos: ls.get('tc.inboxPos', { x: 0, y: 0 }),
@@ -1673,7 +1681,8 @@ function renderAll() {
   // The goals list holds still only while a to-do is being typed: a checkbox or menu keeps focus
   // after a click, and that must not stop new to-dos from showing.
   const f = document.activeElement, adding = f && f.classList.contains('gl-add') ? f.dataset.thread : null;
-  if (S.sheet === 'goals' && !(adding && f.value)) {
+  const editing = f && f.matches('.gl-t-in, .gl-goal-in');
+  if (S.sheet === 'goals' && !(adding && f.value) && !editing) {
     renderGoals();
     const again = adding && $(`.gl-add[data-thread="${CSS.escape(adding)}"]`);
     if (again) again.focus();
@@ -2359,8 +2368,12 @@ $('#tl-scroll').addEventListener('click', e => {
 /* ================= detail drawer ================= */
 const detail = $('#detail');
 let lastKey = '', lastHTML = '', detailHold = false;
+// The panel holds still from a tap's pointerdown until its click has landed (a phone sends the click
+// a moment after pointerup): a live update in between would replace the button under the finger.
 detail.addEventListener('pointerdown', () => { detailHold = true; });
-window.addEventListener('pointerup', () => { if (detailHold) { detailHold = false; setTimeout(render, 0); } }, true);
+const releaseDetail = () => { if (detailHold) setTimeout(() => { detailHold = false; render(); }, 350); };
+window.addEventListener('pointerup', releaseDetail, true);
+window.addEventListener('pointercancel', releaseDetail, true);
 function select(sel) {
   // On a phone a panel is a page of its own: opening one adds a history entry, so ← and the back gesture both close it.
   if (PHONE.matches && !sel && S.sel && history.state && history.state.tcPanel) { history.back(); return; }
@@ -2368,7 +2381,10 @@ function select(sel) {
   S.sel = sel; S.ui = {};
   render();
 }
-window.addEventListener('popstate', () => { if (S.sel) { S.sel = null; S.ui = {}; render(); } });
+window.addEventListener('popstate', () => {
+  if (S.sel) { S.sel = null; S.ui = {}; render(); }
+  try { history.replaceState(null, '', location.pathname + location.search + '#' + S.view); } catch {} // the entry gone back to may name an older view
+});
 function threadOptions(selected, { excludeId, onlyOpen } = {}) {
   const opts = [{ id: INBOX, name: t('inbox') }, ...orderedThreads().filter(th => th.id !== excludeId && (!onlyOpen || th.status === 'active' || th.status === 'parked' || th.id === selected))];
   return opts.map(th => `<option value="${esc(th.id)}" ${th.id === selected ? 'selected' : ''}>${esc(th.name)}${th.status && th.status !== 'active' && th.id !== INBOX ? ` (${esc(statusLabel(th.status))})` : ''}</option>`).join('');
@@ -2683,10 +2699,10 @@ function setView(v) {
   $('#view-agents').hidden = v !== 'agents';
   if (v === 'timeline') S.tlScroll = true;
   if (v !== 'canvas') S.connect = null;
-  try { history.replaceState(null, '', location.pathname + location.search + '#' + v); } catch {}
+  try { history.replaceState(history.state, '', location.pathname + location.search + '#' + v); } catch {}
   render();
 }
-$$('.tab[data-view]').forEach(el => el.addEventListener('click', () => { if (PHONE.matches && S.sheet) closeSheet(); setView(el.dataset.view); }));
+$$('.tab[data-view]').forEach(el => el.addEventListener('click', () => { if (PHONE.matches) { if (S.sheet) closeSheet(); if (S.sel) select(null); } setView(el.dataset.view); }));
 // On a phone Goals is a tab too (its page is the Goals sheet laid out under the header).
 function markTabs() {
   const goals = PHONE.matches && S.sheet === 'goals';
@@ -2884,7 +2900,8 @@ function renderGoals() {
   const row = c => {
     const by = c.done && c.doneBy && c.doneBy !== 'human' ? `<span class="gl-by"><span class="actor a-agent">${ACTOR_ICON.agent}</span>${esc(t('goalsBy', c.doneBy))}</span>` : '';
     const who = c.done ? '' : `<select class="gl-who" data-who="${esc(c.id)}" title="${esc(t('goalsWho'))}"><option value="">${esc(t('goalsAnyone'))}</option>${Object.entries(AGENT_NAMES).map(([k, n]) => `<option value="${k}" ${c.assignee === k ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>${c.assignee ? `<button class="btn gl-hand" data-hand="${esc(c.id)}">${esc(t('goalsHand'))}</button>${S.mode === 'server' && S.platform === 'darwin' ? `<button class="btn gl-hand" data-hand-open="${esc(c.id)}">${esc(t('openInTerminal'))}</button>` : ''}` : ''}`;
-    return `<li class="${c.done ? 'done' : ''} ${S.glOpen === c.id ? 'open' : ''}"><input type="checkbox" data-task="${esc(c.id)}" ${c.done ? 'checked' : ''} aria-label="${esc(c.title)}"><span class="gl-t" data-cid="${esc(c.id)}">${esc(c.title)}</span><span class="gl-acts">${who}<button class="btn gl-view" data-view-rec="${esc(c.id)}">${esc(t('goalsView'))}</button></span>${by}<time>${fmtShort(c.doneAt || c.ts)}</time></li>`;
+    const title = S.glEdit === c.id ? `<input class="gl-t-in" data-title="${esc(c.id)}" value="${esc(c.title)}" enterkeyhint="done" aria-label="${esc(t('goalsEdit'))}">` : `<span class="gl-t" data-cid="${esc(c.id)}">${esc(c.title)}</span>`;
+    return `<li class="${c.done ? 'done' : ''} ${S.glOpen === c.id ? 'open' : ''}"><input type="checkbox" data-task="${esc(c.id)}" ${c.done ? 'checked' : ''} aria-label="${esc(c.title)}">${title}<span class="gl-acts">${who}<button class="btn gl-edit" data-edit="${esc(c.id)}">${esc(t('goalsEdit'))}</button><button class="btn gl-view" data-view-rec="${esc(c.id)}">${esc(t('goalsView'))}</button></span>${by}<time>${fmtShort(c.doneAt || c.ts)}</time></li>`;
   };
   const body = (PHONE.matches ? `<details class="gl-help"><summary>${esc(t('goalsHelp'))}</summary><span>${t('goalsTip')}</span></details>` : tipHidden ? '' : `<div class="gl-tip"><span>${t('goalsTip')}</span><button class="btn" id="gl-tip-hide">${esc(t('goalsTipHide'))}</button></div>`)
     + `<div class="gl-bar-top"><span>${esc(t('goalsSummary', totalOpen, groups.filter(g => g.open.length).length))}</span><label class="check"><input type="checkbox" id="gl-show-done" ${S.goalsShowDone ? 'checked' : ''}>${esc(t('goalsShowDone'))}</label></div>`
@@ -2893,10 +2910,10 @@ function renderGoals() {
       const pct = tasks.length ? Math.round(100 * (tasks.length - open.length) / tasks.length) : 0;
       return `<section class="gl-group" style="--c:${th.color}">
         <div class="gl-head"><span class="roundel" style="--c:${th.color}"></span><b>${esc(th.name)}</b><span class="gl-prog">${tasks.length - open.length}/${tasks.length}</span>${liveBadge(th.id)}<button class="linkish" data-goto="${esc(th.id)}">${esc(t('goalsOpenLine'))}</button></div>
-        ${th.id === INBOX ? '' : `<div class="gl-goal ${goal ? '' : 'none'}">${esc(goal || t('goalsNoGoal'))}</div>`}
+        ${th.id === INBOX ? '' : S.glEdit === 'goal:' + th.id ? `<textarea class="gl-goal-in" data-goal="${esc(th.id)}" rows="${Math.min(6, Math.max(2, Math.ceil(goal.length / 22)))}" placeholder="${esc(t('threadGoalPh'))}">${esc(goal)}</textarea>` : `<div class="gl-goal ${goal ? '' : 'none'}" data-goal-edit="${esc(th.id)}" title="${esc(t('goalsEdit'))}">${esc(goal || t('goalsNoGoal'))}</div>`}
         ${tasks.length ? `<div class="gl-meter"><i style="width:${pct}%"></i></div>` : ''}
         ${shown.length ? `<ul class="gl-tasks">${shown.map(row).join('')}</ul>` : ''}
-        <input class="gl-add" data-thread="${esc(th.id)}" placeholder="${esc(t('goalsAdd'))}">
+        <div class="gl-add-row"><input class="gl-add" data-thread="${esc(th.id)}" value="${esc(S.glDraft[th.id] || '')}" placeholder="${esc(t('goalsAdd'))}" enterkeyhint="done"><button class="btn btn-primary gl-add-go" data-add="${esc(th.id)}">${esc(t('goalsAddBtn'))}</button></div>
       </section>`;
     }).join('') : `<p>${esc(t('goalsEmpty'))}</p>`)
     + (others > 0 ? `<p>${esc(t('goalsOthers', others))}</p>` : '');
@@ -2927,15 +2944,31 @@ sheetBody.addEventListener('change', e => {
     setTimeout(renderGoals, 0); // the box keeps focus, so the render loop would skip the sheet
   }
 });
-// Leaving a half-typed add box shows what arrived meanwhile; the delay lets a click land first.
-sheetBody.addEventListener('focusout', e => { if (e.target.classList.contains('gl-add')) setTimeout(render, 250); });
-sheetBody.addEventListener('keydown', e => {
-  if (S.sheet !== 'goals' || e.key !== 'Enter' || e.isComposing || !e.target.classList.contains('gl-add')) return;
-  const title = e.target.value.trim();
+// What is typed is kept as it is typed: a half-typed to-do stays when you tap elsewhere, and edits save as you go.
+sheetBody.addEventListener('input', e => {
+  const el = e.target;
+  if (el.classList.contains('gl-add')) S.glDraft[el.dataset.thread] = el.value;
+  else if (!canWrite()) return;
+  else if (el.dataset.title && el.value.trim()) patchDoc('commits', el.dataset.title, { title: el.value.trim() }, 600);
+  else if (el.dataset.goal) patchDoc('threads', el.dataset.goal, { goal: el.value }, 700);
+});
+// Leaving a box shows what arrived meanwhile and ends an edit; the delay lets a click land first.
+sheetBody.addEventListener('focusout', e => {
+  if (e.target.matches('.gl-t-in, .gl-goal-in')) S.glEdit = null;
+  if (e.target.matches('.gl-add, .gl-t-in, .gl-goal-in')) setTimeout(render, 250);
+});
+function addTodo(tid) {
+  const box = $(`.gl-add[data-thread="${CSS.escape(tid)}"]`), title = box ? box.value.trim() : '';
   if (!title || !canWrite()) return;
-  addCommit({ thread: e.target.dataset.thread, kind: 'task', title, agent: '' });
+  addCommit({ thread: tid, kind: 'task', title, agent: '' });
+  S.glDraft[tid] = '';
   toast(t('tTaskAdded'));
-  setTimeout(() => { renderGoals(); const again = $(`.gl-add[data-thread="${CSS.escape(e.target.dataset.thread)}"]`); if (again) again.focus(); }, 0);
+  setTimeout(() => { renderGoals(); const again = $(`.gl-add[data-thread="${CSS.escape(tid)}"]`); if (again) again.focus(); }, 0);
+}
+sheetBody.addEventListener('keydown', e => {
+  if (S.sheet !== 'goals' || e.key !== 'Enter' || e.isComposing) return;
+  if (e.target.classList.contains('gl-add')) addTodo(e.target.dataset.thread);
+  else if (e.target.classList.contains('gl-t-in')) e.target.blur();
 });
 sheetBody.addEventListener('click', e => {
   if (S.sheet !== 'goals') return;
@@ -2949,6 +2982,15 @@ sheetBody.addEventListener('click', e => {
   }
   const hand = e.target.closest('[data-hand]');
   if (hand) { const cmd = handCommand(S.commits.get(hand.dataset.hand)); if (cmd) copyText(cmd, t('tHandCopied')); return; }
+  const add = e.target.closest('[data-add]'), edit = e.target.closest('[data-edit], [data-goal-edit]');
+  if (add) { addTodo(add.dataset.add); return; }
+  if (edit && canWrite()) {
+    S.glEdit = edit.dataset.edit || 'goal:' + edit.dataset.goalEdit;
+    renderGoals();
+    const box = $('.gl-t-in, .gl-goal-in', sheetBody);
+    if (box) { box.focus(); box.setSelectionRange(box.value.length, box.value.length); }
+    return;
+  }
   const go = e.target.closest('[data-goto]'), rec = e.target.closest('.gl-t'), view = e.target.closest('[data-view-rec]');
   // On a phone the Goals page stays under the line or record page, so ← comes back to it; a title opens its row.
   if (PHONE.matches && rec) { S.glOpen = S.glOpen === rec.dataset.cid ? null : rec.dataset.cid; renderGoals(); return; }

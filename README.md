@@ -176,7 +176,7 @@ Subagents come from the SubagentStart/Stop hooks and the `.meta.json` file Claud
 | **Progress** | What actually happened | Agent output, commits, decisions |
 | **Inbox** | Loose ideas you have not thought through yet | The inbox |
 
-The list groups to-dos by line, shows each line's goal, a progress bar (done/total) and whether a session is working on it right now. Tick a to-do or add one right there. The first instruction of each session, which the hooks log as a task, is a record of what was asked, so it stays out of the list; next steps Claude writes when capturing a session do show up.
+The list groups to-dos by line, shows each line's goal, a progress bar (done/total) and whether a session is working on it right now. Tick a to-do, add one or click a line's goal to edit it right there; on a phone, tap a to-do to edit it. The first instruction of each session, which the hooks log as a task, is a record of what was asked, so it stays out of the list; next steps Claude writes when capturing a session do show up.
 
 Agents use the same list. At the start of work they read the goal and the open to-dos with `trace_tasks`; when they finish one they call `trace_task_done`, and the list shows who ticked it. So you can write down what you want, let agents work while you are away, and come back to see where things stand. New ideas get on the list as you say them: with every message, the hook tells the agent which line it works on and what is already open, and the agent adds each new goal or next step with `trace_log` (`kind: "task"`); the same open to-do twice stays one. From the command line: `trace-canvas tasks` and `trace-canvas done "<to-do>"` (`--agent Codex` for a script or another agent).
 

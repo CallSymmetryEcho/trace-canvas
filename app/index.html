@@ -835,7 +835,9 @@ const I18N = {
     menuSync: 'Sync with other machines', menuPhone: 'Open on your phone', phoneTitle: 'Open on your phone',
     phoneIntro: 'Scan this with the phone camera. The phone needs Tailscale, signed in to the same account as this computer. The address carries a key: keep it to yourself.',
     phoneAfter: 'On the phone you can read every line, add ideas and to-dos with the box at the bottom (pick a line, or start with #line name), and copy a prompt for an agent from a line\'s panel.',
-    agentPrompt: 'Prompt for an agent', agentPromptTitle: 'Copy a prompt that sends an agent to read this line and carry on', tAgentPrompt: 'Prompt copied: paste it to an agent, for example in the Claude app on your phone',
+    start: '▶ Start', startTitle: 'Start a Claude Code session on this line on your computer, with Remote Control on, so you can follow and approve it in the Claude app', startShow: 'Show it',
+    tStarted: name => `Starting on "${name}": it shows in the Claude app in a moment`, tStartBusy: title => `A session is already running on this line${title ? `: ${title}` : ''}. Send it a message in the Claude app`,
+    agentAsk: 'Prompt for an agent', agentPromptTitle: 'Copy a prompt that sends an agent to read this line and carry on', tAgentPrompt: 'Prompt copied: paste it to an agent, for example in the Claude app on your phone',
     agentPromptText: (name, id) => `Read the Trace Canvas line "${name}" (thread ${id}): use trace_read_thread and trace_tasks for its goal and open to-dos, carry on with them, and tick each one with trace_task_done when it is done.`, tSyncing: 'Syncing…', tSyncBusy: 'A sync is already running', tSyncFailed: e => `Sync failed: ${e}`,
     tSynced: (n, off) => `Synced: ${n} change${n === 1 ? '' : 's'} from other machines${off ? ' (offline; pushes next time)' : ''}`, onMachine: m => `On ${m}`,
     menuAgent: 'Connect an AI agent', menuIO: 'Import / export', menuClearEx: 'Clear example data', menuHelp: 'Shortcuts and help',
@@ -999,7 +1001,9 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     menuSync: '和其他电脑同步', menuPhone: '在手机上打开', phoneTitle: '在手机上打开',
     phoneIntro: '用手机相机扫这个二维码。手机要装 Tailscale，并登录和这台电脑相同的账号。地址里带着密钥，不要发给别人。',
     phoneAfter: '在手机上可以看每条线，用底部的输入框加想法和待办（选一条线，或者以 #线名 开头），也可以在线的面板里复制一段给 agent 的提示。',
-    agentPrompt: '给 agent 的提示', agentPromptTitle: '复制一段提示，让 agent 去读这条线并接着做', tAgentPrompt: '提示已复制：粘贴给 agent，比如手机 Claude app 里的会话',
+    start: '▶ 开始', startTitle: '在电脑上为这条线开一个 Claude Code 会话（开着 Remote Control），在 Claude app 里就能跟进和批准', startShow: '查看',
+    tStarted: name => `正在「${name}」上开工：稍等片刻就会出现在 Claude app 里`, tStartBusy: title => `这条线上已经有会话在跑${title ? `：${title}` : ''}。在 Claude app 里给它发消息就行`,
+    agentAsk: '给 agent 的提示', agentPromptTitle: '复制一段提示，让 agent 去读这条线并接着做', tAgentPrompt: '提示已复制：粘贴给 agent，比如手机 Claude app 里的会话',
     agentPromptText: (name, id) => `读 Trace Canvas 上的线「${name}」（thread ${id}）：用 trace_read_thread 和 trace_tasks 看它的目标和未完成的待办，接着做，每做完一项就用 trace_task_done 勾掉。`, tSyncing: '正在同步…', tSyncBusy: '已经有一个同步在进行', tSyncFailed: e => `同步失败：${e}`,
     tSynced: (n, off) => `已同步：从其他电脑收到 ${n} 处改动${off ? '（离线，下次再推送）' : ''}`, onMachine: m => `在 ${m} 上`,
     menuAgent: '接入 AI agent', menuIO: '导入 / 导出', menuClearEx: '清除示例数据', menuHelp: '快捷键与用法',
@@ -1614,7 +1618,7 @@ async function loadServer() {
     const data = await r.json();
     for (const col of COLS) applyRows(col, data[col] || []);
     S.sessions = data.sessions || [];
-    S.machine = data.machine || ''; S.platform = data.platform || '';
+    S.machine = data.machine || ''; S.platform = data.platform || ''; S.remote = !!data.remote; S.start = !!data.start;
     if (S.offline) { S.offline = false; renderSync(); }
   } catch { S.offline = true; COLS.forEach(c => S.got.add(c)); renderSync(); render(); }
 }
@@ -2657,7 +2661,8 @@ function threadDetail(th) {
       ${cs.length > 40 ? `<p style="margin:0;color:var(--faint);font-size:12px">${esc(t('only40'))}</p>` : ''}
       <div class="d-actions">
         <button class="btn btn-primary" data-act="capture-here">${esc(t('captureHere'))}</button>
-        ${!isInbox ? `<button class="btn" data-act="agent-prompt" title="${esc(t('agentPromptTitle'))}">${esc(t('agentPrompt'))}</button>` : ''}
+        ${!isInbox && S.start && th.status !== 'merged' ? `<button class="btn" data-act="start" title="${esc(t('startTitle'))}">${esc(t('start'))}</button>` : ''}
+        ${!isInbox ? `<button class="btn" data-act="agent-prompt" title="${esc(t('agentPromptTitle'))}">${esc(t('agentAsk'))}</button>` : ''}
         ${!isInbox && th.status !== 'merged' ? (S.ui.merge
           ? `<div class="inline-form"><select id="t-merge">${threadOptions(th.parent && th.parent !== th.id ? th.parent : INBOX, { excludeId: th.id, onlyOpen: true })}</select><button class="btn btn-primary" data-act="merge">${esc(t('merge'))}</button><button class="btn" data-act="merge-cancel">${esc(t('cancel'))}</button></div>`
           : `<button class="btn" data-act="merge-open">${esc(t('mergeTo'))}</button>`) : ''}
@@ -2747,6 +2752,7 @@ detail.addEventListener('click', e => {
     case 'gx-file': { const k = b.dataset.dk; if (GX.open.has(k)) GX.open.delete(k); else GX.open.add(k); render(); break; }
     case 'gx-more': GX.more.add(b.dataset.key); render(); break;
     case 'goto-thread': select({ type: 'thread', id: b.dataset.tid }); break;
+    case 'start': startOn({ thread: s.id }); break;
     case 'agent-prompt': { const th = getThread(s.id); copyText(t('agentPromptText', th.name, th.id), t('tAgentPrompt')); break; }
     case 'g-arrange': doArrange(s.id); break;
     case 'g-focus': setFocus(s.id); break;
@@ -3030,7 +3036,7 @@ function renderGoals() {
   const totalOpen = groups.reduce((n, g) => n + g.open.length, 0);
   const row = c => {
     const by = c.done && c.doneBy && c.doneBy !== 'human' ? `<span class="gl-by"><span class="actor a-agent">${ACTOR_ICON.agent}</span>${esc(t('goalsBy', c.doneBy))}</span>` : '';
-    const who = c.done ? '' : `<select class="gl-who" data-who="${esc(c.id)}" title="${esc(t('goalsWho'))}"><option value="">${esc(t('goalsAnyone'))}</option>${Object.entries(AGENT_NAMES).map(([k, n]) => `<option value="${k}" ${c.assignee === k ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>${c.assignee ? `<button class="btn gl-hand" data-hand="${esc(c.id)}">${esc(t('goalsHand'))}</button>${S.mode === 'server' && S.platform === 'darwin' ? `<button class="btn gl-hand" data-hand-open="${esc(c.id)}">${esc(t('openInTerminal'))}</button>` : ''}` : ''}`;
+    const who = c.done ? '' : `<select class="gl-who" data-who="${esc(c.id)}" title="${esc(t('goalsWho'))}"><option value="">${esc(t('goalsAnyone'))}</option>${Object.entries(AGENT_NAMES).map(([k, n]) => `<option value="${k}" ${c.assignee === k ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>${c.assignee ? `<button class="btn gl-hand" data-hand="${esc(c.id)}">${esc(t('goalsHand'))}</button>${S.mode === 'server' && S.platform === 'darwin' && !S.remote ? `<button class="btn gl-hand" data-hand-open="${esc(c.id)}">${esc(t('openInTerminal'))}</button>` : ''}` : ''}${S.start && tidOf(c) !== INBOX ? `<button class="btn gl-hand" data-start="${esc(c.id)}" title="${esc(t('startTitle'))}">${esc(t('start'))}</button>` : ''}`;
     const title = S.glEdit === c.id ? `<input class="gl-t-in" data-title="${esc(c.id)}" value="${esc(c.title)}" enterkeyhint="done" aria-label="${esc(t('goalsEdit'))}">` : `<span class="gl-t" data-cid="${esc(c.id)}">${esc(c.title)}</span>`;
     return `<li class="${c.done ? 'done' : ''} ${S.glOpen === c.id ? 'open' : ''}"><input type="checkbox" data-task="${esc(c.id)}" ${c.done ? 'checked' : ''} aria-label="${esc(c.title)}">${title}<span class="gl-acts">${who}<button class="btn gl-edit" data-edit="${esc(c.id)}">${esc(t('goalsEdit'))}</button><button class="btn gl-view" data-view-rec="${esc(c.id)}">${esc(t('goalsView'))}</button></span>${by}<time>${fmtShort(c.doneAt || c.ts)}</time></li>`;
   };
@@ -3112,6 +3118,8 @@ sheetBody.addEventListener('click', e => {
       .then(r => r.json()).catch(() => ({ error: t('syncOfflineTitle') })).then(r => toast(r.error || t('tOpenedTerminal')));
     return;
   }
+  const start = e.target.closest('[data-start]');
+  if (start) { startOn({ todo: start.dataset.start }); return; }
   const hand = e.target.closest('[data-hand]');
   if (hand) { const cmd = handCommand(S.commits.get(hand.dataset.hand)); if (cmd) copyText(cmd, t('tHandCopied')); return; }
   const add = e.target.closest('[data-add]'), edit = e.target.closest('[data-edit], [data-goal-edit]');
@@ -3130,6 +3138,14 @@ sheetBody.addEventListener('click', e => {
   if (go) { closeSheet(); select({ type: 'thread', id: go.dataset.goto }); }
   else if (rec) { closeSheet(); select({ type: 'commit', id: rec.dataset.cid }); }
 });
+// ▶ Start (/api/start): a Claude Code session on the line on the computer, with Remote Control on, so it
+// shows in the Claude app; a line that already has one running points at that session instead.
+function startOn(ref) {
+  fetch('/api/start', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Trace-Canvas': '1' }, body: JSON.stringify(ref) })
+    .then(r => r.json()).catch(() => ({ error: t('syncOfflineTitle') }))
+    .then(r => r.busy ? toast(t('tStartBusy', r.busy.title), { label: t('startShow'), run: () => { closeSheet(); select({ type: 'live', id: r.busy.id }); } })
+      : toast(r.error || t('tStarted', r.name)));
+}
 function parseLooseJSON(text) {
   const s = String(text || '').trim();
   try { return JSON.parse(s); } catch {}

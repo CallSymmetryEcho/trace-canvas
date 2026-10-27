@@ -115,7 +115,8 @@ Setup (pass --user for every project, or --project dir for one)
   trace-canvas mcp              Run the MCP server on stdio (Claude Code starts this)
   trace-canvas lang <en|zh>     Language of records the hooks write
   trace-canvas where            Show where data is stored
-  trace-canvas phone [--off] [--rotate]   Open the canvas on your phone over Tailscale (docs/phone.md)
+  trace-canvas phone [--off] [--rotate] [--allow-start|--deny-start]
+                               Open the canvas on your phone over Tailscale (docs/phone.md)
   trace-canvas where <words> [--machine M]   Look things up in the location map (~/agent-map)
   trace-canvas sync             Sync the canvas with your other machines through the location map
   (setup also takes --machine NAME and --map DIR: this computer's name and the map repository)
@@ -404,12 +405,14 @@ async function main() {
       if (!host && !ts) { console.error('Tailscale is not running on this computer. Open it (signed in here and on the phone) and run this again,\nor give your own address: trace-canvas phone --host <name or IP> --bind <address to listen on>.'); process.exit(1); }
       if (host && !bind) { console.error('With --host, also pass --bind: the address on this computer to listen on (0.0.0.0 listens on every network).'); process.exit(1); }
       const old = readConfig().phone || {};
-      const phone = { host: host || ts.dns, ip: ts ? ts.ip : '', bind: bind || ts.ip, token: !rotate && old.token ? old.token : crypto.randomBytes(18).toString('base64url'), ...(port ? { port } : {}) };
+      const start = flag('allow-start', false) ? true : flag('deny-start', false) ? false : !!old.start;
+      const phone = { host: host || ts.dns, ip: ts ? ts.ip : '', bind: bind || ts.ip, token: !rotate && old.token ? old.token : crypto.randomBytes(18).toString('base64url'), ...(port ? { port } : {}), ...(start ? { start } : {}) };
       writeConfig({ phone });
       const url = `http://${phone.host}:${phone.port || 4777}/?k=${phone.token}`;
       console.log(`${terminalQr(url)}\n\nOn your phone: ${url}`);
       if (host) console.log('This address is plain HTTP. Anyone who can reach it and sees the key can read and change your canvas: put it behind a VPN or a TLS proxy.');
       console.log(`Restart the page (trace-canvas serve) so it also listens on ${phone.bind}. Turn this off with trace-canvas phone --off; --rotate makes a new key.`);
+      console.log(start ? '▶ Start is on: the phone can start a Claude Code session on a line in a Terminal window here (--deny-start turns it off).' : '▶ Start is off; --allow-start lets the phone start a Claude Code session on a line here.');
       break;
     }
     case 'where': {

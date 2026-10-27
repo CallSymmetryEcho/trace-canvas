@@ -6,7 +6,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { focusScript, normalize, terminalScript } from '../src/agents.mjs';
 import { handleHook, sessionStartContext, sessionThread } from '../src/hook.mjs';
-import { readLive } from '../src/live.mjs';
+import { readLive, updateLive } from '../src/live.mjs';
 import { codexHooks, codexWritable, install } from '../src/install.mjs';
 import { handTo, listTasks } from '../src/ops.mjs';
 import { addCommit, createThread, emptyData, mutate, readData } from '../src/store.mjs';
@@ -120,6 +120,20 @@ test('to-dos are assigned to an agent and handed over with a command that starts
   assert.deepEqual(listTasks(d, { assignee: 'codex' })[0].tasks.map(t => t.title), ['Add a CSV export']);
   assert.deepEqual(listTasks(d, { assignee: 'gemini' })[0].tasks.map(t => t.assignee), ['gemini']);
   assert.throws(() => handTo(d, { ref: 'Dark mode', to: 'copilot' }), /Hand to whom/);
+});
+
+test('▶ Start names the Remote Control session after the line, keeps the command on one line, and sees a session already there', () => {
+  const d = emptyData(), env = { ...process.env, TRACE_CANVAS_HOME: fs.mkdtempSync(path.join(os.tmpdir(), 'tc-start-')) };
+  const th = createThread(d, { name: "Bin's\nline", key: 'bins-line', note: os.tmpdir() });
+  addCommit(d, { thread: th.id, kind: 'task', title: 'First\nthen second', ts: 1 });
+  const r = handTo(d, { ref: th.id, to: 'claude', remote: true }, env);
+  assert.ok(r.command.startsWith(`cd '${os.tmpdir()}' && TRACE_CANVAS_THREAD=${th.id} claude --remote-control='Bin'\\''s line' 'You are taking over`));
+  assert.ok(!r.command.includes('\n') && r.command.includes('trace_read_thread'));
+  assert.deepEqual(r.live, []);
+  updateLive({ hook_event_name: 'UserPromptSubmit', session_id: 's-running', cwd: os.tmpdir() }, { env });
+  d.sessions = { 's-running': { thread: th.id, bound: true } };
+  assert.deepEqual(handTo(d, { ref: th.id, to: 'claude', remote: true }, env).live.map(s => s.id), ['s-running']);
+  assert.ok(!handTo(d, { ref: th.id, to: 'codex', remote: true }, env).command.includes('--remote-control')); // Claude Code only
 });
 
 test('a new session is told its line, goal, its own to-dos and where things are on this machine', () => {

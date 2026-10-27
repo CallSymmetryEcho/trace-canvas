@@ -31,6 +31,31 @@ node bin/trace-canvas.mjs phone
 - **加想法：** 用底部的输入框。选一条线和类型（想法、待办……），或者直接以 `#线名` 开头，就会归到那条线上。
 - **让 agent 去读一条线：** 打开那条线，点**给 agent 的提示**，会复制一段提示：让 agent 用 `trace_read_thread` 和 `trace_tasks` 读这条线，接着做未完成的待办，做完勾掉。把它粘贴给某个会话，比如你在手机 Claude app 里通过 Remote Control 操作的那个。
 
+## 在手机上开工（macOS）
+
+一条线上没有会话在跑时，点 **▶ 开始** 就会开一个。这个按钮在线面板上，也在**目标**里每一项待办旁边。它默认关闭，要先打开：
+
+```bash
+node bin/trace-canvas.mjs phone --allow-start
+```
+
+点它会在 Mac 上打开一个终端窗口。窗口进入这条线的文件夹，运行 Claude Code，开着 Remote Control，名字就是线名：
+
+```bash
+claude --remote-control='<线名>' '<提示>'
+```
+
+提示会让它先读这条线，包括你在线上记下的想法，然后按目标和未完成的待办往下做，每做完一项就勾掉。从某一项待办点开始，它会先做那一项。稍等片刻，这个会话会出现在 Claude app 里。你在 app 里跟进它，照常批准它要用的工具：这个按钮不会放宽任何权限。
+
+- **线上已经有会话在跑：** 按钮不会再开第二个，而是指向正在跑的那个，你在 Claude app 里给它发消息就行。
+- **手机只发线或待办的 id。** 命令在 Mac 上根据画布数据生成，线名和提示都做了转义。
+- **局限：**
+  - Mac 要开着、已登录，因为会话跑在终端窗口里。
+  - `claude` 命令要已经登录（运行一次 `claude`，然后输入 `/login`）。
+  - 这条线的文件夹要已经在 Claude Code 里信任过；新文件夹会先在 Mac 上询问。
+  - 只有 Claude Code 有 Remote Control。
+- `trace-canvas phone --deny-start` 可以再关掉它。
+
 ## 自己指定地址（不推荐）
 
 没有 Tailscale 时，也可以自己指定地址：

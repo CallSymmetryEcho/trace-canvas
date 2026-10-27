@@ -109,7 +109,7 @@ export function captureSession(d, parsed, { sessionId, thread, separate = false,
     const links = [resumeLink(sid)];
     parsed.turns.forEach((t, i) => {
       const last = i === parsed.turns.length - 1;
-      if (i === 0) put(hashId('c', `${sid}:${t.uuid}:prompt`), { kind: 'task', title: firstLine(t.prompt, 120), body: t.prompt.slice(0, 3000), agent: AGENT, ts: t.ts, links });
+      if (i === 0) put(hashId('c', `${sid}:${t.uuid}:prompt`), { kind: 'task', title: firstLine(t.prompt, 120), body: t.prompt.slice(0, 3000), agent: AGENT, ts: t.ts, links, extra: { actor: 'human' } });
       for (const g of t.git) {
         // Git moments go through the same writer as the hooks, keyed by their content.
         const before = new Set(Object.keys(d.commits));

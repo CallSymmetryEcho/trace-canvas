@@ -15,7 +15,8 @@ const D = 24; // hours per day, for readability below
 const LD = 24 * 0.6; // the grad-school scenario squeezes a month into three weeks so the timeline shows it all
 
 // Thread: [id, name, color, status, x, y, extra]
-// Record: [id, thread, kind, hoursAgo, title, { agent, body, links, parents, done, mergeOf }]
+// Record: [id, thread, kind, hoursAgo, title, { agent, actor, body, links, parents, done, mergeOf }]
+// actor: 'human' marks an instruction you typed that the hooks logged under 'Claude Code'.
 // name/title/body: 'text', [en, zh] or lang => text.
 export const SCENARIOS = {
   // One weekend, one repository, four agent sessions running in parallel.
@@ -28,7 +29,7 @@ export const SCENARIOS = {
       ['fix', 'tripsplit · fix-rounding', '#8E3A96', 'merged', 900, 250, { key: 'tripsplit@fix-rounding', parent: 'main', forkOf: 'm6', mergedInto: 'main' }],
     ],
     records: [
-      ['m1', 'main', 'task', 70, ['Build a web app that splits trip expenses among friends: Next.js, SQLite, deploy on Vercel', '做一个朋友出游分账的网页应用：Next.js + SQLite，部署到 Vercel'], { agent: 'Claude Code', links: [resume('7f3b2c1e')] }],
+      ['m1', 'main', 'task', 70, ['Build a web app that splits trip expenses among friends: Next.js, SQLite, deploy on Vercel', '做一个朋友出游分账的网页应用：Next.js + SQLite，部署到 Vercel'], { agent: 'Claude Code', actor: 'human', links: [resume('7f3b2c1e')] }],
       ['m2', 'main', 'agent', 69, ['Scaffolded the app: expenses table, trip page and a balance page', '搭好了项目骨架：账单表、行程页和结余页'], { agent: 'Claude Code', body: ['Files changed:\n- app/trips/[id]/page.tsx\n- app/balance/page.tsx\n- db/schema.sql', '改动的文件：\n- app/trips/[id]/page.tsx\n- app/balance/page.tsx\n- db/schema.sql'] }],
       ['m3', 'main', 'agent', 68.5, commit('a1c3e9f', 'Scaffold app, expenses schema and balance page'), { agent: 'Claude Code' }],
       ['m4', 'main', 'decision', 66, ['Run auth, receipt OCR and UI polish as three parallel sessions, one worktree each', '鉴权、小票识别、界面打磨拆成三个并行会话，各用一个 worktree'], { agent: 'me' }],
@@ -129,7 +130,7 @@ export const SCENARIOS = {
     ],
     records: [
       ['t0', 'target', 'task', 9 * D, ['Find out what users dislike about the booking system, with numbers', '用数据说明用户不满意预约系统的哪些地方'], { agent: 'me' }],
-      ['p1', 'laptop', 'task', 8.8 * D, ['Clean the survey export and code the free-text answers', '清洗问卷导出数据，给开放题编码'], { agent: 'Claude Code', links: [resume('4c1d7e20')] }],
+      ['p1', 'laptop', 'task', 8.8 * D, ['Clean the survey export and code the free-text answers', '清洗问卷导出数据，给开放题编码'], { agent: 'Claude Code', actor: 'human', links: [resume('4c1d7e20')] }],
       ['p2', 'laptop', 'agent', 8.6 * D, ['412 responses kept, 37 dropped as duplicates; 9 codes for free text', '保留 412 份，去重删掉 37 份；开放题分成 9 类'], { agent: 'Claude Code' }],
       ['p3', 'laptop', 'decision', 8.5 * D, ['Codes are drafted by Claude and checked by hand on a 20% sample', '编码由 Claude 起草，人工抽查 20%'], { agent: 'me' }],
       ['p4', 'laptop', 'agent', 8.4 * D, commit('2f6a913', 'Cleaning script and codebook'), { agent: 'Claude Code' }],
@@ -137,7 +138,7 @@ export const SCENARIOS = {
       ['g1', 'gpt', 'agent', 7.5 * D, ['Five validated usability scales compared (SUS, UMUX, …)', '对比了五种经过验证的可用性量表（SUS、UMUX…）'], { agent: 'ChatGPT', body: ['Pasted into the page as JSON lines.', '以 JSON lines 粘贴进页面。'] }],
       ['g2', 'gpt', 'decision', 7.4 * D, ['Report SUS so results compare with other labs', '采用 SUS，方便和其他实验室比较'], { agent: 'ChatGPT' }],
       ['c1', 'cron', 'agent', 7 * D, ['nightly-check.sh: 6 new responses, 0 schema errors', 'nightly-check.sh：新增 6 份，0 个格式错误'], { agent: 'cron' }],
-      ['w1', 'ws', 'task', 6 * D, ['Fit the regression on the GPU workstation', '在 GPU 工作站上跑回归'], { agent: 'Claude Code', links: [resume('a93f5b18')] }],
+      ['w1', 'ws', 'task', 6 * D, ['Fit the regression on the GPU workstation', '在 GPU 工作站上跑回归'], { agent: 'Claude Code', actor: 'human', links: [resume('a93f5b18')] }],
       ['w2', 'ws', 'agent', 5.8 * D, ['Wait time explains most dissatisfaction (β = 0.48); UI explains little', '等待时间解释了大部分不满（β = 0.48），界面影响很小'], { agent: 'Claude Code', body: ['Ordinal logistic regression, 412 responses, 5 predictors.', '有序 logistic 回归，412 份问卷，5 个自变量。'] }],
       ['w3', 'ws', 'agent', 5.7 * D, commit('b81c4e2', 'Regression notebook and figures'), { agent: 'Claude Code' }],
       ['w4', 'ws', 'note', 5.6 * D, ['Imported from the workstation: trace-canvas import data.json', '从工作站导入：trace-canvas import data.json'], { agent: 'me' }],
@@ -176,7 +177,7 @@ export function scenarioData(name, lang = 'en', now = Date.now()) {
       : last[tid] ? [last[tid]] : [];
     d.commits[`sc_${id}`] = { id: `sc_${id}`, thread: tid, kind, title: pick(title, lang), body: pick(o.body, lang),
       links: o.links || [], agent: o.agent === 'me' ? me : o.agent || '', ts: ts(hrs), parents, done: !!o.done,
-      ...(o.mergeOf ? { mergeOf: `sc_${o.mergeOf}` } : {}), example: true };
+      ...(o.mergeOf ? { mergeOf: `sc_${o.mergeOf}` } : {}), ...(o.actor ? { actor: o.actor } : {}), example: true };
     last[tid] = `sc_${id}`;
     const t = d.threads[tid];
     if (t && !t.createdAt) t.createdAt = ts(hrs);

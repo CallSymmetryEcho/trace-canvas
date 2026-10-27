@@ -75,6 +75,7 @@ test('a session bound by hand logs to that thread, and unbinding returns it to i
   s.fire('UserPromptSubmit', { prompt: 'Fit the regression', prompt_id: 'p1' });
   let d = readData(s.env);
   assert.equal(Object.values(d.commits).find(c => c.title === 'Fit the regression').thread, t.id);
+  assert.equal(Object.values(d.commits).find(c => c.title === 'Fit the regression').actor, 'human'); // a prompt you typed
   assert.deepEqual(sessionThread(d, s.live(), s.env), { threadId: t.id, bound: true });
 
   mutate(d => bindLiveSession(d, { sessionId: 's1', thread: null }, s.env), s.env);

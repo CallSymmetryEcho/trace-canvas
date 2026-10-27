@@ -126,7 +126,7 @@ export function handleHook(input, env = process.env) {
       const log = !isCommand && prompt && (cfg.prompts === 'all' || (cfg.prompts === 'first' && !state.loggedFirstPrompt) || (cfg.prompts === 'long' && prompt.length >= 60));
       if (log) {
         const t = thread(prompt);
-        addCommit(d, { thread: t.id, kind: 'task', title: firstLine(prompt, 120), body: prompt.slice(0, 3000), agent: AGENT, links: [resumeLink(sid)], extra: { session: sid } });
+        addCommit(d, { thread: t.id, kind: 'task', title: firstLine(prompt, 120), body: prompt.slice(0, 3000), agent: AGENT, links: [resumeLink(sid)], extra: { session: sid, actor: 'human' } });
         state.loggedFirstPrompt = true;
       }
     } else if (ev === 'PostToolUse') {

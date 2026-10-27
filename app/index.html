@@ -252,6 +252,24 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .kind-tag { flex: none; font-size: 11px; color: var(--faint); border: 1px solid var(--rule); border-radius: 4px; padding: 0 5px; }
 .agent-tag { flex: none; font-size: 11px; color: var(--muted); background: var(--surface-2); border-radius: 4px; padding: 1px 6px; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .g-time { flex: none; font-family: var(--f-mono); font-size: 11.5px; color: var(--faint); min-width: 78px; text-align: right; }
+/* who wrote it: you (solid, dark) or an agent (outlined, in the line's colour) */
+.actor { flex: none; width: 18px; height: 18px; display: inline-grid; place-items: center; border-radius: 50%; }
+.actor svg { width: 12px; height: 12px; }
+.actor.a-human { background: var(--ink); color: var(--surface); }
+.actor.a-agent { border: 1.5px solid var(--c, var(--faint)); color: var(--c, var(--faint)); }
+.legend-actors { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font-size: 12px; color: var(--muted); }
+/* live tips: a session working on a line right now, above that line's newest record */
+.g-row.g-live { background: color-mix(in srgb, var(--ok) 7%, var(--surface)); }
+.g-row.g-live.st-waiting { background: color-mix(in srgb, var(--warn) 9%, var(--surface)); }
+.g-row.g-live.st-idle { background: var(--surface-2); }
+.g-row.g-live .act { flex: 0 1 auto; min-width: 0; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 34%; }
+.git-svg .tip { stroke: var(--surface); stroke-width: 2.5; }
+.git-svg .tip.st-working { fill: var(--ok); animation: lpulse 1.6s ease-in-out infinite; }
+.git-svg .tip.st-waiting { fill: var(--warn); }
+.git-svg .tip.st-idle { fill: var(--faint); }
+.git-svg .lane-live { stroke-width: 2; stroke-dasharray: 3 4; fill: none; }
+.git-svg [data-sid] { cursor: pointer; }
+@media (prefers-reduced-motion: reduce) { .git-svg .tip.st-working { animation: none; } }
 
 /* ---------- timeline ---------- */
 .tl-wrap { position: absolute; inset: 0; display: flex; flex-direction: column; }
@@ -751,6 +769,7 @@ const I18N = {
     livePrompt: 'Latest instruction', liveThread: 'Thread', liveAuto: 'Automatic (repository and branch)', liveNow: 'Now on',
     liveResume: 'Resume in a terminal', liveRunning: 'Running now', liveBadge: (n, w) => `${n} running${w ? `, ${w} need${w === 1 ? 's' : ''} you` : ''}`,
     tBound: n => `Bound to “${n}”`, tUnbound: 'Back to the repository and branch line',
+    actorHuman: 'You', actorAgent: 'Agent', liveTipTime: 'now',
     tabAgents: 'Agents', agHint: 'Who started whom: each session starts the sessions to its right; the small dashed cards are its subagents.',
     agEmpty: 'No agents are running right now. Claude Code sessions appear here as soon as they run with the Trace Canvas hooks.',
     agLocalOnly: 'The agent view needs the local page (trace-canvas serve), which can see the sessions running on this computer.',
@@ -889,6 +908,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     livePrompt: '最近的指令', liveThread: '所属线', liveAuto: '自动（按仓库和分支）', liveNow: '当前在',
     liveResume: '在终端里恢复', liveRunning: '正在运行', liveBadge: (n, w) => `${n} 个运行中${w ? `，${w} 个等你` : ''}`,
     tBound: n => `已绑定到「${n}」`, tUnbound: '已改回按仓库和分支自动归线',
+    actorHuman: '你', actorAgent: 'Agent', liveTipTime: '此刻',
     tabAgents: 'Agent', agHint: '谁启动了谁：每个会话启动它右边的会话，虚线小卡片是它的子 agent。',
     agEmpty: '现在没有运行中的 agent。装好 Trace Canvas hooks 的 Claude Code 会话一运行就会出现在这里。',
     agLocalOnly: 'Agent 视图需要本地页面（trace-canvas serve），它才能看到这台电脑上正在运行的会话。',
@@ -978,6 +998,21 @@ function toLocalInput(ts) { const d = new Date(ts); return `${d.getFullYear()}-$
 const inboxThread = () => ({ id: INBOX, name: t('inbox'), color: 'var(--inbox)', status: 'active', createdAt: 0, x: S.inboxPos.x, y: S.inboxPos.y, system: true });
 function getThread(id) { if (!id || id === INBOX) return inboxThread(); return S.threads.get(id) || inboxThread(); }
 function tidOf(c) { return c && c.thread && S.threads.has(c.thread) ? c.thread : INBOX; }
+// Who wrote a record: you or an agent. Hooks mark the instructions you typed (actor: 'human');
+// older records fall back to their label: empty, "me" or "自己" means you.
+const HUMAN_LABELS = new Set(['', 'me', '自己', 'you', '你', 'human']);
+function actorOf(c) {
+  if (c.actor) return c.actor;
+  if (c.kind === 'task' && c.session && !c.highlight) return 'human'; // a prompt the hooks logged
+  return HUMAN_LABELS.has(String(c.agent || '').trim().toLowerCase()) ? 'human' : 'agent';
+}
+// Stations you wrote are drawn in ink; agents' stations in the line's colour. Forks and merges keep the line's.
+const stationColor = (c, th) => (actorOf(c) === 'human' && c.kind !== 'fork' && c.kind !== 'merge' ? 'var(--ink)' : th.color);
+const ACTOR_ICON = {
+  human: '<svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="4" r="2.3" fill="currentColor"/><path d="M1.8 11c0-2.6 1.9-4.2 4.2-4.2s4.2 1.6 4.2 4.2z" fill="currentColor"/></svg>',
+  agent: '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 .8l1.3 3.9L11.2 6 7.3 7.3 6 11.2 4.7 7.3.8 6l3.9-1.3z" fill="currentColor"/></svg>',
+};
+const actorMark = (c, color) => { const a = actorOf(c); return `<span class="actor a-${a}" style="--c:${color}" title="${esc(a === 'human' ? t('actorHuman') : (c.agent || t('actorAgent')))}">${ACTOR_ICON[a]}</span>`; };
 function byThread() {
   const m = new Map();
   for (const c of S.commits.values()) { const tid = tidOf(c); if (!m.has(tid)) m.set(tid, []); m.get(tid).push(c); }
@@ -1583,7 +1618,7 @@ function cardHTML(th, cs, selT) {
   const selC = S.sel && S.sel.type === 'commit' ? S.sel.id : null;
   const cls = ['card', isInbox ? 'is-inbox' : `st-${th.status || 'active'}`, selT === th.id ? 'is-sel' : '', S.q && !anyHit ? 'is-dim' : '', S.connect && S.connect.from === th.id ? 'is-from' : '', S.multi.has(th.id) ? 'is-multi' : ''].filter(Boolean).join(' ');
   const items = recent.length
-    ? recent.map(c => `<li data-cid="${esc(c.id)}" class="${c.id === selC ? 'is-sel' : ''} ${S.q && matches(c) ? 'hit' : ''}">${mini(c.kind, th.color, c.done)}<span class="s-title">${esc(c.title)}</span><time class="s-time">${fmtShort(c.ts)}</time></li>`).join('')
+    ? recent.map(c => `<li data-cid="${esc(c.id)}" class="${c.id === selC ? 'is-sel' : ''} ${S.q && matches(c) ? 'hit' : ''}">${mini(c.kind, stationColor(c, th), c.done)}<span class="s-title">${esc(c.title)}</span><time class="s-time">${fmtShort(c.ts)}</time></li>`).join('')
       + (more > 0 ? `<li class="s-more"><span></span><span>${esc(t('moreEarlier', more))}</span><span></span></li>` : '')
     : `<li class="s-empty"><span></span><span>${esc(isInbox ? t('inboxEmpty') : t('noRecords'))}</span><span></span></li>`;
   const chip = isInbox ? `<span class="chip">${esc(t('unsorted'))}</span>` : `<span class="chip chip-${th.status || 'active'}">${esc(statusLabel(th.status))}</span>`;
@@ -1760,11 +1795,14 @@ function renderGit() {
   const by = byThread();
   const visible = new Set([INBOX, ...orderedThreads().filter(th => !isHidden(th)).map(th => th.id)]);
   const list = [...S.commits.values()].filter(c => visible.has(tidOf(c))).sort((a, b) => b.ts - a.ts);
+  // Live tips: sessions working on a visible line right now take the top rows, above its newest record.
+  const tips = S.live.filter(s => s.threadId && visible.has(s.threadId));
   const body = $('#git-body'), legend = $('#git-legend');
-  if (!list.length) { body.innerHTML = ''; legend.innerHTML = ''; return; }
-  const laneOrder = [INBOX, ...orderedThreads().map(th => th.id)].filter(id => visible.has(id) && by.has(id));
+  if (!list.length && !tips.length) { body.innerHTML = ''; legend.innerHTML = ''; return; }
+  const tipLines = new Set(tips.map(s => s.threadId));
+  const laneOrder = [INBOX, ...orderedThreads().map(th => th.id)].filter(id => visible.has(id) && (by.has(id) || tipLines.has(id)));
   const lane = new Map(laneOrder.map((id, i) => [id, i]));
-  const row = new Map(list.map((c, i) => [c.id, i]));
+  const row = new Map(list.map((c, i) => [c.id, i + tips.length]));
   const ROW = 44, LW = 20, PADX = 16;
   const lx = i => PADX + i * LW, ry = i => i * ROW + ROW / 2;
   const gw = PADX * 2 + Math.max(0, laneOrder.length - 1) * LW;
@@ -1772,16 +1810,22 @@ function renderGit() {
   const selC = S.sel && S.sel.type === 'commit' ? S.sel.id : null;
   legend.innerHTML = `<span class="legend-label">${esc(t('legend'))}</span>` + laneOrder.map(id => {
     const th = getThread(id);
-    return `<button class="lane-chip ${selT === id ? 'is-sel' : ''}" data-tid="${esc(id)}" style="--c:${th.color}"><i></i>${esc(th.name)}<span class="mono" style="color:var(--faint);font-size:11px">${by.get(id).length}</span></button>`;
-  }).join('');
+    return `<button class="lane-chip ${selT === id ? 'is-sel' : ''}" data-tid="${esc(id)}" style="--c:${th.color}"><i></i>${esc(th.name)}<span class="mono" style="color:var(--faint);font-size:11px">${(by.get(id) || []).length}</span></button>`;
+  }).join('') + `<span class="legend-actors">${ACTOR_ICON.human ? `<span class="actor a-human">${ACTOR_ICON.human}</span>${esc(t('actorHuman'))}` : ''}<span class="actor a-agent" style="margin-left:8px">${ACTOR_ICON.agent}</span>${esc(t('actorAgent'))}</span>`;
   let svg = '';
   for (const id of laneOrder) {
     const th = getThread(id);
-    const rs = by.get(id).map(c => row.get(c.id)).filter(v => v != null);
-    const top = Math.min(...rs), bot = Math.max(...rs);
-    if (bot > top) svg += `<line class="lane" x1="${lx(lane.get(id))}" y1="${ry(top)}" x2="${lx(lane.get(id))}" y2="${ry(bot)}" style="stroke:${th.color}"/>`;
-    if (id !== INBOX && (th.status === 'active' || th.status === 'parked')) svg += `<line class="lane-open" x1="${lx(lane.get(id))}" y1="${ry(top) - 9}" x2="${lx(lane.get(id))}" y2="${Math.max(4, ry(top) - ROW / 2 - 6)}" style="stroke:${th.color}"/>`;
+    const rs = (by.get(id) || []).map(c => row.get(c.id)).filter(v => v != null);
+    const myTips = tips.map((s, i) => (s.threadId === id ? i : -1)).filter(i => i >= 0);
+    const x = lx(lane.get(id));
+    if (rs.length) {
+      const top = Math.min(...rs), bot = Math.max(...rs);
+      if (bot > top) svg += `<line class="lane" x1="${x}" y1="${ry(top)}" x2="${x}" y2="${ry(bot)}" style="stroke:${th.color}"/>`;
+      if (myTips.length) svg += `<line class="lane-live" x1="${x}" y1="${ry(Math.min(...myTips))}" x2="${x}" y2="${ry(top)}" style="stroke:${th.color}"/>`;
+      else if (id !== INBOX && (th.status === 'active' || th.status === 'parked')) svg += `<line class="lane-open" x1="${x}" y1="${ry(top) - 9}" x2="${x}" y2="${Math.max(4, ry(top) - ROW / 2 - 6)}" style="stroke:${th.color}"/>`;
+    } else if (myTips.length > 1) svg += `<line class="lane-live" x1="${x}" y1="${ry(Math.min(...myTips))}" x2="${x}" y2="${ry(Math.max(...myTips))}" style="stroke:${th.color}"/>`;
   }
+  tips.forEach((s, i) => { svg += `<g data-sid="${esc(s.id)}"><circle class="tip st-${esc(s.status)}" cx="${lx(lane.get(s.threadId))}" cy="${ry(i)}" r="7.5"/></g>`; });
   for (const th of S.threads.values()) {
     if (!th.forkOf || !lane.has(th.id)) continue;
     const fc = S.commits.get(th.forkOf);
@@ -1806,11 +1850,24 @@ function renderGit() {
   for (const c of list) {
     const th = getThread(tidOf(c));
     const cx = lx(lane.get(tidOf(c))), cy = ry(row.get(c.id));
-    svg += `<g data-cid="${esc(c.id)}">${glyph(c.kind, th.color, cx, cy, 6, { done: c.done, dim: S.q && !matches(c) })}${c.id === selC ? `<circle cx="${cx}" cy="${cy}" r="11" fill="none" style="stroke:var(--accent)" stroke-width="2"/>` : ''}</g>`;
+    svg += `<g data-cid="${esc(c.id)}">${glyph(c.kind, stationColor(c, th), cx, cy, 6, { done: c.done, dim: S.q && !matches(c) })}${c.id === selC ? `<circle cx="${cx}" cy="${cy}" r="11" fill="none" style="stroke:var(--accent)" stroke-width="2"/>` : ''}</g>`;
   }
-  const rows = list.map(c => {
+  const selS = S.sel && S.sel.type === 'live' ? S.sel.id : null;
+  const tipRows = tips.map(s => {
+    const th = getThread(s.threadId);
+    return `<div class="g-row g-live st-${esc(s.status)} ${s.id === selS ? 'is-sel' : ''}" data-sid="${esc(s.id)}" style="padding-left:${gw + 6}px">
+      <span class="actor a-agent" style="--c:${th.color}">${ACTOR_ICON.agent}</span>
+      <span class="g-title"><b>${esc(liveTitle(s))}</b></span>
+      ${s.activity ? `<span class="act">${esc(s.activity)}</span>` : ''}
+      <span class="kind-tag">${esc(stLabel(s.status))}</span>
+      <span class="pill" style="--c:${th.color}"><i></i><span>${esc(th.name)}</span></span>
+      <span class="g-time">${esc(t('liveTipTime'))}</span>
+    </div>`;
+  }).join('');
+  const rows = tipRows + list.map(c => {
     const th = getThread(tidOf(c));
     return `<div class="g-row k-${c.kind} ${c.done ? 'done' : ''} ${c.id === selC ? 'is-sel' : ''} ${S.q && !matches(c) ? 'is-dim' : ''}" data-cid="${esc(c.id)}" style="padding-left:${gw + 6}px">
+      ${c.kind === 'fork' || c.kind === 'merge' ? '<span class="actor"></span>' : actorMark(c, th.color)}
       <span class="g-title">${esc(c.title)}</span>
       ${c.agent ? `<span class="agent-tag">${esc(c.agent)}</span>` : ''}
       <span class="kind-tag">${esc(kindLabel(c.kind))}</span>
@@ -1818,9 +1875,11 @@ function renderGit() {
       <span class="g-time">${fmtAbs(c.ts)}</span>
     </div>`;
   }).join('');
-  body.innerHTML = `<svg class="git-svg" width="${gw}" height="${list.length * ROW}" style="left:max(4px, env(safe-area-inset-left, 0px))">${svg}</svg>${rows}`;
+  body.innerHTML = `<svg class="git-svg" width="${gw}" height="${(list.length + tips.length) * ROW}" style="left:max(4px, env(safe-area-inset-left, 0px))">${svg}</svg>${rows}`;
 }
 $('#git-scroll').addEventListener('click', e => {
+  const tip = e.target.closest('[data-sid]');
+  if (tip) { select({ type: 'live', id: tip.dataset.sid }); return; }
   const chip = e.target.closest('[data-tid]');
   if (chip) { select({ type: 'thread', id: chip.dataset.tid }); return; }
   const r = e.target.closest('[data-cid]');
@@ -1901,7 +1960,7 @@ function renderTimeline() {
   b += `<line class="now" x1="${X(now)}" y1="0" x2="${X(now)}" y2="${BH}"/>`;
   for (const id of ids) {
     const th = getThread(id), cs = by.get(id), y = rowY.get(id);
-    for (const c of cs) b += `<g data-cid="${esc(c.id)}" class="${c.id === selC ? 'is-sel' : ''}"><title>${esc(fmtAbs(c.ts) + ' · ' + kindLabel(c.kind) + ' · ' + c.title)}</title>${glyph(c.kind, th.color, X(c.ts), y, 6, { done: c.done, dim: S.q && !matches(c) })}</g>`;
+    for (const c of cs) b += `<g data-cid="${esc(c.id)}" class="${c.id === selC ? 'is-sel' : ''}"><title>${esc(fmtAbs(c.ts) + ' · ' + kindLabel(c.kind) + ' · ' + c.title)}</title>${glyph(c.kind, stationColor(c, th), X(c.ts), y, 6, { done: c.done, dim: S.q && !matches(c) })}</g>`;
     const tip = cs[cs.length - 1];
     const label = tip.title.length > 26 ? tip.title.slice(0, 25) + '…' : tip.title;
     b += `<text class="tip" x="${X(tip.ts) + 12}" y="${y - 14}">${esc(label)}</text>`;
@@ -1955,7 +2014,7 @@ function commitDetail(c) {
   const forkSrc = c.kind === 'fork' && c.parents && c.parents[0] ? S.commits.get(c.parents[0]) : null;
   const children = [...S.threads.values()].filter(x => x.forkOf === c.id);
   return `<div class="d-head">
-      <span class="d-eyebrow">${mini(c.kind, th.color, c.done)}${esc(kindLabel(c.kind))}<span class="mono">${fmtAbs(c.ts)}</span></span>
+      <span class="d-eyebrow">${mini(c.kind, stationColor(c, th), c.done)}${esc(kindLabel(c.kind))}<span class="mono">${fmtAbs(c.ts)}</span></span>
       <button class="icon-btn" data-act="close" aria-label="${esc(t('close'))}">×</button>
     </div>
     <div class="d-scroll">
@@ -1990,7 +2049,7 @@ function threadDetail(th) {
   const cs = (byThread().get(th.id) || []).slice().reverse();
   const isInbox = th.id === INBOX;
   const forkC = th.forkOf ? S.commits.get(th.forkOf) : null;
-  const items = cs.slice(0, 40).map(c => `<li data-act="goto-commit" data-cid="${esc(c.id)}">${mini(c.kind, th.color, c.done)}<span class="s-title">${esc(c.title)}</span><time class="s-time">${fmtShort(c.ts)}</time></li>`).join('');
+  const items = cs.slice(0, 40).map(c => `<li data-act="goto-commit" data-cid="${esc(c.id)}">${mini(c.kind, stationColor(c, th), c.done)}<span class="s-title">${esc(c.title)}</span><time class="s-time">${fmtShort(c.ts)}</time></li>`).join('');
   return `<div class="d-head">
       <span class="d-eyebrow"><span class="roundel" style="--c:${th.color}"></span>${esc(isInbox ? t('inbox') : t('threadLabel'))}<span class="mono">${esc(t('countRecords', cs.length))}</span></span>
       <button class="icon-btn" data-act="close" aria-label="${esc(t('close'))}">×</button>

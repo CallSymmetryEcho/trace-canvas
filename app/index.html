@@ -1486,7 +1486,7 @@ const chatHref = id => `claude://claude.ai/epitaxy/${encodeURIComponent(id)}`;
 function jumpTo(s, cls, text) {
   const a = (href, key) => `<a class="${cls}" href="${esc(href)}" title="${esc(t(key))}">${text || esc(t(key))}</a>`;
   if (s.desktopId) return a(chatHref(s.desktopId), 'openChat');
-  if (s.tty && ['Apple_Terminal', 'iTerm.app'].includes(s.term)) return `<button class="${cls}" data-act="focus-term" data-sid="${esc(s.id)}" title="${esc(t('goTerm'))}">${text || esc(t('goTerm'))}</button>`;
+  if (s.tty && !S.remote && ['Apple_Terminal', 'iTerm.app'].includes(s.term)) return `<button class="${cls}" data-act="focus-term" data-sid="${esc(s.id)}" title="${esc(t('goTerm'))}">${text || esc(t('goTerm'))}</button>`;
   if (!s.tty && (s.agentKey === 'codex' || /^codex /.test(s.resume || ''))) return a(`codex://threads/${encodeURIComponent(s.id)}`, 'openChat');
   return '';
 }

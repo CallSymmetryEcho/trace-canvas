@@ -38,6 +38,7 @@ test('the phone listener wants its key, then a cookie; strange hosts and compute
     assert.equal((await request(pp, '/api/data', { cookie })).status, 200);
     assert.equal((await request(pp, '/api/data', { cookie, host: 'evil.example' })).status, 403);
     assert.match((await request(pp, '/api/sync', { method: 'POST', cookie, body: '{}' })).body, /Only on the computer itself/);
+    assert.match((await request(pp, '/api/focus', { method: 'POST', cookie, body: '{}' })).body, /Only on the computer itself/);
     // ▶ Start opens a Terminal window here, so the phone needs trace-canvas phone --allow-start first.
     assert.match((await request(pp, '/api/start', { method: 'POST', cookie, body: '{"thread":"x"}' })).body, /--allow-start/);
     assert.deepEqual((({ remote, start }) => ({ remote, start }))(JSON.parse((await request(pp, '/api/data', { cookie })).body)), { remote: true, start: false });

@@ -432,6 +432,13 @@ body.sheet-open .top { z-index: 80; }
   .kinds button { padding: 5px 7px; }
   .hud .btn-label { display: none; }
   .toast { bottom: 140px; }
+  /* A phone shows the graph, not the chrome: the lines' legend is one row that scrolls sideways,
+     and the capture bar is a single line until you tap into it (then the line and kind appear). */
+  .git-legend { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .git-legend::-webkit-scrollbar { display: none; }
+  .git-legend > * { flex: none; }
+  .capture:not(:focus-within) .cap-meta { display: none; }
+  .capture:not(:focus-within) .cap-input textarea { height: 38px !important; overflow: hidden; }
 }
 @media (max-width: 480px) {
   .brand-name { display: none; }

@@ -5,8 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { bindSession, handleHook } from '../src/hook.mjs';
-import { bindLiveSession, mergeThreads, readThread, threadSessions } from '../src/ops.mjs';
-import { addCommit, createThread, mutate, readData } from '../src/store.mjs';
+import { bindLiveSession, findThreadLoose, mergeThreads, readThread, threadSessions } from '../src/ops.mjs';
+import { addCommit, createThread, emptyData, mutate, readData } from '../src/store.mjs';
 
 function sandbox() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-sticky-'));
@@ -84,4 +84,17 @@ test('a session bound through the tools says which agent and machine it is, befo
   // Seen from the Mac, it resumes over ssh.
   const d = readData(env), tid = Object.values(d.threads)[0].id;
   assert.equal(threadSessions(d, tid, { ...s.env, TRACE_CANVAS_MACHINE: 'mac' })[0].command, `ssh -t bsuperstation 'codex resume cx9'`);
+});
+
+test('a part of a line name finds the line when only one line has it', () => {
+  const d = emptyData();
+  const ocr = createThread(d, { name: 'tripsplit · receipt-ocr' }).id;
+  createThread(d, { name: 'tripsplit · auth' });
+  assert.equal(findThreadLoose(d, 'receipt-ocr'), ocr);
+  assert.equal(findThreadLoose(d, 'RECEIPT'), ocr);
+  assert.throws(() => findThreadLoose(d, 'tripsplit'), /matches several lines: tripsplit · receipt-ocr, tripsplit · auth/);
+  assert.equal(findThreadLoose(d, 'nothing like it'), null);
+  // Binding finds it too; a name nothing matches still makes a new line.
+  assert.equal(bindLiveSession(d, { sessionId: 's1', thread: 'receipt' }).id, ocr);
+  assert.equal(bindLiveSession(d, { sessionId: 's2', thread: 'Dark mode' }).name, 'Dark mode');
 });

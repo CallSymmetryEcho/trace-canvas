@@ -275,9 +275,9 @@ async function main() {
       break;
     }
     case 'resume': {
-      const { resolveThreadRef, threadSessions } = await import('../src/ops.mjs');
+      const { findThreadLoose, threadSessions } = await import('../src/ops.mjs');
       const { readData } = await import('../src/store.mjs');
-      const d = readData(), ref = argv.join(' ').trim(), tid = ref && resolveThreadRef(d, ref);
+      const d = readData(), ref = argv.join(' ').trim(), tid = ref && findThreadLoose(d, ref);
       if (!tid) { console.error(ref ? `No thread named "${ref}"` : 'Usage: trace-canvas resume <thread>'); process.exit(1); }
       const ss = threadSessions(d, tid);
       if (!ss.length) { console.log('No sessions on this line yet.'); break; }

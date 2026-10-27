@@ -11,6 +11,17 @@ import { tr } from './i18n.mjs';
 
 const norm = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
+// A line by id or name, or else by a part of its name that matches exactly one line; several
+// matches is an error that names them. For looking lines up and binding to them; creating a
+// line, forking and merging keep to exact names, so a short name never lands somewhere unexpected.
+export function findThreadLoose(d, ref) {
+  const exact = resolveThreadRef(d, ref);
+  if (exact || !norm(ref)) return exact;
+  const hits = Object.values(d.threads).filter(t => norm(t.name).includes(norm(ref)));
+  if (hits.length > 1) throw new Error(`"${ref}" matches several lines: ${hits.map(t => t.name).join(', ')}`);
+  return hits.length ? hits[0].id : null;
+}
+
 export function resolveThreadRef(d, ref) {
   if (!ref) return null;
   if (ref === INBOX) return ref;
@@ -30,7 +41,7 @@ export { goalOf } from './store.mjs';
  * Threads that are done or merged show up only while they still have open tasks.
  */
 export function listTasks(d, { thread, includeDone = false, assignee } = {}) {
-  const only = thread ? resolveThreadRef(d, thread) : null;
+  const only = thread ? findThreadLoose(d, thread) : null;
   if (thread && !only) throw new Error(`No thread "${thread}"`);
   const by = {};
   for (const c of Object.values(d.commits)) if (isTodo(c) && (!assignee || c.assignee === assignee)) (by[threadIdOf(d, c)] ||= []).push(c);
@@ -55,7 +66,7 @@ export function findTodo(d, { task, thread, done = false }) {
   const ref = String(task || '').trim();
   if (!ref) throw new Error('Which task? Pass its id or title');
   if (d.commits[ref] && d.commits[ref].kind === 'task') return d.commits[ref];
-  const tid = thread ? resolveThreadRef(d, thread) : null;
+  const tid = thread ? findThreadLoose(d, thread) : null;
   if (thread && !tid) throw new Error(`No thread "${thread}"`);
   const pool = Object.values(d.commits).filter(x => isTodo(x) && !!x.done === !!done && (!tid || threadIdOf(d, x) === tid));
   const want = norm(ref), exact = pool.filter(x => norm(x.title) === want);
@@ -170,7 +181,7 @@ export function bindLiveSession(d, { sessionId, thread, agent }, env = process.e
   if (!sessionId) throw new Error('No session to bind; pass its id');
   let tid = null;
   if (thread) {
-    tid = resolveThreadRef(d, thread);
+    tid = findThreadLoose(d, thread);
     if (tid === INBOX) throw new Error('A session goes on a thread, not the inbox');
     if (!tid) tid = createThread(d, { name: String(thread).trim() }).id;
   }
@@ -403,7 +414,7 @@ export function threadSessions(d, tid, env = process.env) {
 }
 
 export function readThread(d, ref, { limit = 50 } = {}, env = process.env) {
-  const id = resolveThreadRef(d, ref);
+  const id = findThreadLoose(d, ref);
   if (!id) throw new Error(`No thread named "${ref}"`);
   const t = id === INBOX ? { id: INBOX, name: 'Inbox', status: 'active' } : d.threads[id];
   const cs = Object.values(d.commits).filter(c => threadIdOf(d, c) === id).sort((a, b) => a.ts - b.ts);

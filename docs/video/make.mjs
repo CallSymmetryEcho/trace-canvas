@@ -26,7 +26,7 @@ const REMOTION = path.join(here, 'remotion');
 const PUB = path.join(REMOTION, 'public');
 const PY = path.join(here, '.venv', 'bin', 'python');
 const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const PORT = 4791, W = 1280, H = 720, SCALE = 1.5;
+const W = 1280, H = 720, SCALE = 1.5;
 const CHAR = 0.042; // seconds per typed character in the terminal scenes
 const REPO = 'github.com/CallSymmetryEcho/trace-canvas';
 const MODELS = { kokoro: 'mlx-community/Kokoro-82M-bf16', qwen: 'mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16' };
@@ -474,6 +474,85 @@ const GOALS = [
     text: [['Set the goal, let the agents work, check the list. Trace Canvas is free on GitHub.', '定好目标，让 agent 去做，回来看清单。Trace Canvas 在 GitHub 上免费开源。']] },
 ];
 
+// Sessions stay on their line: a resumed session goes on logging on receipt-ocr, the line's panel lists its
+// sessions with a resume command each, and `trace-canvas resume` gives other agents the same list.
+// The resume runs through the real hook handler (handleHook), as Claude Code would call it.
+const RESUMED = '7f3a1c9e-2b4d-4e8a-9c61-0d5e8b2f4a17';
+const resumeTurn = h => {
+  for (const ev of [{ hook_event_name: 'SessionStart', source: 'resume' },
+    { hook_event_name: 'UserPromptSubmit', prompt: pick(['Now compare it with Tesseract on the blurry receipts', '现在拿模糊的小票和 Tesseract 比一比'], h.lang) },
+    { hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: { file_path: '/Users/dev/tripsplit/ocr/compare.py' } },
+    { hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: '/Users/dev/tripsplit/ocr/compare.py' } },
+    { hook_event_name: 'Stop', last_assistant_message: pick(['On blurry receipts the vision model reads 94% of totals; Tesseract reads 61%.', '模糊小票上，视觉模型认对 94% 的总额，Tesseract 只有 61%。'], h.lang) },
+    { hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'python eval_receipts.py --model vision --set all' } }]) // working again
+    handleHook({ session_id: RESUMED, cwd: '/Users/dev/tripsplit', ...ev });
+};
+// Three sessions on receipt-ocr: the one resumed above (last seen yesterday), a Codex session waiting
+// for you, and an older one that has stopped.
+function sessionsDemo(lang) {
+  const t = Date.now(), H = 3600e3, L = v => pick(v, lang), cwd = '/Users/dev/tripsplit';
+  const codex = '019a2c4e-8d1f-7b3a-a5e2-6c9f0e4d1b28';
+  mutate(d => {
+    const s = (id, agent, resume, title, ago, extra = {}) => { d.sessions[id] = { id, thread: 'sc_ocr', bound: true, agent, resume, cwd, title: L(title), last: t - ago * H, prompted: true, ...extra }; };
+    s(RESUMED, 'Claude Code', `claude --resume ${RESUMED}`, ['Try a vision model for receipt totals', '试试用视觉模型读小票总额'], 20);
+    s(codex, 'Codex', `codex resume ${codex}`, ['Benchmark the vision model on 120 receipts', '用 120 张小票测视觉模型'], 0.2, { agentKey: 'codex' });
+    s('b81e44d0-5c2a-4f19-8e3d-27a9c6f01e55', 'Claude Code', 'claude --resume b81e44d0-5c2a-4f19-8e3d-27a9c6f01e55', ['Deskew receipts before Tesseract', '先做倾斜校正再交给 Tesseract'], 70);
+  });
+  const opt = { agent: 'Codex', agentKey: 'codex', resume: `codex resume ${codex}` };
+  updateLive({ session_id: codex, cwd, hook_event_name: 'SessionStart', session_title: L(['Benchmark the vision model on 120 receipts', '用 120 张小票测视觉模型']) }, { ...opt, now: t - 12 * 60e3 });
+  updateLive({ session_id: codex, cwd, hook_event_name: 'Notification', notification_type: 'permission_prompt', message: L(['Codex wants to run python bench.py --receipts 120', 'Codex 想运行 python bench.py --receipts 120']) }, { ...opt, now: t - 60e3 });
+}
+// What `trace-canvas resume "<line>"` prints for the current map.
+const resumeOut = tid => threadSessions(readData(), tid).flatMap(s =>
+  [`${s.status.padEnd(8)} ${s.agent.padEnd(11)} ${new Date(s.last).toISOString().slice(0, 16).replace('T', ' ')}  ${s.title.slice(0, 60)}`, `         ${s.command}`]);
+const SESSIONS = [
+  { page: { terminal: 'zsh — ~/tripsplit' },
+    text: [['Resume yesterday’s session, and it goes on right where it was.', '第二天恢复昨天的会话，它会接着记在原来那条线上。']],
+    run: async h => {
+      const p = h.speak(0);
+      await h.cmd(`claude --resume ${RESUMED.slice(0, 8)}…`);
+      h.out(pick(['⏺ Resuming “Try a vision model for receipt totals”', '⏺ 正在恢复「试试用视觉模型读小票总额」'], h.lang), 'p');
+      await p;
+    } },
+  { page: 'app', preload: h => { h.loadScenario(); sessionsDemo(h.lang); },
+    text: [
+      ['Its new work lands on receipt-ocr, not back on the folder’s main line.', '新的进展落在 receipt-ocr 上，不会掉回 tripsplit 主线。'],
+      ['Each line lists its sessions: who is working, who needs you, and who has stopped.', '每条线都列出它的会话：谁在干活，谁在等你，谁已经停了。'],
+      ['Copy a resume command to pick one up again, instead of starting from scratch.', '复制恢复命令，就能接着那个会话做，不用从头再开一个。'],
+    ],
+    run: async h => {
+      const p = h.speak(0);
+      await h.click('#zoom-fit');
+      await h.move('#cv-cards [data-tid="sc_ocr"]');
+      resumeTurn(h);
+      await h.wait(900);
+      await h.move('#cv-cards [data-tid="sc_ocr"] li[data-cid]', 0);
+      await p;
+      const q = h.speak(1);
+      await h.click('#cv-cards [data-tid="sc_ocr"] .card-head'); // the head: lower down, a click opens a station instead
+      await h.wait(400);
+      await h.js(`document.querySelector('#detail .s-list').scrollIntoView({ behavior: 'smooth', block: 'center' })`); // the list sits below the fold
+      await h.wait(700);
+      for (const st of ['working', 'waiting', 'off']) await h.move(`#detail .s-list li.st-${st} .s-name`);
+      await q;
+      const r = h.speak(2);
+      await h.js('navigator.clipboard.writeText = () => Promise.resolve()'); // headless Chrome has no clipboard to write to
+      await h.click('#detail .s-list li.st-off .btn');
+      await r;
+      await h.key('Escape');
+    } },
+  { page: { terminal: 'codex — ~/tripsplit' },
+    text: [['Other agents get the same list, so they resume instead of starting anew.', '别的 agent 也能拿到这份列表，直接恢复，不用新开。']],
+    run: async h => {
+      const p = h.speak(0);
+      await h.cmd('trace-canvas resume "tripsplit · receipt-ocr"');
+      for (const s of resumeOut('sc_ocr')) { h.out(s); await h.wait(120); }
+      await p;
+    } },
+  { page: { card: { big: 'Trace Canvas', small: ['Sessions stay on their line · open source · MIT', '会话留在它的线上 · 开源 · MIT'], foot: `${REPO} ⭐` } },
+    text: [['Sessions stay on their line. Trace Canvas is free on GitHub.', '会话留在它的线上。Trace Canvas 在 GitHub 上免费开源。']] },
+];
+
 // Feature GIFs for the READMEs: no narration, a closer camera, each on its own data and view.
 // `fresh` reloads the page on `view` after `preload`; `zoom` overrides the camera's 1.15, and `focus` (page px)
 // holds the camera still there, which keeps a GIF small: only what changes on the page differs between frames.
@@ -575,9 +654,58 @@ const GIFS = [
       await h.move('.tl-label', 2);
       await h.wait(1500);
     } },
+  // A resumed session logs on its line again, and the line's panel lists its sessions, each with a resume command.
+  { name: 'sessions', page: 'app', fresh: true, view: 'canvas', text: [],
+    preload: h => { h.loadScenario(); sessionsDemo(h.lang); },
+    run: async h => {
+      await h.camera('#cv-cards [data-tid="sc_ocr"]', 1.7, 0);
+      await h.move('#cv-cards [data-tid="sc_ocr"]');
+      resumeTurn(h);
+      await h.wait(1000);
+      await h.move('#cv-cards [data-tid="sc_ocr"] li[data-cid]', 0);
+      await h.wait(900);
+      await h.click('#cv-cards [data-tid="sc_ocr"] .card-head'); // the head: lower down, a click opens a station instead
+      await h.wait(300);
+      await h.js(`document.querySelector('#detail .s-list').scrollIntoView({ behavior: 'smooth', block: 'center' })`); // the list sits below the fold
+      await h.wait(700);
+      await h.camera('#detail .s-list', 1.6, 700);
+      for (const st of ['working', 'waiting', 'off']) await h.move(`#detail .s-list li.st-${st} .s-name`, 0, 450);
+      await h.js('navigator.clipboard.writeText = () => Promise.resolve()');
+      await h.click('#detail .s-list li.st-off .btn');
+      await h.wait(1500);
+    } },
+  // The READMEs' first GIF: the first command after setup, then each past session lands on the canvas as a line.
+  { name: 'replay', page: { terminal: 'claude — ~/tripsplit' }, text: [],
+    run: async h => {
+      await h.cmd(pick(['/trace-canvas put all my sessions on the canvas', '/trace-canvas 把现在所有的会话展示在画布上'], h.lang), '> ');
+      await h.wait(300);
+      h.out('⏺ trace-canvas - trace_list_sessions (MCP)', 'k');
+      h.out(`  ⎿  ${Object.keys(scenarioData('vibe', h.lang).threads).length + 2} sessions in /Users/dev/tripsplit.`); // the scenario's lines plus addSessions()
+      await h.wait(500);
+      h.out('⏺ trace-canvas - trace_capture_session (MCP)', 'k');
+      await h.wait(700);
+    } },
+  { name: 'replay', page: 'app', fresh: true, view: 'canvas', zoom: 1, focus: { x: 640, y: 360 }, text: [],
+    // The page fits the finished map when it loads, then starts from an empty one.
+    preload: h => { h.loadScenario(); h.addSessions(); h.maps = allSessionsMaps(); fs.writeFileSync(dataFile(), JSON.stringify(h.maps.at(-1))); },
+    ready: async h => { fs.writeFileSync(dataFile(), JSON.stringify(emptyData())); await h.wait(1000); },
+    run: async h => {
+      for (const m of h.maps) {
+        fs.writeFileSync(dataFile(), JSON.stringify(m));
+        await h.wait(380);
+        const sel = `#cv-cards [data-tid="${Object.keys(m.threads).at(-1)}"]`;
+        if (await h.at(sel)) await h.move(sel, 0, 300);
+      }
+      await h.wait(1800);
+    } },
 ];
 // TC_GIFS=branches,merge records only those GIFs.
 const VIDEOS = { tutorial: SCENES, promo: PROMO, hook: HOOK, agents: AGENTS, goals: GOALS, gifs: process.env.TC_GIFS ? GIFS.filter(g => process.env.TC_GIFS.split(',').includes(g.name)) : GIFS };
+
+VIDEOS.sessions = SESSIONS;
+// Feature shorts carry their number from the to-do list (功能短视频 N), so a file and its to-do match: 08-sessions.zh.mp4.
+const NUMBER = { sessions: 8, story: 9 };
+const fileName = video => (NUMBER[video] ? `${String(NUMBER[video]).padStart(2, '0')}-${video}` : `trace-canvas-${video}`);
 
 /* ---------- narration ---------- */
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -622,7 +750,10 @@ const { mutate, dataFile, emptyData, readData, readConfig, addCommit } = await i
 const { listThreads, readThread, listTasks, setTaskDone } = await import('../../src/ops.mjs');
 const { updateLive } = await import('../../src/live.mjs');
 const { writeAgentsDemo } = await import('../scenarios/agents.mjs');
-const { server } = await startServer({ port: PORT });
+const { handleHook } = await import('../../src/hook.mjs');
+const { threadSessions } = await import('../../src/ops.mjs');
+const { server } = await startServer({ port: 0 }); // free ports here and for Chrome, so two builds can run at once
+const PORT = server.address().port;
 const chrome = spawn(CHROME, ['--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run', '--no-default-browser-check',
   '--remote-debugging-port=0', `--user-data-dir=${path.join(home, 'chrome')}`, 'about:blank'], { stdio: 'ignore' });
 
@@ -884,27 +1015,44 @@ function replayScenes(data, sid) {
   ];
 }
 
+// The maps that `/trace-canvas put all my sessions on the canvas` builds, one past session (line) more each:
+// the current made-up data, each line on its own and whole, since capturing past sessions draws no forks.
+function allSessionsMaps() {
+  const d = readData();
+  const lines = Object.values(d.threads).map(t => ({ ...t, parent: null, forkOf: null, mergedInto: null, status: t.status === 'merged' ? 'done' : t.status }));
+  const recs = Object.values(d.commits).filter(c => d.threads[c.thread] && c.kind !== 'fork');
+  const first = id => Math.min(...recs.filter(c => c.thread === id).map(c => c.ts));
+  lines.sort((a, b) => first(a.id) - first(b.id));
+  return lines.map((_, k) => {
+    const on = lines.slice(0, k + 1), ids = new Set(recs.filter(c => on.some(t => t.id === c.thread)).map(c => c.id));
+    const commits = Object.fromEntries([...ids].map(id => [id, { ...d.commits[id], parents: (d.commits[id].parents || []).filter(p => ids.has(p) && d.commits[p].thread === d.commits[id].thread) }]));
+    return { version: 1, threads: Object.fromEntries(on.map(t => [t.id, t])), commits, edges: {}, sessions: {} };
+  });
+}
+
 function writeSrt(video, lang, scenes) {
   const ts = s => new Date(s * 1000).toISOString().slice(11, 23).replace('.', ',');
   let at = 0;
   const cues = scenes.flatMap(sc => { const c = sc.lines.map(l => [at + l.t, at + l.t + l.dur, l.text]); at += sc.dur; return c; });
   fs.mkdirSync(OUT, { recursive: true });
-  fs.writeFileSync(path.join(OUT, `trace-canvas-${video}.${lang}.srt`), cues.map(([a, b, c], i) => `${i + 1}\n${ts(a)} --> ${ts(b)}\n${c}\n`).join('\n'));
+  fs.writeFileSync(path.join(OUT, `${fileName(video)}.${lang}.srt`), cues.map(([a, b, c], i) => `${i + 1}\n${ts(a)} --> ${ts(b)}\n${c}\n`).join('\n'));
 }
 
 // Concurrency 2 was fastest on an M2 Pro: 13 fps against 10 fps at the default 6; more tabs only compete for decoding the recorded clips.
 // --vertical renders 1080 x 1920 to out/short-<video>.<lang>.mp4 instead.
 function render(video, lang) {
-  const mp4 = path.join(OUT, vertical ? `short-${video}.${lang}.mp4` : `trace-canvas-${video}.${lang}.mp4`);
+  const mp4 = path.join(OUT, vertical ? `short-${NUMBER[video] ? fileName(video) : video}.${lang}.mp4` : `${fileName(video)}.${lang}.mp4`);
   execFileSync('npx', ['remotion', 'render', 'src/index.jsx', vertical ? 'Vertical' : 'Tutorial', mp4, `--props=${JSON.stringify({ video, lang })}`, `--browser-executable=${CHROME}`, `--concurrency=${process.env.TC_CONCURRENCY || 2}`, '--log=error'], { cwd: REMOTION, stdio: 'inherit' });
   console.log(`${path.relative(process.cwd(), mp4)}  ${duration(mp4).toFixed(1)} s`);
 }
 
 // Each GIF scene alone, without captions or sound, then a palette GIF next to the READMEs.
+// Scenes that share a name make one GIF together, e.g. a terminal and then the canvas.
 function renderGifs(lang) {
-  VIDEOS.gifs.forEach((g, i) => {
-    const mp4 = path.join(OUT, `gif-${g.name}.${lang}.mp4`), gif = path.join(here, '..', `gif-${g.name}.${lang}.gif`);
-    execFileSync('npx', ['remotion', 'render', 'src/index.jsx', 'Tutorial', mp4, `--props=${JSON.stringify({ video: 'gifs', lang, only: [i], bare: true })}`,
+  [...new Set(VIDEOS.gifs.map(g => g.name))].forEach(name => {
+    const only = VIDEOS.gifs.flatMap((g, i) => (g.name === name ? [i] : []));
+    const mp4 = path.join(OUT, `gif-${name}.${lang}.mp4`), gif = path.join(here, '..', `gif-${name}.${lang}.gif`);
+    execFileSync('npx', ['remotion', 'render', 'src/index.jsx', 'Tutorial', mp4, `--props=${JSON.stringify({ video: 'gifs', lang, only, bare: true })}`,
       `--browser-executable=${CHROME}`, `--concurrency=${process.env.TC_CONCURRENCY || 2}`, '--muted', '--log=error'], { cwd: REMOTION, stdio: 'inherit' });
     run('ffmpeg', ['-y', '-v', 'error', '-i', mp4, '-filter_complex',
       'fps=12,scale=1000:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=64:stats_mode=diff[p];[b][p]paletteuse=dither=none:diff_mode=rectangle', '-loop', '0', gif]);
@@ -935,7 +1083,8 @@ try {
   chrome.kill();
   await new Promise(r => chrome.once('exit', r));
   server.close();
-  fs.rmSync(home, { recursive: true, force: true });
+  // Chrome's helpers may still be writing its profile; a leftover temp folder is no reason to skip the render.
+  try { fs.rmSync(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (e) { console.warn(`Left ${home}: ${e.code}`); }
 }
 for (const [v, l] of jobs) (v === 'gifs' ? renderGifs(l) : render(v, l));
 process.exit(0);

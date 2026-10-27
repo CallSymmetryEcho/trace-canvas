@@ -1,14 +1,18 @@
 #!/usr/bin/env node
-// Records the tutorial videos (English and Chinese) with headless Chrome, macOS `say` and
-// ffmpeg, against a throwaway data folder (your own ~/.trace-canvas is never touched).
-//   node docs/video/make.mjs          # both languages
-//   node docs/video/make.mjs zh       # one language
-// Writes docs/video/out/trace-canvas-tutorial.<lang>.mp4 and .srt (git-ignored).
-// Voices: TC_VOICE_EN / TC_VOICE_ZH (default Samantha / Tingting). A Premium or Enhanced
-// voice, added in System Settings > Accessibility > Spoken Content, sounds more natural.
+// Builds the tutorial and the promo video (English and Chinese) in three steps:
+//  1. narration: tts.py reads every line with a neural voice (cached, so re-runs only read new lines);
+//  2. recording: headless Chrome plays the app scenes against a throwaway data folder (your own
+//     ~/.trace-canvas is never touched) and logs every cursor move, click and narration cue;
+//  3. animation: Remotion (docs/video/remotion) draws title cards, terminals, cursor, captions and
+//     camera from that log, and renders the MP4.
+//   node docs/video/make.mjs                # both videos, both languages
+//   node docs/video/make.mjs promo zh       # one video, one language
+// Writes docs/video/out/trace-canvas-<tutorial|promo>.<lang>.mp4 and .srt (git-ignored).
+// Voices: TC_VOICE_EN / TC_VOICE_ZH as "kokoro:<voice>" or "qwen:<speaker>"; see README.md.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { spawn, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { scenarioData } from '../scenarios/scenarios.mjs';
@@ -16,71 +20,32 @@ import { tr } from '../../src/i18n.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(here, 'out');
+const REMOTION = path.join(here, 'remotion');
+const PUB = path.join(REMOTION, 'public');
+const PY = path.join(here, '.venv', 'bin', 'python');
 const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const PORT = 4791, DEBUG = 9341, W = 1280, H = 720, SCALE = 1.5;
-const VOICE = { en: process.env.TC_VOICE_EN || 'Samantha', zh: process.env.TC_VOICE_ZH || 'Tingting' };
-const RATE = { en: ['-r', '168'], zh: [] };
+const CHAR = 0.042; // seconds per typed character in the terminal scenes
 const REPO = 'github.com/CallSymmetryEcho/trace-canvas';
+const MODELS = { kokoro: 'mlx-community/Kokoro-82M-bf16', qwen: 'mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16' };
+const VOICE = { en: process.env.TC_VOICE_EN || 'kokoro:af_heart', zh: process.env.TC_VOICE_ZH || 'qwen:Ryan' };
+// Style instruction for Qwen3-TTS voices (Kokoro takes none).
+const STYLE = {
+  en: 'Warm, low and relaxed, with a calm, confident and slightly intimate tone, like a late-night radio host.',
+  zh: '声音低沉有磁性，语气从容、温和而自信，语速舒缓，像深夜电台主持人。',
+};
 const pick = (v, lang) => (Array.isArray(v) ? v[lang === 'zh' ? 1 : 0] : v);
 
-/* ---------- pages that are not the app: title cards and terminals ---------- */
-const card = (big, small, foot = '') => `<!doctype html><meta charset="utf-8"><style>
-body{margin:0;height:100vh;display:grid;place-items:center;background:#f4f2ec;color:#141414;text-align:center;font-family:-apple-system,"PingFang SC","Helvetica Neue",sans-serif}
-.line{margin:0 auto 34px;width:520px;height:10px;border-radius:5px;background:linear-gradient(90deg,#E4002B 0 25%,#0072CE 25% 50%,#00A651 50% 75%,#F29F05 75%)}
-h1{font-size:76px;margin:0 0 18px;letter-spacing:-1px}p{font-size:28px;margin:0;color:#444}.f{margin-top:36px;font:24px "SF Mono",Menlo,monospace;color:#0b57d0}
-</style><div><div class="line"></div><h1>${big}</h1><p>${small}</p>${foot && `<div class="f">${foot}</div>`}</div>`;
-
-const term = title => `<!doctype html><meta charset="utf-8"><style>
-body{margin:0;height:100vh;display:grid;place-items:center;background:#e9e7e1;font-family:-apple-system,"PingFang SC",sans-serif}
-.win{width:1080px;height:470px;margin-bottom:90px;border-radius:12px;background:#16181d;box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:hidden;display:flex;flex-direction:column}
-.bar{height:36px;background:#2a2d34;display:flex;align-items:center;gap:8px;padding:0 14px;color:#aab;font-size:13px}
-.bar i{width:12px;height:12px;border-radius:50%}.bar span{flex:1;text-align:center;margin-right:60px}
-pre{margin:0;padding:20px 24px;color:#e6e6e6;font:19px/1.55 "SF Mono",Menlo,"PingFang SC",monospace;white-space:pre-wrap}
-.p{color:#7ee787}.o{color:#b9c0cc}.k{color:#d2a8ff}.c{display:inline-block;width:10px;height:21px;background:#e6e6e6;vertical-align:-4px;animation:b 1s steps(1) infinite}
-@keyframes b{50%{opacity:0}}
-</style><div class="win"><div class="bar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i><span>${title}</span></div><pre id="t"></pre></div>
-<script>
-const t = document.getElementById('t'), esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
-let html = '';
-const draw = () => { t.innerHTML = html + '<span class="c"></span>'; };
-window.__t = {
-  async cmd(s, prompt) { html += '<span class="p">' + esc(prompt) + '</span>'; for (const ch of s) { html += esc(ch); draw(); await new Promise(r => setTimeout(r, 42)); } html += '\\n'; draw(); },
-  out(s, cls) { html += '<span class="' + (cls || 'o') + '">' + esc(s) + '</span>\\n'; draw(); },
-};
-draw();
-</script>`;
-
-// Injected into every page: captions, a visible cursor and a click ripple (headless Chrome draws no cursor).
-function overlay(bottom, x, y) {
-  if (window.__ov) return;
-  const st = document.createElement('style');
-  st.textContent = `#__cap{position:fixed;left:50%;bottom:${bottom}px;transform:translateX(-50%);max-width:1060px;width:max-content;padding:9px 20px;border-radius:12px;background:rgba(18,18,20,.86);color:#fff;font:500 24px/1.45 -apple-system,"PingFang SC","Helvetica Neue",sans-serif;text-align:center;z-index:2147483646;pointer-events:none}
-#__cap:empty{display:none}
-#__cur{position:fixed;left:0;top:0;z-index:2147483647;pointer-events:none;transition-property:transform;transition-timing-function:cubic-bezier(.4,0,.2,1)}
-.__rip{position:fixed;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;border:3px solid rgba(37,99,235,.9);z-index:2147483645;pointer-events:none;animation:__rip .5s ease-out forwards}
-@keyframes __rip{from{transform:scale(.3);opacity:1}to{transform:scale(1.4);opacity:0}}`;
-  document.head.appendChild(st);
-  const cap = document.createElement('div'); cap.id = '__cap';
-  const cur = document.createElement('div'); cur.id = '__cur';
-  cur.innerHTML = '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M4 2l15 10.5-6.6 1.3 3.9 7.4-2.8 1.5-3.9-7.5L4 20z" fill="#111" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg>';
-  document.body.append(cap, cur);
-  window.__ov = {
-    cap: s => { cap.textContent = s; },
-    move: (nx, ny, ms) => { x = nx; y = ny; cur.style.transitionDuration = ms + 'ms'; cur.style.transform = `translate(${nx - 4}px, ${ny - 2}px)`; },
-    ripple: () => { const r = document.createElement('div'); r.className = '__rip'; r.style.left = x + 'px'; r.style.top = y + 'px'; document.body.appendChild(r); setTimeout(() => r.remove(), 600); },
-  };
-  window.__ov.move(x, y, 0);
-}
-
 /* ---------- the script ---------- */
+// page: 'app' (recorded), { card } or { terminal } (drawn by Remotion).
 // Narration lines are [en, zh]; either side can be [caption, what the voice says].
 const SCENES = [
-  { page: lang => card('Trace Canvas', pick(['A transit map of your parallel AI work', '把并行的 AI 工作画成一张地铁线路图'], lang)),
+  { page: { card: { big: 'Trace Canvas', small: ['A transit map of your parallel AI work', '把并行的 AI 工作画成一张地铁线路图'] } },
     text: [
       ['When you run several AI agents at once, the work scatters across sessions, branches and chat windows.', '同时开好几个 AI agent 干活时，工作会散落在不同的会话、分支和聊天窗口里。'],
       ['Trace Canvas puts all of it on one map.', 'Trace Canvas 把它们画到同一张图上。'],
     ] },
-  { page: () => term('zsh — ~/code'),
+  { page: { terminal: 'zsh — ~/code' },
     text: [
       ['It needs only Node.js, with nothing else to install.', '只需要 Node.js，不用安装别的依赖。'],
       ['Clone the repository and start it with one command.', '克隆仓库，一条命令就能启动。'],
@@ -96,7 +61,7 @@ const SCENES = [
       for (const s of ['Trace Canvas is running at http://localhost:4777/', 'Data: ~/.trace-canvas/data.json', 'AI tidy-up: on (uses your local `claude` CLI)', 'Press Ctrl+C to stop.']) { h.out(s); await h.wait(250); }
       await q;
     } },
-  { page: 'app', empty: true,
+  { page: 'app',
     text: [
       ['The page runs on your own computer, and your data stays in one local file.', '页面在你自己的电脑上运行，数据保存在本机的一个文件里。'],
       ['As your agents work, their records arrive on the page.', 'agent 一边工作，记录一边出现在页面上。'],
@@ -163,7 +128,7 @@ const SCENES = [
       await h.click('#tl-zoom [data-z="month"]');
       await p;
     } },
-  { page: 'app',
+  { page: 'app', captionAt: 'top', // the typing happens at the bottom of the page
     text: [
       ['To add something by hand, type it and press Enter.', '想手动记一笔，输入后按回车就行。'],
       ['Start with a hash and a thread name to file it on that line.', ['以 # 号加线程名开头，就会记到那条线上。', '以井号加线程名开头，就会记到那条线上。']],
@@ -182,7 +147,7 @@ const SCENES = [
       await q;
       await h.wait(800);
     } },
-  { page: () => term('zsh — ~/code/trace-canvas'),
+  { page: { terminal: 'zsh — ~/code/trace-canvas' },
     text: [
       ['One command connects Claude Code: hooks, an MCP server and the trace-canvas skill.', '一条命令接入 Claude Code：hooks、MCP 服务和 trace-canvas skill。'],
       ['The hooks then log the key moments of every session by themselves: the first instruction, commits, pull requests and a summary.', '之后 hooks 会自动记下每个会话的关键节点：第一条指令、提交、PR 和会话总结。'],
@@ -194,7 +159,7 @@ const SCENES = [
       await p;
       await h.speak(1);
     } },
-  { page: () => term('claude — ~/code/tripsplit'),
+  { page: { terminal: 'claude — ~/code/tripsplit' },
     text: [[['Type /trace-canvas in a session, and Claude writes its highlights and a summary onto the map.', 'Type slash trace canvas in a session, and Claude writes its highlights and a summary onto the map.'],
       ['在会话里输入 /trace-canvas，Claude 会把这次会话的要点和总结写到图上。', '在会话里输入斜杠 trace canvas，Claude 会把这次会话的要点和总结写到图上。']]],
     run: async h => {
@@ -251,23 +216,112 @@ const SCENES = [
       await h.click('#lang-btn');
       await p;
     } },
-  { page: lang => card('Trace Canvas', pick(['Free and open source · MIT · Node.js 18+', '免费开源 · MIT 许可 · Node.js 18+'], lang), `${REPO} ⭐`),
+  { page: { card: { big: 'Trace Canvas', small: ['Free and open source · MIT · Node.js 18+', '免费开源 · MIT 许可 · Node.js 18+'], foot: `${REPO} ⭐` } },
     text: [
       ['Trace Canvas is free and open source, under the MIT license.', 'Trace Canvas 免费开源，使用 MIT 许可。'],
       ['Find it on GitHub, and give it a star if it helps your work.', '地址在屏幕上，如果对你有帮助，欢迎在 GitHub 上点个 Star。'],
     ] },
 ];
 
-/* ---------- recording machinery ---------- */
+// The promo: Trace Canvas as the entry point for agents. `preload` puts the full map in place before the first shot.
+const PROMO = [
+  { page: { card: { big: 'Trace Canvas', small: ['The entry point for your agents', '你的 agent 的入口'] } },
+    text: [
+      ['Every new agent session starts from zero, and so do you when you come back to a project.', '每开一个新的 agent 会话，都要从头讲一遍项目；你自己隔几天回来，也一样。'],
+      ['Trace Canvas gives you and your agents one shared map of all your work.', 'Trace Canvas 给你和你的 agent 一张共享的地图，装下你手上的所有工作。'],
+    ] },
+  { page: 'app', preload: true,
+    text: [
+      ['Every project, branch, decision and agent session sits on one transit map.', '每个项目、分支、决策和 agent 会话，都在同一张线路图上。'],
+      ['While Claude Code works, its hooks, skill and MCP tools keep the map up to date.', 'Claude Code 工作时，hooks、skill 和 MCP 工具会自动更新这张图。'],
+    ],
+    run: async h => {
+      const p = h.speak(0);
+      await h.click('#zoom-fit');
+      for (const id of ['sc_main', 'sc_auth', 'sc_share']) await h.move(`#cv-cards [data-tid="${id}"]`);
+      await p;
+      const q = h.speak(1);
+      await h.move('#cv-cards [data-tid="sc_cur"]');
+      await h.move('#cv-cards [data-tid="sc_ocr"]');
+      await q;
+    } },
+  { page: { terminal: 'claude — ~/code/tripsplit' },
+    text: [['A new agent reads the map through MCP and catches up in seconds, without rereading old chats.', '新的 agent 通过 MCP 读这张图，几秒钟就能跟上进度，不用再翻旧聊天记录。']],
+    run: async h => {
+      const p = h.speak(0);
+      await h.cmd(pick(['Where did we leave the receipt OCR work?', '小票识别那部分做到哪了？'], h.lang), '> ');
+      await h.wait(500);
+      // The tool lines are what the MCP tools return for this map.
+      h.out('⏺ trace-canvas - trace_list_threads (MCP)', 'k');
+      h.out(`  ⎿  ${h.tools.list()}`);
+      await h.wait(600);
+      h.out('⏺ trace-canvas - trace_read_thread (MCP)(thread: "tripsplit · receipt-ocr")', 'k');
+      h.out(`  ⎿  ${h.tools.read('tripsplit · receipt-ocr')}`);
+      await h.wait(700);
+      h.out(pick(['⏺ It is parked. Even after deskewing, Tesseract reads only 74% of receipt totals; the open task is to try a vision model instead. It is planned for v0.2.',
+        '⏺ 这条线已暂停。先做倾斜校正后，Tesseract 也只认对 74% 的小票总额；待办是改用视觉模型试试，计划放进 v0.2。'], h.lang), 'p');
+      await p;
+      await h.wait(1200);
+    } },
+  { page: 'app',
+    text: [
+      ['Every answer points back to records on the map, so you can check it.', '每个回答都能对应到图上的记录，随时可以核对。'],
+      ['Agents on other computers can send their records too, so nothing is lost between machines.', '其他电脑上的 agent 也能把记录导进来，换了机器也不会丢。'],
+    ],
+    run: async h => {
+      const p = h.speak(0);
+      await h.click('#cv-cards [data-tid="sc_ocr"]');
+      await p;
+      const q = h.speak(1);
+      await h.key('Escape');
+      await h.click('#tab-git');
+      await h.wait(900);
+      await h.js(`document.getElementById('git-scroll').scrollBy({ top: 200, behavior: 'smooth' })`);
+      await q;
+    } },
+  { page: { card: { big: 'Trace Canvas', small: ['Open source · MIT · works with Claude Code', '开源 · MIT · 支持 Claude Code'], foot: `${REPO} ⭐` } },
+    text: [['Give your agents a map. Trace Canvas is free on GitHub.', '给你的 agent 一张地图。Trace Canvas 在 GitHub 上免费开源。']] },
+];
+const VIDEOS = { tutorial: SCENES, promo: PROMO };
+
+/* ---------- narration ---------- */
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const run = (cmd, args) => execFileSync(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim();
+const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'], ...opts }).toString().trim();
 const duration = file => Number(run('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file]));
 
+function narrate(scenes, lang) {
+  const [engine, voice] = VOICE[lang].split(':');
+  if (!MODELS[engine]) throw new Error(`TC_VOICE_${lang.toUpperCase()} must look like kokoro:af_heart or qwen:Serena`);
+  if (!fs.existsSync(PY)) throw new Error('No voice environment yet; see "Setup" in docs/video/README.md');
+  const v = { model: MODELS[engine], voice, ...(engine === 'qwen' ? { instruct: STYLE[lang] } : {}) };
+  const dir = path.join(PUB, 'audio', lang);
+  fs.mkdirSync(dir, { recursive: true });
+  const lines = scenes.map(s => s.text.map(pair => {
+    const x = pick(pair, lang), spoken = Array.isArray(x) ? x[1] : x;
+    const id = crypto.createHash('sha1').update(JSON.stringify([v, spoken])).digest('hex').slice(0, 12);
+    return { caption: pick(x, 'en'), spoken, file: `audio/${lang}/${id}.wav`, abs: path.join(dir, `${id}.wav`) };
+  }));
+  const todo = lines.flat().filter(l => !fs.existsSync(l.abs));
+  console.log(`[${lang}] voice ${VOICE[lang]}: ${todo.length} of ${lines.flat().length} lines to read`);
+  if (todo.length) {
+    execFileSync(PY, [path.join(here, 'tts.py')], { input: JSON.stringify(todo.map(l => ({ ...v, lang, text: l.spoken, out: `${l.abs}.raw.wav` }))), stdio: ['pipe', 'inherit', 'inherit'] });
+    // Even loudness across lines and voices.
+    for (const l of todo) {
+      run('ffmpeg', ['-v', 'error', '-y', '-i', `${l.abs}.raw.wav`, '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11', '-ar', '48000', l.abs]);
+      fs.rmSync(`${l.abs}.raw.wav`);
+    }
+  }
+  for (const l of lines.flat()) l.dur = duration(l.abs);
+  return lines;
+}
+
+/* ---------- recording ---------- */
 const home = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-video-'));
 process.env.TRACE_CANVAS_HOME = path.join(home, 'data');
 fs.mkdirSync(process.env.TRACE_CANVAS_HOME, { recursive: true });
 const { startServer } = await import('../../src/server.mjs');
-const { mutate, dataFile, emptyData } = await import('../../src/store.mjs');
+const { mutate, dataFile, emptyData, readData } = await import('../../src/store.mjs');
+const { listThreads, readThread } = await import('../../src/ops.mjs');
 const { server } = await startServer({ port: PORT });
 const chrome = spawn(CHROME, ['--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run', '--no-default-browser-check',
   `--remote-debugging-port=${DEBUG}`, `--user-data-dir=${path.join(home, 'chrome')}`, 'about:blank'], { stdio: 'ignore' });
@@ -279,7 +333,7 @@ for (let i = 0; i < 50 && !target; i++) {
 }
 const ws = new WebSocket(target.webSocketDebuggerUrl);
 await new Promise(r => ws.addEventListener('open', r, { once: true }));
-let seq = 0, rec = null;
+let seq = 0, cast = null; // cast: { dir, t0, frames } while an app scene records
 const waiting = new Map();
 const cdp = (method, params = {}) => new Promise(r => { const id = ++seq; waiting.set(id, r); ws.send(JSON.stringify({ id, method, params })); });
 const js = async expr => {
@@ -287,105 +341,118 @@ const js = async expr => {
   if (m.result?.exceptionDetails) throw new Error(`page: ${m.result.exceptionDetails.exception?.description || expr}`);
   return m.result?.result?.value;
 };
-// Video time runs only while recording, so page loads between scenes are cut out.
-const vnow = () => (Date.now() - rec.t0 - rec.paused) / 1000;
 ws.addEventListener('message', e => {
   const m = JSON.parse(e.data);
   if (m.id && waiting.has(m.id)) { waiting.get(m.id)(m); waiting.delete(m.id); return; }
   if (m.method !== 'Page.screencastFrame') return;
   cdp('Page.screencastFrameAck', { sessionId: m.params.sessionId });
-  if (!rec || rec.pauseAt) return;
-  const file = path.join(rec.dir, `f${String(rec.frames.length).padStart(5, '0')}.jpg`);
+  if (!cast) return;
+  const file = path.join(cast.dir, `f${String(cast.frames.length).padStart(5, '0')}.jpg`);
   fs.writeFileSync(file, Buffer.from(m.params.data, 'base64'));
-  rec.frames.push([file, vnow()]);
+  cast.frames.push([file, (Date.now() - cast.t0) / 1000]);
 });
 await cdp('Page.enable');
 await cdp('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: SCALE, mobile: false });
+// Light theme whatever the Mac's appearance, to match the title cards and the screenshots.
+await cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }] });
 
-async function record(lang) {
-  console.log(`[${lang}] voice ${VOICE[lang]}`);
-  const tmp = fs.mkdtempSync(path.join(home, `rec-${lang}-`));
-  // Narration first, so every scene knows how long each line takes.
-  const lines = SCENES.map((s, si) => s.text.map((pair, li) => {
-    const v = pick(pair, lang), caption = pick(v, 'en'), spoken = Array.isArray(v) ? v[1] : v;
-    const file = path.join(tmp, `s${si}-${li}.aiff`);
-    run('say', ['-v', VOICE[lang], ...RATE[lang], '-o', file, spoken]);
-    return { caption, file, dur: duration(file) };
-  }));
+// Screencast frames arrive only when the page changes; each one is held until the next.
+function encodeClip(frames, dur, file) {
+  const list = frames.map(([f, t], i) => `file '${f}'\nduration ${((frames[i + 1]?.[1] ?? dur) - (i ? t : 0)).toFixed(4)}`);
+  fs.writeFileSync(`${file}.txt`, `${list.join('\n')}\nfile '${frames.at(-1)[0]}'\n`);
+  run('ffmpeg', ['-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', `${file}.txt`, '-vf', 'scale=1920:1080,fps=30,format=yuv420p', '-t', dur.toFixed(2), '-c:v', 'libx264', '-crf', '18', '-an', file]);
+  fs.rmSync(`${file}.txt`);
+}
+
+async function record(video, lang) {
+  const SCENES = VIDEOS[video], base = `${video}/${lang}`;
+  const lines = narrate(SCENES, lang);
+  fs.rmSync(path.join(PUB, base), { recursive: true, force: true });
+  fs.mkdirSync(path.join(PUB, base, 'clips'), { recursive: true });
   fs.writeFileSync(dataFile(), JSON.stringify(emptyData()));
   fs.writeFileSync(path.join(process.env.TRACE_CANVAS_HOME, 'config.json'), JSON.stringify({ lang }));
   await cdp('Page.navigate', { url: `http://localhost:${PORT}/api/health` });
   await sleep(300);
   await js('localStorage.clear()');
 
-  rec = { dir: tmp, frames: [], clips: [], cues: [], t0: Date.now(), paused: 0, pauseAt: Date.now() };
-  let cur = { x: W / 2, y: H / 2 }, onApp = false;
-  const center = async (sel, n = 0) => js(`(() => { const all = document.querySelectorAll(${JSON.stringify(sel)}); const e = all[${n} < 0 ? all.length + ${n} : ${n}]; if (!e) return null; const r = e.getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + Math.min(r.height / 2, 22)) }; })()`);
-  const h = {
-    lang,
-    wait: sleep,
-    js,
-    speak: null,
-    async move(sel, n = 0, ms = 650) {
-      const p = await center(sel, n);
-      if (!p) throw new Error(`not on the page: ${sel}`);
-      cur = p;
-      await js(`__ov.move(${p.x}, ${p.y}, ${ms})`);
-      await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p.x, y: p.y });
-      await sleep(ms + 80);
-      return p;
-    },
-    async click(sel) {
-      const p = await h.move(sel);
-      await js('__ov.ripple()');
-      for (const type of ['mousePressed', 'mouseReleased']) { await cdp('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: 'left', clickCount: 1 }); await sleep(60); }
-      await sleep(300);
-    },
-    async type(text) { for (const ch of text) { await cdp('Input.insertText', { text: ch }); await sleep(55); } },
-    async key(k) {
-      const code = { Enter: 13, Escape: 27 }[k];
-      await cdp('Input.dispatchKeyEvent', { type: 'keyDown', key: k, code: k, windowsVirtualKeyCode: code, ...(k === 'Enter' ? { text: '\r' } : {}) });
-      await cdp('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code: k, windowsVirtualKeyCode: code });
-    },
-    cmd: (s, prompt = '$ ') => js(`__t.cmd(${JSON.stringify(s)}, ${JSON.stringify(prompt)})`),
-    out: (s, cls) => js(`__t.out(${JSON.stringify(s)}, ${JSON.stringify(cls || '')})`),
-    loadScenario: () => fs.writeFileSync(dataFile(), JSON.stringify(scenarioData('vibe', lang))),
-    addSessions: () => addSessions(lang),
-  };
-
+  const scenes = [];
+  let cur = { x: W / 2, y: H / 2 }, loaded = false;
   for (const [si, scene] of SCENES.entries()) {
-    const needsNav = scene.page !== 'app' || !onApp;
-    if (needsNav) {
-      if (!rec.pauseAt) { rec.pauseAt = Date.now(); await cdp('Page.stopScreencast'); }
-      const url = scene.page === 'app' ? `http://localhost:${PORT}/#canvas` : `data:text/html;charset=utf-8,${encodeURIComponent(scene.page(lang))}`;
-      await cdp('Page.navigate', { url });
-      await sleep(scene.page === 'app' ? 1500 : 500);
-      onApp = scene.page === 'app';
-      // On the app the caption sits above the zoom toolbar and the capture bar.
-      await js(`(${overlay})(${onApp ? 156 : 40}, ${cur.x}, ${cur.y})`);
-      await sleep(200);
-      rec.paused += Date.now() - rec.pauseAt; rec.pauseAt = null;
-      await cdp('Page.startScreencast', { format: 'jpeg', quality: 88, maxWidth: W * SCALE, maxHeight: H * SCALE });
-    }
-    h.speak = async li => {
-      const { caption, file, dur } = lines[si][li];
-      const start = vnow();
-      rec.clips.push([file, start]);
-      rec.cues.push([start, start + dur, caption]);
-      await js(`__ov.cap(${JSON.stringify(caption)})`);
-      await sleep(dur * 1000 + 250);
+    const app = scene.page === 'app';
+    // App scenes run in real time; cards and terminals only advance a virtual clock.
+    let t0 = Date.now(), vt = 0;
+    const now = () => (app ? (Date.now() - t0) / 1000 : vt);
+    const waitUntil = async T => { if (app) await sleep(Math.max(0, T - now()) * 1000); else vt = Math.max(vt, T); };
+    const wait = ms => waitUntil(now() + ms / 1000);
+    const sc = app ? { kind: 'app', clip: `${base}/clips/s${String(si + 1).padStart(2, '0')}.mp4`, start: { ...cur }, cursor: [] }
+      : scene.page.card ? { kind: 'card', big: scene.page.card.big, small: pick(scene.page.card.small, lang), foot: scene.page.card.foot || '' }
+      : { kind: 'terminal', title: scene.page.terminal, steps: [] };
+    sc.lines = [];
+    if (scene.captionAt) sc.captionAt = scene.captionAt;
+    const center = (sel, n) => js(`(() => { const all = document.querySelectorAll(${JSON.stringify(sel)}); const e = all[${n} < 0 ? all.length + ${n} : ${n}]; if (!e) return null; const r = e.getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + Math.min(r.height / 2, 22)) }; })()`);
+    const h = {
+      lang, js, wait,
+      // Resolves when the line has been spoken; awaiting it later still waits from when it started.
+      speak(li) {
+        const l = lines[si][li], t = now();
+        sc.lines.push({ t, dur: l.dur, text: l.caption, audio: l.file });
+        return { then: (res, rej) => waitUntil(t + l.dur + 0.25).then(res, rej) };
+      },
+      async move(sel, n = 0, ms = 650) {
+        const p = await center(sel, n);
+        if (!p) throw new Error(`not on the page: ${sel}`);
+        cur = p;
+        sc.cursor.push({ t: now(), x: p.x, y: p.y, ms });
+        await sleep(ms + 80);
+        await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p.x, y: p.y });
+        return p;
+      },
+      async click(sel) {
+        const p = await h.move(sel);
+        sc.cursor.push({ t: now(), x: p.x, y: p.y, click: true });
+        for (const type of ['mousePressed', 'mouseReleased']) { await cdp('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: 'left', clickCount: 1 }); await sleep(60); }
+        await sleep(300);
+      },
+      async type(text) { for (const ch of text) { await cdp('Input.insertText', { text: ch }); await sleep(55); } },
+      async key(k) {
+        const code = { Enter: 13, Escape: 27 }[k];
+        await cdp('Input.dispatchKeyEvent', { type: 'keyDown', key: k, code: k, windowsVirtualKeyCode: code, ...(k === 'Enter' ? { text: '\r' } : {}) });
+        await cdp('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code: k, windowsVirtualKeyCode: code });
+      },
+      async cmd(s, prompt = '$ ') { sc.steps.push({ t: now(), cmd: s, prompt }); await wait(s.length * CHAR * 1000 + 150); },
+      out(s, cls = '') { sc.steps.push({ t: now(), out: s, cls }); },
+      loadScenario: () => fs.writeFileSync(dataFile(), JSON.stringify(scenarioData('vibe', lang))),
+      addSessions: () => addSessions(lang),
+      // The text the MCP tools return for the current map.
+      tools: {
+        list: () => { const n = listThreads(readData()).length; return `${n} thread${n === 1 ? '' : 's'}.`; },
+        read: name => { const t = readThread(readData(), name); return `"${t.name}": ${t.total} record${t.total === 1 ? '' : 's'}.`; },
+      },
     };
-    await sleep(250);
+
+    if (scene.preload) { h.loadScenario(); h.addSessions(); }
+    if (app) {
+      if (!loaded) { await cdp('Page.navigate', { url: `http://localhost:${PORT}/#canvas` }); await sleep(1500); loaded = true; }
+      cast = { dir: fs.mkdtempSync(path.join(home, 'frames-')), frames: [] };
+      t0 = cast.t0 = Date.now();
+      await cdp('Page.startScreencast', { format: 'jpeg', quality: 90, maxWidth: W * SCALE, maxHeight: H * SCALE });
+    }
+    await wait(300);
     if (scene.run) await scene.run(h);
     else for (const li of lines[si].keys()) await h.speak(li);
-    await sleep(500);
-    await js(`__ov.cap('')`);
-    console.log(`[${lang}] scene ${si + 1}/${SCENES.length} done at ${vnow().toFixed(1)} s`);
+    await wait(600);
+    sc.dur = Number(now().toFixed(3));
+    if (app) {
+      await cdp('Page.stopScreencast');
+      encodeClip(cast.frames, sc.dur, path.join(PUB, sc.clip));
+      fs.rmSync(cast.dir, { recursive: true, force: true });
+      cast = null;
+    }
+    scenes.push(sc);
+    console.log(`[${video} ${lang}] scene ${si + 1}/${SCENES.length}: ${sc.kind}, ${sc.dur.toFixed(1)} s`);
   }
-  await sleep(600);
-  const end = vnow();
-  await cdp('Page.stopScreencast');
-  return assemble(lang, end, tmp);
+  fs.writeFileSync(path.join(PUB, base, 'manifest.json'), JSON.stringify({ lang, charSec: CHAR, scenes }, null, 1));
+  writeSrt(video, lang, scenes);
 }
 
 // The two new sessions that the /trace-canvas scene puts on the canvas.
@@ -407,24 +474,27 @@ function addSessions(lang) {
   });
 }
 
-function assemble(lang, end, tmp) {
-  fs.mkdirSync(OUT, { recursive: true });
-  const { frames, clips, cues } = rec;
-  // The first frame starts at 0 so the picture stays in step with the narration.
-  const list = frames.map(([f, t], i) => `file '${f}'\nduration ${((frames[i + 1]?.[1] ?? end) - (i ? t : 0)).toFixed(4)}`);
-  fs.writeFileSync(path.join(tmp, 'frames.txt'), `${list.join('\n')}\nfile '${frames.at(-1)[0]}'\n`);
-  const mp4 = path.join(OUT, `trace-canvas-tutorial.${lang}.mp4`);
-  const delays = clips.map(([, t], i) => `[${i + 1}:a]adelay=${Math.round(t * 1000)}:all=1[a${i}]`).join(';');
-  run('ffmpeg', ['-y', '-v', 'error', '-f', 'concat', '-safe', '0', '-i', path.join(tmp, 'frames.txt'), ...clips.flatMap(([f]) => ['-i', f]),
-    '-filter_complex', `[0:v]scale=1920:1080,fps=30,format=yuv420p[v];${delays};${clips.map((_, i) => `[a${i}]`).join('')}amix=inputs=${clips.length}:normalize=0,apad[a]`,
-    '-map', '[v]', '-map', '[a]', '-t', end.toFixed(2), '-c:v', 'libx264', '-crf', '20', '-preset', 'medium', '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart', mp4]);
+function writeSrt(video, lang, scenes) {
   const ts = s => new Date(s * 1000).toISOString().slice(11, 23).replace('.', ',');
-  fs.writeFileSync(path.join(OUT, `trace-canvas-tutorial.${lang}.srt`), cues.map(([a, b, c], i) => `${i + 1}\n${ts(a)} --> ${ts(b)}\n${c}\n`).join('\n'));
-  console.log(`${path.relative(process.cwd(), mp4)}  ${end.toFixed(1)} s, ${frames.length} frames`);
+  let at = 0;
+  const cues = scenes.flatMap(sc => { const c = sc.lines.map(l => [at + l.t, at + l.t + l.dur, l.text]); at += sc.dur; return c; });
+  fs.mkdirSync(OUT, { recursive: true });
+  fs.writeFileSync(path.join(OUT, `trace-canvas-${video}.${lang}.srt`), cues.map(([a, b, c], i) => `${i + 1}\n${ts(a)} --> ${ts(b)}\n${c}\n`).join('\n'));
 }
 
+// Concurrency 2 was fastest on an M2 Pro: 13 fps against 10 fps at the default 6; more tabs only compete for decoding the recorded clips.
+function render(video, lang) {
+  const mp4 = path.join(OUT, `trace-canvas-${video}.${lang}.mp4`);
+  execFileSync('npx', ['remotion', 'render', 'src/index.jsx', 'Tutorial', mp4, `--props=${JSON.stringify({ video, lang })}`, `--browser-executable=${CHROME}`, `--concurrency=${process.env.TC_CONCURRENCY || 2}`, '--log=error'], { cwd: REMOTION, stdio: 'inherit' });
+  console.log(`${path.relative(process.cwd(), mp4)}  ${duration(mp4).toFixed(1)} s`);
+}
+
+const args = process.argv.slice(2);
+const videos = Object.keys(VIDEOS).filter(v => !args.some(a => a in VIDEOS) || args.includes(v));
+const langs = ['en', 'zh'].filter(l => !args.some(a => a === 'en' || a === 'zh') || args.includes(l));
+const jobs = videos.flatMap(v => langs.map(l => [v, l]));
 try {
-  for (const lang of process.argv[2] ? [process.argv[2]] : ['en', 'zh']) await record(lang);
+  for (const [v, l] of jobs) await record(v, l);
 } finally {
   ws.close();
   chrome.kill();
@@ -432,4 +502,5 @@ try {
   server.close();
   fs.rmSync(home, { recursive: true, force: true });
 }
+for (const [v, l] of jobs) render(v, l);
 process.exit(0);

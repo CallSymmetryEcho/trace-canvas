@@ -1,0 +1,17 @@
+{
+  "name": "trace-canvas-tutorial",
+  "private": true,
+  "type": "module",
+  "description": "Remotion compositions for the Trace Canvas tutorial videos. Separate from the tool, which has no dependencies.",
+  "scripts": {
+    "studio": "remotion studio",
+    "render": "remotion render"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.539",
+    "@remotion/transitions": "4.0.539",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "remotion": "4.0.539"
+  }
+}

@@ -1,1 +1,5 @@
 docs/video/out/
+docs/video/.venv/
+docs/video/remotion/node_modules/
+docs/video/remotion/public/
+.DS_Store

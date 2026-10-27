@@ -109,6 +109,7 @@ Capturing is safe to repeat: records already on the canvas are skipped. If the h
 | `trace_list_threads` | Lists threads with status, record count, last update; `query` searches |
 | `trace_read_thread` | Returns the records on one thread |
 | `trace_merge` | Merges any number of threads, in `merge` or `combine` mode (below) |
+| `trace_fork` | Branches a new thread off a record or a thread's newest record; `bind: true` puts the calling session on it |
 | `trace_log` | Adds one record |
 | `trace_import_data` | Merges another data set: an export, `data.json` from another computer, or JSON lines |
 | `trace_live` | Lists the sessions running now, with status, activity and thread |
@@ -224,6 +225,7 @@ Records
   trace-canvas capture [--session ID] [--project DIR] [--thread T] [--separate] [--all]
   trace-canvas sessions [--project DIR]            List Claude Code sessions of a project
   trace-canvas merge <thread>... --into <thread> [--combine]
+  trace-canvas fork <record|thread> [--name N] [--bind]   Branch a new thread off another
   trace-canvas import <file|->                     Merge an export, another data.json, or JSON lines
 
 Goals and to-dos

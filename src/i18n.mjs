@@ -15,6 +15,7 @@ const S = {
     resume: 'Resume',
     sessionThread: (repo, date) => `${repo} session ${date}`,
     combinedFrom: names => `Combined from ${names}`,
+    inbox: 'Inbox', branchDefault: n => `${n} · branch`, forkTitle: (p, ti) => `Forked from ${p}: ${ti}`,
   },
   zh: {
     branchedFrom: (branch, parent) => `从 ${parent} 分出分支 ${branch}`,
@@ -31,6 +32,7 @@ const S = {
     resume: '恢复会话',
     sessionThread: (repo, date) => `${repo} 会话 ${date}`,
     combinedFrom: names => `由 ${names} 合并而来`,
+    inbox: '收件箱', branchDefault: n => `${n} · 分支`, forkTitle: (p, ti) => `从「${p}」分叉：${ti}`,
   },
 };
 export function tr(lang, key, ...args) {

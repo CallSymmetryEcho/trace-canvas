@@ -2097,7 +2097,7 @@ function threadDetail(th) {
       <label class="fld"><span>${esc(t('threadName'))}</span><input id="t-name" class="big-input" value="${esc(th.name)}"></label>
       <div class="fld"><span>${esc(t('threadStatus'))}</span><div class="seg">${['active', 'parked', 'done'].map(s => `<button data-act="status" data-status="${s}" aria-pressed="${th.status === s}">${esc(statusLabel(s))}</button>`).join('')}${th.status === 'merged' ? `<button aria-pressed="true" disabled>${esc(statusLabel('merged'))}</button>` : ''}</div></div>
       <div class="fld"><span>${esc(t('threadColor'))}</span><div class="swatches">${LINE_COLORS.map(c => `<button class="swatch" data-act="color" data-color="${c}" style="--c:${c}" aria-pressed="${th.color === c}" aria-label="${esc(t('colorAria', c))}"></button>`).join('')}</div></div>
-      <label class="fld"><span>${esc(t('threadGoal'))}</span><textarea id="t-note" rows="3" placeholder="${esc(t('threadGoalPh'))}">${esc(th.note || '')}</textarea></label>
+      <label class="fld"><span>${esc(t('threadGoal'))}</span><textarea id="t-goal" rows="3" placeholder="${esc(t('threadGoalPh'))}">${esc(goalOf(th))}</textarea></label>
       <div class="meta">
         <span>${esc(t('createdAt', fmtAbs(th.createdAt || Date.now())))}${cs[0] ? esc(t('lastUpdate', fmtRel(cs[0].ts))) : ''}</span>
         ${th.parent ? `<span>${esc(t('forkedFromThread'))} <button class="linkish" data-act="goto-thread" data-tid="${esc(th.parent)}">${esc(getThread(th.parent).name)}</button>${forkC ? ` ${esc(t('of'))} <button class="linkish" data-act="goto-commit" data-cid="${esc(forkC.id)}">${esc(forkC.title.slice(0, 40))}</button>` : ''}</span>` : ''}
@@ -2163,7 +2163,7 @@ detail.addEventListener('input', e => {
     else if (el.id === 'd-agent') patchDoc('commits', s.id, { agent: el.value }, 700);
   } else if (s.type === 'thread') {
     if (el.id === 't-name') patchDoc('threads', s.id, { name: el.value }, 600);
-    else if (el.id === 't-note') patchDoc('threads', s.id, { note: el.value }, 700);
+    else if (el.id === 't-goal') patchDoc('threads', s.id, { goal: el.value }, 700);
   } else if (s.type === 'edge' && el.id === 'e-label') patchDoc('edges', s.id, { label: el.value }, 600);
 });
 detail.addEventListener('change', e => {
@@ -2420,7 +2420,13 @@ $('#goals-btn').onclick = () => openSheet('goals');
 // capture) records what was asked and stays out; next steps Claude writes as highlights count.
 const isTodo = c => c.kind === 'task' && !(c.session && !c.highlight);
 // A line's goal is its note; a bare repository path (what hooks used to put there) is not a goal.
-const goalOf = th => (th && th.note && !/^(\/|~\/)[^\n]*$/.test(th.note.trim()) ? th.note.trim() : '');
+// Same rule as ops.goalOf: the goal field, else the lines of an old note that are not system notes.
+const SYSTEM_NOTE = /^(\/|~\/)\S*$|^(\/|~\/).*\/.*$|^Combined from |^由 .+ 合并而来$/;
+const goalOf = th => {
+  if (!th) return '';
+  if (th.goal != null) return String(th.goal).trim();
+  return String(th.note || '').split('\n').map(l => l.trim()).filter(l => l && !SYSTEM_NOTE.test(l)).join('\n');
+};
 function renderGoals() {
   const by = byThread();
   const groups = [inboxThread(), ...orderedThreads()].map(th => {
@@ -2502,7 +2508,7 @@ function buildAIPrompt() {
   const threads = orderedThreads().filter(th => th.status !== 'merged').map(th => {
     const cs = by.get(th.id) || [];
     const last = cs[cs.length - 1];
-    return { id: th.id, name: th.name, status: th.status || 'active', goal: (th.note || '').slice(0, 160), idleDays: last ? Math.floor((now - last.ts) / 864e5) : null, recent: cs.slice(-6).map(c => `[${c.kind}] ${c.title.slice(0, 70)}`) };
+    return { id: th.id, name: th.name, status: th.status || 'active', goal: goalOf(th).slice(0, 160), idleDays: last ? Math.floor((now - last.ts) / 864e5) : null, recent: cs.slice(-6).map(c => `[${c.kind}] ${c.title.slice(0, 70)}`) };
   });
   const inbox = (by.get(INBOX) || []).slice(-60).map(c => ({ id: c.id, kind: c.kind, title: c.title.slice(0, 120), body: (c.body || '').slice(0, 160) }));
   const edges = [...S.edges.values()].map(e => ({ from: e.from, to: e.to, label: e.label }));

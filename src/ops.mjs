@@ -26,9 +26,14 @@ export function resolveThreadRef(d, ref) {
 // writes as highlights are to-dos.
 export const isTodo = c => c.kind === 'task' && !(c.session && !c.highlight);
 
-// A thread's goal is its note. Hooks used to put the repository path there, which is not a goal.
-// ponytail: "a single line starting with / or ~/" counts as a path; a goal field of its own is the upgrade.
-export const goalOf = th => (th && th.note && !/^(\/|~\/)[^\n]*$/.test(th.note.trim()) ? th.note.trim() : '');
+// A thread's goal has its own field. Older data kept it in `note`, which also holds system notes
+// (the repository path hooks stored, "Combined from …" after a combine); those lines are not a goal.
+const SYSTEM_NOTE = /^(\/|~\/)\S*$|^(\/|~\/).*\/.*$|^Combined from |^由 .+ 合并而来$/;
+export const goalOf = th => {
+  if (!th) return '';
+  if (th.goal != null) return String(th.goal).trim();
+  return String(th.note || '').split('\n').map(l => l.trim()).filter(l => l && !SYSTEM_NOTE.test(l)).join('\n');
+};
 
 /**
  * Goals and to-dos per thread: the thread's goal and its tasks (open ones only unless includeDone).
@@ -94,6 +99,26 @@ export function liveSessions(d, env = process.env) {
     }
   }
   return { sessions, others };
+}
+
+/**
+ * Forks a new thread from a record, or from a thread's newest record when `from` names a thread.
+ * Same shape as forkFrom on the page: the new thread points at its parent and fork point, and
+ * starts with a fork record whose parent is that point. Returns { thread, record }.
+ */
+export function forkThread(d, { from, name, agent = '' } = {}, env = process.env) {
+  const cfg = readConfig(env);
+  let c = d.commits[from];
+  if (!c) {
+    const tid = resolveThreadRef(d, from);
+    if (!tid) throw new Error(`No record or thread "${from}"`);
+    c = lastCommit(d, tid);
+    if (!c) throw new Error(`"${from}" has no records to fork from yet`);
+  }
+  const ptid = threadIdOf(d, c), pname = ptid === INBOX ? tr(cfg.lang, 'inbox') : d.threads[ptid].name;
+  const thread = createThread(d, { name: String(name || '').trim() || tr(cfg.lang, 'branchDefault', pname), parent: ptid, forkOf: c.id });
+  const record = addCommit(d, { thread: thread.id, kind: 'fork', title: tr(cfg.lang, 'forkTitle', pname, c.title).slice(0, 120), parents: [c.id], ts: Math.max(Date.now(), c.ts + 1), agent });
+  return { thread, record };
 }
 
 /**
@@ -325,7 +350,7 @@ export function readThread(d, ref, { limit = 50 } = {}) {
   const t = id === INBOX ? { id: INBOX, name: 'Inbox', status: 'active' } : d.threads[id];
   const cs = Object.values(d.commits).filter(c => threadIdOf(d, c) === id).sort((a, b) => a.ts - b.ts);
   return {
-    id: t.id, name: t.name, status: t.status, note: t.note || '', total: cs.length,
+    id: t.id, name: t.name, status: t.status, goal: goalOf(t), note: t.note || '', total: cs.length,
     records: cs.slice(-limit).map(c => ({ id: c.id, at: new Date(c.ts).toISOString(), kind: c.kind, title: c.title, ...(c.body ? { body: c.body.slice(0, 600) } : {}), ...(c.agent ? { agent: c.agent } : {}), ...(c.session ? { session: c.session } : {}), ...(c.links && c.links.length ? { links: c.links } : {}) })),
   };
 }

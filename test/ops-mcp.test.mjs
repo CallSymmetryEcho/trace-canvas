@@ -120,7 +120,7 @@ test('the MCP server speaks JSON-RPC over stdio and captures the current session
   assert.equal(findTranscript({ projectDir: project }, { CLAUDE_PROJECTS_DIR: projects }), path.join(projects, encodeProjectDir(project), 'sess-a.jsonl'));
 
   const child = spawn(process.execPath, [path.join(here, '..', 'bin', 'trace-canvas.mjs'), 'mcp'], {
-    env: { ...process.env, TRACE_CANVAS_HOME: path.join(root, 'home'), CLAUDE_PROJECTS_DIR: projects, CLAUDE_PROJECT_DIR: project, TRACE_CANVAS_PORT: '4999', TRACE_CANVAS_LANG: 'en' },
+    env: { ...process.env, CLAUDE_CODE_SESSION_ID: 'sess-a', TRACE_CANVAS_HOME: path.join(root, 'home'), CLAUDE_PROJECTS_DIR: projects, CLAUDE_PROJECT_DIR: project, TRACE_CANVAS_PORT: '4999', TRACE_CANVAS_LANG: 'en' },
     stdio: ['pipe', 'pipe', 'inherit'],
   });
   const call = rpc(child);
@@ -130,7 +130,7 @@ test('the MCP server speaks JSON-RPC over stdio and captures the current session
     assert.equal(init.result.serverInfo.name, 'trace-canvas');
     child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
     const list = await call('tools/list', {});
-    assert.deepEqual(list.result.tools.map(t => t.name), ['trace_capture_session', 'trace_list_sessions', 'trace_list_threads', 'trace_read_thread', 'trace_merge', 'trace_log', 'trace_import_data', 'trace_tasks', 'trace_task_done', 'trace_live', 'trace_bind', 'trace_open']);
+    assert.deepEqual(list.result.tools.map(t => t.name), ['trace_capture_session', 'trace_list_sessions', 'trace_list_threads', 'trace_read_thread', 'trace_merge', 'trace_log', 'trace_import_data', 'trace_fork', 'trace_tasks', 'trace_task_done', 'trace_live', 'trace_bind', 'trace_open']);
 
     const cap = await call('tools/call', { name: 'trace_capture_session', arguments: { summary: 'Drafted methods.', highlights: [{ kind: 'task', title: 'Build the sampling table' }] } });
     assert.equal(cap.result.isError, undefined);

@@ -109,6 +109,7 @@ node bin/trace-canvas.mjs setup --user
 | `trace_list_threads` | 列出线程：状态、记录数、最近更新；`query` 可搜索 |
 | `trace_read_thread` | 读取一条线程上的记录 |
 | `trace_merge` | 合并任意多条线程，`merge` 或 `combine` 两种方式（见下） |
+| `trace_fork` | 从一条记录或一条线最新的记录分出新线；`bind: true` 时把调用它的会话放到新线上 |
 | `trace_log` | 记一条 |
 | `trace_import_data` | 合并另一份数据：导出文件、另一台电脑的 `data.json`、或 JSON 行 |
 | `trace_live` | 列出正在运行的会话：状态、当前动作、所属线 |
@@ -224,6 +225,7 @@ node bin/trace-canvas.mjs log "文献对比表完成" \
   trace-canvas capture [--session ID] [--project 目录] [--thread 线程] [--separate] [--all]
   trace-canvas sessions [--project 目录]           列出某个项目的 Claude Code 会话
   trace-canvas merge <线程>... --into <线程> [--combine]
+  trace-canvas fork <记录|线程> [--name 名字] [--bind]   从另一条线分出新线
   trace-canvas import <文件|->                     合并导出文件、另一份 data.json 或 JSON 行
 
 目标和待办

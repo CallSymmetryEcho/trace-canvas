@@ -44,6 +44,8 @@ Records
   trace-canvas sessions [--project dir]            List Claude Code sessions of a project
   trace-canvas merge <thread>... --into <thread> [--combine]
                                                    Merge threads (combine folds them into one line)
+  trace-canvas fork <record|thread> [--name N] [--bind] [--session id]
+                                                   Branch a new thread off a record or a thread's tip
   trace-canvas import <file|->                     Merge an export, another data.json, or JSON lines
 
 Goals and to-dos
@@ -114,11 +116,12 @@ async function main() {
       break;
     }
     case 'capture': {
-      const { findTranscript, parseTranscript } = await import('../src/transcript.mjs');
+      const { currentSessionId, findTranscript, parseTranscript } = await import('../src/transcript.mjs');
       const { captureSession } = await import('../src/ops.mjs');
-      const session = str(flag('session', '')), project = str(flag('project', '')) || process.cwd(), thread = str(flag('thread', ''));
+      const project = str(flag('project', '')) || process.cwd(), thread = str(flag('thread', ''));
+      const session = currentSessionId({ sessionId: str(flag('session', '')) || undefined, projectDir: project });
       const separate = !!flag('separate', false), all = !!flag('all', false);
-      const file = findTranscript({ sessionId: session || undefined, projectDir: project });
+      const file = session ? findTranscript({ sessionId: session, projectDir: project }) : null;
       if (!file) { console.error(session ? `No transcript for session ${session}` : `No Claude Code transcripts for ${project}`); process.exit(1); }
       const r = mutate(d => captureSession(d, parseTranscript(file), { sessionId: session || undefined, thread: thread || undefined, separate, detail: all ? 'all' : 'key' }));
       console.log(`Added ${r.added} record${r.added === 1 ? '' : 's'} to "${r.thread.name}"${r.skipped ? ` (${r.skipped} already there)` : ''}`);
@@ -134,6 +137,17 @@ async function main() {
         const when = s.lastActivity ? new Date(s.lastActivity).toISOString().replace('T', ' ').slice(0, 16) : '';
         console.log(`${s.sessionId}  ${when}  ${String(s.prompts).padStart(3)} prompts  ${String(s.filesChanged).padStart(3)} files  ${s.title}`);
       }
+      break;
+    }
+    case 'fork': {
+      const { forkThread, bindLiveSession } = await import('../src/ops.mjs');
+      const { currentSessionId } = await import('../src/transcript.mjs');
+      const name = str(flag('name', '')), bind = !!flag('bind', false), session = str(flag('session', ''));
+      const from = argv.join(' ').trim();
+      if (!from) { console.error('Usage: trace-canvas fork <record|thread> [--name N] [--bind]'); process.exit(1); }
+      const sid = bind ? currentSessionId({ sessionId: session || undefined, projectDir: process.cwd() }) : null;
+      const r = mutate(d => { const f = forkThread(d, { from, name, agent: str(flag('agent', '')) }); if (sid) bindLiveSession(d, { sessionId: sid, thread: f.thread.id }); return f; });
+      console.log(`Forked "${r.thread.name}"${sid ? ` and put session ${sid} on it` : ''}`);
       break;
     }
     case 'merge': {
@@ -195,8 +209,9 @@ async function main() {
     }
     case 'bind': {
       const { bindLiveSession } = await import('../src/ops.mjs');
-      const { findTranscripts } = await import('../src/transcript.mjs');
-      const unbind = !!flag('unbind', false), session = str(flag('session', '')) || (findTranscripts(process.cwd())[0] || {}).sessionId;
+      const { currentSessionId } = await import('../src/transcript.mjs');
+      const unbind = !!flag('unbind', false), session = currentSessionId({ sessionId: str(flag('session', '')) || undefined, projectDir: process.cwd() });
+      if (!session) { console.error('No session to bind; pass --session'); process.exit(1); }
       const thread = argv.join(' ').trim();
       if (!unbind && !thread) { console.error('Usage: trace-canvas bind <thread> [--session id]   or   trace-canvas bind --unbind'); process.exit(1); }
       const t = mutate(d => bindLiveSession(d, { sessionId: session, thread: unbind ? null : thread }));

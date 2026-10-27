@@ -44,6 +44,21 @@ export function findTranscripts(projectDir, env = process.env) {
   return files.sort((a, b) => b.mtime - a.mtime);
 }
 
+/**
+ * The session that is calling. An explicit id wins; then CLAUDE_CODE_SESSION_ID, which Claude Code
+ * sets for the MCP servers and shell commands it starts; then the newest transcript of the project,
+ * but only if no other transcript there changed in the last 10 minutes: two sessions working in one
+ * folder cannot be told apart by their files, so guessing would put records on the wrong session.
+ */
+export function currentSessionId({ sessionId, projectDir, env = process.env, now = Date.now() } = {}) {
+  if (sessionId) return sessionId;
+  if (env.CLAUDE_CODE_SESSION_ID) return env.CLAUDE_CODE_SESSION_ID;
+  const files = projectDir ? findTranscripts(projectDir, env) : [];
+  const recent = files.filter(f => now - f.mtime < 10 * 60e3);
+  if (recent.length > 1) throw new Error(`${recent.length} sessions in ${projectDir} were active in the last 10 minutes, so it is not clear which one is calling; pass session_id`);
+  return files[0] ? files[0].sessionId : null;
+}
+
 export function findTranscript({ sessionId, projectDir, transcriptPath }, env = process.env) {
   if (transcriptPath) return fs.existsSync(transcriptPath) ? transcriptPath : null;
   if (sessionId) {

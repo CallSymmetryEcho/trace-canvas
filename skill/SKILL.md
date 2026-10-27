@@ -2,8 +2,8 @@
 name: trace-canvas
 description: Put this Claude Code session on the Trace Canvas, a transit map of parallel work (threads like git branches, records like commits), log a key moment, list past sessions, or merge sessions and threads into one line. Use when the user asks to trace, capture, save or log this session or conversation, to see how parallel work fits together, or to merge sessions or threads.
 when_to_use: Trigger phrases include "trace this", "put this session on the canvas", "log this", "merge these sessions", "留痕", "把这次会话放进画布", "合并会话", "合并线程".
-argument-hint: "[capture | sessions | tasks | live | bind <thread> | merge <threads…> | open | log <text>]"
-allowed-tools: mcp__trace-canvas__trace_capture_session mcp__trace-canvas__trace_list_sessions mcp__trace-canvas__trace_list_threads mcp__trace-canvas__trace_read_thread mcp__trace-canvas__trace_log mcp__trace-canvas__trace_open mcp__trace-canvas__trace_live mcp__trace-canvas__trace_bind mcp__trace-canvas__trace_tasks mcp__trace-canvas__trace_task_done
+argument-hint: "[capture | sessions | tasks | live | bind <thread> | fork <thread> | merge <threads…> | open | log <text>]"
+allowed-tools: mcp__trace-canvas__trace_capture_session mcp__trace-canvas__trace_list_sessions mcp__trace-canvas__trace_list_threads mcp__trace-canvas__trace_read_thread mcp__trace-canvas__trace_log mcp__trace-canvas__trace_open mcp__trace-canvas__trace_live mcp__trace-canvas__trace_bind mcp__trace-canvas__trace_tasks mcp__trace-canvas__trace_task_done mcp__trace-canvas__trace_fork
 ---
 
 # Trace Canvas
@@ -33,6 +33,10 @@ Pick the matching action below. With no arguments, capture the current session.
 ## sessions: list past sessions
 
 Call `trace_list_sessions` and show a short table: when, title, prompts, files changed, commits, and the thread it is already on. Offer to capture any of them with `trace_capture_session` and `session_id`. For past sessions you have not seen, pass no highlights; the transcript import is enough.
+
+## fork <thread>: branch a new line off another
+
+Call `trace_fork` with `from` (the thread or record the user named) and `name`. Pass `bind: true` when this session should work on the new line. Report the new thread's name in one line.
 
 ## merge: combine sessions or threads
 

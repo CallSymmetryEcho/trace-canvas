@@ -5,8 +5,8 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { addCommit, dataFile, ensureThread, importText, INBOX, mutate, readData } from './store.mjs';
-import { bindLiveSession, captureSession, listTasks, listThreads, liveSessions, mergeDataset, mergeThreads, readThread, setTaskDone } from './ops.mjs';
-import { describeSession, findTranscript, findTranscripts, parseTranscript } from './transcript.mjs';
+import { bindLiveSession, captureSession, forkThread, listTasks, listThreads, liveSessions, mergeDataset, mergeThreads, readThread, setTaskDone } from './ops.mjs';
+import { currentSessionId, describeSession, findTranscript, findTranscripts, parseTranscript } from './transcript.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const CLI = path.join(here, '..', 'bin', 'trace-canvas.mjs');
@@ -26,7 +26,7 @@ const TOOLS = [
   {
     name: 'trace_capture_session',
     title: 'Put a session on the canvas',
-    description: 'Adds a Claude Code session to the Trace Canvas: its first instruction, turns that changed files, git commits, pushes and pull requests, plus the highlights and summary you pass. With no session_id it captures the current session (the newest transcript of this project). Safe to call again: records already on the canvas are skipped.',
+    description: 'Adds a Claude Code session to the Trace Canvas: its first instruction, turns that changed files, git commits, pushes and pull requests, plus the highlights and summary you pass. With no session_id it captures the session that is calling. Safe to call again: records already on the canvas are skipped.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -93,6 +93,13 @@ const TOOLS = [
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
   },
   {
+    name: 'trace_fork',
+    title: 'Fork a thread',
+    description: 'Starts a new thread that branches off an existing one, drawn as a fork in the Branches view. from is a record id, or a thread id or name (then it forks from that thread\'s newest record). bind: true also puts the calling session on the new thread, so its records land there.',
+    inputSchema: { type: 'object', properties: { from: { type: 'string', description: 'Record id, or thread id or name.' }, name: { type: 'string', description: 'Name of the new thread.' }, bind: { type: 'boolean' }, session_id: { type: 'string', description: 'Session to bind instead of the calling one.' } }, required: ['from'] },
+    annotations: { readOnlyHint: false, destructiveHint: false },
+  },
+  {
     name: 'trace_tasks',
     title: 'Goals and to-dos',
     description: 'Returns the goal and the to-dos of each thread (or of one thread), with how many are done. Read it before working on a thread; tick to-dos with trace_task_done when they are finished.',
@@ -116,7 +123,7 @@ const TOOLS = [
   {
     name: 'trace_bind',
     title: 'Put a session on a thread',
-    description: 'Binds a running session to a thread, so the canvas shows it there and its records land on that line. With no session_id it binds the current session. A thread name that does not exist yet creates the thread. unbind: true goes back to the repository/branch line.',
+    description: 'Binds a running session to a thread, so the canvas shows it there and its records land on that line. With no session_id it binds the session that is calling. A thread name that does not exist yet creates the thread. unbind: true goes back to the repository/branch line.',
     inputSchema: { type: 'object', properties: { thread: { type: 'string', description: 'Thread id or name.' }, session_id: { type: 'string' }, unbind: { type: 'boolean' } } },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
   },
@@ -150,11 +157,12 @@ const pageUrl = async () => { const url = `http://localhost:${port()}/`; return 
 async function callTool(name, a = {}) {
   switch (name) {
     case 'trace_capture_session': {
-      const file = findTranscript({ sessionId: a.session_id, projectDir: projectDir() });
+      const sid = currentSessionId({ sessionId: a.session_id, projectDir: projectDir() });
+      const file = sid ? findTranscript({ sessionId: sid, projectDir: projectDir() }) : null;
       if (a.session_id && !file) throw new Error(`No transcript found for session ${a.session_id}`);
       const parsed = file ? parseTranscript(file) : null;
       const r = mutate(d => captureSession(d, parsed, {
-        sessionId: a.session_id || (parsed && parsed.sessionId), thread: a.thread, name: a.name, separate: !!a.separate,
+        sessionId: sid || (parsed && parsed.sessionId), thread: a.thread, name: a.name, separate: !!a.separate,
         summary: a.summary, highlights: Array.isArray(a.highlights) ? a.highlights : [], detail: a.detail === 'all' ? 'all' : 'key',
       }));
       const url = `http://localhost:${port()}/`;
@@ -208,6 +216,12 @@ async function callTool(name, a = {}) {
       const n = mutate(d => importText(d, text));
       return { text: `Imported ${n} record${n === 1 ? '' : 's'}.`, data: { records: n } };
     }
+    case 'trace_fork': {
+      const sessionId = a.bind ? currentSessionId({ sessionId: a.session_id, projectDir: projectDir() }) : null;
+      if (a.bind && !sessionId) throw new Error('No session to bind; pass session_id');
+      const r = mutate(d => { const f = forkThread(d, { from: a.from, name: a.name, agent: 'Claude' }); if (sessionId) bindLiveSession(d, { sessionId, thread: f.thread.id }); return f; });
+      return { text: `Forked "${r.thread.name}"${sessionId ? `; session ${sessionId} is on it now` : ''}.`, data: { thread: { id: r.thread.id, name: r.thread.name }, forkOf: r.thread.forkOf, record: r.record.id, sessionId } };
+    }
     case 'trace_tasks': {
       const rows = listTasks(readData(), { thread: a.thread, includeDone: !!a.include_done });
       const open = rows.reduce((n, r) => n + (r.total - r.done), 0);
@@ -231,8 +245,8 @@ async function callTool(name, a = {}) {
       return { text: `${sessions.length} running session${sessions.length === 1 ? '' : 's'}${waiting ? `, ${waiting} waiting for the user` : ''}.`, data: { sessions } };
     }
     case 'trace_bind': {
-      // The current session is the newest transcript of this project, as for trace_capture_session.
-      const sessionId = a.session_id || (findTranscripts(projectDir())[0] || {}).sessionId;
+      const sessionId = currentSessionId({ sessionId: a.session_id, projectDir: projectDir() });
+      if (!sessionId) throw new Error('No session to bind; pass session_id');
       if (!a.unbind && !String(a.thread || '').trim()) throw new Error('Pass thread, or unbind: true');
       const t = mutate(d => bindLiveSession(d, { sessionId, thread: a.unbind ? null : a.thread }));
       return { text: t ? `Session ${sessionId} is on "${t.name}" now.` : `Session ${sessionId} follows its repository/branch line again.`, data: { sessionId, thread: t ? { id: t.id, name: t.name } : null } };

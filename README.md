@@ -158,6 +158,10 @@ The list groups to-dos by line, shows each line's goal, a progress bar (done/tot
 
 Agents use the same list. At the start of work they read the goal and the open to-dos with `trace_tasks`; when they finish one they call `trace_task_done`, and the list shows who ticked it. So you can write down what you want, let agents work while you are away, and come back to see where things stand. From the command line: `trace-canvas tasks` and `trace-canvas done "<to-do>"` (`--agent Codex` for a script or another agent).
 
+![Goals and to-dos: agents tick to-dos off on the shared list](docs/gif-goals.en.gif)
+
+*Agents tick to-dos off on the shared list, one by Claude Code and one by Codex, and the line's progress bar moves forward. Made-up data.*
+
 ## Merging sessions and threads
 
 Several sessions about the same piece of work can become one line, in two ways:

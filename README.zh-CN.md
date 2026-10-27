@@ -158,6 +158,10 @@ node bin/trace-canvas.mjs setup --user
 
 agent 用的是同一份清单：开工时用 `trace_tasks` 读目标和待办，做完一项就调用 `trace_task_done`，清单上会标出是谁勾的。这样你写下想要的结果，离开时 agent 照样推进，回来一看就知道做到哪了。命令行里是 `trace-canvas tasks` 和 `trace-canvas done "<待办>"`（脚本或其他 agent 加 `--agent Codex`）。
 
+![目标和待办：agent 在共用的清单上勾掉待办](docs/gif-goals.zh.gif)
+
+*agent 在共用的清单上勾掉待办：一项由 Claude Code 勾选，一项由 Codex 勾选，这条线的进度条随之前进。虚构数据。*
+
 ## 合并会话与线程
 
 同一件事的多次会话可以并成一条线，有两种方式：

@@ -363,6 +363,88 @@ const AGENTS = [
   { page: { card: { big: 'Trace Canvas', small: ['Agents view · open source · MIT', 'Agent 视图 · 开源 · MIT'], foot: `${REPO} ⭐` } },
     text: [['See all your agents at a glance. Trace Canvas is free on GitHub.', '所有 agent 一目了然。Trace Canvas 在 GitHub 上免费开源。']] },
 ];
+// Goals and to-dos: you set the goal and the to-dos, agents tick them off, the list shows how far along it is.
+const SHARE = ['Share link so friends can join without an account', '分享链接：朋友不注册也能加入'];
+const CURRENCIES = ['Trips with expenses in several currencies', '一次出游支持多种货币'];
+const GOALS = [
+  { page: { card: { big: 'Trace Canvas', small: ['Goals and to-dos, shared with your agents', '目标和待办，和 agent 共用一份清单'] } },
+    text: [
+      ['You set the goals. Agents do the work, often while you are away.', '你定目标，agent 干活，常常是在你不在的时候。'],
+      ['Goals and to-dos keep both sides on the same list.', '「目标和待办」让双方看同一份清单。'],
+    ] },
+  { page: 'app', preload: h => { h.loadScenario(); h.loadAgents(); h.goalsDemo(); },
+    text: [
+      ['Goals in the header opens one list: each line’s goal, its to-dos and how far along it is.', '页头的「目标」按钮打开一份清单：每条线的目标、待办和进度。'],
+      ['The first time, a short note explains how the inbox, to-dos and goals differ.', '第一次打开时，有一段说明讲清收件箱、待办和目标的区别。'],
+    ],
+    run: async h => {
+      const p = h.speak(0);
+      await h.click('#goals-btn');
+      await h.wait(800);
+      await h.move('.gl-group .gl-goal');
+      await p;
+      const q = h.speak(1);
+      await h.move('.gl-tip');
+      await q;
+      await h.click('#gl-tip-hide');
+      await h.wait(400);
+    } },
+  { page: 'app',
+    text: [
+      ['Each line shows its goal, a progress bar, and a badge while a session is working on it.', '每条线显示目标和进度条；有会话正在做时，还会显示徽标。'],
+      ['Add a to-do for the agent right in the list.', '直接在清单里给 agent 加一条待办。'],
+    ],
+    run: async h => {
+      const p = h.speak(0);
+      await h.move('.gl-group .gl-meter');
+      await h.move('.gl-group .live-badge');
+      await p;
+      const q = h.speak(1);
+      await h.click('.gl-add[data-thread="sc_main"]');
+      await h.type(pick(['Add a dark mode', '加一个深色模式'], h.lang));
+      await h.key('Enter');
+      await h.wait(500);
+      await q;
+      await h.click('#gl-show-done'); // keep ticked to-dos in view, with who ticked them
+      await h.js('document.activeElement.blur()'); // the list redraws on outside changes only when nothing in it has focus
+    } },
+  { page: { terminal: 'claude — ~/code/tripsplit' },
+    text: [['Agents read the same list through MCP. When Claude Code finishes a to-do, it ticks it off.', 'agent 通过 MCP 读同一份清单。Claude Code 做完一项，就把它勾掉。']],
+    run: async h => {
+      const p = h.speak(0);
+      await h.cmd(pick(['Work through the open to-dos on tripsplit', '把 tripsplit 上的待办依次做完'], h.lang), '> ');
+      await h.wait(500);
+      // The tool lines are what the MCP tools return for this list.
+      h.out('⏺ trace-canvas - trace_tasks (MCP)(thread: "tripsplit")', 'k');
+      h.out(`  ⎿  ${h.tools.tasks('tripsplit')}`);
+      await h.wait(900);
+      h.out(`⏺ trace-canvas - trace_task_done (MCP)(task: "${pick(SHARE, h.lang)}")`, 'k');
+      h.out(`  ⎿  Ticked "${pick(SHARE, h.lang)}".`);
+      await p;
+    } },
+  { page: 'app',
+    text: [
+      ['Back on the page, the to-do is ticked, marked as done by Claude Code, and the bar moves forward.', '回到页面，那一项已经勾上，标着由 Claude Code 勾选，进度条也往前走。'],
+      ['When you come back, one look tells you where everything stands.', '你回来时，看一眼就知道进展到哪了。'],
+    ],
+    run: async h => {
+      const p = h.speak(0);
+      await h.wait(500);
+      h.done(SHARE, 'Claude Code');
+      await h.wait(1200);
+      await h.move('.gl-by');
+      await h.move('.gl-group .gl-meter');
+      await p;
+      const q = h.speak(1);
+      h.done(CURRENCIES, 'Codex');
+      await h.wait(1200);
+      await h.move('.gl-group .gl-prog');
+      await q;
+    } },
+  { page: { card: { big: 'Trace Canvas', small: ['Goals and to-dos · open source · MIT', '目标和待办 · 开源 · MIT'], foot: `${REPO} ⭐` } },
+    text: [['Set the goal, let the agents work, check the list. Trace Canvas is free on GitHub.', '定好目标，让 agent 去做，回来看清单。Trace Canvas 在 GitHub 上免费开源。']] },
+];
+
 // Feature GIFs for the READMEs: no narration, a closer camera, each on its own data and view.
 // `fresh` reloads the page on `view` after `preload`; `zoom` overrides the camera's 1.15, and `focus` (page px)
 // holds the camera still there, which keeps a GIF small: only what changes on the page differs between frames.
@@ -429,6 +511,27 @@ const GIFS = [
       await h.camera('#cv-cards [data-tid="sc_main"]', 1.6, 450);
       await h.wait(1000);
     } },
+  // Goals and to-dos: agents tick to-dos off on the shared list, the progress bar moves.
+  { name: 'goals', page: 'app', fresh: true, view: 'canvas', text: [],
+    preload: h => { h.loadScenario(); h.loadAgents(); h.goalsDemo(); },
+    run: async h => {
+      await h.camera({ x: 640, y: 360 }, 1, 0);
+      await h.click('#goals-btn');
+      await h.wait(500);
+      await h.click('#gl-tip-hide');
+      await h.click('#gl-show-done');
+      await h.js('document.activeElement.blur()');
+      await h.wait(300);
+      const g = await h.at('.gl-group:has(.gl-add[data-thread="sc_main"])');
+      await h.camera({ x: g.x, y: g.y + 90 }, 1.55, 500);
+      await h.wait(700);
+      h.done(SHARE, 'Claude Code');
+      await h.wait(1600);
+      h.done(CURRENCIES, 'Codex');
+      await h.wait(1800);
+      await h.camera({ x: 640, y: 360 }, 1, 500);
+      await h.wait(500);
+    } },
   { name: 'timeline', page: 'app', fresh: true, view: 'timeline', zoom: 1.35, text: [],
     preload: h => h.loadScenario('life'),
     run: async h => {
@@ -445,7 +548,7 @@ const GIFS = [
     } },
 ];
 // TC_GIFS=branches,merge records only those GIFs.
-const VIDEOS = { tutorial: SCENES, promo: PROMO, agents: AGENTS, gifs: process.env.TC_GIFS ? GIFS.filter(g => process.env.TC_GIFS.split(',').includes(g.name)) : GIFS };
+const VIDEOS = { tutorial: SCENES, promo: PROMO, agents: AGENTS, goals: GOALS, gifs: process.env.TC_GIFS ? GIFS.filter(g => process.env.TC_GIFS.split(',').includes(g.name)) : GIFS };
 
 /* ---------- narration ---------- */
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -485,7 +588,7 @@ process.env.TRACE_CANVAS_DESKTOP_DIR = path.join(home, 'desktop'); // never the 
 fs.mkdirSync(process.env.TRACE_CANVAS_HOME, { recursive: true });
 const { startServer } = await import('../../src/server.mjs');
 const { mutate, dataFile, emptyData, readData, addCommit } = await import('../../src/store.mjs');
-const { listThreads, readThread } = await import('../../src/ops.mjs');
+const { listThreads, readThread, listTasks, setTaskDone } = await import('../../src/ops.mjs');
 const { updateLive } = await import('../../src/live.mjs');
 const { writeAgentsDemo } = await import('../scenarios/agents.mjs');
 const { server } = await startServer({ port: PORT });
@@ -601,6 +704,19 @@ async function record(video, lang) {
         await sleep(ms);
       },
       // A record written straight into the data, as `trace-canvas log` would; no agent means you wrote it.
+      // A to-do ticked off by an agent, as trace_task_done or `trace-canvas done --agent` would.
+      done: (title, by) => mutate(d => setTaskDone(d, { task: pick(title, lang), thread: 'sc_main', by })),
+      // Goals demo: a goal for tripsplit and four to-dos, one done; the session's first instruction is not a to-do.
+      goalsDemo: () => mutate(d => {
+        d.commits.sc_m1.session = 'demo-release';
+        d.threads.sc_main.note = pick(['Ship v0.2: friends can split a trip in under a minute', '发布 v0.2：朋友一分钟内就能分好一次出游的账'], lang);
+        const t = Date.now(), H = 3600e3;
+        for (const [title, hours, by] of [[['Fix rounding: amounts in integer cents', '修复舍入：金额一律用整数分'], 30, 'human'], [SHARE, 5], [CURRENCIES, 4.5],
+          [['Settle-up reminders by email', '用邮件提醒结清'], 4]]) {
+          const c = addCommit(d, { thread: 'sc_main', kind: 'task', title: pick(title, lang), ts: t - hours * H, extra: { example: true } });
+          if (by) Object.assign(c, { done: true, doneBy: by, doneAt: t - 20 * H });
+        }
+      }),
       record: ({ thread, kind, title, agent = '' }) => mutate(d => addCommit(d, { thread, kind, title: pick(title, lang), agent })),
       async cmd(s, prompt = '$ ') { sc.steps.push({ t: now(), cmd: s, prompt }); await wait(s.length * CHAR * 1000 + 150); },
       out(s, cls = '') { sc.steps.push({ t: now(), out: s, cls }); },
@@ -612,6 +728,8 @@ async function record(video, lang) {
       // The text the MCP tools return for the current map.
       tools: {
         list: () => { const n = listThreads(readData()).length; return `${n} thread${n === 1 ? '' : 's'}.`; },
+        tasks: thread => { const rows = listTasks(readData(), { thread }); const open = rows.reduce((n, r) => n + r.total - r.done, 0);
+          return `${open} open to-do${open === 1 ? '' : 's'} on ${rows.length} thread${rows.length === 1 ? '' : 's'}.`; },
         read: name => { const t = readThread(readData(), name); return `"${t.name}": ${t.total} record${t.total === 1 ? '' : 's'}.`; },
       },
     };

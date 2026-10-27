@@ -7,12 +7,14 @@
 //   Stop              a turn that changed files becomes an agent record
 //   SessionEnd        a summary of the whole session
 // Records go to a thread per repository and branch, so parallel sessions on
-// different branches land on different lines. The hook never prints to stdout
-// and never fails the session.
+// different branches land on different lines, unless the session was put on a line
+// by hand. Which line a session is on lives in the data's session table, so it
+// survives the session process ending and being resumed. The hook never prints to
+// stdout and never fails the session.
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { home, mutate, readConfig, readData, withLock, createThread, addCommit, lastCommit, goalOf } from './store.mjs';
+import { home, mutate, readConfig, readData, createThread, addCommit, lastCommit, goalOf, threadById, threadByKey } from './store.mjs';
 import { gitEvents, redirectTargets, BASH_WRITES, EDIT_TOOLS, headline, firstLine, cleanPrompt } from './git-events.mjs';
 import { tr } from './i18n.mjs';
 const threadIdOfLocal = (d, c) => (c && c.thread && d.threads[c.thread] ? c.thread : 'inbox');
@@ -43,7 +45,7 @@ export function repoInfo(cwd) {
 const stateFile = (sid, env) => path.join(home(env), 'sessions', String(sid).replace(/[^\w.-]/g, '_') + '.json');
 function loadState(sid, env) {
   try { return JSON.parse(fs.readFileSync(stateFile(sid, env), 'utf8')); } catch {}
-  return { startedAt: Date.now(), threadId: null, prompts: 0, loggedFirstPrompt: false, files: [], turnFiles: [], turnTodos: [], turnActions: 0, doneTodos: [], commits: [], seen: [] };
+  return { startedAt: Date.now(), prompts: 0, files: [], turnFiles: [], turnTodos: [], turnActions: 0, doneTodos: [], commits: [], seen: [] };
 }
 function saveState(sid, state, env) {
   fs.mkdirSync(path.dirname(stateFile(sid, env)), { recursive: true });
@@ -67,7 +69,7 @@ function threadKey(info, cfg, sid) {
 // Finds or creates the thread for a repository/branch. Exported for transcript capture.
 export function resolveThread(d, info, { cfg, sid, prevThreadId = null, promptForName = '', agent = AGENT }) {
   const key = threadKey(info, cfg, sid);
-  let t = Object.values(d.threads).find(x => x.key === key);
+  let t = threadByKey(d, key);
   if (t) return t;
   if (cfg.group === 'session') {
     const date = new Date().toISOString().slice(5, 10);
@@ -76,7 +78,7 @@ export function resolveThread(d, info, { cfg, sid, prevThreadId = null, promptFo
   if (!key.includes('@')) return createThread(d, { name: info.repo, key, note: info.root });
   // A new branch forks from the thread this session was on, else from the repository's main line.
   const prev = prevThreadId && d.threads[prevThreadId];
-  const parent = prev && prev.key !== key ? prev : Object.values(d.threads).find(x => x.key === info.repo) || createThread(d, { name: info.repo, key: info.repo, note: info.root });
+  const parent = prev && prev.key !== key ? prev : threadByKey(d, info.repo) || createThread(d, { name: info.repo, key: info.repo, note: info.root });
   const forkPoint = lastCommit(d, parent.id);
   t = createThread(d, { name: `${info.repo} · ${info.branch}`, key, parent: parent.id, forkOf: forkPoint ? forkPoint.id : null, note: info.root });
   addCommit(d, { thread: t.id, kind: 'fork', title: tr(cfg.lang, 'branchedFrom', info.branch, parent.name), parents: forkPoint ? [forkPoint.id] : [], agent });
@@ -116,9 +118,13 @@ export function handleHook(input, env = process.env) {
     if (key && state.seen.includes(key)) return false;
     if (key) { state.seen.push(key); if (state.seen.length > 300) state.seen = state.seen.slice(-200); }
     let changed = false;
+    // The session's entry outlives this process: the desktop app ends sessions and resumes them
+    // under the same id, and a resumed session stays on its line and does not log a first prompt again.
+    const s = d.sessions[sid] || adoptSession(d, sid, state);
+    const touch = () => { d.sessions[sid] = Object.assign(s, { id: sid, agent: ag.name, agentKey: input._agent || 'claude', resume: ag.resume(sid), cwd, last: Date.now() }); changed = true; };
     const thread = prompt => {
-      const t = (state.bound && d.threads[state.threadId]) || resolveThread(d, info, { cfg, sid, prevThreadId: state.threadId, promptForName: prompt || state.lastPrompt, agent: ag.name });
-      state.threadId = t.id; changed = true; return t;
+      const t = (s.bound && threadById(d, s.thread)) || resolveThread(d, info, { cfg, sid, prevThreadId: s.thread, promptForName: prompt || state.lastPrompt, agent: ag.name });
+      s.thread = t.id; touch(); return t;
     };
 
     if (ev === 'UserPromptSubmit') {
@@ -126,11 +132,12 @@ export function handleHook(input, env = process.env) {
       state.prompts++;
       if (prompt && !prompt.startsWith('/')) state.lastPrompt = firstLine(prompt, 200);
       const isCommand = prompt.startsWith('/');
-      const log = !isCommand && prompt && (cfg.prompts === 'all' || (cfg.prompts === 'first' && !state.loggedFirstPrompt) || (cfg.prompts === 'long' && prompt.length >= 60));
+      const log = !isCommand && prompt && (cfg.prompts === 'all' || (cfg.prompts === 'first' && !s.prompted) || (cfg.prompts === 'long' && prompt.length >= 60));
       if (log) {
         const t = thread(prompt);
         addCommit(d, { thread: t.id, kind: 'task', title: firstLine(prompt, 120), body: prompt.slice(0, 3000), agent: ag.name, links: [ag.resume(sid)], extra: { session: sid, actor: 'human' } });
-        state.loggedFirstPrompt = true;
+        s.prompted = true;
+        if (!s.title) s.title = firstLine(prompt, 120);
       }
     } else if (ev === 'PostToolUse') {
       const tool = input.tool_name, ti = input.tool_input || {}, out = input.tool_response || {};
@@ -164,7 +171,8 @@ export function handleHook(input, env = process.env) {
       }
       state.turnFiles = []; state.turnTodos = []; state.turnActions = 0;
     } else if (ev === 'SessionEnd') {
-      const tid = state.threadId && d.threads[state.threadId] ? state.threadId : null;
+      const th = threadById(d, s.thread), tid = th ? th.id : null;
+      if (d.sessions[sid]) { s.last = Date.now(); changed = true; }
       if (tid && (state.prompts || state.files.length || state.commits.length)) {
         const mins = Math.max(1, Math.round((Date.now() - state.startedAt) / 60000));
         const links = [ag.resume(sid)];
@@ -180,22 +188,31 @@ export function handleHook(input, env = process.env) {
   }, env);
 }
 
-// Puts a session on a thread by hand (null undoes it); from then on the hooks log its records there.
-// Call it inside mutate(), which holds the lock the hooks use for the same state file.
-export function bindSession(sid, tid, env = process.env) {
-  const state = loadState(sid, env);
-  state.threadId = tid || null;
-  state.bound = !!tid;
-  saveState(sid, state, env);
+// Sessions from before the session table: the old state file's binding, else the line of the
+// session's newest record (a line without a key only gets a session's records by hand).
+function adoptSession(d, sid, state) {
+  if (state.threadId && d.threads[state.threadId]) return { thread: state.threadId, bound: !!state.bound, prompted: !!state.loggedFirstPrompt };
+  let last = null;
+  for (const c of Object.values(d.commits)) if (c.session === sid && (!last || c.ts > last.ts)) last = c;
+  const t = last && threadById(d, last.thread);
+  return { thread: t ? t.id : null, bound: !!t && !t.key, prompted: !!last };
 }
 
-// The thread a live session belongs to: bound by hand, else where the hooks put it, else its repo/branch line.
+// Puts a session on a line by hand (null undoes it); from then on its records go there, also after
+// the session is resumed. Call it inside mutate().
+export function bindSession(d, sid, tid, env = process.env) {
+  const s = d.sessions[sid] || (d.sessions[sid] = { id: sid, ...adoptSession(d, sid, loadState(sid, env)) });
+  s.thread = tid || null;
+  s.bound = !!tid;
+}
+
+// The line a session is on: bound by hand, else where the hooks last put it, else its repo/branch line.
 export function sessionThread(d, s, env = process.env) {
-  let st = null;
-  try { st = JSON.parse(fs.readFileSync(stateFile(s.id, env), 'utf8')); } catch {}
-  if (st && st.threadId && d.threads[st.threadId]) return { threadId: st.threadId, bound: !!st.bound };
-  const t = s.key && Object.values(d.threads).find(x => x.key === s.key);
-  return { threadId: t ? t.id : null, bound: false };
+  const e = (d.sessions || {})[s.id] || adoptSession(d, s.id, loadState(s.id, env));
+  const t = threadById(d, e.thread);
+  if (t) return { threadId: t.id, bound: !!e.bound };
+  const k = threadByKey(d, s.key);
+  return { threadId: k ? k.id : null, bound: false };
 }
 
 // Where things are on this machine, from the location map: the entries whose local path holds cwd
@@ -223,7 +240,7 @@ export function sessionStartContext(input, env = process.env) {
   const cfg = readConfig(env);
   const d = readData(env);
   let tid = env.TRACE_CANVAS_THREAD && d.threads[env.TRACE_CANVAS_THREAD] ? env.TRACE_CANVAS_THREAD : null;
-  if (tid && sid) withLock(() => bindSession(sid, tid, env), env);
+  if (tid && sid) mutate(dd => bindSession(dd, sid, tid, env), env);
   if (!tid && sid) tid = sessionThread(d, { id: sid, key: threadKey(repoInfo(cwd), cfg, sid) }, env).threadId;
   const out = [];
   if (tid) {

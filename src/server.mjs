@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { COLS, dataFile, home, mutate, readConfig, readData, toArrays, writeConfig } from './store.mjs';
 import { demoData } from './demo.mjs';
 import { liveDir } from './live.mjs';
-import { bindLiveSession, liveSessions } from './ops.mjs';
+import { bindLiveSession, liveSessions, sessionList } from './ops.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const APP = path.join(here, '..', 'app', 'index.html');
@@ -80,7 +80,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
 
       if (req.method === 'GET' && (p === '/' || p === '/index.html')) return send(res, 200, page(readConfig(), ai), 'text/html; charset=utf-8');
       if (req.method === 'GET' && p === '/api/health') return send(res, 200, { ok: true, version: VERSION, ai, dataFile: dataFile() });
-      if (req.method === 'GET' && p === '/api/data') return send(res, 200, toArrays(readData()));
+      if (req.method === 'GET' && p === '/api/data') { const d = readData(); return send(res, 200, { ...toArrays(d), sessions: sessionList(d) }); }
       if (req.method === 'GET' && p === '/api/live') return send(res, 200, liveSessions(readData()));
       if (req.method === 'GET' && p === '/api/events') {
         res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });

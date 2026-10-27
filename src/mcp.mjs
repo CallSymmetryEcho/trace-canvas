@@ -59,7 +59,7 @@ const TOOLS = [
   {
     name: 'trace_read_thread',
     title: 'Read a thread',
-    description: 'Returns the records on one thread, oldest first.',
+    description: 'Returns the records on one thread, oldest first, and the sessions on it (newest first) with the command that resumes each. To continue work on a line, resume its session rather than starting a new one.',
     inputSchema: { type: 'object', properties: { thread: { type: 'string', description: 'Thread id or name; "inbox" for the inbox.' }, limit: { type: 'number', description: 'Most recent records to return (default 50).' } }, required: ['thread'] },
     annotations: { readOnlyHint: true },
   },

@@ -461,6 +461,11 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .l-list li { display: grid; grid-template-columns: 10px 1fr; gap: 1px 8px; align-items: center; padding: 6px 9px; border: 1px solid var(--rule-soft); border-radius: 8px; cursor: pointer; }
 .l-list li:hover { border-color: var(--faint); }
 .l-list li.st-waiting { border-color: var(--warn); }
+.l-list.s-list li { grid-template-columns: 10px 1fr auto; cursor: default; }
+.l-list.s-list li.is-live { cursor: pointer; }
+.l-list.s-list .s-name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.l-list.s-list .btn { grid-column: 3; grid-row: 1 / span 2; padding: 3px 9px; font-size: 12px; }
+.l-list li.st-off .ldot { opacity: .35; }
 .l-list .act { grid-column: 2; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .l-cmd { display: flex; gap: 6px; align-items: center; }
 .l-cmd code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--f-mono); font-size: 12px; padding: 6px 8px; background: var(--surface-2); border: 1px solid var(--rule-soft); border-radius: 6px; }
@@ -794,7 +799,7 @@ const I18N = {
     stWorking: 'Working', stWaiting: 'Needs you', stIdle: 'Idle',
     liveHead: 'Running session', liveUntitled: 'Untitled session', liveStarted: x => `Started ${x}`, liveSeen: x => ` · last activity ${x}`,
     livePrompt: 'Latest instruction', liveThread: 'Thread', liveAuto: 'Automatic (repository and branch)', liveNow: 'Now on',
-    liveResume: 'Resume in a terminal', liveRunning: 'Running now', liveBadge: (n, w) => `${n} running${w ? `, ${w} need${w === 1 ? 's' : ''} you` : ''}`,
+    liveResume: 'Resume in a terminal', liveRunning: 'Running now', lineSessions: 'Sessions on this line', copyResume: 'Copy resume command', lineSessionsHint: 'Resume one to keep working on this line instead of starting a new session.', liveBadge: (n, w) => `${n} running${w ? `, ${w} need${w === 1 ? 's' : ''} you` : ''}`,
     tBound: n => `Bound to “${n}”`, tUnbound: 'Back to the repository and branch line',
     actorHuman: 'You', actorAgent: 'Agent', liveTipTime: 'now',
     goalsBtn: 'Goals', goalsBtnTitle: 'Goals and to-dos of every line', goalsTitle: 'Goals and to-dos',
@@ -941,7 +946,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     stWorking: '工作中', stWaiting: '等你', stIdle: '空闲',
     liveHead: '运行中的会话', liveUntitled: '未命名会话', liveStarted: x => `开始于 ${x}`, liveSeen: x => ` · 最近活动 ${x}`,
     livePrompt: '最近的指令', liveThread: '所属线', liveAuto: '自动（按仓库和分支）', liveNow: '当前在',
-    liveResume: '在终端里恢复', liveRunning: '正在运行', liveBadge: (n, w) => `${n} 个运行中${w ? `，${w} 个等你` : ''}`,
+    liveResume: '在终端里恢复', liveRunning: '正在运行', lineSessions: '这条线上的会话', copyResume: '复制恢复命令', lineSessionsHint: '恢复其中一个就能接着在这条线上做，不用新开会话。', liveBadge: (n, w) => `${n} 个运行中${w ? `，${w} 个等你` : ''}`,
     tBound: n => `已绑定到「${n}」`, tUnbound: '已改回按仓库和分支自动归线',
     actorHuman: '你', actorAgent: 'Agent', liveTipTime: '此刻',
     goalsBtn: '目标', goalsBtnTitle: '每条线的目标和待办', goalsTitle: '目标和待办',
@@ -1014,7 +1019,7 @@ const S = {
   captureKind: 'idea', captureThread: ls.get('tc.captureThread', INBOX),
   mode: 'loading', readOnly: false, offline: false, got: new Set(), dragId: null,
   ai: null, sheet: null,
-  live: [], liveOthers: [], goalsShowDone: false,
+  live: [], liveOthers: [], sessions: [], goalsShowDone: false,
 };
 
 function fmtAbs(ts) { const d = new Date(ts); return `${pad2(d.getMonth() + 1)}/${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
@@ -1315,6 +1320,7 @@ async function loadServer() {
     const r = await fetch('/api/data', { cache: 'no-store' });
     const data = await r.json();
     for (const col of COLS) applyRows(col, data[col] || []);
+    S.sessions = data.sessions || [];
     if (S.offline) { S.offline = false; renderSync(); }
   } catch { S.offline = true; COLS.forEach(c => S.got.add(c)); renderSync(); render(); }
 }
@@ -1635,10 +1641,14 @@ function mergeMany(mode, targetVal) {
       seen.add(k);
       if (from !== e.from || to !== e.to) patchDoc('edges', e.id, { from, to }, 0);
     }
+    // Same as absorb() in src/store.mjs: the kept line takes a key if it had none, and the folded
+    // lines' ids and other keys become aliases, so their folders and bound sessions still land here.
+    const gone = sources.map(id => S.threads.get(id)), target = S.threads.get(tid);
+    const keys = gone.map(g => g.key).filter(Boolean), key = target.key || keys.shift();
+    const aliases = [...new Set([...(target.aliases || []), ...keys, ...gone.flatMap(g => [g.id, ...(g.aliases || [])])])];
     for (const id of sources) removeDoc('threads', id);
-    const target = S.threads.get(tid);
     const note = t('combinedFrom', names.join(', '));
-    patchDoc('threads', tid, { note: target.note ? `${target.note}\n${note}` : note, ...(target.status === 'merged' ? { status: 'active', mergedInto: null } : {}) }, 0);
+    patchDoc('threads', tid, { note: target.note ? `${target.note}\n${note}` : note, ...(key ? { key } : {}), aliases, ...(target.status === 'merged' ? { status: 'active', mergedInto: null } : {}) }, 0);
     if (sources.includes(S.captureThread)) setCaptureThread(tid);
   } else {
     for (const sid of sources) {
@@ -2089,6 +2099,23 @@ function commitDetail(c) {
       </div>
     </div>`;
 }
+// The line's sessions, running ones first, then the most recent. A running one opens its live panel;
+// each copies the command that resumes it, so work on a line goes on in its session.
+function lineSessions(tid) {
+  const live = liveOn(tid), byId = new Map(live.map(s => [s.id, s]));
+  const known = new Set(S.sessions.map(s => s.id));
+  const rows = [...S.sessions.filter(s => s.thread === tid || byId.has(s.id)), ...live.filter(l => !known.has(l.id)).map(l => ({ id: l.id, agent: l.agent, last: l.lastSeen }))]
+    .sort((a, b) => byId.has(b.id) - byId.has(a.id) || (b.last || 0) - (a.last || 0));
+  if (!rows.length) return '';
+  const li = s => {
+    const l = byId.get(s.id), st = l ? l.status : 'off', cwd = s.cwd || (l && l.cwd);
+    const cmd = `${cwd ? `cd ${shq(cwd)} && ` : ''}${s.resume || (l && l.resume) || `claude --resume ${s.id}`}`;
+    const sub = [l && stLabel(st), s.agent || (l && l.agent) || 'Claude Code', s.id.slice(0, 8), s.last && fmtRel(s.last)].filter(Boolean).join(' · ');
+    return `<li class="st-${esc(st)}${l ? ' is-live' : ''}"${l ? ` data-act="goto-live" data-sid="${esc(s.id)}"` : ''}><span class="ldot"></span><span class="s-name">${esc(s.title || (l ? liveTitle(l) : s.id))}</span><span class="act">${esc(sub)}</span><button class="btn" data-act="copy-cmd" data-cmd="${esc(cmd)}" title="${esc(cmd)}">${esc(t('copyResume'))}</button></li>`;
+  };
+  return `<div class="sec-label">${esc(t('lineSessions'))}</div><ul class="l-list s-list">${rows.slice(0, 8).map(li).join('')}</ul>
+      <p style="margin:0;color:var(--faint);font-size:12px">${rows.length > 8 ? `+${rows.length - 8} · ` : ''}${esc(t('lineSessionsHint'))}</p>`;
+}
 function threadDetail(th) {
   const cs = (byThread().get(th.id) || []).slice().reverse();
   const isInbox = th.id === INBOX;
@@ -2109,7 +2136,7 @@ function threadDetail(th) {
         ${th.parent ? `<span>${esc(t('forkedFromThread'))} <button class="linkish" data-act="goto-thread" data-tid="${esc(th.parent)}">${esc(getThread(th.parent).name)}</button>${forkC ? ` ${esc(t('of'))} <button class="linkish" data-act="goto-commit" data-cid="${esc(forkC.id)}">${esc(forkC.title.slice(0, 40))}</button>` : ''}</span>` : ''}
         ${th.mergedInto ? `<span>${esc(t('mergedInto'))} <button class="linkish" data-act="goto-thread" data-tid="${esc(th.mergedInto)}">${esc(getThread(th.mergedInto).name)}</button></span>` : ''}
       </div>`}
-      ${liveOn(th.id).length ? `<div class="sec-label">${esc(t('liveRunning'))}</div>${liveList(liveOn(th.id))}` : ''}
+      ${lineSessions(th.id)}
       <div class="sec-label">${esc(t('stations'))}</div>
       ${items ? `<ol class="d-strip" style="--c:${th.color}">${items}</ol>` : `<p style="margin:0;color:var(--faint)">${esc(t('noRecordsYet'))}</p>`}
       ${cs.length > 40 ? `<p style="margin:0;color:var(--faint);font-size:12px">${esc(t('only40'))}</p>` : ''}

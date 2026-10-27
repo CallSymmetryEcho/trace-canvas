@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 // Operations shared by the MCP server and the command line:
 // putting a session on the canvas, merging threads, and merging data sets.
-import { INBOX, COLS, addCommit, createThread, findThreadByName, goalOf, lastCommit, readConfig, threadIdOf } from './store.mjs';
+import { INBOX, COLS, absorb, addCommit, createThread, findThreadByName, goalOf, lastCommit, readConfig, threadById, threadIdOf } from './store.mjs';
 import { headline, firstLine } from './git-events.mjs';
 import { AGENT, bindSession, logGitEvents, repoInfo, resumeLink, sessionThread, turnBody, rel } from './hook.mjs';
 import { listLive } from './live.mjs';
@@ -89,11 +89,40 @@ export function handTo(d, { ref, to, thread }, env = process.env) {
   const th = tid === INBOX ? null : d.threads[tid];
   if (!th) throw new Error('Put the to-do on a line first; the inbox has no folder or goal to hand over');
   const live = listLive(env).filter(s => sessionThreadOf(d, s, env) === tid).sort((a, b) => b.lastSeen - a.lastSeen);
-  const dir = /^\/\S*$/.test(String(th.note || '').trim()) && fs.existsSync(th.note.trim()) ? th.note.trim() : live[0] ? live[0].cwd : '';
+  const dir = lineDir(th) || (live[0] ? live[0].cwd : '');
   const prompt = `You are taking over the Trace Canvas line "${th.name}" (thread ${tid}). First call the MCP tool trace_bind with thread "${tid}". Then call trace_tasks with mine: true for the goal and your to-dos, work through them, and tick each one with trace_task_done when it is done. Log decisions and results with trace_log.${todo ? ` Start with: ${todo.title}` : ''}`;
   return { thread: th, todo, command: `${dir ? `cd ${q(dir)} && ` : ''}TRACE_CANVAS_THREAD=${tid} ${ag.launch(prompt)}` };
 }
 const sessionThreadOf = (d, s, env) => sessionThread(d, s, env).threadId;
+// The folder a line works in: the repository path the hooks keep in its note.
+const lineDir = th => { const n = String((th && th.note) || '').trim(); return /^\/\S*$/.test(n) && fs.existsSync(n) ? n : ''; };
+const RESUME = /^(claude --resume|codex resume|gemini --resume) \S+$/;
+
+/**
+ * Every session the canvas knows, newest first, each on the line it stays on: the session table,
+ * plus older sessions known only from their records (their newest record's line). `command`
+ * resumes it from its folder, so anyone can pick a line's session up again instead of starting anew.
+ */
+export function sessionList(d, tid = null) {
+  const rec = new Map();
+  for (const c of Object.values(d.commits)) {
+    if (!c.session) continue;
+    const r = rec.get(c.session) || { last: 0, at: Infinity };
+    if (c.ts > r.last) Object.assign(r, { last: c.ts, thread: threadIdOf(d, c), agent: c.agent || r.agent });
+    if (c.kind === 'task' && c.ts < r.at) Object.assign(r, { at: c.ts, title: c.title });
+    const link = (c.links || []).find(l => RESUME.test(l));
+    if (link) r.resume = link;
+    rec.set(c.session, r);
+  }
+  const table = d.sessions || {};
+  const all = [...new Set([...Object.keys(table), ...rec.keys()])].map(id => {
+    const r = rec.get(id) || {}, e = table[id] || {};
+    const th = table[id] ? threadById(d, e.thread) : d.threads[r.thread] || null;
+    const cwd = e.cwd || lineDir(th), resume = e.resume || r.resume || resumeLink(id);
+    return { id, thread: th ? th.id : null, agent: e.agent || r.agent || AGENT, title: e.title || r.title || '', bound: !!e.bound, last: Math.max(e.last || 0, r.last || 0), cwd, resume, command: `${cwd ? `cd ${q(cwd)} && ` : ''}${resume}` };
+  }).sort((a, b) => b.last - a.last);
+  return tid ? all.filter(s => s.thread === tid) : all;
+}
 
 /**
  * Running sessions with their thread, title and the session that started them (from the
@@ -150,7 +179,7 @@ export function bindLiveSession(d, { sessionId, thread }, env = process.env) {
     if (tid === INBOX) throw new Error('A session goes on a thread, not the inbox');
     if (!tid) tid = createThread(d, { name: String(thread).trim() }).id;
   }
-  bindSession(sessionId, tid, env);
+  bindSession(d, sessionId, tid, env);
   return tid ? d.threads[tid] : null;
 }
 
@@ -278,8 +307,9 @@ export function mergeThreads(d, { sources = [], target, newName, mode = 'merge' 
       const k = `${e.from}>${e.to}:${e.label}`;
       if (e.from === e.to || seen.has(k)) delete d.edges[e.id]; else seen.add(k);
     }
-    for (const id of sids) delete d.threads[id];
     const t = d.threads[tid];
+    absorb(t, sids.map(id => d.threads[id]));
+    for (const id of sids) delete d.threads[id];
     const note = tr(cfg.lang, 'combinedFrom', names.join(', '));
     t.note = t.note ? `${t.note}\n${note}` : note;
     if (t.status === 'merged') { t.status = 'active'; t.mergedInto = null; }
@@ -361,13 +391,23 @@ export function listThreads(d, { query, includeDone = true } = {}) {
   return q ? rows.filter(r => r.matches || norm(r.name).includes(q)) : rows;
 }
 
-export function readThread(d, ref, { limit = 50 } = {}) {
+// A line's sessions with their live status ('off' when not running).
+export function threadSessions(d, tid, env = process.env) {
+  const live = new Map(listLive(env).map(s => [s.id, s]));
+  return sessionList(d, tid).map(s => {
+    const l = live.get(s.id), cwd = s.cwd || (l && l.cwd) || '';
+    return { ...s, status: l ? l.status : 'off', cwd, command: `${cwd ? `cd ${q(cwd)} && ` : ''}${s.resume}` };
+  });
+}
+
+export function readThread(d, ref, { limit = 50 } = {}, env = process.env) {
   const id = resolveThreadRef(d, ref);
   if (!id) throw new Error(`No thread named "${ref}"`);
   const t = id === INBOX ? { id: INBOX, name: 'Inbox', status: 'active' } : d.threads[id];
   const cs = Object.values(d.commits).filter(c => threadIdOf(d, c) === id).sort((a, b) => a.ts - b.ts);
   return {
     id: t.id, name: t.name, status: t.status, goal: goalOf(t), note: t.note || '', total: cs.length,
+    sessions: threadSessions(d, id, env).slice(0, 10).map(s => ({ id: s.id, agent: s.agent, title: s.title, status: s.status, last: new Date(s.last).toISOString(), resume: s.command })),
     records: cs.slice(-limit).map(c => ({ id: c.id, at: new Date(c.ts).toISOString(), kind: c.kind, title: c.title, ...(c.body ? { body: c.body.slice(0, 600) } : {}), ...(c.agent ? { agent: c.agent } : {}), ...(c.session ? { session: c.session } : {}), ...(c.links && c.links.length ? { links: c.links } : {}) })),
   };
 }

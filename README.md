@@ -130,6 +130,8 @@ The local page shows which Claude Code sessions are running right now. A bar und
 
 In every view, stations you wrote (your instructions and decisions) are drawn dark with a person mark, and agents' stations in the line's colour with a star mark, so you can see who moved each line forward. In the Branches view, a session working on a line right now sits at the top of that line's lane as a pulsing tip (green working, orange needs you), joined to the line's newest record; click it for the session panel. Each card shows how many sessions are running on its thread. Click a session to see its repository, branch, folder and latest instruction, copy `claude --resume <id>`, or put it on another thread. A session lands on its repository/branch line by itself; to bind it by hand, pick a thread in the page, run `trace-canvas bind "<thread>"`, or ask Claude (`trace_bind`). From then on its records go to that thread too.
 
+A session stays on its line. The desktop app ends sessions and resumes them under the same id; the line each session is on is kept in the canvas data (not in the session's own state), so a resumed session goes on where it was and does not log its first instruction again. Each thread panel lists **Sessions on this line**, running ones first, each with a button that copies the command that resumes it from its folder (`cd … && claude --resume <id>`, `codex resume <id>`). The same list comes from `trace-canvas resume "<thread>"` and from `trace_read_thread`, so you or another agent can pick a line's session up again instead of starting a new one. When you combine lines, the line you keep takes over the folded lines' repository key and ids, so sessions in that folder, bound or not, land on it instead of on a re-created folder line.
+
 Live status needs the SessionStart, PreToolUse, Notification and SubagentStart/Stop hooks, which `setup` adds (run it again after updating). It lives in small files in `~/.trace-canvas/live/` (one per session and one per subagent), apart from your records. A session drops off when it ends, or after 12 hours without activity. Only the local page shows live sessions.
 
 ### Agent view: who started whom
@@ -255,6 +257,7 @@ Live sessions
   trace-canvas live                                Running sessions: status, activity, thread
   trace-canvas bind <thread> [--session ID]        Put a running session on a thread (default: this one)
   trace-canvas bind --unbind [--session ID]        Back to its repository/branch line
+  trace-canvas resume <thread>                     The line's sessions, newest first, each with the command that resumes it
 
 Setup (--user for every project, --project DIR for one)
   trace-canvas setup            Hooks + MCP server + skill

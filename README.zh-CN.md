@@ -130,6 +130,8 @@ node bin/trace-canvas.mjs setup --user
 
 所有视图里，你写的站点（你的指令和决定）画成深色并带人形标记，agent 的站点用线路颜色并带星形标记，一眼能看出每条线是谁推进的。分支视图里，正在某条线上工作的会话会出现在这条泳道的顶端，是一个脉动的线头（绿色是工作中，橙色是等你），并用虚线连到这条线最新的记录；点它会打开会话面板。每张卡片会显示这条线上有几个会话在运行。点开一个会话，可以看到它的仓库、分支、目录和最近的指令，复制 `claude --resume <id>`，或者把它换到另一条线。会话默认按仓库和分支自动归线；要手动绑定，可以在页面上选线，运行 `trace-canvas bind "<线名>"`，或者让 Claude 来做（`trace_bind`）。绑定之后，这个会话的记录也会记到那条线上。
 
+会话会一直留在它的线上。桌面 app 会结束会话进程，之后再用同一个 id 恢复；每个会话在哪条线上，记在画布数据里（不再放在会话自己的状态文件里），所以恢复后的会话会接着记在原来的线上，也不会把第一条指令再记一遍。每条线的面板里有「这条线上的会话」，运行中的排在前面，每个都有按钮复制从它的目录恢复它的命令（`cd … && claude --resume <id>`、`codex resume <id>`）。`trace-canvas resume "<线名>"` 和 `trace_read_thread` 也能拿到同一份列表，你或别的 agent 可以接着这条线上的会话做，不用新开。合并（combine）几条线时，保留下来的线会接管被并掉的线的仓库 key 和 id，所以那个文件夹里的会话，不论是否绑定，都会记到它上面，而不是重新建一条文件夹的线。
+
 实时状态需要 SessionStart、PreToolUse、Notification 和 SubagentStart/Stop 这几个 hook，`setup` 会自动加上（更新后再运行一次）。状态存在 `~/.trace-canvas/live/` 里，每个会话、每个子 agent 各一个小文件，和你的记录分开。会话结束或 12 小时没有动静后就不再显示。只有本地页面能看到实时会话。
 
 ### Agent 视图：谁启动了谁
@@ -255,6 +257,7 @@ node bin/trace-canvas.mjs log "文献对比表完成" \
   trace-canvas live                                正在运行的会话：状态、当前动作、所属线
   trace-canvas bind <线程> [--session ID]          把运行中的会话放到某条线上（默认是当前会话）
   trace-canvas bind --unbind [--session ID]        改回按仓库和分支自动归线
+  trace-canvas resume <线程>                       这条线上的会话（新的在前）和恢复每个会话的命令
 
 安装（--user 对所有项目，--project 目录 只对一个项目）
   trace-canvas setup            hooks + MCP 服务 + skill

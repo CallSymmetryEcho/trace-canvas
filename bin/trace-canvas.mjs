@@ -61,6 +61,7 @@ Live sessions
   trace-canvas live                                Running sessions: status, activity, thread
   trace-canvas bind <thread> [--session id]        Put a running session on a thread (default: this one)
   trace-canvas bind --unbind [--session id]        Back to its repository/branch line
+  trace-canvas resume <thread>                     The line's sessions, newest first, each with the command that resumes it
 
 Setup (pass --user for every project, or --project dir for one)
   trace-canvas setup            Hooks + MCP server + /trace-canvas skill
@@ -231,6 +232,19 @@ async function main() {
         console.log(`${s.status.padEnd(8)} ${s.id}  ${(s.title || s.prompt || s.repo || '').slice(0, 50).padEnd(50)}  ${where}`);
         console.log(`         ${s.activity || ''}${s.parent ? `\n         started by ${s.parent}` : ''}`);
         for (const a of s.agents) console.log(`         ${a.status === 'running' ? '▸' : '✓'} ${a.type}${a.description ? `: ${a.description}` : ''}`);
+      }
+      break;
+    }
+    case 'resume': {
+      const { resolveThreadRef, threadSessions } = await import('../src/ops.mjs');
+      const { readData } = await import('../src/store.mjs');
+      const d = readData(), ref = argv.join(' ').trim(), tid = ref && resolveThreadRef(d, ref);
+      if (!tid) { console.error(ref ? `No thread named "${ref}"` : 'Usage: trace-canvas resume <thread>'); process.exit(1); }
+      const ss = threadSessions(d, tid);
+      if (!ss.length) { console.log('No sessions on this line yet.'); break; }
+      for (const s of ss) {
+        console.log(`${s.status.padEnd(8)} ${s.agent.padEnd(11)} ${new Date(s.last).toISOString().slice(0, 16).replace('T', ' ')}  ${s.title.slice(0, 60)}`);
+        console.log(`         ${s.command}`);
       }
       break;
     }

@@ -21,12 +21,14 @@ export const uid = prefix => prefix + Date.now().toString(36) + Math.random().to
 
 function sleepSync(ms) { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); }
 
-export function emptyData() { return { version: 1, threads: {}, commits: {}, edges: {} }; }
+// sessions: the line each agent session stays on (see hook.mjs). Not a document collection: only the
+// hooks and the bind tools write it.
+export function emptyData() { return { version: 1, threads: {}, commits: {}, edges: {}, sessions: {} }; }
 
 export function readData(env) {
   try {
     const d = JSON.parse(fs.readFileSync(dataFile(env), 'utf8'));
-    for (const c of COLS) if (!d[c] || typeof d[c] !== 'object' || Array.isArray(d[c])) d[c] = {};
+    for (const c of [...COLS, 'sessions']) if (!d[c] || typeof d[c] !== 'object' || Array.isArray(d[c])) d[c] = {};
     return d;
   } catch {
     return emptyData();
@@ -90,6 +92,19 @@ export function toArrays(d) {
 }
 
 export function threadIdOf(d, c) { return c && c.thread && d.threads[c.thread] ? c.thread : INBOX; }
+
+// A line by id or by key. A combine leaves the folded lines' ids and keys on the line that kept
+// their records (aliases), so bindings and folders that pointed at them still find it.
+const aliased = (d, ref) => Object.values(d.threads).find(t => (t.aliases || []).includes(ref)) || null;
+export const threadById = (d, id) => (id && (d.threads[id] || aliased(d, id))) || null;
+export const threadByKey = (d, key) => (key && (Object.values(d.threads).find(t => t.key === key) || aliased(d, key))) || null;
+// The line that keeps a combine's records takes the first key if it had none; the folded lines'
+// ids and other keys become its aliases. app/index.html does the same in mergeMany.
+export function absorb(target, gone) {
+  const keys = gone.map(g => g.key).filter(Boolean);
+  if (!target.key && keys.length) target.key = keys.shift();
+  target.aliases = [...new Set([...(target.aliases || []), ...keys, ...gone.flatMap(g => [g.id, ...(g.aliases || [])])])];
+}
 
 export function lastCommit(d, tid) {
   let best = null;

@@ -9,7 +9,11 @@ A transit map of your work. When you work with AI agents, ideas and tasks run in
 - **Fork** a new thread from any record and **merge** it back when it is done. Forks and merges are drawn as interchanges.
 - The **inbox** holds loose ideas until you file them.
 
-![Canvas view: four agents building an app in parallel (made-up data)](docs/scenarios/vibe-canvas.en.png)
+**One entry point for your agents.** Agents can read the same map: through the MCP tools `trace_list_threads` and `trace_read_thread`, a new Claude Code session catches up on all your projects in seconds instead of rereading old chats. Hooks and the `/trace-canvas` skill keep the map up to date while you work.
+
+![Records from agents arrive on the canvas, a new session appears as its own line, and two lines are merged back (made-up data)](docs/demo.en.gif)
+
+Videos: [2-minute tutorial](https://github.com/CallSymmetryEcho/trace-canvas/releases/tag/v0.1.0) in English and Chinese.
 
 Three views of the same data:
 

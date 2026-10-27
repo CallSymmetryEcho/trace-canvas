@@ -138,11 +138,12 @@ What is known to be missing today, and what to improve next, in order of priorit
 ### Product directions
 
 1. **New sessions pick up the background automatically (do first).** A `SessionStart` hook injects the latest decisions and open tasks of the current branch's line as context, so the agent knows where things stand from its first turn. This is the biggest win for vibe coding.
-2. **Tasks tick themselves off.** A task record is marked done when its commit or pull request is merged, so plans and results line up on the canvas.
-3. **Regular reviews.** A weekly review is generated automatically (the progress updates in scenario 2 are the manual version): what moved, what stalled, what to do first next week.
-4. **Numbers per line.** Agent time, commits and idle days, to show where the bottleneck is.
-5. **Tidying when there are many lines.** Archive finished lines, group them by project, filter by agent or time, so the canvas stays readable.
-6. **JSON Canvas export.** So Obsidian and similar tools can open the map.
+2. **Live agents per project.** Show on each line which agents are running right now. Local Claude Code and Codex sessions report through the existing hooks (start, a heartbeat, stop) and the server's live updates; cloud sessions and CI need their own status source, such as an API or a check-in from the agent. Local comes first.
+3. **Tasks tick themselves off.** A task record is marked done when its commit or pull request is merged, so plans and results line up on the canvas.
+4. **Regular reviews.** A weekly review is generated automatically (the progress updates in scenario 2 are the manual version): what moved, what stalled, what to do first next week.
+5. **Numbers per line.** Agent time, commits and idle days, to show where the bottleneck is.
+6. **Tidying when there are many lines.** Archive finished lines, group them by project, filter by agent or time, so the canvas stays readable.
+7. **JSON Canvas export.** So Obsidian and similar tools can open the map.
 
 ## Try it yourself
 

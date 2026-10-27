@@ -9,7 +9,11 @@
 - 可以从任意记录**分叉**出新线程，做完再**合并**回去，分叉与合并画成换乘站。
 - **收件箱**放还没归类的零碎想法。
 
-![画布视图：四个 agent 并行开发一个应用（虚构数据）](docs/scenarios/vibe-canvas.zh.png)
+**agent 的统一入口。** 这张图 agent 也能读：通过 MCP 工具 `trace_list_threads` 和 `trace_read_thread`，新开的 Claude Code 会话几秒钟就能了解你手上所有项目的进展，不用再翻旧聊天记录。工作时，hooks 和 `/trace-canvas` skill 会自动更新这张图。
+
+![agent 的记录陆续出现在画布上，新会话成为一条新线路，再把两条线合并回来（虚构数据）](docs/demo.zh.gif)
+
+视频：[中英文教程](https://github.com/CallSymmetryEcho/trace-canvas/releases/tag/v0.1.0)。
 
 同一份数据，三个视图：
 

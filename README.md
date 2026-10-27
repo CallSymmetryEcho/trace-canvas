@@ -233,6 +233,8 @@ Nothing is copied into the canvas: a record keeps the commit's sha and its repos
 
 Put lines that belong together in a group: select them (**Select**) and press **Group** with a name, or type the group in a line's panel. On the canvas a group is a frame around its cards; drag its label to move the whole group, or click it to rename it, arrange just that group, or ungroup it (the lines stay). Lines forked from a grouped line join its group, also the branch lines the hooks make. **Arrange**, next to **Fit**, lays the canvas out: the inbox top left, one block per group, each line followed by the lines forked from it, lines without a group last. It can be undone for ten seconds from the message it shows. From the command line: `trace-canvas group <thread>… --name <group>` (`--clear` takes lines out); `trace_list_threads` and `trace_read_thread` tell agents each line's group.
 
+![Scattered lines go into groups, each with a frame; Arrange lays them out by group, and a group moves by its label (made-up data)](docs/gif-groups.en.gif)
+
 ## Merging sessions and threads
 
 Several sessions about the same piece of work can become one line, in two ways:

@@ -861,6 +861,18 @@ const GIFS = [
       if (i >= 0) await h.move('#detail .meta', i, 350);
       await h.wait(1400);
     } },
+  // Groups: scattered lines, the tripsplit ones grouped, Arrange, then the thesis group moved by its label.
+  { name: 'groups', page: 'app', fresh: true, view: 'canvas', zoom: 1, focus: { x: 640, y: 360 }, text: [],
+    preload: h => { h.loadScenario(); groupsDemo(h.lang); mutate(d => { for (const id of ['sc_meth', 'sc_lit']) d.threads[id].group = pick(GRP_THESIS, h.lang); }); },
+    run: async h => {
+      await h.click('#zoom-fit', { ms: 350 });
+      await grpPick(h, GRP_TRIP, 'tripsplit');
+      await h.wait(600);
+      await h.click('#arrange-btn', { ms: 350 });
+      await h.wait(1600);
+      await h.drag(`.grp-label[data-group="${pick(GRP_THESIS, h.lang)}"]`, 140, 100, 700);
+      await h.wait(1400);
+    } },
 ];
 // TC_GIFS=branches,merge records only those GIFs.
 const VIDEOS = { tutorial: SCENES, promo: PROMO, hook: HOOK, story: STORY, agents: AGENTS, goals: GOALS, gifs: process.env.TC_GIFS ? GIFS.filter(g => process.env.TC_GIFS.split(',').includes(g.name)) : GIFS };
@@ -1105,8 +1117,78 @@ const MACHINES = [
     text: [['One canvas, several machines; each one writes only its own file.', '一张画布，几台电脑；每台只写自己的那份。']] },
 ];
 VIDEOS.machines = MACHINES;
+
+// Groups and arranging: tripsplit, a thesis and two loose lines, scattered over the canvas; group them, Arrange,
+// then move a group by its label. Groups are the lines' `group` field; positions are their x and y.
+const GRP_TRIP = ['sc_main', 'sc_auth', 'sc_ocr', 'sc_ui', 'sc_fix'], GRP_THESIS = ['Thesis', '论文'];
+function groupsDemo(lang) {
+  const L = v => pick(v, lang), t = Date.now(), H = 3600e3;
+  mutate(d => {
+    const line = (id, name, color, records) => {
+      d.threads[id] = { id, name: L(name), color, status: 'active', x: 0, y: 0, note: '', parent: null, forkOf: null, mergedInto: null, key: null, createdAt: t - 90 * H, example: true };
+      records.forEach(([title, hours], i) => addCommit(d, { thread: id, kind: i ? 'agent' : 'task', agent: i ? 'Claude Code' : '', title: L(title), ts: t - hours * H, extra: { example: true } }));
+    };
+    line('sc_meth', ['Thesis · Methods chapter', '论文 · 方法章节'], '#7B61FF', [[['Write up the sampling and the error model', '写清采样方法和误差模型'], 70], [['Methods draft: 4,200 words, figures 3 to 5', '方法章节初稿：4200 字，图 3 到图 5'], 20]]);
+    line('sc_lit', ['Thesis · Literature review', '论文 · 文献综述'], '#00A0B0', [[['Review the last five years of receipt OCR', '梳理近五年的小票识别研究'], 80], [['38 papers sorted into four approaches', '38 篇论文按四类方法归好'], 30]]);
+    line('sc_dot', ['Dotfiles', '整理 dotfiles'], '#8D6E63', [[['Move the shell setup to one repo', '把终端配置放进一个仓库'], 50]]);
+    line('sc_week', ['Weekly review', '每周回顾'], '#546E7A', [[['Draft this week’s review from the canvas', '根据画布起草本周回顾'], 6]]);
+    // Scattered on purpose: Arrange has something to put in order.
+    const spots = { sc_main: [1250, 420], sc_auth: [80, 520], sc_ocr: [900, -120], sc_ui: [1550, -60], sc_fix: [420, 150], sc_meth: [-150, 40], sc_lit: [1150, 760], sc_dot: [560, 640], sc_week: [1700, 520] };
+    for (const [id, [x, y]] of Object.entries(spots)) Object.assign(d.threads[id], { x, y });
+  });
+}
+// Grouping ends select mode, so each group starts by switching it on.
+const grpPick = async (h, ids, name) => {
+  await h.click('#select-btn', { ms: 350 });
+  for (const id of ids) await h.click(`#cv-cards [data-tid="${id}"] .card-head`, { ms: 350 });
+  await h.click('#multi-group', { ms: 350 });
+  await h.type(name);
+  await h.click('[data-multi="group"]', { ms: 350 });
+  await h.wait(500);
+};
+const GROUPS = [
+  { page: 'app', zoom: 1.2, preload: h => { h.loadScenario(); groupsDemo(h.lang); },
+    text: [
+      ['Lines from different projects end up all over the canvas.', '不同项目的线，在画布上散得到处都是。'],
+      ['Select a few lines and put them in a group, and the group gets a frame.', '选中几条线放进一个分组，画布上就多了一个框。'],
+    ],
+    run: async h => {
+      const p = h.speak(0);
+      await h.click('#zoom-fit');
+      for (const id of ['sc_meth', 'sc_main', 'sc_week']) await h.move(`#cv-cards [data-tid="${id}"]`, 0, 500);
+      await p;
+      const q = h.speak(1);
+      await grpPick(h, GRP_TRIP, 'tripsplit');
+      await grpPick(h, ['sc_meth', 'sc_lit'], pick(GRP_THESIS, h.lang));
+      await h.move(`.grp-label[data-group="${pick(GRP_THESIS, h.lang)}"]`);
+      await q;
+    } },
+  { page: 'app', zoom: 1.2,
+    text: [['Arrange lays them out: a block per group, each fork right after its line. And you can undo it.', '「整理」把它们排好：每组一块，分叉紧跟在原线后面，还能撤销。']],
+    run: async h => {
+      const p = h.speak(0);
+      await h.click('#arrange-btn');
+      await h.wait(1200);
+      await h.move('.grp-label[data-group="tripsplit"]');
+      await p;
+    } },
+  { page: 'app', zoom: 1.2,
+    // ponytail: a real click on a group label does not open the group panel yet (reported); show the drag only.
+    text: [['Drag a group by its label, and the whole group moves with it.', '拖着分组标签，整组一起走。']],
+    run: async h => {
+      const p = h.speak(0);
+      const g = `.grp-label[data-group="${pick(GRP_THESIS, h.lang)}"]`;
+      await h.drag(g, 160, 120);
+      await h.wait(600);
+      await h.move(g);
+      await p;
+    } },
+  { page: { card: { big: 'Trace Canvas', small: ['Groups and arranging · open source · MIT', '分组与整理 · 开源 · MIT'], foot: `${REPO} ⭐` } },
+    text: [['A few lines to a group, laid out in one click.', '几条线一组，一键排好。']] },
+];
+VIDEOS.groups = GROUPS;
 // Feature shorts carry their number from the to-do list (功能短视频 N), so a file and its to-do match: 08-sessions.zh.mp4.
-const NUMBER = { sessions: 8, story: 9, tutorial: 10, changes: 11, machines: 12 };
+const NUMBER = { sessions: 8, story: 9, tutorial: 10, changes: 11, machines: 12, groups: 13 };
 const fileName = video => (NUMBER[video] ? `${String(NUMBER[video]).padStart(2, '0')}-${video}` : `trace-canvas-${video}`);
 
 /* ---------- narration ---------- */
@@ -1269,6 +1351,15 @@ async function record(video, lang) {
         sc.cursor.push({ t: now(), x: p.x, y: p.y, click: true });
         for (const type of ['mousePressed', 'mouseReleased']) { await cdp('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: 'left', clickCount: 1, modifiers: shift ? 8 : 0 }); await sleep(60); }
         await sleep(300);
+      },
+      // Press on an element, glide by (dx, dy) page px holding the button, release: a drag, logged as one cursor move.
+      async drag(sel, dx, dy, ms = 800) {
+        const p = await h.move(sel, 0, 350), q = { x: p.x + dx, y: p.y + dy }, n = 16;
+        await cdp('Input.dispatchMouseEvent', { type: 'mousePressed', x: p.x, y: p.y, button: 'left', clickCount: 1 });
+        cur = q; sc.cursor.push({ t: now(), x: q.x, y: q.y, ms });
+        for (let i = 1; i <= n; i++) { await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p.x + dx * i / n, y: p.y + dy * i / n, button: 'left', buttons: 1 }); await sleep(ms / n); }
+        await cdp('Input.dispatchMouseEvent', { type: 'mouseReleased', x: q.x, y: q.y, button: 'left', clickCount: 1 });
+        await sleep(200);
       },
       async type(text) { for (const ch of text) { await cdp('Input.insertText', { text: ch }); await sleep(55); } },
       async key(k) {

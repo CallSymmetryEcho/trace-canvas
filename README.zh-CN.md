@@ -194,6 +194,8 @@ node bin/trace-canvas.mjs setup --user --agents codex,gemini
 
 这条命令会把 hooks 加进 `~/.codex/hooks.json` 和 `~/.gemini/settings.json`（排在已有 hooks 之后，并先做备份），再在两个 CLI 里注册 MCP 服务。Codex 会在它的 `workspace-write` 沙盒里运行 hooks，沙盒不允许写项目以外的地方，所以这条命令还会把 `~/.trace-canvas` 加进 `~/.codex/config.toml` 里 `[sandbox_workspace_write]` 的 `writable_roots`（同样先做备份）。之后启动一次 Codex，它问到时信任新的 hooks。没安装的 CLI 会自动跳过。
 
+对于 Codex，setup 还会把 skill 链接到 `~/.agents/skills/trace-canvas`。用 `$trace-canvas` 调用，例如 `$trace-canvas tasks`。已有安装只补 skill 时，运行 `node bin/trace-canvas.mjs install-skill --user --agents codex`；换成 `--project <目录>` 就装到该目录的 `.agents/skills/trace-canvas`。skill 链接到这份仓库，后续拉取更新也会同步生效。
+
 - **谁做什么**：**目标**清单里每项待办都能选"由谁做"（Claude Code、Codex、Gemini CLI 或任何人）。agent 用 `trace_tasks`（`mine: true`）读分给自己的待办，做完用 `trace_task_done` 勾上，清单会标出是谁勾的。
 - **交出去**：已指定的待办旁边有**交给它**按钮，会复制一条命令；`trace-canvas hand "<待办>" --to codex` 也能打印同样的命令。这条命令在这条线的目录里启动那个 agent，并设置 `TRACE_CANVAS_THREAD`，新会话一开始就落在这条线上。
 - **开局就知道情况**：三个 agent 无论哪个开新会话，hook 都会告诉它：在哪条线上、线的目标、分给它的待办、还有谁在这条线上，以及（配好位置地图时）本机上的东西在哪里。

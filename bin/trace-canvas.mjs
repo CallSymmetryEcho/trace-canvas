@@ -83,7 +83,8 @@ Setup (pass --user for every project, or --project dir for one)
   trace-canvas setup            Hooks + MCP server + /trace-canvas skill
   trace-canvas install-hooks    Automatic traces from Claude Code sessions
   trace-canvas install-mcp      MCP tools: trace_capture_session, trace_merge, …
-  trace-canvas install-skill    The /trace-canvas skill
+  trace-canvas install-skill [--agents codex]
+                               The skill for Claude Code, and optionally Codex
   trace-canvas uninstall-hooks
   trace-canvas mcp              Run the MCP server on stdio (Claude Code starts this)
   trace-canvas lang <en|zh>     Language of records the hooks write
@@ -298,7 +299,11 @@ async function main() {
       break;
     }
     case 'install-skill': {
-      console.log(`Skill installed at ${installSkill(scope(), SKILL_DIR)}`);
+      const s = scope();
+      console.log(`Skill installed at ${installSkill(s, SKILL_DIR)}`);
+      if (str(flag('agents', '')).split(',').some(a => a.trim() === 'codex')) {
+        console.log(`Codex skill installed at ${installSkill(s, SKILL_DIR, 'codex')}`);
+      }
       break;
     }
     case 'setup': {
@@ -333,6 +338,7 @@ async function main() {
         const r = installAgentMcp(a, SELF);
         console.log(`   ${a}: hooks in ${f}; MCP ${r.ok ? 'registered' : `not registered, run: ${r.hint}`}`);
         if (a === 'codex') {
+          console.log(`   codex: skill installed at ${installSkill(s, SKILL_DIR, 'codex')}; invoke it with $trace-canvas.`);
           const toml = path.join(os.homedir(), '.codex', 'config.toml');
           if (codexWritable(toml, home())) console.log(`   codex: ${home()} added to the sandbox's writable_roots in ${toml}, so its hooks can record`);
           console.log('   codex: start Codex once and trust the new hooks when it asks.');

@@ -194,6 +194,8 @@ node bin/trace-canvas.mjs setup --user --agents codex,gemini
 
 This adds the hooks to `~/.codex/hooks.json` and `~/.gemini/settings.json` (after any hooks already there, with a backup) and registers the MCP server with each CLI. Codex runs hooks inside its `workspace-write` sandbox, which blocks writes outside the project, so setup also adds `~/.trace-canvas` to `writable_roots` under `[sandbox_workspace_write]` in `~/.codex/config.toml` (with a backup). Start Codex once afterwards and trust the new hooks when it asks. CLIs that are not installed are skipped.
 
+For Codex, setup also links the skill into `~/.agents/skills/trace-canvas`. Invoke it with `$trace-canvas`, for example `$trace-canvas tasks`. To add just the skill to an existing installation, run `node bin/trace-canvas.mjs install-skill --user --agents codex`. With `--project <dir>`, that command installs it into `<dir>/.agents/skills/trace-canvas`. The skill stays linked to this clone, so pulling updates refreshes it too.
+
 - **Who does what:** each to-do in **Goals** has a "who does it" choice (Claude Code, Codex, Gemini CLI or anyone). Agents read their own with `trace_tasks` (`mine: true`) and tick them with `trace_task_done`, and the list shows who ticked each one.
 - **Hand it over:** **Hand to it** next to an assigned to-do copies a command, and so does `trace-canvas hand "<to-do>" --to codex`. The command starts that agent in the line's folder with `TRACE_CANVAS_THREAD` set, so the new session lands on the line.
 - **A head start:** when any of the three starts a session, the hook tells it which line it works on, the line's goal, the to-dos assigned to it, who else is working there, and (with the location map) where things are on this machine.

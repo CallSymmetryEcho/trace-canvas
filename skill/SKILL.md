@@ -1,8 +1,6 @@
 ---
 name: trace-canvas
-description: Put this Claude Code session on the Trace Canvas, a transit map of parallel work (threads like git branches, records like commits), log a key moment, list past sessions, or merge sessions and threads into one line. Use when the user asks to trace, capture, save or log this session or conversation, to see how parallel work fits together, or to merge sessions or threads.
-when_to_use: Trigger phrases include "trace this", "put this session on the canvas", "put all my sessions on the canvas", "把所有会话展示在画布上", "log this", "merge these sessions", "留痕", "把这次会话放进画布", "合并会话", "合并线程".
-argument-hint: "[capture | all | sessions | tasks | live | bind <thread> | fork <thread> | merge <threads…> | open | log <text>]"
+description: Put an agent session on the Trace Canvas, a transit map of parallel work (threads like git branches, records like commits), log a key moment, list past Claude Code sessions, or merge sessions and threads into one line. Use when the user asks to trace, capture, save or log this session or conversation, to see how parallel work fits together, or to merge sessions or threads, including "留痕", "把这次会话放进画布", "合并会话" and "合并线程".
 allowed-tools: mcp__trace-canvas__trace_capture_session mcp__trace-canvas__trace_list_sessions mcp__trace-canvas__trace_list_threads mcp__trace-canvas__trace_read_thread mcp__trace-canvas__trace_log mcp__trace-canvas__trace_open mcp__trace-canvas__trace_live mcp__trace-canvas__trace_bind mcp__trace-canvas__trace_tasks mcp__trace-canvas__trace_task_done mcp__trace-canvas__trace_fork
 ---
 
@@ -10,9 +8,13 @@ allowed-tools: mcp__trace-canvas__trace_capture_session mcp__trace-canvas__trace
 
 Trace Canvas shows work as a transit map. A **thread** is one piece of work in progress, like a git branch. A **record** is a station on it, like a commit: idea, task, agent output, decision or note. Records are stored on this computer and shown at http://localhost:4777/.
 
-The user asked: `$ARGUMENTS`
+In Claude Code, invoke `/trace-canvas` (arguments: `$ARGUMENTS`). In Codex, invoke `$trace-canvas` and read the action from the user's request.
+
+Actions: `capture`, `all`, `sessions`, `tasks`, `live`, `bind <thread>`, `fork <thread>`, `merge <threads…>`, `open`, `log <text>`.
 
 Pick the matching action below. With no arguments, capture the current session.
+
+Current-session capture works with the agent's live hook records and the highlights you write. Historical transcript discovery (`all` and `sessions`) currently reads Claude Code transcripts only. To inspect recorded Codex sessions, use `trace_live` or `trace_read_thread`. If the capture tool cannot identify the current session, do not guess: establish the intended thread with the user and add the highlights there with `trace_log`.
 
 ## capture (default): put this session on the canvas
 
@@ -30,7 +32,7 @@ Pick the matching action below. With no arguments, capture the current session.
    - If they want this session as its own line, pass `separate: true`.
 6. Reply in two or three lines: which thread it went to, how many records were added, and the address the tool returned. If the page is not running, offer to open it with `trace_open`.
 
-## all: put every session of this project on the canvas
+## all: put every Claude Code session of this project on the canvas
 
 For "put all my sessions on the canvas" and the like (the first thing many people type after setup):
 
@@ -39,7 +41,7 @@ For "put all my sessions on the canvas" and the like (the first thing many peopl
 3. Call `trace_open` with `open_browser: true`.
 4. Reply in two or three lines: how many sessions went on, on which lines, and the address.
 
-## sessions: list past sessions
+## sessions: list past Claude Code sessions
 
 Call `trace_list_sessions` and show a short table: when, title, prompts, files changed, commits, and the thread it is already on. Offer to capture any of them with `trace_capture_session` and `session_id`. For past sessions you have not seen, pass no highlights; the transcript import is enough.
 
@@ -83,6 +85,8 @@ If the `trace_*` tools are not available, the MCP server is not set up. Tell the
 ```bash
 node bin/trace-canvas.mjs setup --user
 ```
+
+For Codex, add `--agents codex` to install its hooks, MCP server and skill. If the hooks and MCP server already work, run `node bin/trace-canvas.mjs install-skill --user --agents codex` to install just the skill.
 
 Until then, single records can still be logged with the command line:
 

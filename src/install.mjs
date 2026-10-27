@@ -141,8 +141,9 @@ export function codexWritable(file, dir) {
 export const onPath = cmd => { try { execFileSync('which', [cmd], { stdio: 'ignore' }); return true; } catch { return false; } };
 
 // Skill. Linked rather than copied, so pulling a newer Trace Canvas updates it too.
-export function installSkill({ user, project }, skillDir) {
-  const base = user ? path.join(os.homedir(), '.claude', 'skills') : path.join(path.resolve(project || process.cwd()), '.claude', 'skills');
+export function installSkill({ user, project }, skillDir, agent = 'claude') {
+  if (agent !== 'claude' && agent !== 'codex') throw new Error(`Skill installation is not supported for ${agent}`);
+  const base = path.join(user ? os.homedir() : path.resolve(project || process.cwd()), agent === 'codex' ? '.agents' : '.claude', 'skills');
   const dest = path.join(base, 'trace-canvas');
   fs.mkdirSync(base, { recursive: true });
   try {

@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **Open the chat.** A session the Claude desktop app runs opens its chat from the live panel, the Agent view (↗) and the line's session list.
+- **Open the chat.** From the live panel, the Agent view (↗) and the line's session list: a session the Claude desktop app runs opens its chat there, a Codex session opens in the Codex app, and a session running in Terminal or iTerm2 (macOS) brings its tab to the front (**Go to its terminal**).
 - **Focus mode:** pick a group (More → Focus on a group…, or its panel) and every view shows only its lines: the canvas, the branches, the timeline and the goals. A bar under the header names the group; the choice stays after a reload until you leave it. Arrange then arranges just them.
 - **On a phone:** Goals is a tab with a page of its own, one to-do per row; lines and records open as full pages with ← (the back gesture closes them); Branches keeps the graph to two fifths of the screen so titles stay readable. The desktop layout is unchanged.
 - Branches: each title stays level with its station (rows were a pixel taller than the graph's step).

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { normalize, terminalScript } from '../src/agents.mjs';
+import { focusScript, normalize, terminalScript } from '../src/agents.mjs';
 import { handleHook, sessionStartContext, sessionThread } from '../src/hook.mjs';
 import { readLive } from '../src/live.mjs';
 import { codexHooks, codexWritable, install } from '../src/install.mjs';
@@ -146,4 +146,13 @@ test('a new session is told its line, goal, its own to-dos and where things are 
 test('Open in Terminal runs the hand-off command in a new Terminal window, quoted for AppleScript', () => {
   const s = terminalScript(`cd '/x y' && TRACE_CANVAS_THREAD=t1 codex 'Say "hi" \\ then work'`);
   assert.equal(s, `tell application "Terminal"\n  do script "cd '/x y' && TRACE_CANVAS_THREAD=t1 codex 'Say \\"hi\\" \\\\ then work'"\n  activate\nend tell`);
+});
+
+test('Go to the terminal finds the Terminal or iTerm2 tab by its tty, and nothing else', () => {
+  assert.match(focusScript({ tty: '/dev/ttys012', term: 'Apple_Terminal' }), /tell application "Terminal"[\s\S]*tty of t is "\/dev\/ttys012"[\s\S]*return "ok"/);
+  assert.match(focusScript({ tty: '/dev/ttys004', term: 'iTerm.app' }), /tell application "iTerm2"[\s\S]*sessions of t/);
+  assert.equal(focusScript({ tty: '/dev/ttys004', term: 'vscode' }), null);
+  assert.equal(focusScript({ tty: '', term: 'Apple_Terminal' }), null);
+  assert.equal(focusScript({ tty: '/dev/ttys1" & do shell script "x', term: 'Apple_Terminal' }), null);
+  assert.equal(focusScript(), null);
 });

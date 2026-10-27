@@ -6,13 +6,13 @@
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
-import { spawn, spawnSync } from 'node:child_process';
+import { execFile, spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { COLS, dataFile, home, mutate, readConfig, readData, toArrays, writeConfig } from './store.mjs';
 import { demoData } from './demo.mjs';
-import { liveDir } from './live.mjs';
+import { liveDir, readLive } from './live.mjs';
 import { bindLiveSession, handTo, liveSessions, sessionList } from './ops.mjs';
-import { terminalScript } from './agents.mjs';
+import { focusScript, terminalScript } from './agents.mjs';
 import { commitDiff, commitInfo } from './git-view.mjs';
 import { runSync } from './sync.mjs';
 import { desktopSessions } from './desktop.mjs';
@@ -119,6 +119,14 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         spawn('osascript', ['-e', terminalScript(r.command)], { stdio: 'ignore', detached: true }).unref();
         broadcast('change');
         return send(res, 200, { ok: true, command: r.command });
+      }
+      // Go to the terminal: brings a live session's Terminal or iTerm2 tab to the front, found by its tty.
+      if (req.method === 'POST' && p === '/api/focus') {
+        const body = JSON.parse(await readBody(req));
+        const script = process.platform === 'darwin' && focusScript(readLive(String(body.session || '')) || {});
+        if (!script) return send(res, 200, { error: 'no terminal' });
+        execFile('osascript', ['-e', script], { timeout: 5000 }, (err, out) => send(res, 200, String(out).trim() === 'ok' ? { ok: true } : { error: 'not found' }));
+        return;
       }
       if (req.method === 'POST' && p === '/api/sync') { const r = runSync(); broadcast('change'); return send(res, 200, r); }
       if (req.method === 'POST' && p === '/api/bind') {

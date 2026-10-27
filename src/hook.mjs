@@ -18,7 +18,7 @@ import { home, mutate, readConfig, readData, createThread, addCommit, lastCommit
 import { gitEvents, redirectTargets, BASH_WRITES, EDIT_TOOLS, GIT_COMMIT, commandDir, headline, firstLine, cleanPrompt } from './git-events.mjs';
 import { tr } from './i18n.mjs';
 const threadIdOfLocal = (d, c) => (c && c.thread && d.threads[c.thread] ? c.thread : 'inbox');
-import { readLive, updateLive, listLive as listLiveLocal } from './live.mjs';
+import { readLive, terminalOf, updateLive, listLive as listLiveLocal } from './live.mjs';
 import { agentOf } from './agents.mjs';
 
 export { headline, redirectTargets };
@@ -130,11 +130,14 @@ export function handleHook(input, env = process.env) {
   // PreToolUse and Notification fire on every tool call, so they reuse what the live file already knows.
   const relevantTool = ev !== 'PostToolUse' || input.tool_name === 'Bash' || EDIT_TOOLS.has(input.tool_name) || input.tool_name === 'TodoWrite';
   const quick = ['PreToolUse', 'Notification', 'SubagentStart', 'SubagentStop'].includes(ev);
-  const info = ev !== 'SessionEnd' && relevantTool && !(quick && readLive(sid, env)) ? repoInfo(cwd) : null;
+  const known = ev !== 'SessionEnd' && readLive(sid, env);
+  const info = ev !== 'SessionEnd' && relevantTool && !(quick && known) ? repoInfo(cwd) : null;
+  // The session's terminal tab, looked up once (Go to the terminal on the page).
+  const terminal = ev !== 'SessionEnd' && !(known && 'tty' in known) ? terminalOf(env) : null;
   // The repository a commit landed in, which is often not cwd's (`cd other && git commit`).
   const bashCmd = ev === 'PostToolUse' && input.tool_name === 'Bash' ? String((input.tool_input || {}).command || '') : '';
   const commitRepo = GIT_COMMIT.test(bashCmd) ? gitRoot(commandDir(bashCmd, cwd)) : null;
-  try { updateLive(input, { info, key: info ? threadKey(info, cfg, sid) : null, env, agent: ag.name, agentKey: input._agent || 'claude', resume: ag.resume(sid), machine: cfg.machine }); } catch {}
+  try { updateLive(input, { info, key: info ? threadKey(info, cfg, sid) : null, env, agent: ag.name, agentKey: input._agent || 'claude', resume: ag.resume(sid), machine: cfg.machine, terminal }); } catch {}
   if (!LOG_EVENTS.includes(ev)) return { live: ev };
 
   return mutate(d => {

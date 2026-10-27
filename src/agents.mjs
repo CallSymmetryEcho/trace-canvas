@@ -13,6 +13,14 @@ export const AGENTS = {
 export const agentOf = key => AGENTS[key] || AGENTS.claude;
 // AppleScript that runs cmd in a new Terminal window and brings it forward (macOS, "Open in Terminal").
 export const terminalScript = cmd => `tell application "Terminal"\n  do script "${String(cmd).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"\n  activate\nend tell`;
+// AppleScript that brings the Terminal or iTerm2 tab with this tty to the front and prints "ok",
+// or nothing when no tab has it (Go to the terminal). null for other terminals.
+export function focusScript({ tty = '', term = '' } = {}) {
+  if (!/^\/dev\/ttys\d+$/.test(tty)) return null;
+  if (term === 'Apple_Terminal') return `tell application "Terminal"\n  repeat with w in windows\n    repeat with t in tabs of w\n      if tty of t is "${tty}" then\n        set selected of t to true\n        set index of w to 1\n        activate\n        return "ok"\n      end if\n    end repeat\n  end repeat\nend tell`;
+  if (term === 'iTerm.app') return `tell application "iTerm2"\n  repeat with w in windows\n    repeat with t in tabs of w\n      repeat with s in sessions of t\n        if tty of s is "${tty}" then\n          tell w to select\n          tell t to select\n          tell s to select\n          activate\n          return "ok"\n        end if\n      end repeat\n    end repeat\n  end repeat\nend tell`;
+  return null;
+}
 // Which agent the current process serves: set in each CLI's MCP config; Claude Code needs none.
 export const agentKey = (env = process.env) => (AGENTS[env.TRACE_CANVAS_AGENT] ? env.TRACE_CANVAS_AGENT : 'claude');
 

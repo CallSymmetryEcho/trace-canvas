@@ -51,6 +51,18 @@ test('a session is idle, working, waiting for you, idle again, then gone', () =>
   assert.equal(s.live(), null);
 });
 
+test('a session notes its terminal once: the tty it runs in and the terminal app', () => {
+  const s = sandbox();
+  s.env.TERM_PROGRAM = 'Apple_Terminal';
+  s.fire('SessionStart', { source: 'startup' });
+  assert.ok('tty' in s.live());
+  assert.match(s.live().tty, /^(\/dev\/(ttys?\d+|pts\/\d+))?$/);
+  assert.equal(s.live().term, 'Apple_Terminal');
+  s.env.TERM_PROGRAM = 'other';
+  s.fire('UserPromptSubmit', { prompt: 'go on' });
+  assert.equal(s.live().term, 'Apple_Terminal');
+});
+
 test('MCP tools show their short name in the activity line', () => {
   assert.equal(activityOf('mcp__Claude_Browser__javascript_tool', { action: 'javascript_exec' }), 'javascript_tool');
   assert.equal(activityOf('mcp__trace-canvas__trace_log', { title: 'Done' }), 'trace_log');

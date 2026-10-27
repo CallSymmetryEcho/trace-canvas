@@ -5,6 +5,7 @@
 // at the same moment, and separate files mean none of them overwrites another.
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { home } from './store.mjs';
 import { cleanPrompt, firstLine, headline } from './git-events.mjs';
 
@@ -108,11 +109,32 @@ export function activityOf(rawTool, input = {}) {
 }
 
 /**
+ * The terminal a session runs in, so the page can bring its tab to the front: the tty of the
+ * hook or the nearest ancestor that has one (the agent's), and the app (TERM_PROGRAM).
+ * tty is '' when there is none, as for the desktop apps' sessions.
+ */
+export function terminalOf(env = process.env, pid = process.pid) {
+  const procs = new Map();
+  try {
+    for (const l of execFileSync('ps', ['-A', '-o', 'pid=,ppid=,tty='], { encoding: 'utf8', timeout: 2000 }).split('\n')) {
+      const [p, pp, t] = l.trim().split(/\s+/);
+      if (p) procs.set(+p, { ppid: +pp, tty: t });
+    }
+  } catch {}
+  let tty = '';
+  for (let p = pid, n = 0; procs.has(p) && p > 1 && n < 8 && !tty; p = procs.get(p).ppid, n++) {
+    const t = procs.get(p).tty;
+    if (/^(ttys?\d+|pts\/\d+)$/.test(t)) tty = '/dev/' + t;
+  }
+  return { tty, term: String(env.TERM_PROGRAM || '') };
+}
+
+/**
  * Updates the live file for one hook event and returns it (null once the session ended).
  * working while Claude acts, waiting when it needs you, idle when its turn is done.
  * info and key come from the hook (repository, branch, thread key) when it computed them.
  */
-export function updateLive(input, { info = null, key = null, env = process.env, now = Date.now(), agent = null, agentKey = null, resume = null, machine = null } = {}) {
+export function updateLive(input, { info = null, key = null, env = process.env, now = Date.now(), agent = null, agentKey = null, resume = null, machine = null, terminal = null } = {}) {
   const ev = input.hook_event_name, sid = input.session_id;
   if (!sid) return null;
   if (ev === 'SessionEnd') { dropLive(sid, env); return null; }
@@ -121,6 +143,7 @@ export function updateLive(input, { info = null, key = null, env = process.env, 
   const doc = { ...prev, lastSeen: now, cwd: input.cwd || prev.cwd || '', transcript: input.transcript_path || prev.transcript || '' };
   if (agent) Object.assign(doc, { agent, agentKey, resume });
   if (machine) doc.machine = machine;
+  if (terminal) Object.assign(doc, terminal);
   if (info) Object.assign(doc, { repo: info.repo, branch: info.branch, root: info.root });
   if (key) doc.key = key;
   if (input.session_title) doc.title = String(input.session_title).slice(0, 120);

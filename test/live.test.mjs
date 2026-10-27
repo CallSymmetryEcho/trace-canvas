@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { handleHook, sessionThread } from '../src/hook.mjs';
-import { listLive, readLive, updateLive, STALE_MS } from '../src/live.mjs';
+import { activityOf, listLive, readLive, updateLive, STALE_MS } from '../src/live.mjs';
 import { bindLiveSession } from '../src/ops.mjs';
 import { mutate, readData } from '../src/store.mjs';
 
@@ -49,6 +49,13 @@ test('a session is idle, working, waiting for you, idle again, then gone', () =>
   assert.deepEqual([s.live().status, s.live().activity], ['idle', 'I drafted the methods section.']);
   s.fire('SessionEnd', { reason: 'prompt_input_exit' });
   assert.equal(s.live(), null);
+});
+
+test('MCP tools show their short name in the activity line', () => {
+  assert.equal(activityOf('mcp__Claude_Browser__javascript_tool', { action: 'javascript_exec' }), 'javascript_tool');
+  assert.equal(activityOf('mcp__trace-canvas__trace_log', { title: 'Done' }), 'trace_log');
+  assert.equal(activityOf('mcp__Claude_Browser__navigate', { url: 'http://localhost:4777/' }), 'navigate: http://localhost:4777/');
+  assert.equal(activityOf('Read', { file_path: '/x/notes.md' }), 'Read notes.md');
 });
 
 test('an event that finishes late never replaces a newer status, and stale sessions drop out', () => {

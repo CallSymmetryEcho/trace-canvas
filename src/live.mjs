@@ -36,12 +36,14 @@ export function listLive(env, now = Date.now()) {
 }
 
 // A short line for what a tool call is doing: "Edit hook.mjs", "$ npm test", "Agent: find callers".
-export function activityOf(tool, input = {}) {
+// MCP tools show their own name: mcp__Claude_Browser__navigate becomes "navigate".
+export function activityOf(rawTool, input = {}) {
+  const tool = String(rawTool || '').replace(/^mcp__.+?__/, '');
   const f = input.file_path || input.notebook_path;
   if (f) return `${tool} ${path.basename(String(f))}`;
   if (tool === 'Bash') return `$ ${firstLine(input.command, 80)}`;
   const what = input.description || input.pattern || input.url || input.query || input.prompt;
-  return what ? `${tool}: ${firstLine(what, 80)}` : String(tool || '');
+  return what ? `${tool}: ${firstLine(what, 80)}` : tool;
 }
 
 /**

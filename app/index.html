@@ -144,6 +144,8 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .grp { position: absolute; border: 1.5px dashed color-mix(in srgb, var(--c) 55%, transparent); border-radius: 14px; background: color-mix(in srgb, var(--c) 7%, transparent); }
 .grp-label { position: absolute; padding: 2px 10px; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--c) 18%, var(--surface)); color: var(--ink); font: 600 12.5px var(--f-display); letter-spacing: .03em; cursor: grab; white-space: nowrap; }
 .grp-label:hover { background: color-mix(in srgb, var(--c) 30%, var(--surface)); }
+.phone-qr { display: grid; place-items: center; padding: 8px 0; }
+.phone-qr svg { max-width: 100%; height: auto; border-radius: 8px; }
 .toast .toast-act { margin-left: 10px; padding: 0; border: 0; background: none; color: var(--accent-soft); font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
 .card.is-multi .roundel { box-shadow: 0 0 0 3px var(--accent-soft); }
 .ex-chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 3px 2px 9px; border: 1px dashed var(--faint); border-radius: 999px; font-size: 12px; color: var(--muted); white-space: nowrap; }
@@ -679,6 +681,7 @@ body.sheet-open .top { z-index: 80; }
         <button data-menu="agent" data-i18n="menuAgent">Connect an AI agent</button>
         <button data-menu="io" data-i18n="menuIO">Import / export</button>
         <button data-menu="sync" id="sync-item" hidden data-i18n="menuSync">Sync with other machines</button>
+        <button data-menu="phone" id="phone-item" hidden data-i18n="menuPhone">Open on your phone</button>
         <button data-menu="clear-examples" id="clear-ex-item" hidden data-i18n="menuClearEx">Clear example data</button>
         <hr>
         <button data-menu="help" data-i18n="menuHelp">Shortcuts and help</button>
@@ -829,7 +832,13 @@ const I18N = {
     focusNoGroups: 'No groups yet. Select lines on the canvas and press Group, or fill in a group in a line\'s panel.', groupUngroup: 'Ungroup',
     threadGroup: 'Group', threadGroupPh: 'None', multiGroup: 'Group', multiGroupPh: 'Group name', tGroupNeedName: 'Type a group name first',
     tGrouped: (n, g) => `${n} line${n === 1 ? '' : 's'} in "${g}"`, tUngrouped: 'Group dissolved; the lines stay',
-    menuSync: 'Sync with other machines', tSyncing: 'Syncing…', tSyncBusy: 'A sync is already running', tSyncFailed: e => `Sync failed: ${e}`,
+    menuSync: 'Sync with other machines', menuPhone: 'Open on your phone', phoneTitle: 'Open on your phone',
+    phoneIntro: 'Scan this with the phone camera. The phone needs Tailscale, signed in to the same account as this computer. The address carries a key: keep it to yourself.',
+    phoneAfter: 'On the phone you can read every line, add ideas and to-dos with the box at the bottom (pick a line, or start with #line name), and copy a prompt for an agent from a line\'s panel.',
+    start: '▶ Start', startTitle: 'Start a Claude Code session on this line on your computer, with Remote Control on, so you can follow and approve it in the Claude app', startShow: 'Show it',
+    tStarted: name => `Starting on "${name}": it shows in the Claude app in a moment`, tStartBusy: title => `A session is already running on this line${title ? `: ${title}` : ''}. Send it a message in the Claude app`,
+    agentAsk: 'Prompt for an agent', agentPromptTitle: 'Copy a prompt that sends an agent to read this line and carry on', tAgentPrompt: 'Prompt copied: paste it to an agent, for example in the Claude app on your phone',
+    agentPromptText: (name, id) => `Read the Trace Canvas line "${name}" (thread ${id}): use trace_read_thread and trace_tasks for its goal and open to-dos, carry on with them, and tick each one with trace_task_done when it is done.`, tSyncing: 'Syncing…', tSyncBusy: 'A sync is already running', tSyncFailed: e => `Sync failed: ${e}`,
     tSynced: (n, off) => `Synced: ${n} change${n === 1 ? '' : 's'} from other machines${off ? ' (offline; pushes next time)' : ''}`, onMachine: m => `On ${m}`,
     menuAgent: 'Connect an AI agent', menuIO: 'Import / export', menuClearEx: 'Clear example data', menuHelp: 'Shortcuts and help',
     zoomOut: 'Zoom out', zoomIn: 'Zoom in', zoomReset: 'Reset to 100%', fit: 'Fit', connect: 'Connect', connectTitle: 'Draw a link between two threads', newThread: 'New thread',
@@ -989,7 +998,13 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     focusNoGroups: '还没有分组。在画布上选中几条线点「编组」，或者在线面板里填写分组。', groupUngroup: '解散分组',
     threadGroup: '分组', threadGroupPh: '无', multiGroup: '编组', multiGroupPh: '分组名称', tGroupNeedName: '先填分组名称',
     tGrouped: (n, g) => `${n} 条线已放进「${g}」`, tUngrouped: '分组已解散，线都还在',
-    menuSync: '和其他电脑同步', tSyncing: '正在同步…', tSyncBusy: '已经有一个同步在进行', tSyncFailed: e => `同步失败：${e}`,
+    menuSync: '和其他电脑同步', menuPhone: '在手机上打开', phoneTitle: '在手机上打开',
+    phoneIntro: '用手机相机扫这个二维码。手机要装 Tailscale，并登录和这台电脑相同的账号。地址里带着密钥，不要发给别人。',
+    phoneAfter: '在手机上可以看每条线，用底部的输入框加想法和待办（选一条线，或者以 #线名 开头），也可以在线的面板里复制一段给 agent 的提示。',
+    start: '▶ 开始', startTitle: '在电脑上为这条线开一个 Claude Code 会话（开着 Remote Control），在 Claude app 里就能跟进和批准', startShow: '查看',
+    tStarted: name => `正在「${name}」上开工：稍等片刻就会出现在 Claude app 里`, tStartBusy: title => `这条线上已经有会话在跑${title ? `：${title}` : ''}。在 Claude app 里给它发消息就行`,
+    agentAsk: '给 agent 的提示', agentPromptTitle: '复制一段提示，让 agent 去读这条线并接着做', tAgentPrompt: '提示已复制：粘贴给 agent，比如手机 Claude app 里的会话',
+    agentPromptText: (name, id) => `读 Trace Canvas 上的线「${name}」（thread ${id}）：用 trace_read_thread 和 trace_tasks 看它的目标和未完成的待办，接着做，每做完一项就用 trace_task_done 勾掉。`, tSyncing: '正在同步…', tSyncBusy: '已经有一个同步在进行', tSyncFailed: e => `同步失败：${e}`,
     tSynced: (n, off) => `已同步：从其他电脑收到 ${n} 处改动${off ? '（离线，下次再推送）' : ''}`, onMachine: m => `在 ${m} 上`,
     menuAgent: '接入 AI agent', menuIO: '导入 / 导出', menuClearEx: '清除示例数据', menuHelp: '快捷键与用法',
     zoomOut: '缩小', zoomIn: '放大', zoomReset: '重置为 100%', fit: '适配', connect: '连线', connectTitle: '在两个线程之间画一条关联', newThread: '新线程',
@@ -1370,6 +1385,100 @@ function liveBadge(tid) {
   const waiting = ls.filter(s => s.status === 'waiting').length;
   return `<span class="live-badge st-${esc(top.status)}" title="${esc(t('liveBadge', ls.length, waiting))}"><span class="ldot"></span>${ls.length}</span>`;
 }
+// <qr>
+// A QR code for a short text such as a URL: byte mode, error correction M, versions 1–6, the best of
+// the eight masks. Pure; `trace-canvas phone` prints it in the terminal from this same code.
+function qrMatrix(text) {
+  const bytes = [...new TextEncoder().encode(text)];
+  const SPEC = [null, [16, 10, 1], [28, 16, 1], [44, 26, 1], [64, 18, 2], [86, 24, 2], [108, 16, 4]]; // [data codewords, EC per block, blocks]
+  let v = 1;
+  while (v <= 6 && bytes.length + 2 > SPEC[v][0]) v++;
+  if (v > 6) throw new Error('Too long for this QR code (106 bytes at most)');
+  const [dataN, ecN, blocks] = SPEC[v], size = 17 + 4 * v;
+  // Data: mode 0100, 8-bit length, the bytes, terminator, then pad bytes.
+  const bits = [], put = (val, n) => { for (let i = n - 1; i >= 0; i--) bits.push((val >>> i) & 1); };
+  put(4, 4); put(bytes.length, 8); for (const b of bytes) put(b, 8);
+  put(0, Math.min(4, dataN * 8 - bits.length));
+  while (bits.length % 8) bits.push(0);
+  const data = [];
+  for (let i = 0; i < bits.length; i += 8) data.push(bits.slice(i, i + 8).reduce((x, b) => (x << 1) | b, 0));
+  for (let pad = 0xEC; data.length < dataN; pad ^= 0xEC ^ 0x11) data.push(pad);
+  // Reed–Solomon error correction over GF(256) (polynomial 0x11D), one block at a time, then interleaved.
+  const exp = [], log = [];
+  for (let i = 0, x = 1; i < 255; i++) { exp[i] = x; log[x] = i; x <<= 1; if (x & 256) x ^= 0x11D; }
+  for (let i = 255; i < 512; i++) exp[i] = exp[i - 255];
+  const mul = (a, b) => (a && b ? exp[log[a] + log[b]] : 0);
+  let gen = [1];
+  for (let i = 0; i < ecN; i++) { const next = new Array(gen.length + 1).fill(0); gen.forEach((g, j) => { next[j] ^= g; next[j + 1] ^= mul(g, exp[i]); }); gen = next; }
+  const ecOf = blk => { const r = [...blk, ...new Array(ecN).fill(0)]; for (let i = 0; i < blk.length; i++) { const f = r[i]; if (f) gen.forEach((g, j) => { r[i + j] ^= mul(g, f); }); } return r.slice(blk.length); };
+  const per = dataN / blocks, dBl = [], eBl = [];
+  for (let b = 0; b < blocks; b++) { const blk = data.slice(b * per, (b + 1) * per); dBl.push(blk); eBl.push(ecOf(blk)); }
+  const words = [];
+  for (let i = 0; i < per; i++) for (const b of dBl) words.push(b[i]);
+  for (let i = 0; i < ecN; i++) for (const b of eBl) words.push(b[i]);
+  // Function patterns: finders, timing, the one alignment pattern, format areas, the dark module.
+  const m = Array.from({ length: size }, () => new Array(size).fill(false)), fn = m.map(row => row.map(() => false));
+  const set = (r, c, on) => { m[r][c] = on; fn[r][c] = true; };
+  for (const [r0, c0] of [[0, 0], [0, size - 7], [size - 7, 0]]) {
+    for (let r = -1; r <= 7; r++) for (let c = -1; c <= 7; c++) {
+      if (r0 + r < 0 || c0 + c < 0 || r0 + r >= size || c0 + c >= size) continue;
+      set(r0 + r, c0 + c, r >= 0 && r <= 6 && c >= 0 && c <= 6 && (r === 0 || r === 6 || c === 0 || c === 6 || (r >= 2 && r <= 4 && c >= 2 && c <= 4)));
+    }
+  }
+  for (let i = 8; i < size - 8; i++) { set(6, i, i % 2 === 0); set(i, 6, i % 2 === 0); }
+  if (v >= 2) for (let r = -2; r <= 2; r++) for (let c = -2; c <= 2; c++) set(size - 7 + r, size - 7 + c, Math.max(Math.abs(r), Math.abs(c)) !== 1);
+  for (let i = 0; i < 9; i++) { fn[8][i] = fn[i][8] = true; }
+  for (let i = 0; i < 8; i++) { fn[8][size - 1 - i] = fn[size - 1 - i][8] = true; }
+  set(size - 8, 8, true);
+  // Data modules, two columns at a time from the bottom right, up and down in turn, around column 6.
+  const all = words.flatMap(w => [7, 6, 5, 4, 3, 2, 1, 0].map(i => (w >>> i) & 1));
+  let k = 0;
+  for (let right = size - 1; right >= 1; right -= 2) {
+    if (right === 6) right = 5;
+    for (let vert = 0; vert < size; vert++) for (let j = 0; j < 2; j++) {
+      const c = right - j, r = ((right + 1) & 2) === 0 ? size - 1 - vert : vert;
+      if (!fn[r][c]) m[r][c] = !!all[k++];
+    }
+  }
+  const MASKS = [(r, c) => (r + c) % 2 === 0, r => r % 2 === 0, (r, c) => c % 3 === 0, (r, c) => (r + c) % 3 === 0,
+    (r, c) => (Math.floor(r / 2) + Math.floor(c / 3)) % 2 === 0, (r, c) => (r * c) % 2 + (r * c) % 3 === 0,
+    (r, c) => ((r * c) % 2 + (r * c) % 3) % 2 === 0, (r, c) => ((r + c) % 2 + (r * c) % 3) % 2 === 0];
+  const withMask = mask => {
+    const out = m.map((row, r) => row.map((on, c) => (fn[r][c] ? on : on !== MASKS[mask](r, c))));
+    let rem = mask; // error correction M is 00
+    for (let i = 0; i < 10; i++) rem = (rem << 1) ^ ((rem >>> 9) * 0x537);
+    const f = ((mask << 10) | rem) ^ 0x5412, bit = i => ((f >>> i) & 1) === 1;
+    for (let i = 0; i <= 5; i++) out[i][8] = bit(i);
+    out[7][8] = bit(6); out[8][8] = bit(7); out[8][7] = bit(8);
+    for (let i = 9; i < 15; i++) out[8][14 - i] = bit(i);
+    for (let i = 0; i < 8; i++) out[8][size - 1 - i] = bit(i);
+    for (let i = 8; i < 15; i++) out[size - 15 + i][8] = bit(i);
+    return out;
+  };
+  const penalty = q => {
+    let p = 0, dark = 0;
+    for (let pass = 0; pass < 2; pass++) for (let i = 0; i < size; i++) {
+      const line = q.map((row, j) => (pass ? q[j][i] : q[i][j]) ? '1' : '0').join('');
+      for (const run of line.match(/0{5,}|1{5,}/g) || []) p += run.length - 2;
+      const padded = `0000${line}0000`;
+      for (let j = 0; j + 11 <= padded.length; j++) { const s = padded.slice(j, j + 11); if (s === '10111010000' || s === '00001011101') p += 40; }
+    }
+    for (let r = 0; r < size; r++) for (let c = 0; c < size; c++) {
+      if (q[r][c]) dark++;
+      if (r + 1 < size && c + 1 < size && q[r][c] === q[r][c + 1] && q[r][c] === q[r + 1][c] && q[r][c] === q[r + 1][c + 1]) p += 3;
+    }
+    return p + (Math.ceil(Math.abs(dark * 20 - size * size * 10) / (size * size)) - 1) * 10;
+  };
+  let best = null, bestP = Infinity;
+  for (let mask = 0; mask < 8; mask++) { const q = withMask(mask), pq = penalty(q); if (pq < bestP) { best = q; bestP = pq; } }
+  return best;
+}
+function qrSvg(text, scale = 6) {
+  const q = qrMatrix(text), n = q.length + 8;
+  const d = q.flatMap((row, r) => row.map((on, c) => (on ? `M${c + 4} ${r + 4}h1v1h-1z` : ''))).join('');
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n} ${n}" width="${n * scale}" height="${n * scale}" shape-rendering="crispEdges"><rect width="${n}" height="${n}" fill="#fff"/><path d="${d}" fill="#000"/></svg>`;
+}
+// </qr>
 // The Claude desktop app opens a session's chat from this link (desktopId comes from its session records).
 const chatHref = id => `claude://claude.ai/epitaxy/${encodeURIComponent(id)}`;
 // Where a session's chat is: the Claude desktop app, the Codex app (its thread id is the session id),
@@ -1377,7 +1486,7 @@ const chatHref = id => `claude://claude.ai/epitaxy/${encodeURIComponent(id)}`;
 function jumpTo(s, cls, text) {
   const a = (href, key) => `<a class="${cls}" href="${esc(href)}" title="${esc(t(key))}">${text || esc(t(key))}</a>`;
   if (s.desktopId) return a(chatHref(s.desktopId), 'openChat');
-  if (s.tty && ['Apple_Terminal', 'iTerm.app'].includes(s.term)) return `<button class="${cls}" data-act="focus-term" data-sid="${esc(s.id)}" title="${esc(t('goTerm'))}">${text || esc(t('goTerm'))}</button>`;
+  if (s.tty && !S.remote && ['Apple_Terminal', 'iTerm.app'].includes(s.term)) return `<button class="${cls}" data-act="focus-term" data-sid="${esc(s.id)}" title="${esc(t('goTerm'))}">${text || esc(t('goTerm'))}</button>`;
   if (!s.tty && (s.agentKey === 'codex' || /^codex /.test(s.resume || ''))) return a(`codex://threads/${encodeURIComponent(s.id)}`, 'openChat');
   return '';
 }
@@ -1509,7 +1618,7 @@ async function loadServer() {
     const data = await r.json();
     for (const col of COLS) applyRows(col, data[col] || []);
     S.sessions = data.sessions || [];
-    S.machine = data.machine || ''; S.platform = data.platform || '';
+    S.machine = data.machine || ''; S.platform = data.platform || ''; S.remote = !!data.remote; S.start = !!data.start;
     if (S.offline) { S.offline = false; renderSync(); }
   } catch { S.offline = true; COLS.forEach(c => S.got.add(c)); renderSync(); render(); }
 }
@@ -1517,6 +1626,8 @@ async function initStore() {
   if (SERVER) {
     S.mode = 'server';
     $('#sync-item').hidden = false;
+    // Phone access (trace-canvas phone): the server tells only this computer the address with its token.
+    fetch('/api/health', { cache: 'no-store' }).then(r => r.json()).then(j => { if (j.phone) { S.phoneUrl = j.phone; $('#phone-item').hidden = false; } }).catch(() => {});
     await loadServer();
     loadLive();
     const es = new EventSource('/api/events');
@@ -2550,6 +2661,8 @@ function threadDetail(th) {
       ${cs.length > 40 ? `<p style="margin:0;color:var(--faint);font-size:12px">${esc(t('only40'))}</p>` : ''}
       <div class="d-actions">
         <button class="btn btn-primary" data-act="capture-here">${esc(t('captureHere'))}</button>
+        ${!isInbox && S.start && th.status !== 'merged' ? `<button class="btn" data-act="start" title="${esc(t('startTitle'))}">${esc(t('start'))}</button>` : ''}
+        ${!isInbox ? `<button class="btn" data-act="agent-prompt" title="${esc(t('agentPromptTitle'))}">${esc(t('agentAsk'))}</button>` : ''}
         ${!isInbox && th.status !== 'merged' ? (S.ui.merge
           ? `<div class="inline-form"><select id="t-merge">${threadOptions(th.parent && th.parent !== th.id ? th.parent : INBOX, { excludeId: th.id, onlyOpen: true })}</select><button class="btn btn-primary" data-act="merge">${esc(t('merge'))}</button><button class="btn" data-act="merge-cancel">${esc(t('cancel'))}</button></div>`
           : `<button class="btn" data-act="merge-open">${esc(t('mergeTo'))}</button>`) : ''}
@@ -2639,6 +2752,8 @@ detail.addEventListener('click', e => {
     case 'gx-file': { const k = b.dataset.dk; if (GX.open.has(k)) GX.open.delete(k); else GX.open.add(k); render(); break; }
     case 'gx-more': GX.more.add(b.dataset.key); render(); break;
     case 'goto-thread': select({ type: 'thread', id: b.dataset.tid }); break;
+    case 'start': startOn({ thread: s.id }); break;
+    case 'agent-prompt': { const th = getThread(s.id); copyText(t('agentPromptText', th.name, th.id), t('tAgentPrompt')); break; }
     case 'g-arrange': doArrange(s.id); break;
     case 'g-focus': setFocus(s.id); break;
     case 'g-ungroup': setGroup(orderedThreads().filter(th => th.group === s.id).map(th => th.id), ''); select(null); toast(t('tUngrouped')); break;
@@ -2853,6 +2968,8 @@ function openSheet(kind) {
       <p>${t('helpIntro')}</p>
       <div class="ai-list">${t('help').map(([k, v]) => `<div class="ai-item" style="cursor:default"><span class="mono">${esc(k)}</span><span>${v}</span></div>`).join('')}</div>
       <p>${esc(t('helpShapes'))}</p>`);
+  } else if (kind === 'phone') {
+    setSheet(t('phoneTitle'), `<p>${esc(t('phoneIntro'))}</p><div class="phone-qr">${qrSvg(S.phoneUrl, 5)}</div><div class="l-cmd"><code>${esc(S.phoneUrl)}</code><button class="btn" data-copy-phone>${esc(t('copy'))}</button></div><p>${esc(t('phoneAfter'))}</p>`);
   } else if (kind === 'ai') runAI();
   else if (kind === 'goals') renderGoals();
   else if (kind === 'focus') {
@@ -2919,7 +3036,7 @@ function renderGoals() {
   const totalOpen = groups.reduce((n, g) => n + g.open.length, 0);
   const row = c => {
     const by = c.done && c.doneBy && c.doneBy !== 'human' ? `<span class="gl-by"><span class="actor a-agent">${ACTOR_ICON.agent}</span>${esc(t('goalsBy', c.doneBy))}</span>` : '';
-    const who = c.done ? '' : `<select class="gl-who" data-who="${esc(c.id)}" title="${esc(t('goalsWho'))}"><option value="">${esc(t('goalsAnyone'))}</option>${Object.entries(AGENT_NAMES).map(([k, n]) => `<option value="${k}" ${c.assignee === k ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>${c.assignee ? `<button class="btn gl-hand" data-hand="${esc(c.id)}">${esc(t('goalsHand'))}</button>${S.mode === 'server' && S.platform === 'darwin' ? `<button class="btn gl-hand" data-hand-open="${esc(c.id)}">${esc(t('openInTerminal'))}</button>` : ''}` : ''}`;
+    const who = c.done ? '' : `<select class="gl-who" data-who="${esc(c.id)}" title="${esc(t('goalsWho'))}"><option value="">${esc(t('goalsAnyone'))}</option>${Object.entries(AGENT_NAMES).map(([k, n]) => `<option value="${k}" ${c.assignee === k ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>${c.assignee ? `<button class="btn gl-hand" data-hand="${esc(c.id)}">${esc(t('goalsHand'))}</button>${S.mode === 'server' && S.platform === 'darwin' && !S.remote ? `<button class="btn gl-hand" data-hand-open="${esc(c.id)}">${esc(t('openInTerminal'))}</button>` : ''}` : ''}${S.start && tidOf(c) !== INBOX ? `<button class="btn gl-hand" data-start="${esc(c.id)}" title="${esc(t('startTitle'))}">${esc(t('start'))}</button>` : ''}`;
     const title = S.glEdit === c.id ? `<input class="gl-t-in" data-title="${esc(c.id)}" value="${esc(c.title)}" enterkeyhint="done" aria-label="${esc(t('goalsEdit'))}">` : `<span class="gl-t" data-cid="${esc(c.id)}">${esc(c.title)}</span>`;
     return `<li class="${c.done ? 'done' : ''} ${S.glOpen === c.id ? 'open' : ''}"><input type="checkbox" data-task="${esc(c.id)}" ${c.done ? 'checked' : ''} aria-label="${esc(c.title)}">${title}<span class="gl-acts">${who}<button class="btn gl-edit" data-edit="${esc(c.id)}">${esc(t('goalsEdit'))}</button><button class="btn gl-view" data-view-rec="${esc(c.id)}">${esc(t('goalsView'))}</button></span>${by}<time>${fmtShort(c.doneAt || c.ts)}</time></li>`;
   };
@@ -2991,6 +3108,7 @@ sheetBody.addEventListener('keydown', e => {
   else if (e.target.classList.contains('gl-t-in')) e.target.blur();
 });
 sheetBody.addEventListener('click', e => {
+  if (e.target.closest('[data-copy-phone]')) { copyText(S.phoneUrl); return; }
   if (S.sheet !== 'goals') return;
   if (e.target.id === 'gl-tip-hide') { try { localStorage.setItem('tc.goalsTipHidden', '1'); } catch {} renderGoals(); return; }
   const open = e.target.closest('[data-hand-open]');
@@ -3000,6 +3118,8 @@ sheetBody.addEventListener('click', e => {
       .then(r => r.json()).catch(() => ({ error: t('syncOfflineTitle') })).then(r => toast(r.error || t('tOpenedTerminal')));
     return;
   }
+  const start = e.target.closest('[data-start]');
+  if (start) { startOn({ todo: start.dataset.start }); return; }
   const hand = e.target.closest('[data-hand]');
   if (hand) { const cmd = handCommand(S.commits.get(hand.dataset.hand)); if (cmd) copyText(cmd, t('tHandCopied')); return; }
   const add = e.target.closest('[data-add]'), edit = e.target.closest('[data-edit], [data-goal-edit]');
@@ -3018,6 +3138,14 @@ sheetBody.addEventListener('click', e => {
   if (go) { closeSheet(); select({ type: 'thread', id: go.dataset.goto }); }
   else if (rec) { closeSheet(); select({ type: 'commit', id: rec.dataset.cid }); }
 });
+// ▶ Start (/api/start): a Claude Code session on the line on the computer, with Remote Control on, so it
+// shows in the Claude app; a line that already has one running points at that session instead.
+function startOn(ref) {
+  fetch('/api/start', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Trace-Canvas': '1' }, body: JSON.stringify(ref) })
+    .then(r => r.json()).catch(() => ({ error: t('syncOfflineTitle') }))
+    .then(r => r.busy ? toast(t('tStartBusy', r.busy.title), { label: t('startShow'), run: () => { closeSheet(); select({ type: 'live', id: r.busy.id }); } })
+      : toast(r.error || t('tStarted', r.name)));
+}
 function parseLooseJSON(text) {
   const s = String(text || '').trim();
   try { return JSON.parse(s); } catch {}

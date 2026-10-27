@@ -318,6 +318,7 @@ node bin/trace-canvas.mjs log "文献对比表完成" \
   trace-canvas mcp              以 stdio 运行 MCP 服务（由 Claude Code 启动）
   trace-canvas lang <en|zh>     hooks 写入记录的语言
   trace-canvas where            显示数据存放位置
+  trace-canvas phone            在手机上打开画布（Tailscale 扫码，见 docs/phone.zh-CN.md；只在 phone 分支上）
 ```
 
 ## 在线版

@@ -87,7 +87,7 @@ export function setTaskDone(d, { task, thread, done = true, by = 'human' }) {
  * that starts that agent on the thread. TRACE_CANVAS_THREAD binds the new session through the
  * SessionStart hook; the prompt also asks for trace_bind in case the hook cannot see it.
  */
-export function handTo(d, { ref, to, thread }, env = process.env) {
+export function handTo(d, { ref, to, thread, remote = false }, env = process.env) {
   const ag = AGENTS[to];
   if (!ag) throw new Error(`Hand to whom? One of ${Object.keys(AGENTS).join(', ')}`);
   let todo = null, tid = d.commits[ref] && d.commits[ref].kind !== 'task' ? null : resolveThreadRef(d, ref);
@@ -96,9 +96,12 @@ export function handTo(d, { ref, to, thread }, env = process.env) {
   if (!th) throw new Error('Put the to-do on a line first; the inbox has no folder or goal to hand over');
   const live = listLive(env).filter(s => sessionThreadOf(d, s, env) === tid).sort((a, b) => b.lastSeen - a.lastSeen);
   const dir = lineDir(th) || (live[0] ? live[0].cwd : '');
-  const prompt = `You are taking over the Trace Canvas line "${th.name}" (thread ${tid}). First call the MCP tool trace_bind with thread "${tid}". Then call trace_tasks with mine: true for the goal and your to-dos, work through them, and tick each one with trace_task_done when it is done. Log decisions and results with trace_log.${todo ? ` Start with: ${todo.title}` : ''}`;
-  return { thread: th, todo, command: `${dir ? `cd ${q(dir)} && ` : ''}TRACE_CANVAS_THREAD=${tid} ${ag.launch(prompt)}` };
+  const prompt = oneLine(`You are taking over the Trace Canvas line "${th.name}" (thread ${tid}). First call the MCP tool trace_bind with thread "${tid}". Then read the line with trace_read_thread (ideas logged on it are there) and call trace_tasks with mine: true for the goal and your to-dos, work through them, and tick each one with trace_task_done when it is done. Log decisions and results with trace_log.${todo ? ` Start with: ${todo.title}` : ''}`);
+  const run = remote && ag.remote ? ag.remote(oneLine(th.name), prompt) : ag.launch(prompt);
+  return { thread: th, todo, live, command: `${dir ? `cd ${q(dir)} && ` : ''}TRACE_CANVAS_THREAD=${tid} ${run}` };
 }
+// The command is typed into a terminal, so a name or to-do with a line break must not end it early.
+const oneLine = s => String(s).replace(/[\x00-\x1f\x7f]+/g, ' ');
 const sessionThreadOf = (d, s, env) => sessionThread(d, s, env).threadId;
 // The folder a line works in: the repository path the hooks keep in its note.
 const lineDir = th => { const n = String((th && th.note) || '').trim(); return /^\/\S*$/.test(n) && fs.existsSync(n) ? n : ''; };

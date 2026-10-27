@@ -5,7 +5,8 @@
 export const q = s => `'${String(s).replace(/'/g, `'\\''`)}'`; // POSIX shell quoting
 
 export const AGENTS = {
-  claude: { name: 'Claude Code', resume: id => `claude --resume ${id}`, launch: p => `claude ${q(p)}` },
+  // remote: Remote Control on, named after the line, so the session shows in the Claude app (▶ Start).
+  claude: { name: 'Claude Code', resume: id => `claude --resume ${id}`, launch: p => `claude ${q(p)}`, remote: (name, p) => `claude --remote-control=${q(name)} ${q(p)}` },
   codex: { name: 'Codex', resume: id => `codex resume ${id}`, launch: p => `codex ${q(p)}` },
   // ponytail: Gemini's resume flag is unverified until a current gemini-cli is installed.
   gemini: { name: 'Gemini CLI', resume: id => `gemini --resume ${id}`, launch: p => `gemini -i ${q(p)}` },

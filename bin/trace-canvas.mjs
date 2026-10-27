@@ -10,6 +10,7 @@ import { handleHook, readStdin } from '../src/hook.mjs';
 import { agentFiles, allowSafeTools, codexHooks, codexWritable, geminiHooks, hookCommand, install, installAgentMcp, installMcp, installSkill, onPath, settingsPath, uninstall } from '../src/install.mjs';
 import { normalize } from '../src/agents.mjs';
 import os from 'node:os';
+import crypto from 'node:crypto';
 
 const SELF = fileURLToPath(import.meta.url);
 
@@ -28,6 +29,30 @@ function whoami(map) {
   try { return py && fs.existsSync(py) ? execFileSync('python3', [py, '--whoami'], { encoding: 'utf8', timeout: 5000 }).trim() : ''; } catch { return ''; }
 }
 const SKILL_DIR = path.join(path.dirname(SELF), '..', 'skill');
+// This computer on Tailscale, or null when Tailscale is not running: { dns, ip }.
+function tailscaleSelf() {
+  for (const bin of ['tailscale', '/Applications/Tailscale.app/Contents/MacOS/Tailscale']) {
+    try {
+      const s = JSON.parse(execFileSync(bin, ['status', '--json'], { encoding: 'utf8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'] }));
+      const self = s.Self || {}, ip = (self.TailscaleIPs || []).find(a => a.includes('.'));
+      return s.BackendState === 'Running' && self.DNSName && ip ? { dns: self.DNSName.replace(/\.$/, ''), ip } : null;
+    } catch {}
+  }
+  return null;
+}
+// A QR code for the terminal, black on white whatever the terminal's colours, from the page's own encoder.
+function terminalQr(text) {
+  const src = fs.readFileSync(path.join(path.dirname(SELF), '..', 'app', 'index.html'), 'utf8');
+  const { qrMatrix } = new Function(`${src.slice(src.indexOf('// <qr>'), src.indexOf('// </qr>'))}; return { qrMatrix };`)();
+  const q = qrMatrix(text), n = q.length, dark = (r, c) => r >= 0 && c >= 0 && r < n && c < n && q[r][c];
+  const lines = [];
+  for (let r = -4; r < n + 4; r += 2) {
+    let s = '';
+    for (let c = -4; c < n + 4; c++) s += `\x1b[${dark(r, c) ? 30 : 97};${dark(r + 1, c) ? 40 : 107}m\u2580`;
+    lines.push(`${s}\x1b[0m`);
+  }
+  return lines.join('\n');
+}
 const argv = process.argv.slice(2);
 const cmd = argv[0] && !argv[0].startsWith('-') ? argv.shift() : 'serve';
 
@@ -90,6 +115,8 @@ Setup (pass --user for every project, or --project dir for one)
   trace-canvas mcp              Run the MCP server on stdio (Claude Code starts this)
   trace-canvas lang <en|zh>     Language of records the hooks write
   trace-canvas where            Show where data is stored
+  trace-canvas phone [--off] [--rotate] [--allow-start|--deny-start]
+                               Open the canvas on your phone over Tailscale (docs/phone.md)
   trace-canvas where <words> [--machine M]   Look things up in the location map (~/agent-map)
   trace-canvas sync             Sync the canvas with your other machines through the location map
   (setup also takes --machine NAME and --map DIR: this computer's name and the map repository)
@@ -368,6 +395,24 @@ async function main() {
       if (lang !== 'en' && lang !== 'zh') { console.error('Usage: trace-canvas lang <en|zh>'); process.exit(1); }
       writeConfig({ lang });
       console.log(`Hooks will write records in ${lang === 'en' ? 'English' : 'Chinese'}`);
+      break;
+    }
+    case 'phone': {
+      // Opens the canvas to your phone: over Tailscale by default, or at an address you give.
+      if (flag('off', false)) { writeConfig({ phone: null }); console.log('Phone access is off. Restart the page (trace-canvas serve) so it stops listening.'); break; }
+      const host = str(flag('host', '')), bind = str(flag('bind', '')), port = Number(flag('port', 0)) || null, rotate = !!flag('rotate', false);
+      const ts = host ? null : tailscaleSelf();
+      if (!host && !ts) { console.error('Tailscale is not running on this computer. Open it (signed in here and on the phone) and run this again,\nor give your own address: trace-canvas phone --host <name or IP> --bind <address to listen on>.'); process.exit(1); }
+      if (host && !bind) { console.error('With --host, also pass --bind: the address on this computer to listen on (0.0.0.0 listens on every network).'); process.exit(1); }
+      const old = readConfig().phone || {};
+      const start = flag('allow-start', false) ? true : flag('deny-start', false) ? false : !!old.start;
+      const phone = { host: host || ts.dns, ip: ts ? ts.ip : '', bind: bind || ts.ip, token: !rotate && old.token ? old.token : crypto.randomBytes(18).toString('base64url'), ...(port ? { port } : {}), ...(start ? { start } : {}) };
+      writeConfig({ phone });
+      const url = `http://${phone.host}:${phone.port || 4777}/?k=${phone.token}`;
+      console.log(`${terminalQr(url)}\n\nOn your phone: ${url}`);
+      if (host) console.log('This address is plain HTTP. Anyone who can reach it and sees the key can read and change your canvas: put it behind a VPN or a TLS proxy.');
+      console.log(`Restart the page (trace-canvas serve) so it also listens on ${phone.bind}. Turn this off with trace-canvas phone --off; --rotate makes a new key.`);
+      console.log(start ? '▶ Start is on: the phone can start a Claude Code session on a line in a Terminal window here (--deny-start turns it off).' : '▶ Start is off; --allow-start lets the phone start a Claude Code session on a line here.');
       break;
     }
     case 'where': {

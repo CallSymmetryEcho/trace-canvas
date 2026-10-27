@@ -60,10 +60,10 @@ const pick = (v, lang) => (Array.isArray(v) ? v[lang === 'zh' ? 1 : 0] : v);
 // page: 'app' (recorded), { card } or { terminal } (drawn by Remotion).
 // Narration lines are [en, zh]; either side can be [caption, what the voice says].
 const SCENES = [
-  { page: { card: { big: 'Trace Canvas', small: ['A transit map of your parallel AI work', '把并行的 AI 工作画成一张地铁线路图'] } },
+  { page: { card: { big: 'Trace Canvas', small: ['A map both you and your agents can read', '人和 agent 都看得懂的路线图'] } },
     text: [
       ['When you run several AI agents at once, the work scatters across sessions, branches and chat windows.', '同时开好几个 AI agent 干活时，工作会散落在不同的会话、分支和聊天窗口里。'],
-      ['Trace Canvas puts all of it on one map.', 'Trace Canvas 把它们画到同一张图上。'],
+      ['Trace Canvas puts all of it on one map that both you and your agents can read.', 'Trace Canvas 把它们画到同一张图上，你和 agent 都看得懂。'],
     ] },
   { page: { terminal: 'zsh — ~/code' },
     text: [
@@ -866,6 +866,36 @@ const GIFS = [
 const VIDEOS = { tutorial: SCENES, promo: PROMO, hook: HOOK, story: STORY, agents: AGENTS, goals: GOALS, gifs: process.env.TC_GIFS ? GIFS.filter(g => process.env.TC_GIFS.split(',').includes(g.name)) : GIFS };
 
 VIDEOS.sessions = SESSIONS;
+// The tutorial: the tour up to connecting Claude Code, then many agents at once (the story), the Agents view,
+// who did what in the Branches view, and the punch line: a map both you and your agents can read.
+const WHO_DID_WHAT = { page: 'app',
+  text: [
+    ['Back in the Branches view, you see who did what at a glance: your own stations are dark, each agent’s are in its line’s colour.', '回到「分支」视图，谁做了什么一目了然：你写的站点是深色，agent 的用它所在线路的颜色。'],
+    ['The running sessions sit at the tips, so you and your agents look at the same picture.', '正在跑的会话挂在线头上，你和 agent 看的是同一张图。'],
+  ],
+  run: async h => {
+    const p = h.speak(0);
+    await h.click('#tab-git');
+    await h.js(`document.getElementById('git-scroll').scrollTo({ top: 0 })`); // the tour left it scrolled down; the new rows are on top
+    await h.wait(500);
+    h.record({ thread: 'sc_ocr', kind: 'decision', title: ['Switch to a vision model', '改用视觉模型'] });
+    await h.wait(900);
+    await h.move('.g-row.k-decision', 0);
+    h.record({ thread: 'sc_ocr', kind: 'agent', agent: 'Claude Code', title: ['The vision model reads 94% of receipt totals', '视觉模型认对 94% 的小票总额'] });
+    await h.wait(900);
+    await h.move('.g-row.k-agent', 0);
+    await p;
+    const q = h.speak(1);
+    await h.move('.g-row.g-live', 0);
+    await h.move('.g-row.g-live', -1);
+    await q;
+  } };
+const PUNCH = { page: { card: { big: ['Read the same map', '看懂同一张图'], small: ['When you and your agents can read the same map, you work better together.', '当你和 agent 能看懂同一张图，才能更有效地工作。'] } },
+  text: [['When you and your agents can read the same map, you work better together.', '当你和 agent 能看懂同一张图，才能更有效地工作。']] };
+// The canvas empties while the story shows its windows, so it draws itself from nothing again; the story's
+// tidied map then stays, and the Agents view only adds its running sessions to it.
+VIDEOS.tutorial = [...SCENES.slice(0, 9), { ...STORY[0], preload: () => fs.writeFileSync(dataFile(), JSON.stringify(emptyData())) }, ...STORY.slice(1, 5),
+  { ...AGENTS[1], preload: h => h.loadAgents() }, AGENTS[2], AGENTS[3], AGENTS[5], WHO_DID_WHAT, PUNCH, SCENES.at(-1)];
 // See what changed: a made-up tripsplit repository with three real commits in the build's temp folder, so the
 // page can ask git for their files and diffs. The records keep only each commit's sha and repository.
 const CHG = { recs: [] };
@@ -1208,7 +1238,7 @@ async function record(video, lang) {
     const waitUntil = async T => { if (app) await sleep(Math.max(0, T - now()) * 1000); else vt = Math.max(vt, T); };
     const wait = ms => waitUntil(now() + ms / 1000);
     const sc = app ? { kind: 'app', clip: `${base}/clips/s${String(si + 1).padStart(2, '0')}.mp4`, start: { ...cur }, cursor: [] }
-      : scene.page.card ? { kind: 'card', big: scene.page.card.big, small: pick(scene.page.card.small, lang), foot: scene.page.card.foot || '' }
+      : scene.page.card ? { kind: 'card', big: pick(scene.page.card.big, lang), small: pick(scene.page.card.small, lang), foot: scene.page.card.foot || '' }
       : scene.page.windows ? { kind: 'windows', wins: scene.page.windows.map(([agent, title, task]) => ({ agent, title, task: pick(task, lang) })) }
       : { kind: 'terminal', title: scene.page.terminal, steps: [] };
     sc.lines = [];

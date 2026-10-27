@@ -1,5 +1,6 @@
 // Local server: serves the page, a small JSON API over the data file, and a
-// server-sent event stream so the page updates the moment a hook writes.
+// server-sent event stream so the page updates the moment a hook writes
+// (`change` for the data file, `live` for the running sessions in live/).
 // Binds to 127.0.0.1 only. Writes need a custom header, which a cross-site
 // form or fetch cannot send without a preflight this server never approves.
 import fs from 'node:fs';
@@ -9,6 +10,9 @@ import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { COLS, dataFile, home, mutate, readConfig, readData, toArrays, writeConfig } from './store.mjs';
 import { demoData } from './demo.mjs';
+import { listLive, liveDir } from './live.mjs';
+import { sessionThread } from './hook.mjs';
+import { bindLiveSession } from './ops.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const APP = path.join(here, '..', 'app', 'index.html');
@@ -55,12 +59,16 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
   fs.mkdirSync(home(), { recursive: true });
   const ai = claudeAvailable();
   const clients = new Set();
-  let pending = 0;
-  const broadcast = () => {
-    clearTimeout(pending);
-    pending = setTimeout(() => { for (const res of clients) res.write(`event: change\ndata: ${Date.now()}\n\n`); }, 80);
+  const pending = {};
+  const broadcast = (event = 'change') => {
+    clearTimeout(pending[event]);
+    pending[event] = setTimeout(() => { for (const res of clients) res.write(`event: ${event}\ndata: ${Date.now()}\n\n`); }, 80);
   };
   fs.watchFile(dataFile(), { interval: 400 }, (cur, prev) => { if (cur.mtimeMs !== prev.mtimeMs) broadcast(); });
+  fs.mkdirSync(liveDir(), { recursive: true });
+  // ponytail: fs.watch on the folder; poll its files if a platform ever drops these events.
+  try { fs.watch(liveDir(), () => broadcast('live')).unref(); } catch {}
+  const live = () => { const d = readData(); return listLive().map(s => ({ ...s, ...sessionThread(d, s) })); };
   setInterval(() => { for (const res of clients) res.write(': ping\n\n'); }, 25000).unref();
 
   const server = http.createServer(async (req, res) => {
@@ -75,6 +83,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
       if (req.method === 'GET' && (p === '/' || p === '/index.html')) return send(res, 200, page(readConfig(), ai), 'text/html; charset=utf-8');
       if (req.method === 'GET' && p === '/api/health') return send(res, 200, { ok: true, version: VERSION, ai, dataFile: dataFile() });
       if (req.method === 'GET' && p === '/api/data') return send(res, 200, toArrays(readData()));
+      if (req.method === 'GET' && p === '/api/live') return send(res, 200, { sessions: live() });
       if (req.method === 'GET' && p === '/api/events') {
         res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
         res.write('retry: 2000\n\n');
@@ -92,6 +101,12 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         }
         mutate(d => { if (doc) d[col][id] = { ...doc, id }; else delete d[col][id]; });
         return send(res, 200, { ok: true });
+      }
+      if (req.method === 'POST' && p === '/api/bind') {
+        const body = JSON.parse(await readBody(req));
+        const t = mutate(d => bindLiveSession(d, { sessionId: String(body.session || ''), thread: body.thread ? String(body.thread) : null }));
+        broadcast('live');
+        return send(res, 200, { ok: true, thread: t ? { id: t.id, name: t.name } : null });
       }
       if (req.method === 'POST' && p === '/api/config') {
         const body = JSON.parse(await readBody(req));

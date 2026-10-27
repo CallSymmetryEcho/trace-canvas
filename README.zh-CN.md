@@ -102,7 +102,23 @@ node bin/trace-canvas.mjs setup --user
 | `trace_merge` | 合并任意多条线程，`merge` 或 `combine` 两种方式（见下） |
 | `trace_log` | 记一条 |
 | `trace_import_data` | 合并另一份数据：导出文件、另一台电脑的 `data.json`、或 JSON 行 |
+| `trace_live` | 列出正在运行的会话：状态、当前动作、所属线 |
+| `trace_bind` | 把一个运行中的会话（默认是当前会话）放到某条线上 |
 | `trace_open` | 必要时启动页面，返回地址 |
+
+## 实时会话
+
+本地页面会显示此刻有哪些 Claude Code 会话在运行。页头下方的一栏列出它们，等你处理的排在最前：
+
+| 状态 | 什么时候 |
+| --- | --- |
+| **工作中**（绿色） | Claude 正在干活，栏里显示当前这一步，比如 `Edit hook.mjs` 或 `$ npm test` |
+| **等你**（橙色） | 等你批准权限、回答问题（`AskUserQuestion`）、确认计划，或回答 MCP 服务的提问 |
+| **空闲**（灰色） | 这一轮做完了，栏里显示 Claude 回复的第一句 |
+
+每张卡片会显示这条线上有几个会话在运行。点开一个会话，可以看到它的仓库、分支、目录和最近的指令，复制 `claude --resume <id>`，或者把它换到另一条线。会话默认按仓库和分支自动归线；要手动绑定，可以在页面上选线，运行 `trace-canvas bind "<线名>"`，或者让 Claude 来做（`trace_bind`）。绑定之后，这个会话的记录也会记到那条线上。
+
+实时状态需要 SessionStart、PreToolUse 和 Notification 这三个 hook，`setup` 会自动加上（更新后再运行一次）。状态存在 `~/.trace-canvas/live/` 里，每个会话一个小文件，和你的记录分开。会话结束或 12 小时没有动静后就不再显示。只有本地页面能看到实时会话。
 
 ## 合并会话与线程
 
@@ -164,6 +180,11 @@ node bin/trace-canvas.mjs log "文献对比表完成" \
   trace-canvas merge <线程>... --into <线程> [--combine]
   trace-canvas import <文件|->                     合并导出文件、另一份 data.json 或 JSON 行
 
+实时会话
+  trace-canvas live                                正在运行的会话：状态、当前动作、所属线
+  trace-canvas bind <线程> [--session ID]          把运行中的会话放到某条线上（默认是当前会话）
+  trace-canvas bind --unbind [--session ID]        改回按仓库和分支自动归线
+
 安装（--user 对所有项目，--project 目录 只对一个项目）
   trace-canvas setup            hooks + MCP 服务 + skill
   trace-canvas install-hooks | install-mcp | install-skill | uninstall-hooks
@@ -187,6 +208,7 @@ skill/SKILL.md        /trace-canvas skill
 src/server.mjs        只监听 127.0.0.1 的本地服务：页面、JSON API、用 SSE 实时推送更新
 src/mcp.mjs           MCP 服务（stdio JSON-RPC，无依赖）
 src/hook.mjs          Claude Code hook 处理
+src/live.mjs          实时会话：每个运行中的会话一个状态文件，由 hooks 写入
 src/transcript.mjs    读取 Claude Code 会话记录（~/.claude/projects/…/<session>.jsonl）
 src/ops.mjs           放入会话、合并线程、合并数据集
 src/git-events.mjs    从 shell 命令及其输出里识别提交、推送、合并和 PR

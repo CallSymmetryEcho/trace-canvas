@@ -23,6 +23,7 @@
   --edge: #66707B;
   --danger: #C2302A;
   --ok: #1D7F4E;
+  --warn: #D9480F;
   --scrim: rgba(12, 14, 18, .38);
   --shadow: 0 1px 2px rgba(20, 24, 28, .06), 0 8px 24px rgba(20, 24, 28, .10);
   --f-display: "Barlow Condensed", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
@@ -34,7 +35,7 @@
   :root:not([data-theme="light"]) {
     --bg: #101317; --surface: #191D23; --surface-2: #14181D; --ink: #E6E9ED; --muted: #9AA3AD; --faint: #6D7681;
     --rule: #2B3139; --rule-soft: #22272E; --grid: #2A3038; --accent: #7397FF; --accent-soft: #1E2A48; --accent-ink: #0B1020;
-    --inbox: #8D96A1; --edge: #8C95A0; --danger: #FF6F63; --ok: #4CC38A; --scrim: rgba(0, 0, 0, .55);
+    --inbox: #8D96A1; --edge: #8C95A0; --danger: #FF6F63; --ok: #4CC38A; --warn: #FF8A3D; --scrim: rgba(0, 0, 0, .55);
     --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px rgba(0, 0, 0, .45);
     color-scheme: dark;
   }
@@ -42,7 +43,7 @@
 :root[data-theme="dark"] {
   --bg: #101317; --surface: #191D23; --surface-2: #14181D; --ink: #E6E9ED; --muted: #9AA3AD; --faint: #6D7681;
   --rule: #2B3139; --rule-soft: #22272E; --grid: #2A3038; --accent: #7397FF; --accent-soft: #1E2A48; --accent-ink: #0B1020;
-  --inbox: #8D96A1; --edge: #8C95A0; --danger: #FF6F63; --ok: #4CC38A; --scrim: rgba(0, 0, 0, .55);
+  --inbox: #8D96A1; --edge: #8C95A0; --danger: #FF6F63; --ok: #4CC38A; --warn: #FF8A3D; --scrim: rgba(0, 0, 0, .55);
   --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px rgba(0, 0, 0, .45);
   color-scheme: dark;
 }
@@ -411,6 +412,40 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
   .brand-name { display: none; }
   .top { gap: 8px 10px; }
 }
+
+/* ---------- live sessions ---------- */
+.live-bar { display: flex; align-items: center; gap: 8px; overflow-x: auto; scrollbar-width: none; position: relative; z-index: 30;
+  padding-block: 6px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: var(--surface-2); border-bottom: 1px solid var(--rule); }
+.live-bar[hidden] { display: none; }
+.live-bar::-webkit-scrollbar { display: none; }
+.live-label { flex: none; font-family: var(--f-display); font-weight: 600; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.live-count { flex: none; font-size: 12px; color: var(--faint); margin-right: 4px; }
+.live-chip { flex: none; display: inline-flex; align-items: center; gap: 7px; max-width: 360px; padding: 4px 11px 4px 9px; border: 1px solid var(--rule); border-radius: 999px; background: var(--surface); cursor: pointer; font-size: 12.5px; }
+.live-chip:hover { border-color: var(--faint); }
+.live-chip.st-waiting { border-color: var(--warn); }
+.live-chip.is-sel { outline: 2px solid var(--accent); outline-offset: 1px; }
+.live-chip b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
+.live-chip .act { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.ldot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
+.st-working .ldot, .ldot.st-working { background: var(--ok); animation: lpulse 1.6s ease-in-out infinite; }
+.st-waiting .ldot, .ldot.st-waiting { background: var(--warn); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 28%, transparent); }
+@keyframes lpulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .st-working .ldot, .ldot.st-working { animation: none; } }
+.live-badge { flex: none; display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--rule); color: var(--muted); }
+.live-badge.st-working { border-color: var(--ok); color: var(--ok); }
+.live-badge.st-waiting { border-color: var(--warn); color: var(--warn); }
+.l-title { font-family: var(--f-display); font-weight: 700; font-size: 20px; line-height: 1.2; overflow-wrap: anywhere; }
+.l-status { display: flex; align-items: baseline; gap: 8px; font-weight: 600; flex-wrap: wrap; }
+.l-status .ldot { align-self: center; }
+.l-status .act { font-weight: 400; color: var(--muted); overflow-wrap: anywhere; }
+.l-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.l-list li { display: grid; grid-template-columns: 10px 1fr; gap: 1px 8px; align-items: center; padding: 6px 9px; border: 1px solid var(--rule-soft); border-radius: 8px; cursor: pointer; }
+.l-list li:hover { border-color: var(--faint); }
+.l-list li.st-waiting { border-color: var(--warn); }
+.l-list .act { grid-column: 2; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.l-cmd { display: flex; gap: 6px; align-items: center; }
+.l-cmd code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--f-mono); font-size: 12px; padding: 6px 8px; background: var(--surface-2); border: 1px solid var(--rule-soft); border-radius: 6px; }
 </style>
 
 <div id="app">
@@ -453,6 +488,7 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
       </div>
     </div>
   </header>
+  <div class="live-bar" id="live-bar" hidden></div>
 
   <main id="main">
     <section class="view" id="view-canvas">
@@ -676,6 +712,12 @@ const I18N = {
     aiInbox: 'Sort the inbox', aiRelations: 'Links between threads', aiStale: 'Possibly stalled', aiStaleItem: n => `Mark <b>${n}</b> as parked`, aiNew: ' (new)',
     aiNoChanges: 'Nothing needs changing.', aiCancel: 'Not now', aiClose: 'Close', aiApply: 'Apply selected',
     aiLangName: 'English',
+    liveLabel: 'Live', liveCount: (n, w) => `${n} running${w ? ` · ${w} need${w === 1 ? 's' : ''} you` : ''}`,
+    stWorking: 'Working', stWaiting: 'Needs you', stIdle: 'Idle',
+    liveHead: 'Running session', liveUntitled: 'Untitled session', liveStarted: x => `Started ${x}`, liveSeen: x => ` · last activity ${x}`,
+    livePrompt: 'Latest instruction', liveThread: 'Thread', liveAuto: 'Automatic (repository and branch)', liveNow: 'Now on',
+    liveResume: 'Resume in a terminal', liveRunning: 'Running now', liveBadge: (n, w) => `${n} running${w ? `, ${w} need${w === 1 ? 's' : ''} you` : ''}`,
+    tBound: n => `Bound to “${n}”`, tUnbound: 'Back to the repository and branch line',
     agentPrompt: url => `Please log the key progress of this task to my Trace Canvas: ${url}
 Use the ArtifactData tool to write to this artifact's database:
 1. First list the threads collection. Reuse the document id of a thread with the same name; otherwise create threads/<new id>:
@@ -804,6 +846,12 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     aiInbox: '收件箱归类', aiRelations: '线程关联', aiStale: '可能停滞', aiStaleItem: n => `把 <b>${n}</b> 标为搁置`, aiNew: '（新建）',
     aiNoChanges: '没有需要调整的地方。', aiCancel: '先不改', aiClose: '关闭', aiApply: '应用勾选的建议',
     aiLangName: 'Simplified Chinese',
+    liveLabel: '实时', liveCount: (n, w) => `${n} 个运行中${w ? ` · ${w} 个等你` : ''}`,
+    stWorking: '工作中', stWaiting: '等你', stIdle: '空闲',
+    liveHead: '运行中的会话', liveUntitled: '未命名会话', liveStarted: x => `开始于 ${x}`, liveSeen: x => ` · 最近活动 ${x}`,
+    livePrompt: '最近的指令', liveThread: '所属线', liveAuto: '自动（按仓库和分支）', liveNow: '当前在',
+    liveResume: '在终端里恢复', liveRunning: '正在运行', liveBadge: (n, w) => `${n} 个运行中${w ? `，${w} 个等你` : ''}`,
+    tBound: n => `已绑定到「${n}」`, tUnbound: '已改回按仓库和分支自动归线',
     agentPrompt: url => `请把这次任务的关键进展留痕到我的 Trace Canvas：${url}
 用 ArtifactData 工具写入这个 artifact 的数据库：
 1. 先 list 一下 threads 集合。已有同名线程就复用它的文档 id；没有就新建 threads/<新id>：
@@ -862,6 +910,7 @@ const S = {
   captureKind: 'idea', captureThread: ls.get('tc.captureThread', INBOX),
   mode: 'loading', readOnly: false, offline: false, got: new Set(), dragId: null,
   ai: null, sheet: null,
+  live: [],
 };
 
 function fmtAbs(ts) { const d = new Date(ts); return `${pad2(d.getMonth() + 1)}/${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
@@ -992,6 +1041,69 @@ function subscribe(col, attempt = 0) {
     toast(t('tConnLost'));
   });
 }
+/* ================= live sessions (local server only) ================= */
+const LIVE_RANK = { waiting: 0, working: 1, idle: 2 };
+const liveTitle = s => s.title || s.prompt || [s.repo, s.branch].filter(Boolean).join(' · ') || t('liveUntitled');
+const liveOn = tid => S.live.filter(s => s.threadId === tid);
+const stLabel = st => t({ working: 'stWorking', waiting: 'stWaiting' }[st] || 'stIdle');
+let liveRefresh = 0;
+async function loadLive() {
+  try { S.live = (await (await fetch('/api/live', { cache: 'no-store' })).json()).sessions || []; } catch { S.live = []; }
+  render();
+}
+async function bindLive(sid, tid) {
+  try {
+    const r = await fetch('/api/bind', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Trace-Canvas': '1' }, body: JSON.stringify({ session: sid, thread: tid || null }) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || r.status);
+    toast(j.thread ? t('tBound', j.thread.name) : t('tUnbound'));
+  } catch (e) { toast(String(e.message || e)); }
+  loadLive();
+}
+function renderLive() {
+  const bar = $('#live-bar');
+  if (!S.live.length) { bar.hidden = true; bar.innerHTML = ''; return; }
+  const waiting = S.live.filter(s => s.status === 'waiting').length;
+  const selS = S.sel && S.sel.type === 'live' ? S.sel.id : null;
+  bar.hidden = false;
+  bar.innerHTML = `<span class="live-label">${esc(t('liveLabel'))}</span><span class="live-count">${esc(t('liveCount', S.live.length, waiting))}</span>`
+    + S.live.map(s => `<button class="live-chip st-${esc(s.status)} ${s.id === selS ? 'is-sel' : ''}" data-sid="${esc(s.id)}" title="${esc(`${stLabel(s.status)} · ${s.activity || ''}`)}"><span class="ldot"></span><b>${esc(liveTitle(s))}</b>${s.activity ? `<span class="act">${esc(s.activity)}</span>` : ''}</button>`).join('');
+}
+$('#live-bar').addEventListener('click', e => { const b = e.target.closest('[data-sid]'); if (b) select({ type: 'live', id: b.dataset.sid }); });
+function liveBadge(tid) {
+  const ls = liveOn(tid);
+  if (!ls.length) return '';
+  const top = ls.reduce((a, s) => ((LIVE_RANK[s.status] ?? 3) < (LIVE_RANK[a.status] ?? 3) ? s : a));
+  const waiting = ls.filter(s => s.status === 'waiting').length;
+  return `<span class="live-badge st-${esc(top.status)}" title="${esc(t('liveBadge', ls.length, waiting))}"><span class="ldot"></span>${ls.length}</span>`;
+}
+function liveList(list) {
+  return `<ul class="l-list">${list.map(s => `<li class="st-${esc(s.status)}" data-act="goto-live" data-sid="${esc(s.id)}"><span class="ldot"></span><span>${esc(liveTitle(s))}</span>${s.activity ? `<span class="act">${esc(s.activity)}</span>` : ''}</li>`).join('')}</ul>`;
+}
+function liveDetail(s) {
+  const cmd = `claude --resume ${s.id}`;
+  const opts = `<option value="">${esc(t('liveAuto'))}</option>` + orderedThreads().filter(th => th.status !== 'merged' || th.id === s.threadId)
+    .map(th => `<option value="${esc(th.id)}" ${s.bound && th.id === s.threadId ? 'selected' : ''}>${esc(th.name)}</option>`).join('');
+  const where = [[s.repo, s.branch].filter(Boolean).join(' · '), s.model].filter(Boolean).join(' · ');
+  return `<div class="d-head">
+      <span class="d-eyebrow"><span class="ldot st-${esc(s.status)}"></span>${esc(t('liveHead'))}<span class="mono">${esc(s.agent || 'Claude Code')}</span></span>
+      <button class="icon-btn" data-act="close" aria-label="${esc(t('close'))}">×</button>
+    </div>
+    <div class="d-scroll">
+      <div class="l-title">${esc(liveTitle(s))}</div>
+      <div class="l-status st-${esc(s.status)}"><span class="ldot"></span>${esc(stLabel(s.status))}${s.activity ? `<span class="act">${esc(s.activity)}</span>` : ''}</div>
+      <div class="meta">
+        ${where ? `<span>${esc(where)}</span>` : ''}
+        ${s.cwd ? `<span class="mono">${esc(s.cwd)}</span>` : ''}
+        <span>${esc(t('liveStarted', fmtRel(s.startedAt)))}${esc(t('liveSeen', fmtRel(s.lastSeen)))}</span>
+      </div>
+      ${s.prompt && s.prompt !== liveTitle(s) ? `<div class="sec-label">${esc(t('livePrompt'))}</div><p style="margin:0">${esc(s.prompt)}</p>` : ''}
+      <label class="fld"><span>${esc(t('liveThread'))}</span><select id="l-thread">${opts}</select></label>
+      ${s.threadId && S.threads.has(s.threadId) ? `<div class="meta"><span>${esc(t('liveNow'))} <button class="linkish" data-act="goto-thread" data-tid="${esc(s.threadId)}">${esc(S.threads.get(s.threadId).name)}</button></span></div>` : ''}
+      <div class="fld"><span>${esc(t('liveResume'))}</span><div class="l-cmd"><code>${esc(cmd)}</code><button class="btn" data-act="copy-cmd" data-cmd="${esc(cmd)}">${esc(t('copy'))}</button></div></div>
+    </div>`;
+}
+
 let serverRefresh = 0;
 async function loadServer() {
   try {
@@ -1005,9 +1117,13 @@ async function initStore() {
   if (SERVER) {
     S.mode = 'server';
     await loadServer();
+    loadLive();
     const es = new EventSource('/api/events');
     es.addEventListener('change', () => { clearTimeout(serverRefresh); serverRefresh = setTimeout(loadServer, 120); });
-    es.addEventListener('open', () => { if (S.offline) loadServer(); });
+    es.addEventListener('live', () => { clearTimeout(liveRefresh); liveRefresh = setTimeout(loadLive, 120); });
+    es.addEventListener('open', () => { if (S.offline) loadServer(); loadLive(); });
+    // Relative times ("5 min ago") on live sessions age even when nothing is written.
+    setInterval(() => { if (S.live.length) render(); }, 30000);
     es.addEventListener('error', () => { S.offline = true; renderSync(); });
     return;
   }
@@ -1169,6 +1285,7 @@ let rq = 0;
 function render() { if (rq) return; rq = requestAnimationFrame(() => { rq = 0; renderAll(); }); }
 function renderAll() {
   renderSync();
+  renderLive();
   renderCaptureThreads();
   $('#ex-banner').hidden = !(loaded() && hasExamples());
   $('#clear-ex-item').hidden = !hasExamples();
@@ -1224,6 +1341,7 @@ function selThreadId() {
   if (!S.sel) return null;
   if (S.sel.type === 'thread') return S.sel.id;
   if (S.sel.type === 'commit') { const c = S.commits.get(S.sel.id); return c ? tidOf(c) : null; }
+  if (S.sel.type === 'live') { const s = S.live.find(x => x.id === S.sel.id); return s ? s.threadId : null; }
   return null;
 }
 function renderCanvas() {
@@ -1343,7 +1461,7 @@ function cardHTML(th, cs, selT) {
   const chip = isInbox ? `<span class="chip">${esc(t('unsorted'))}</span>` : `<span class="chip chip-${th.status || 'active'}">${esc(statusLabel(th.status))}</span>`;
   const agents = cs.filter(c => c.kind === 'agent').length;
   return `<div class="${cls}" data-tid="${esc(th.id)}" style="left:${th.x || 0}px;top:${th.y || 0}px;--c:${th.color}">
-    <div class="card-head"><span class="roundel"></span><span class="card-name">${esc(th.name)}</span>${chip}</div>
+    <div class="card-head"><span class="roundel"></span><span class="card-name">${esc(th.name)}</span>${liveBadge(th.id)}${chip}</div>
     <ol class="strip">${items}</ol>
     <div class="card-foot"><span>${esc(t('countRecords', cs.length))}${agents ? esc(t('countAgent', agents)) : ''}</span><span>${last ? esc(t('updated', fmtRel(last.ts))) : ''}</span></div>
   </div>`;
@@ -1760,6 +1878,7 @@ function threadDetail(th) {
         ${th.parent ? `<span>${esc(t('forkedFromThread'))} <button class="linkish" data-act="goto-thread" data-tid="${esc(th.parent)}">${esc(getThread(th.parent).name)}</button>${forkC ? ` ${esc(t('of'))} <button class="linkish" data-act="goto-commit" data-cid="${esc(forkC.id)}">${esc(forkC.title.slice(0, 40))}</button>` : ''}</span>` : ''}
         ${th.mergedInto ? `<span>${esc(t('mergedInto'))} <button class="linkish" data-act="goto-thread" data-tid="${esc(th.mergedInto)}">${esc(getThread(th.mergedInto).name)}</button></span>` : ''}
       </div>`}
+      ${liveOn(th.id).length ? `<div class="sec-label">${esc(t('liveRunning'))}</div>${liveList(liveOn(th.id))}` : ''}
       <div class="sec-label">${esc(t('stations'))}</div>
       ${items ? `<ol class="d-strip" style="--c:${th.color}">${items}</ol>` : `<p style="margin:0;color:var(--faint)">${esc(t('noRecordsYet'))}</p>`}
       ${cs.length > 40 ? `<p style="margin:0;color:var(--faint);font-size:12px">${esc(t('only40'))}</p>` : ''}
@@ -1791,14 +1910,14 @@ function edgeDetail(e) {
 function renderDetail() {
   let sel = S.sel;
   if (sel) {
-    const ok = sel.type === 'commit' ? S.commits.has(sel.id) : sel.type === 'thread' ? (sel.id === INBOX || S.threads.has(sel.id)) : S.edges.has(sel.id);
+    const ok = sel.type === 'commit' ? S.commits.has(sel.id) : sel.type === 'thread' ? (sel.id === INBOX || S.threads.has(sel.id)) : sel.type === 'live' ? S.live.some(s => s.id === sel.id) : S.edges.has(sel.id);
     if (!ok) { S.sel = sel = null; }
   }
   if (!sel) { detail.hidden = true; detail.innerHTML = ''; lastKey = ''; lastHTML = ''; return; }
   const key = LANG + ':' + sel.type + ':' + sel.id + ':' + JSON.stringify(S.ui);
   const ae = document.activeElement;
   if (key === lastKey && (detailHold || (detail.contains(ae) && ae.matches('input, textarea, select')))) return;
-  const html = sel.type === 'commit' ? commitDetail(S.commits.get(sel.id)) : sel.type === 'thread' ? threadDetail(getThread(sel.id)) : edgeDetail(S.edges.get(sel.id));
+  const html = sel.type === 'commit' ? commitDetail(S.commits.get(sel.id)) : sel.type === 'thread' ? threadDetail(getThread(sel.id)) : sel.type === 'live' ? liveDetail(S.live.find(s => s.id === sel.id)) : edgeDetail(S.edges.get(sel.id));
   if (key === lastKey && html === lastHTML && !S.focusAfter) return;
   lastKey = key; lastHTML = html;
   const sc = $('.d-scroll', detail);
@@ -1824,6 +1943,7 @@ detail.addEventListener('input', e => {
 });
 detail.addEventListener('change', e => {
   const el = e.target, s = S.sel; if (!s || S.readOnly) return;
+  if (s.type === 'live' && el.id === 'l-thread') { bindLive(s.id, el.value); el.blur(); return; }
   if (s.type !== 'commit') return;
   if (el.id === 'd-kind') patchDoc('commits', s.id, { kind: el.value }, 0);
   else if (el.id === 'd-thread') { patchDoc('commits', s.id, { thread: el.value }, 0); toast(t('tMoved', getThread(el.value).name)); }
@@ -1844,6 +1964,8 @@ detail.addEventListener('click', e => {
     case 'close': select(null); break;
     case 'goto-commit': select({ type: 'commit', id: b.dataset.cid }); break;
     case 'goto-thread': select({ type: 'thread', id: b.dataset.tid }); break;
+    case 'goto-live': select({ type: 'live', id: b.dataset.sid }); break;
+    case 'copy-cmd': copyText(b.dataset.cmd); break;
     case 'fork-open': S.ui = { fork: true }; S.focusAfter = '#d-fork-name'; render(); break;
     case 'fork-cancel': case 'del-cancel': case 'merge-cancel': S.ui = {}; render(); break;
     case 'fork-create': forkFrom(s.id, $('#d-fork-name').value); break;

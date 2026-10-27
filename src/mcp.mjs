@@ -5,7 +5,9 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { addCommit, dataFile, ensureThread, importText, INBOX, mutate, readData } from './store.mjs';
-import { captureSession, listThreads, mergeDataset, mergeThreads, readThread } from './ops.mjs';
+import { bindLiveSession, captureSession, listThreads, mergeDataset, mergeThreads, readThread } from './ops.mjs';
+import { listLive } from './live.mjs';
+import { sessionThread } from './hook.mjs';
 import { describeSession, findTranscript, findTranscripts, parseTranscript } from './transcript.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -17,6 +19,7 @@ const port = () => Number(process.env.TRACE_CANVAS_PORT || 4777);
 
 const INSTRUCTIONS = `Trace Canvas keeps a trace of parallel work as threads (like git branches) and records (like commits), shown as a canvas, a branch graph and a timeline.
 Use trace_capture_session to put the current Claude Code session on the canvas; write 2-6 highlights (decisions, outcomes, next steps) and a short summary yourself, in the user's language.
+Use trace_live to see which sessions are running now and whether one waits for the user; trace_bind puts a session on a thread.
 Use trace_list_threads before trace_merge, and confirm with the user which threads to merge and how: "merge" keeps every line and draws merges; "combine" folds them into one line and removes the others.`;
 
 const KIND = { type: 'string', enum: ['idea', 'task', 'agent', 'decision', 'note'] };
@@ -88,6 +91,20 @@ const TOOLS = [
     title: 'Merge another data set',
     description: 'Merges another Trace Canvas data set into this one: an export file, data.json copied from another computer, or JSON lines from an agent. Threads with the same repository/branch or session key, or the same name, become one line; records already present are skipped.',
     inputSchema: { type: 'object', properties: { path: { type: 'string', description: 'File to read.' }, json: { type: 'string', description: 'Or the data itself.' } } },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+  },
+  {
+    name: 'trace_live',
+    title: 'Running sessions',
+    description: 'Lists the Claude Code sessions running right now: status (working, waiting for the user, idle), what each is doing, its repository and branch, and the thread it belongs to.',
+    inputSchema: { type: 'object', properties: { project_dir: { type: 'string', description: 'Only sessions working in this folder.' } } },
+    annotations: { readOnlyHint: true },
+  },
+  {
+    name: 'trace_bind',
+    title: 'Put a session on a thread',
+    description: 'Binds a running session to a thread, so the canvas shows it there and its records land on that line. With no session_id it binds the current session. A thread name that does not exist yet creates the thread. unbind: true goes back to the repository/branch line.',
+    inputSchema: { type: 'object', properties: { thread: { type: 'string', description: 'Thread id or name.' }, session_id: { type: 'string' }, unbind: { type: 'boolean' } } },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
   },
   {
@@ -177,6 +194,23 @@ async function callTool(name, a = {}) {
       }
       const n = mutate(d => importText(d, text));
       return { text: `Imported ${n} record${n === 1 ? '' : 's'}.`, data: { records: n } };
+    }
+    case 'trace_live': {
+      const d = readData();
+      const dir = a.project_dir ? path.resolve(a.project_dir) : null;
+      const sessions = listLive().filter(s => !dir || (s.cwd || '').startsWith(dir)).map(s => {
+        const { threadId, bound } = sessionThread(d, s);
+        return { sessionId: s.id, status: s.status, activity: s.activity, title: s.title || s.prompt || '', repo: s.repo, branch: s.branch, cwd: s.cwd, thread: threadId ? d.threads[threadId].name : null, bound, startedAt: new Date(s.startedAt).toISOString(), lastSeen: new Date(s.lastSeen).toISOString() };
+      });
+      const waiting = sessions.filter(s => s.status === 'waiting').length;
+      return { text: `${sessions.length} running session${sessions.length === 1 ? '' : 's'}${waiting ? `, ${waiting} waiting for the user` : ''}.`, data: { sessions } };
+    }
+    case 'trace_bind': {
+      // The current session is the newest transcript of this project, as for trace_capture_session.
+      const sessionId = a.session_id || (findTranscripts(projectDir())[0] || {}).sessionId;
+      if (!a.unbind && !String(a.thread || '').trim()) throw new Error('Pass thread, or unbind: true');
+      const t = mutate(d => bindLiveSession(d, { sessionId, thread: a.unbind ? null : a.thread }));
+      return { text: t ? `Session ${sessionId} is on "${t.name}" now.` : `Session ${sessionId} follows its repository/branch line again.`, data: { sessionId, thread: t ? { id: t.id, name: t.name } : null } };
     }
     case 'trace_open': {
       const { url, started } = await ensureServer();

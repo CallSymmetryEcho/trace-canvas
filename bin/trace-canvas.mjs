@@ -46,6 +46,11 @@ Records
                                                    Merge threads (combine folds them into one line)
   trace-canvas import <file|->                     Merge an export, another data.json, or JSON lines
 
+Live sessions
+  trace-canvas live                                Running sessions: status, activity, thread
+  trace-canvas bind <thread> [--session id]        Put a running session on a thread (default: this one)
+  trace-canvas bind --unbind [--session id]        Back to its repository/branch line
+
 Setup (pass --user for every project, or --project dir for one)
   trace-canvas setup            Hooks + MCP server + /trace-canvas skill
   trace-canvas install-hooks    Automatic traces from Claude Code sessions
@@ -148,6 +153,29 @@ async function main() {
         const n = mutate(d => importText(d, text));
         console.log(`Imported ${n} item${n === 1 ? '' : 's'}`);
       }
+      break;
+    }
+    case 'live': {
+      const { listLive } = await import('../src/live.mjs');
+      const { sessionThread } = await import('../src/hook.mjs');
+      const { readData } = await import('../src/store.mjs');
+      const d = readData(), list = listLive();
+      if (!list.length) { console.log('No running sessions.'); break; }
+      for (const s of list) {
+        const { threadId, bound } = sessionThread(d, s);
+        const where = threadId ? `${d.threads[threadId].name}${bound ? ' (bound)' : ''}` : '-';
+        console.log(`${s.status.padEnd(8)} ${s.id}  ${(s.title || s.prompt || s.repo || '').slice(0, 50).padEnd(50)}  ${where}\n         ${s.activity || ''}`);
+      }
+      break;
+    }
+    case 'bind': {
+      const { bindLiveSession } = await import('../src/ops.mjs');
+      const { findTranscripts } = await import('../src/transcript.mjs');
+      const unbind = !!flag('unbind', false), session = str(flag('session', '')) || (findTranscripts(process.cwd())[0] || {}).sessionId;
+      const thread = argv.join(' ').trim();
+      if (!unbind && !thread) { console.error('Usage: trace-canvas bind <thread> [--session id]   or   trace-canvas bind --unbind'); process.exit(1); }
+      const t = mutate(d => bindLiveSession(d, { sessionId: session, thread: unbind ? null : thread }));
+      console.log(t ? `Session ${session} is on "${t.name}"` : `Session ${session} follows its repository/branch line again`);
       break;
     }
     case 'install-hooks':

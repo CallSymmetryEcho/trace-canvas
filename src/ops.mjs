@@ -2,7 +2,7 @@
 // putting a session on the canvas, merging threads, and merging data sets.
 import { INBOX, COLS, addCommit, createThread, findThreadByName, lastCommit, readConfig, threadIdOf } from './store.mjs';
 import { headline, firstLine } from './git-events.mjs';
-import { AGENT, logGitEvents, repoInfo, resumeLink, turnBody, rel } from './hook.mjs';
+import { AGENT, bindSession, logGitEvents, repoInfo, resumeLink, turnBody, rel } from './hook.mjs';
 import { tr } from './i18n.mjs';
 
 // Stable ids, so capturing the same session twice updates instead of duplicating.
@@ -17,6 +17,22 @@ export function resolveThreadRef(d, ref) {
   if (!ref) return null;
   if (ref === INBOX || d.threads[ref]) return ref;
   return findThreadByName(d, ref);
+}
+
+/**
+ * Binds a running session to a thread (id or name; a new name creates the thread),
+ * or unbinds it when thread is empty. Returns the thread, or null after unbinding.
+ */
+export function bindLiveSession(d, { sessionId, thread }, env = process.env) {
+  if (!sessionId) throw new Error('No session to bind; pass its id');
+  let tid = null;
+  if (thread) {
+    tid = resolveThreadRef(d, thread);
+    if (tid === INBOX) throw new Error('A session goes on a thread, not the inbox');
+    if (!tid) tid = createThread(d, { name: String(thread).trim() }).id;
+  }
+  bindSession(sessionId, tid, env);
+  return tid ? d.threads[tid] : null;
 }
 
 /**

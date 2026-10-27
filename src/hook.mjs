@@ -1,5 +1,6 @@
 // Claude Code hook handler. Reads one hook event (JSON on stdin) and turns the
 // moments that matter into records:
+//   SessionStart, PreToolUse, Notification  only update the live status (live.mjs)
 //   UserPromptSubmit  the session's first instruction becomes a task
 //   PostToolUse       file edits are collected; git commit / push / merge and
 //                     `gh pr create` are logged as they happen
@@ -14,6 +15,7 @@ import { execFileSync } from 'node:child_process';
 import { home, mutate, readConfig, createThread, addCommit, lastCommit } from './store.mjs';
 import { gitEvents, redirectTargets, BASH_WRITES, EDIT_TOOLS, headline, firstLine, cleanPrompt } from './git-events.mjs';
 import { tr } from './i18n.mjs';
+import { readLive, updateLive } from './live.mjs';
 
 export { headline, redirectTargets };
 
@@ -86,17 +88,24 @@ function eventKey(input) {
   return id ? `${ev}:${id}` : null;
 }
 
+const LOG_EVENTS = ['UserPromptSubmit', 'PostToolUse', 'Stop', 'SessionEnd'];
+const LIVE_EVENTS = [...LOG_EVENTS, 'SessionStart', 'PreToolUse', 'Notification'];
+
 export function handleHook(input, env = process.env) {
   if (!input || typeof input !== 'object') return { skipped: 'no input' };
   if (env.TRACE_CANVAS_DISABLE === '1') return { skipped: 'disabled' };
   const ev = input.hook_event_name;
-  if (!['UserPromptSubmit', 'PostToolUse', 'Stop', 'SessionEnd'].includes(ev)) return { skipped: ev };
+  if (!LIVE_EVENTS.includes(ev)) return { skipped: ev };
   const sid = input.session_id || 'unknown';
   const cfg = readConfig(env);
   const cwd = input.cwd || process.cwd();
   // git calls happen outside the lock so parallel sessions don't wait on each other.
+  // PreToolUse and Notification fire on every tool call, so they reuse what the live file already knows.
   const relevantTool = ev !== 'PostToolUse' || input.tool_name === 'Bash' || EDIT_TOOLS.has(input.tool_name) || input.tool_name === 'TodoWrite';
-  const info = ev !== 'SessionEnd' && relevantTool ? repoInfo(cwd) : null;
+  const quick = ev === 'PreToolUse' || ev === 'Notification';
+  const info = ev !== 'SessionEnd' && relevantTool && !(quick && readLive(sid, env)) ? repoInfo(cwd) : null;
+  try { updateLive(input, { info, key: info ? threadKey(info, cfg, sid) : null, env }); } catch {}
+  if (!LOG_EVENTS.includes(ev)) return { live: ev };
 
   return mutate(d => {
     const state = loadState(sid, env);
@@ -105,7 +114,7 @@ export function handleHook(input, env = process.env) {
     if (key) { state.seen.push(key); if (state.seen.length > 300) state.seen = state.seen.slice(-200); }
     let changed = false;
     const thread = prompt => {
-      const t = resolveThread(d, info, { cfg, sid, prevThreadId: state.threadId, promptForName: prompt || state.lastPrompt });
+      const t = (state.bound && d.threads[state.threadId]) || resolveThread(d, info, { cfg, sid, prevThreadId: state.threadId, promptForName: prompt || state.lastPrompt });
       state.threadId = t.id; changed = true; return t;
     };
 
@@ -164,6 +173,24 @@ export function handleHook(input, env = process.env) {
     saveState(sid, state, env);
     return changed ? undefined : false;
   }, env);
+}
+
+// Puts a session on a thread by hand (null undoes it); from then on the hooks log its records there.
+// Call it inside mutate(), which holds the lock the hooks use for the same state file.
+export function bindSession(sid, tid, env = process.env) {
+  const state = loadState(sid, env);
+  state.threadId = tid || null;
+  state.bound = !!tid;
+  saveState(sid, state, env);
+}
+
+// The thread a live session belongs to: bound by hand, else where the hooks put it, else its repo/branch line.
+export function sessionThread(d, s, env = process.env) {
+  let st = null;
+  try { st = JSON.parse(fs.readFileSync(stateFile(s.id, env), 'utf8')); } catch {}
+  if (st && st.threadId && d.threads[st.threadId]) return { threadId: st.threadId, bound: !!st.bound };
+  const t = s.key && Object.values(d.threads).find(x => x.key === s.key);
+  return { threadId: t ? t.id : null, bound: false };
 }
 
 export function turnBody(lang, msg, files, todos = []) {

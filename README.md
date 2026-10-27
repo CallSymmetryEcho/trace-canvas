@@ -102,7 +102,23 @@ Capturing is safe to repeat: records already on the canvas are skipped. If the h
 | `trace_merge` | Merges any number of threads, in `merge` or `combine` mode (below) |
 | `trace_log` | Adds one record |
 | `trace_import_data` | Merges another data set: an export, `data.json` from another computer, or JSON lines |
+| `trace_live` | Lists the sessions running now, with status, activity and thread |
+| `trace_bind` | Puts a running session (the current one by default) on a thread |
 | `trace_open` | Starts the page if needed and returns its address |
+
+## Live sessions
+
+The local page shows which Claude Code sessions are running right now. A bar under the header lists them, the ones waiting for you first:
+
+| Status | When |
+| --- | --- |
+| **Working** (green) | Claude is acting; the bar shows the current step, for example `Edit hook.mjs` or `$ npm test` |
+| **Needs you** (orange) | A permission prompt, a question for you (`AskUserQuestion`), a plan to approve, or a question from an MCP server |
+| **Idle** (grey) | The turn is done; the bar shows the first sentence of Claude's reply |
+
+Each card shows how many sessions are running on its thread. Click a session to see its repository, branch, folder and latest instruction, copy `claude --resume <id>`, or put it on another thread. A session lands on its repository/branch line by itself; to bind it by hand, pick a thread in the page, run `trace-canvas bind "<thread>"`, or ask Claude (`trace_bind`). From then on its records go to that thread too.
+
+Live status needs the SessionStart, PreToolUse and Notification hooks, which `setup` adds (run it again after updating). It lives in one small file per session in `~/.trace-canvas/live/`, apart from your records. A session drops off when it ends, or after 12 hours without activity. Only the local page shows live sessions.
 
 ## Merging sessions and threads
 
@@ -164,6 +180,11 @@ Records
   trace-canvas merge <thread>... --into <thread> [--combine]
   trace-canvas import <file|->                     Merge an export, another data.json, or JSON lines
 
+Live sessions
+  trace-canvas live                                Running sessions: status, activity, thread
+  trace-canvas bind <thread> [--session ID]        Put a running session on a thread (default: this one)
+  trace-canvas bind --unbind [--session ID]        Back to its repository/branch line
+
 Setup (--user for every project, --project DIR for one)
   trace-canvas setup            Hooks + MCP server + skill
   trace-canvas install-hooks | install-mcp | install-skill | uninstall-hooks
@@ -187,6 +208,7 @@ skill/SKILL.md        The /trace-canvas skill.
 src/server.mjs        Local server on 127.0.0.1: page, JSON API, live updates over server-sent events.
 src/mcp.mjs           MCP server (stdio JSON-RPC, no dependencies).
 src/hook.mjs          Claude Code hook handler.
+src/live.mjs          Live sessions: one status file per running session, written by the hooks.
 src/transcript.mjs    Reads Claude Code session transcripts (~/.claude/projects/…/<session>.jsonl).
 src/ops.mjs           Capturing sessions, merging threads, merging data sets.
 src/git-events.mjs    Reads commits, pushes, merges and pull requests from shell commands and their output.

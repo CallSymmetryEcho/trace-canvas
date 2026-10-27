@@ -244,7 +244,8 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .git-svg .link { stroke-width: 3; fill: none; stroke-linecap: round; }
 .git-svg [data-cid] { cursor: pointer; }
 .g-row {
-  display: flex; align-items: center; gap: 10px; height: 44px; border-bottom: 1px solid var(--rule-soft);
+  /* border-box: the row is exactly ROW tall with its border, so each title stays level with its station */
+  display: flex; align-items: center; gap: 10px; height: 44px; box-sizing: border-box; border-bottom: 1px solid var(--rule-soft);
   padding-right: max(16px, env(safe-area-inset-right, 0px)); cursor: pointer; min-width: 0;
 }
 .g-row:hover { background: var(--surface-2); }

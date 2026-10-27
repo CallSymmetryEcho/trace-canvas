@@ -259,6 +259,7 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .kind-tag { flex: none; font-size: 11px; color: var(--faint); border: 1px solid var(--rule); border-radius: 4px; padding: 0 5px; }
 .agent-tag { flex: none; font-size: 11px; color: var(--muted); background: var(--surface-2); border-radius: 4px; padding: 1px 6px; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .g-time { flex: none; font-family: var(--f-mono); font-size: 11.5px; color: var(--faint); min-width: 78px; text-align: right; }
+.g-ago { display: none; } /* phone only */
 /* who wrote it: you (solid, dark) or an agent (outlined, in the line's colour) */
 .actor { flex: none; width: 18px; height: 18px; display: inline-grid; place-items: center; border-radius: 50%; }
 .actor svg { width: 12px; height: 12px; }
@@ -425,9 +426,14 @@ body.sheet-open .top { z-index: 80; }
   .brand-name { font-size: 18px; }
   .search { order: 10; flex: 1 1 100%; }
   .tab { padding: 4px 10px; }
-  .g-row .kind-tag, .g-row .agent-tag { display: none; }
+  .g-row .kind-tag, .g-row .agent-tag, .g-row .pill, .g-row .g-time { display: none; }
   .pill { max-width: 96px; }
   .g-time { min-width: 0; }
+  /* Branches on a phone: rows are 52px (ROW in renderGit) with a two-line title and a short time. */
+  .g-row { height: 52px; gap: 8px; align-items: center; }
+  .g-row .g-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-size: 14px; line-height: 1.3; }
+  .g-row.g-live .act { display: none; }
+  .g-ago { display: block; flex: none; align-self: flex-start; padding-top: 9px; font-family: var(--f-mono); font-size: 11px; color: var(--faint); }
   .cap-input { flex-basis: 100%; }
   .kinds button span { display: none; }
   .kinds button { padding: 5px 7px; }
@@ -2117,7 +2123,10 @@ function renderGit() {
   const laneOrder = [INBOX, ...orderedThreads().map(th => th.id)].filter(id => visible.has(id) && (by.has(id) || tipLines.has(id)));
   const lane = new Map(laneOrder.map((id, i) => [id, i]));
   const row = new Map(list.map((c, i) => [c.id, i + tips.length]));
-  const ROW = 44, LW = 20, PADX = 16;
+  // A phone keeps the graph to about two fifths of the screen so the titles stay readable, and gives each
+  // row two lines (ROW matches .g-row's height in the narrow-screen CSS).
+  const phone = PHONE.matches, ROW = phone ? 52 : 44, PADX = phone ? 10 : 16;
+  const LW = phone ? Math.max(7, Math.min(20, Math.floor((innerWidth * 0.4 - 2 * PADX) / Math.max(1, laneOrder.length - 1)))) : 20;
   const lx = i => PADX + i * LW, ry = i => i * ROW + ROW / 2;
   const gw = PADX * 2 + Math.max(0, laneOrder.length - 1) * LW;
   const selT = selThreadId();
@@ -2175,7 +2184,7 @@ function renderGit() {
       ${s.activity ? `<span class="act">${esc(s.activity)}</span>` : ''}
       <span class="kind-tag">${esc(stLabel(s.status))}</span>
       <span class="pill" style="--c:${th.color}"><i></i><span>${esc(th.name)}</span></span>
-      <span class="g-time">${esc(t('liveTipTime'))}</span>
+      <span class="g-time">${esc(t('liveTipTime'))}</span><span class="g-ago">${esc(t('liveTipTime'))}</span>
     </div>`;
   }).join('');
   const rows = tipRows + list.map(c => {
@@ -2186,7 +2195,7 @@ function renderGit() {
       ${c.agent ? `<span class="agent-tag">${esc(c.agent)}</span>` : ''}
       <span class="kind-tag">${esc(kindLabel(c.kind))}</span>
       <span class="pill" style="--c:${th.color}"><i></i><span>${esc(th.name)}</span></span>
-      <span class="g-time">${fmtAbs(c.ts)}</span>
+      <span class="g-time">${fmtAbs(c.ts)}</span><span class="g-ago">${fmtShort(c.ts)}</span>
     </div>`;
   }).join('');
   body.innerHTML = `<svg class="git-svg" width="${gw}" height="${(list.length + tips.length) * ROW}" style="left:max(4px, env(safe-area-inset-left, 0px))">${svg}</svg>${rows}`;

@@ -171,14 +171,14 @@ Claude Code, Codex and Gemini CLI can share the canvas and split the work throug
 node bin/trace-canvas.mjs setup --user --agents codex,gemini
 ```
 
-This adds the hooks to `~/.codex/hooks.json` and `~/.gemini/settings.json` (after any hooks already there, with a backup) and registers the MCP server with each CLI. Start Codex once afterwards and trust the new hooks when it asks. CLIs that are not installed are skipped.
+This adds the hooks to `~/.codex/hooks.json` and `~/.gemini/settings.json` (after any hooks already there, with a backup) and registers the MCP server with each CLI. Codex runs hooks inside its `workspace-write` sandbox, which blocks writes outside the project, so setup also adds `~/.trace-canvas` to `writable_roots` under `[sandbox_workspace_write]` in `~/.codex/config.toml` (with a backup). Start Codex once afterwards and trust the new hooks when it asks. CLIs that are not installed are skipped.
 
 - **Who does what:** each to-do in **Goals** has a "who does it" choice (Claude Code, Codex, Gemini CLI or anyone). Agents read their own with `trace_tasks` (`mine: true`) and tick them with `trace_task_done`, and the list shows who ticked each one.
 - **Hand it over:** **Hand to it** next to an assigned to-do copies a command, and so does `trace-canvas hand "<to-do>" --to codex`. The command starts that agent in the line's folder with `TRACE_CANVAS_THREAD` set, so the new session lands on the line.
 - **A head start:** when any of the three starts a session, the hook tells it which line it works on, the line's goal, the to-dos assigned to it, who else is working there, and (with the location map) where things are on this machine.
 - Records, live tips and the Agent view show which agent did what. Each session gets its own resume command: `claude --resume`, `codex resume` or `gemini --resume`.
 
-Codex has no notification event, so a permission request stands in for "needs you". Gemini CLI support follows its documented hook events and will be checked against a current `@google/gemini-cli`.
+Codex has no notification event, so a permission request stands in for "needs you". Checked against real Codex 0.164 sessions (`test/fixtures/codex/`): prompts, shell commands, `apply_patch` edits, commits, permission requests, the context at session start and ticking a to-do over MCP. Gemini CLI support follows its documented hook events and will be checked against a current `@google/gemini-cli`.
 
 ## Merging sessions and threads
 

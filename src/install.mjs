@@ -116,6 +116,28 @@ export function installAgentMcp(agent, cli, home = os.homedir()) {
   fs.writeFileSync(file, JSON.stringify(s, null, 2) + '\n');
   return { ok: true };
 }
+// Codex runs hooks inside its workspace-write sandbox, which blocks writes outside the project, so
+// the data folder goes on the sandbox's writable list. A text edit, since Node has no TOML parser.
+// ponytail: a root-level dotted `sandbox_workspace_write.x = …` key would clash with the table; add it by hand then.
+export function codexWritable(file, dir) {
+  const raw = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+  const entry = JSON.stringify(dir); // a TOML basic string too
+  if (raw.includes(entry)) return false;
+  let t;
+  const head = /^\[sandbox_workspace_write\][^\n]*(\n|$)/m.exec(raw);
+  if (!head) t = `${raw.replace(/\n*$/, raw ? '\n\n' : '')}[sandbox_workspace_write]\nwritable_roots = [${entry}]\n`;
+  else {
+    const start = head.index + head[0].length;
+    const end = (/^\[/m.exec(raw.slice(start)) || { index: raw.length - start }).index + start;
+    const section = raw.slice(start, end);
+    const roots = /^(writable_roots\s*=\s*\[)/m;
+    t = raw.slice(0, start) + (roots.test(section) ? section.replace(roots, `$1${entry}, `) : `writable_roots = [${entry}]\n${section}`) + raw.slice(end);
+  }
+  if (raw) fs.writeFileSync(file + '.bak', raw);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, t);
+  return true;
+}
 export const onPath = cmd => { try { execFileSync('which', [cmd], { stdio: 'ignore' }); return true; } catch { return false; } };
 
 // Skill. Linked rather than copied, so pulling a newer Trace Canvas updates it too.

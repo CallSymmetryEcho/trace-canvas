@@ -171,14 +171,14 @@ Claude Code、Codex 和 Gemini CLI 可以共用同一张画布，通过待办分
 node bin/trace-canvas.mjs setup --user --agents codex,gemini
 ```
 
-这条命令会把 hooks 加进 `~/.codex/hooks.json` 和 `~/.gemini/settings.json`（排在已有 hooks 之后，并先做备份），再在两个 CLI 里注册 MCP 服务。之后启动一次 Codex，它问到时信任新的 hooks。没安装的 CLI 会自动跳过。
+这条命令会把 hooks 加进 `~/.codex/hooks.json` 和 `~/.gemini/settings.json`（排在已有 hooks 之后，并先做备份），再在两个 CLI 里注册 MCP 服务。Codex 会在它的 `workspace-write` 沙盒里运行 hooks，沙盒不允许写项目以外的地方，所以这条命令还会把 `~/.trace-canvas` 加进 `~/.codex/config.toml` 里 `[sandbox_workspace_write]` 的 `writable_roots`（同样先做备份）。之后启动一次 Codex，它问到时信任新的 hooks。没安装的 CLI 会自动跳过。
 
 - **谁做什么**：**目标**清单里每项待办都能选"由谁做"（Claude Code、Codex、Gemini CLI 或任何人）。agent 用 `trace_tasks`（`mine: true`）读分给自己的待办，做完用 `trace_task_done` 勾上，清单会标出是谁勾的。
 - **交出去**：已指定的待办旁边有**交给它**按钮，会复制一条命令；`trace-canvas hand "<待办>" --to codex` 也能打印同样的命令。这条命令在这条线的目录里启动那个 agent，并设置 `TRACE_CANVAS_THREAD`，新会话一开始就落在这条线上。
 - **开局就知道情况**：三个 agent 无论哪个开新会话，hook 都会告诉它：在哪条线上、线的目标、分给它的待办、还有谁在这条线上，以及（配好位置地图时）本机上的东西在哪里。
 - 记录、实时线头和 Agent 视图都会标出是哪个 agent 做的。每个会话都有自己的恢复命令：`claude --resume`、`codex resume` 或 `gemini --resume`。
 
-Codex 没有通知事件，所以用权限请求来表示"等你"。Gemini CLI 的支持按它文档里的 hook 事件实现，还要用最新的 `@google/gemini-cli` 实际核对。
+Codex 没有通知事件，所以用权限请求来表示"等你"。这些已经用真实的 Codex 0.164 会话核对过（`test/fixtures/codex/`）：指令、shell 命令、`apply_patch` 改文件、提交、权限请求、会话开始时的上下文，以及通过 MCP 勾掉待办。Gemini CLI 的支持按它文档里的 hook 事件实现，还要用最新的 `@google/gemini-cli` 实际核对。
 
 ## 合并会话与线程
 

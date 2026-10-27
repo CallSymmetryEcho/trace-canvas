@@ -4,9 +4,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { addCommit, dataFile, ensureThread, importText, INBOX, mutate, writeConfig } from '../src/store.mjs';
+import { addCommit, dataFile, ensureThread, home, importText, INBOX, mutate, writeConfig } from '../src/store.mjs';
 import { handleHook, readStdin } from '../src/hook.mjs';
-import { agentFiles, allowSafeTools, codexHooks, geminiHooks, install, installAgentMcp, installMcp, installSkill, onPath, settingsPath, uninstall } from '../src/install.mjs';
+import { agentFiles, allowSafeTools, codexHooks, codexWritable, geminiHooks, install, installAgentMcp, installMcp, installSkill, onPath, settingsPath, uninstall } from '../src/install.mjs';
 import { normalize } from '../src/agents.mjs';
 import os from 'node:os';
 
@@ -283,7 +283,11 @@ async function main() {
         install(f, cmd, a === 'codex' ? codexHooks(cmd) : geminiHooks(cmd));
         const r = installAgentMcp(a, SELF);
         console.log(`   ${a}: hooks in ${f}; MCP ${r.ok ? 'registered' : `not registered, run: ${r.hint}`}`);
-        if (a === 'codex') console.log('   codex: start Codex once and trust the new hooks when it asks.');
+        if (a === 'codex') {
+          const toml = path.join(os.homedir(), '.codex', 'config.toml');
+          if (codexWritable(toml, home())) console.log(`   codex: ${home()} added to the sandbox's writable_roots in ${toml}, so its hooks can record`);
+          console.log('   codex: start Codex once and trust the new hooks when it asks.');
+        }
       }
       console.log('Start a new Claude Code session, then type /trace-canvas to put it on the canvas.');
       break;

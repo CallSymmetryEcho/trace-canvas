@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { normalize } from '../src/agents.mjs';
 import { handleHook, sessionStartContext, sessionThread } from '../src/hook.mjs';
 import { readLive } from '../src/live.mjs';
-import { codexHooks, install } from '../src/install.mjs';
+import { codexHooks, codexWritable, install } from '../src/install.mjs';
 import { handTo, listTasks } from '../src/ops.mjs';
 import { addCommit, createThread, emptyData, mutate, readData } from '../src/store.mjs';
 
@@ -57,6 +57,39 @@ test('a Codex session is recorded as Codex, with its own resume command and a "n
   ]);
   assert.deepEqual(cs[2].files, ['export.js']);
   assert.deepEqual(cs[0].links, ['codex resume cx1']);
+});
+
+test('a real Codex 0.164 session replays into the right records (test/fixtures/codex/session.jsonl)', () => {
+  const s = sandbox();
+  const lines = fs.readFileSync(new URL('./fixtures/codex/session.jsonl', import.meta.url), 'utf8').trim().split('\n');
+  let waiting;
+  for (const l of lines) {
+    const p = normalize('codex', JSON.parse(l.replaceAll('/work/codex-probe', s.repo)));
+    handleHook(p, s.env);
+    if (p.notification_type === 'permission_prompt') waiting = readLive(p.session_id, s.env).status;
+  }
+  const cs = Object.values(readData(s.env).commits).sort((a, b) => a.ts - b.ts);
+  assert.deepEqual(cs.map(c => c.kind), ['task', 'agent', 'agent', 'note']);
+  assert.equal(cs[1].title, 'Commit eac5d74: Second line'); // the failed first try (index.lock) left nothing
+  assert.deepEqual(cs[2].files, ['notes.md']); // from apply_patch
+  assert.ok(cs.every(c => c.agent === 'Codex') && cs[0].links[0].startsWith('codex resume '));
+  assert.equal(waiting, 'waiting');
+  assert.equal(readLive(JSON.parse(lines[0]).session_id, s.env), null); // SessionEnd clears it
+});
+
+test('setup puts the data folder on the Codex sandbox writable list, once, wherever the table is', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-toml-')), f = path.join(dir, 'config.toml');
+  fs.writeFileSync(f, 'model = "x"\n\n[projects."/a"]\ntrust_level = "trusted"\n');
+  assert.equal(codexWritable(f, '/h/.trace-canvas'), true);
+  assert.equal(codexWritable(f, '/h/.trace-canvas'), false);
+  assert.ok(fs.readFileSync(f, 'utf8').endsWith('trust_level = "trusted"\n\n[sandbox_workspace_write]\nwritable_roots = ["/h/.trace-canvas"]\n'));
+  fs.writeFileSync(f, '[sandbox_workspace_write]\nnetwork_access = true\n[x]\nwritable_roots = ["no"]\n');
+  codexWritable(f, '/h');
+  assert.equal(fs.readFileSync(f, 'utf8'), '[sandbox_workspace_write]\nwritable_roots = ["/h"]\nnetwork_access = true\n[x]\nwritable_roots = ["no"]\n');
+  fs.writeFileSync(f, '[sandbox_workspace_write]\nwritable_roots = ["/data"]\n');
+  codexWritable(f, '/h');
+  assert.equal(fs.readFileSync(f, 'utf8'), '[sandbox_workspace_write]\nwritable_roots = ["/h", "/data"]\n');
+  assert.ok(fs.existsSync(f + '.bak'));
 });
 
 test('Codex hooks go after everyone else\'s, in seconds, and installing twice changes nothing', () => {

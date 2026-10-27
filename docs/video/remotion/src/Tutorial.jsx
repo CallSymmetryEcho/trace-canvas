@@ -116,6 +116,20 @@ function cursorAt(s, t) {
   return { x: from.x + (last.x - from.x) * k, y: from.y + (last.y - from.y) * k };
 }
 
+// Camera keyframes logged by the recorder (h.camera): each glides from the previous one in `ms`.
+function cameraAt(s, t) {
+  let from = null, last = null;
+  for (const e of s.camera) {
+    if (e.t > t) break;
+    if (last) from = last;
+    last = e;
+  }
+  if (!last) return s.camera[0];
+  if (!from || !last.ms) return last;
+  const k = ease(Math.min(1, (t - last.t) / (last.ms / 1000)));
+  return { x: from.x + (last.x - from.x) * k, y: from.y + (last.y - from.y) * k, z: from.z + (last.z - from.z) * k };
+}
+
 const App = ({ s, t, T, zoomIn, zoomOut }) => {
   const pos = cursorAt(s, t);
   // The camera looks at the average cursor position of the last 0.7 s, so it drifts instead of jumping;
@@ -125,7 +139,8 @@ const App = ({ s, t, T, zoomIn, zoomOut }) => {
   else for (let k = 0; k < 10; k++) { const p = cursorAt(s, Math.max(0, t - k * 0.07)); cx += p.x / 10; cy += p.y / 10; }
   const ramp = Math.min(0.9, T / 3);
   const Z = s.zoom || ZOOM;
-  const z = s.focus ? Z : interpolate(t, [0, ramp, T - ramp, T], [zoomIn ? 1 : Z, Z, Z, zoomOut ? 1 : Z], { ...CLAMP, easing: ease });
+  let z = s.focus ? Z : interpolate(t, [0, ramp, T - ramp, T], [zoomIn ? 1 : Z, Z, Z, zoomOut ? 1 : Z], { ...CLAMP, easing: ease });
+  if (s.camera) ({ x: cx, y: cy, z } = cameraAt(s, t));
   const ox = Math.min(0, Math.max(W - W * z, W / 2 - cx * S * z));
   const oy = Math.min(0, Math.max(H - H * z, H / 2 - cy * S * z));
   return (

@@ -384,22 +384,50 @@ const GIFS = [
       await h.move('#detail [data-act="goto-live"]');
       await h.wait(1400);
     } },
-  { name: 'merge', page: 'app', fresh: true, view: 'canvas', zoom: 1.2, focus: { x: 640, y: 330 }, text: [],
-    preload: h => { h.loadScenario(); h.addSessions(); },
+  // Who did what: your stations are dark, the agents' are in the line's colour; live tips sit on top.
+  { name: 'branches', page: 'app', fresh: true, view: 'git', text: [],
+    preload: h => { h.loadScenario(); h.loadAgents(); },
     run: async h => {
+      await h.camera({ x: 640, y: 360 }, 1, 0);
+      await h.wait(900);
+      const tip = await h.at('.g-row.g-live.st-waiting');
+      await h.camera({ x: 360, y: tip.y + 60 }, 1.6, 900);
+      await h.click('.g-row.g-live.st-waiting');
+      await h.wait(1300);
+      await h.key('Escape');
+      await h.wait(300);
+      h.live({ session_id: 'demo-ocr', hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_input: { command: 'python eval_receipts.py --model vision --set blurry' } });
+      h.live({ session_id: 'demo-ocr', hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command: 'python eval_receipts.py --model vision --set all' } });
+      await h.wait(1300);
+      h.record({ thread: 'sc_ocr', kind: 'decision', title: ['Switch to a vision model', '改用视觉模型'] });
+      await h.wait(1300);
+      h.record({ thread: 'sc_ocr', kind: 'agent', agent: 'Claude Code', title: ['The vision model reads 94% of receipt totals', '视觉模型认对 94% 的小票总额'] });
+      await h.wait(1500);
+      await h.camera({ x: 640, y: 400 }, 1.1, 900);
+      await h.js(`document.getElementById('git-scroll').scrollBy({ top: 340, behavior: 'smooth' })`);
+      await h.wait(1800);
+    } },
+  // Merging on the canvas, after a close look at one card: dark stations are yours, coloured ones the agents'.
+  { name: 'merge', page: 'app', fresh: true, view: 'canvas', text: [],
+    preload: h => { h.loadScenario(); h.addSessions(); h.loadAgents(); },
+    run: async h => {
+      await h.camera({ x: 640, y: 360 }, 1, 0);
       await h.click('#zoom-fit');
-      await h.click('#select-btn');
-      await h.click('#cv-cards [data-tid="sc_share"]');
-      await h.click('#cv-cards [data-tid="sc_cur"]');
+      await h.camera('#cv-cards [data-tid="sc_main"]', 1.9, 500);
+      await h.move('#cv-cards [data-tid="sc_main"] li[data-cid]', 1);
+      await h.wait(900);
+      await h.camera({ x: 640, y: 360 }, 1.15, 500);
+      await h.click('#cv-cards [data-tid="sc_share"]', { shift: true });
+      await h.click('#cv-cards [data-tid="sc_cur"]', { shift: true });
       await h.move('#multi-target');
       await h.js(`(() => { const s = document.getElementById('multi-target'); s.value = 'sc_main'; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
       await h.wait(300);
       await h.click('[data-multi="merge"]');
-      await h.wait(700);
+      await h.wait(600);
       await h.key('Escape');
       await h.click('#zoom-fit');
-      await h.move('#cv-cards [data-tid="sc_main"]');
-      await h.wait(1500);
+      await h.camera('#cv-cards [data-tid="sc_main"]', 1.6, 450);
+      await h.wait(1000);
     } },
   { name: 'timeline', page: 'app', fresh: true, view: 'timeline', zoom: 1.35, text: [],
     preload: h => h.loadScenario('life'),
@@ -416,7 +444,8 @@ const GIFS = [
       await h.wait(1500);
     } },
 ];
-const VIDEOS = { tutorial: SCENES, promo: PROMO, agents: AGENTS, gifs: GIFS };
+// TC_GIFS=branches,merge records only those GIFs.
+const VIDEOS = { tutorial: SCENES, promo: PROMO, agents: AGENTS, gifs: process.env.TC_GIFS ? GIFS.filter(g => process.env.TC_GIFS.split(',').includes(g.name)) : GIFS };
 
 /* ---------- narration ---------- */
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -455,7 +484,7 @@ process.env.TRACE_CANVAS_HOME = path.join(home, 'data');
 process.env.TRACE_CANVAS_DESKTOP_DIR = path.join(home, 'desktop'); // never the real desktop app's records
 fs.mkdirSync(process.env.TRACE_CANVAS_HOME, { recursive: true });
 const { startServer } = await import('../../src/server.mjs');
-const { mutate, dataFile, emptyData, readData } = await import('../../src/store.mjs');
+const { mutate, dataFile, emptyData, readData, addCommit } = await import('../../src/store.mjs');
 const { listThreads, readThread } = await import('../../src/ops.mjs');
 const { updateLive } = await import('../../src/live.mjs');
 const { writeAgentsDemo } = await import('../scenarios/agents.mjs');
@@ -551,10 +580,10 @@ async function record(video, lang) {
         await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p.x, y: p.y });
         return p;
       },
-      async click(sel) {
+      async click(sel, { shift = false } = {}) {
         const p = await h.move(sel);
         sc.cursor.push({ t: now(), x: p.x, y: p.y, click: true });
-        for (const type of ['mousePressed', 'mouseReleased']) { await cdp('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: 'left', clickCount: 1 }); await sleep(60); }
+        for (const type of ['mousePressed', 'mouseReleased']) { await cdp('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: 'left', clickCount: 1, modifiers: shift ? 8 : 0 }); await sleep(60); }
         await sleep(300);
       },
       async type(text) { for (const ch of text) { await cdp('Input.insertText', { text: ch }); await sleep(55); } },
@@ -563,6 +592,16 @@ async function record(video, lang) {
         await cdp('Input.dispatchKeyEvent', { type: 'keyDown', key: k, code: k, windowsVirtualKeyCode: code, ...(k === 'Enter' ? { text: '\r' } : {}) });
         await cdp('Input.dispatchKeyEvent', { type: 'keyUp', key: k, code: k, windowsVirtualKeyCode: code });
       },
+      // Camera keyframe for Remotion: look at an element (or {x, y} in page px) at zoom z, gliding there in ms.
+      at: (sel, n = 0) => center(sel, n), // where an element is, in page px
+      async camera(target, z, ms = 800) {
+        const p = typeof target === 'string' ? await center(target, 0) : target;
+        if (!p) throw new Error(`not on the page: ${target}`);
+        (sc.camera ||= []).push({ t: now(), x: p.x, y: p.y, z, ms });
+        await sleep(ms);
+      },
+      // A record written straight into the data, as `trace-canvas log` would; no agent means you wrote it.
+      record: ({ thread, kind, title, agent = '' }) => mutate(d => addCommit(d, { thread, kind, title: pick(title, lang), agent })),
       async cmd(s, prompt = '$ ') { sc.steps.push({ t: now(), cmd: s, prompt }); await wait(s.length * CHAR * 1000 + 150); },
       out(s, cls = '') { sc.steps.push({ t: now(), out: s, cls }); },
       loadScenario: (name = 'vibe') => fs.writeFileSync(dataFile(), JSON.stringify(scenarioData(name, lang))),
@@ -646,7 +685,7 @@ function render(video, lang) {
 
 // Each GIF scene alone, without captions or sound, then a palette GIF next to the READMEs.
 function renderGifs(lang) {
-  GIFS.forEach((g, i) => {
+  VIDEOS.gifs.forEach((g, i) => {
     const mp4 = path.join(OUT, `gif-${g.name}.${lang}.mp4`), gif = path.join(here, '..', `gif-${g.name}.${lang}.gif`);
     execFileSync('npx', ['remotion', 'render', 'src/index.jsx', 'Tutorial', mp4, `--props=${JSON.stringify({ video: 'gifs', lang, only: [i], bare: true })}`,
       `--browser-executable=${CHROME}`, `--concurrency=${process.env.TC_CONCURRENCY || 2}`, '--muted', '--log=error'], { cwd: REMOTION, stdio: 'inherit' });

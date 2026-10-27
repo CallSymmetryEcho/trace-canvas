@@ -122,6 +122,10 @@ The local page shows which Claude Code sessions are running right now. A bar und
 
 In every view, stations you wrote (your instructions and decisions) are drawn dark with a person mark, and agents' stations in the line's colour with a star mark, so you can see who moved each line forward. In the Branches view, a session working on a line right now sits at the top of that line's lane as a pulsing tip (green working, orange needs you), joined to the line's newest record; click it for the session panel. Each card shows how many sessions are running on its thread. Click a session to see its repository, branch, folder and latest instruction, copy `claude --resume <id>`, or put it on another thread. A session lands on its repository/branch line by itself; to bind it by hand, pick a thread in the page, run `trace-canvas bind "<thread>"`, or ask Claude (`trace_bind`). From then on its records go to that thread too.
 
+![Branches view: live tips, an approval, your decision and the agent's result](docs/gif-branches.en.gif)
+
+*Branches: running sessions sit as live tips on top of their lines. The orange one waits for you; once approved it turns green, your decision appears dark and the agent's result in the line's colour. Made-up data.*
+
 Live status needs the SessionStart, PreToolUse, Notification and SubagentStart/Stop hooks, which `setup` adds (run it again after updating). It lives in small files in `~/.trace-canvas/live/` (one per session and one per subagent), apart from your records. A session drops off when it ends, or after 12 hours without activity. Only the local page shows live sessions.
 
 ### Agent view: who started whom
@@ -153,7 +157,7 @@ Data from another computer (for example a workstation) merges with `trace-canvas
 
 ![Merging two lines on the canvas](docs/gif-merge.en.gif)
 
-*On the canvas: select two lines, pick the target and **Merge**; the merged lines join the target line. Made-up data.*
+*On the canvas: a close look at one card (dark stations are yours, coloured ones the agents'), then Shift-click two lines, pick the target and **Merge**. Made-up data.*
 
 ## Tuning the hooks
 

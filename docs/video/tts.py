@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Neural narration with mlx-audio on Apple Silicon, for make.mjs and for voice samples.
+"""Neural narration with mlx-audio on Apple Silicon, for make.mjs.
 
 Reads a JSON list of jobs on stdin, {"text", "out", "model", "voice", "lang", "instruct"?, "temperature"?, "top_p"? (Qwen3), "speed"? (Kokoro)},
 and writes one WAV file per job. Each model is loaded once.

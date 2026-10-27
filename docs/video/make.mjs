@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Builds the tutorial and the promo video (English and Chinese) in three steps:
+// Builds the tutorial, the promo, the Agents view and the goals video (English and Chinese) in three steps:
 //  1. narration: tts.py reads every line with a neural voice (cached, so re-runs only read new lines);
 //  2. recording: headless Chrome plays the app scenes against a throwaway data folder (your own
 //     ~/.trace-canvas is never touched) and logs every cursor move, click and narration cue;
@@ -234,7 +234,8 @@ const PROMO = [
       ['Every new agent session starts from zero, and so do you when you come back to a project.', '每开一个新的 agent 会话，都要从头讲一遍项目；你自己隔几天回来，也一样。'],
       ['Trace Canvas gives you and your agents one shared map of all your work.', 'Trace Canvas 给你和你的 agent 一张共享的地图，装下你手上的所有工作。'],
     ] },
-  { page: 'app', preload: h => { h.loadScenario(); h.addSessions(); },
+  // The demo sessions go in before the page loads, so the live bar shows them from the first shot.
+  { page: 'app', preload: h => { h.loadScenario(); h.addSessions(); h.loadAgents(); },
     text: [
       ['Every project, branch, decision and agent session sits on one transit map.', '每个项目、分支、决策和 agent 会话，都在同一张线路图上。'],
       ['While Claude Code works, its hooks, skill and MCP tools keep the map up to date.', 'Claude Code 工作时，hooks、skill 和 MCP 工具会自动更新这张图。'],
@@ -270,7 +271,7 @@ const PROMO = [
   { page: 'app',
     text: [
       ['Every answer points back to records on the map, so you can check it.', '每个回答都能对应到图上的记录，随时可以核对。'],
-      ['Agents on other computers can send their records too, so nothing is lost between machines.', '其他电脑上的 agent 也能把记录导进来，换了机器也不会丢。'],
+      ['And the Agents view shows every running session live: who started whom, and which one is waiting for you.', '「Agent」视图实时显示每个在跑的会话：谁启动了谁，哪个在等你。'],
     ],
     run: async h => {
       const p = h.speak(0);
@@ -278,9 +279,10 @@ const PROMO = [
       await p;
       const q = h.speak(1);
       await h.key('Escape');
-      await h.click('#tab-git');
-      await h.wait(900);
-      await h.js(`document.getElementById('git-scroll').scrollBy({ top: 200, behavior: 'smooth' })`);
+      await h.click('#tab-agents');
+      await h.wait(700);
+      for (const id of ['release', 'post', 'ocr']) await h.move(`#ag-inner .ag-session[data-sid="demo-${id}"]`);
+      await h.move('#ag-inner .ag-agent.st-running');
       await q;
     } },
   { page: { card: { big: 'Trace Canvas', small: ['Open source · MIT · works with Claude Code', '开源 · MIT · 支持 Claude Code'], foot: `${REPO} ⭐` } },

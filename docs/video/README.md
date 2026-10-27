@@ -1,13 +1,22 @@
-# Tutorial and promo videos
+# Videos and feature GIFs
 
-One command builds two videos, each in English and Chinese: a tutorial (about 2.5 minutes) and a short promo that presents Trace Canvas as the entry point for agents (under a minute).
+`make.mjs` builds four narrated videos, each in English and Chinese, and the silent feature GIFs that the READMEs show:
+
+| Name | What it shows | Length |
+| --- | --- | --- |
+| `tutorial` | the whole tool, from install to merging threads | about 2¼ min |
+| `promo` | Trace Canvas as the entry point for agents: one shared map, catching up through MCP, the Agents view | under a minute |
+| `agents` | the Agents view: who started whom, and which session needs you | about a minute |
+| `goals` | goals and to-dos, one list shared with your agents | about a minute |
+| `gifs` | `docs/gif-<agents\|branches\|merge\|goals\|timeline>.<lang>.gif`, no sound; `TC_GIFS=merge,goals` records only those | 10–13 s each |
 
 ```bash
-node docs/video/make.mjs                # both videos, both languages
-node docs/video/make.mjs promo zh       # one video, one language
+node docs/video/make.mjs                        # everything, both languages
+node docs/video/make.mjs promo zh               # one video, one language
+node docs/video/make.mjs promo --render-only    # animate the last recording again, e.g. after editing Tutorial.jsx
 ```
 
-Output: `docs/video/out/trace-canvas-<tutorial|promo>.<lang>.mp4` and `.srt` caption files for YouTube or Bilibili (not committed).
+Output: `docs/video/out/trace-canvas-<video>.<lang>.mp4` and `.srt` caption files for YouTube or Bilibili (not committed); the GIFs go to `docs/` and are committed. The opening GIF of the READMEs, `docs/demo.<lang>.gif`, was cut by hand from an earlier recording; `make.mjs` does not rebuild it.
 
 How it works:
 
@@ -15,7 +24,7 @@ How it works:
 2. **Recording.** Headless Chrome plays the app scenes against a throwaway data folder with the made-up `tripsplit` scenario from `docs/scenarios`. It saves one clean clip per scene and logs every cursor move, click and narration cue in `remotion/public/<video>/<lang>/manifest.json`.
 3. **Animation.** [Remotion](https://www.remotion.dev) (`remotion/src/Tutorial.jsx`) draws the title cards, the terminals, the cursor and click ripples, a camera that follows the cursor, and the captions, and renders the MP4. `npm run studio` in `remotion/` previews it.
 
-To change a video, edit `SCENES` (tutorial) or `PROMO` in `make.mjs`. Each scene has a page (the app, a terminal or a title card), narration lines in both languages, and the clicks and typing that go with them. A line can give separate caption and spoken text, for example to have `/trace-canvas` read as "slash trace canvas".
+To change a video, edit `SCENES` (tutorial), `PROMO`, `AGENTS`, `GOALS` or `GIFS` in `make.mjs`. Each scene has a page (the app, a terminal or a title card), narration lines in both languages, and the clicks and typing that go with them. A line can give separate caption and spoken text, for example to have `/trace-canvas` read as "slash trace canvas".
 
 ## Setup (once)
 

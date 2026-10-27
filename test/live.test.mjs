@@ -140,6 +140,8 @@ test('the desktop app records give each session the one that started it, and kee
   const by = Object.fromEntries(sessions.map(x => [x.id, x]));
   assert.deepEqual([by['cli-c'].parent, by['cli-c'].title, by['cli-b'].parent], ['cli-b', 'Render the videos', 'cli-a']);
   assert.deepEqual(others.map(o => [o.id, o.title, o.status]), [['cli-a', 'Plan the release', 'off']]);
+  // The page opens a session's chat in the desktop app with claude://claude.ai/epitaxy/<desktopId>.
+  assert.deepEqual([by['cli-c'].desktopId, others[0].desktopId], ['local_C', 'local_A']);
 });
 
 test('server lists running sessions with their thread and binds only with its header', async () => {

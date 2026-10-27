@@ -14,6 +14,7 @@ import { liveDir } from './live.mjs';
 import { bindLiveSession, liveSessions, sessionList } from './ops.mjs';
 import { commitDiff, commitInfo } from './git-view.mjs';
 import { runSync } from './sync.mjs';
+import { desktopSessions } from './desktop.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const APP = path.join(here, '..', 'app', 'index.html');
@@ -82,7 +83,11 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
 
       if (req.method === 'GET' && (p === '/' || p === '/index.html')) return send(res, 200, page(readConfig(), ai), 'text/html; charset=utf-8');
       if (req.method === 'GET' && p === '/api/health') return send(res, 200, { ok: true, version: VERSION, ai, dataFile: dataFile() });
-      if (req.method === 'GET' && p === '/api/data') { const d = readData(); return send(res, 200, { ...toArrays(d), sessions: sessionList(d), machine: readConfig().machine }); }
+      if (req.method === 'GET' && p === '/api/data') {
+        // desktopId: the Claude desktop app's id of a session, so the page can open its chat (claude://…).
+        const d = readData(), desk = desktopSessions();
+        return send(res, 200, { ...toArrays(d), sessions: sessionList(d).map(s => ({ ...s, desktopId: (desk.get(s.id) || {}).desktopId || null })), machine: readConfig().machine });
+      }
       if (req.method === 'GET' && p === '/api/live') return send(res, 200, liveSessions(readData()));
       // What a commit record changed, read from git on demand (src/git-view.mjs).
       if (req.method === 'GET' && p === '/api/git/commit') return send(res, 200, await commitInfo(readData(), url.searchParams.get('record'), url.searchParams.get('against')));

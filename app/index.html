@@ -469,7 +469,10 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .l-list.s-list li { grid-template-columns: 10px 1fr auto; cursor: default; }
 .l-list.s-list li.is-live { cursor: pointer; }
 .l-list.s-list .s-name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.l-list.s-list .btn { grid-column: 3; grid-row: 1 / span 2; padding: 3px 9px; font-size: 12px; }
+.l-list.s-list .s-acts { grid-column: 3; grid-row: 1 / span 2; display: flex; gap: 6px; }
+.l-list.s-list .btn { padding: 3px 9px; font-size: 12px; text-decoration: none; }
+.ag-open { margin-left: auto; padding: 0 4px; color: var(--accent); font-weight: 600; text-decoration: none; }
+.ag-open:hover { text-decoration: underline; }
 .l-list li.st-off .ldot { opacity: .35; }
 .l-list .act { grid-column: 2; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .l-cmd { display: flex; gap: 6px; align-items: center; }
@@ -828,7 +831,7 @@ const I18N = {
     stWorking: 'Working', stWaiting: 'Needs you', stIdle: 'Idle',
     liveHead: 'Running session', liveUntitled: 'Untitled session', liveStarted: x => `Started ${x}`, liveSeen: x => ` · last activity ${x}`,
     livePrompt: 'Latest instruction', liveThread: 'Thread', liveAuto: 'Automatic (repository and branch)', liveNow: 'Now on',
-    liveResume: 'Resume in a terminal', liveRunning: 'Running now', lineSessions: 'Sessions on this line',
+    liveResume: 'Resume in a terminal', openChat: 'Open the chat', liveRunning: 'Running now', lineSessions: 'Sessions on this line',
     gxChanges: 'Changes', gxLoading: 'Reading from git…', gxNoRepo: 'This repository is not on this computer.', gxNoCommit: 'This commit is no longer in its repository (rewritten or cleaned up).',
     gxFiles: n => `${n} file${n === 1 ? '' : 's'}`, gxMore: n => `${n} more`, gxQuiet: n => `${n} binary or generated`, gxBinary: 'binary',
     gxCompare: 'Compare with', gxThisOnly: 'this commit only', gxOtherRepo: 'That station is in another repository.', gxTruncated: 'Cut at 200 KB.',
@@ -985,7 +988,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     stWorking: '工作中', stWaiting: '等你', stIdle: '空闲',
     liveHead: '运行中的会话', liveUntitled: '未命名会话', liveStarted: x => `开始于 ${x}`, liveSeen: x => ` · 最近活动 ${x}`,
     livePrompt: '最近的指令', liveThread: '所属线', liveAuto: '自动（按仓库和分支）', liveNow: '当前在',
-    liveResume: '在终端里恢复', liveRunning: '正在运行', lineSessions: '这条线上的会话',
+    liveResume: '在终端里恢复', openChat: '打开对话', liveRunning: '正在运行', lineSessions: '这条线上的会话',
     gxChanges: '改动', gxLoading: '正在从 git 读取…', gxNoRepo: '这台电脑上没有这个仓库。', gxNoCommit: '仓库里已经没有这个提交，可能被改写或清理了。',
     gxFiles: n => `${n} 个文件`, gxMore: n => `还有 ${n} 个`, gxQuiet: n => `${n} 个二进制或生成文件`, gxBinary: '二进制',
     gxCompare: '对比', gxThisOnly: '只看这次提交', gxOtherRepo: '那个站点不在同一个仓库。', gxTruncated: '超过 200 KB，已截断。',
@@ -1245,6 +1248,8 @@ function liveBadge(tid) {
   const waiting = ls.filter(s => s.status === 'waiting').length;
   return `<span class="live-badge st-${esc(top.status)}" title="${esc(t('liveBadge', ls.length, waiting))}"><span class="ldot"></span>${ls.length}</span>`;
 }
+// The Claude desktop app opens a session's chat from this link (desktopId comes from its session records).
+const chatHref = id => `claude://claude.ai/epitaxy/${encodeURIComponent(id)}`;
 function liveList(list) {
   return `<ul class="l-list">${list.map(s => `<li class="st-${esc(s.status)}" data-act="goto-live" data-sid="${esc(s.id)}"><span class="ldot"></span><span>${esc(liveTitle(s))}</span>${s.activity ? `<span class="act">${esc(s.activity)}</span>` : ''}</li>`).join('')}</ul>`;
 }
@@ -1260,6 +1265,7 @@ function liveDetail(s) {
     <div class="d-scroll">
       <div class="l-title">${esc(liveTitle(s))}</div>
       <div class="l-status st-${esc(s.status)}"><span class="ldot"></span>${esc(stLabel(s.status))}${s.activity ? `<span class="act">${esc(s.activity)}</span>` : ''}</div>
+      ${s.desktopId ? `<div class="d-actions"><a class="btn btn-primary" href="${esc(chatHref(s.desktopId))}">${esc(t('openChat'))}</a></div>` : ''}
       <div class="meta">
         ${where ? `<span>${esc(where)}</span>` : ''}
         ${s.cwd ? `<span class="mono">${esc(s.cwd)}</span>` : ''}
@@ -1335,7 +1341,7 @@ function renderAgents() {
     const meta = [th ? `<span class="roundel" style="--c:${th.color}"></span><span>${esc(th.name)}</span>` : '', n.agents && n.agents.length ? `<span>· ${esc(t('agSubCount', n.agents.length))}</span>` : ''].join('');
     const off = n.status === 'off';
     return `<div class="ag-node ag-session st-${esc(n.status)} ${n.id === selS ? 'is-sel' : ''}" ${off ? '' : `data-sid="${esc(n.id)}"`} style="left:${x}px;top:${top}px;--c:${color || 'var(--rule)'}">
-      <div class="ag-t"><span class="ldot"></span><span>${esc(off ? n.title || n.id : liveTitle(n))}</span></div>
+      <div class="ag-t"><span class="ldot"></span><span>${esc(off ? n.title || n.id : liveTitle(n))}</span>${n.desktopId ? `<a class="ag-open" href="${esc(chatHref(n.desktopId))}" title="${esc(t('openChat'))}">↗</a>` : ''}</div>
       <div class="ag-a">${esc(off ? t('stOff') : n.activity || stLabel(n.status))}</div>
       <div class="ag-m">${meta || esc([n.repo, n.branch].filter(Boolean).join(' · '))}</div>
     </div>`;
@@ -2329,9 +2335,9 @@ function lineSessions(tid) {
     const l = byId.get(s.id), st = l ? l.status : 'off', cwd = s.cwd || (l && l.cwd);
     const here = `${cwd ? `cd ${shq(cwd)} && ` : ''}${s.resume || (l && l.resume) || `claude --resume ${s.id}`}`;
     // A session from another machine resumes there, over ssh (the machine names are the ssh aliases).
-    const away = s.machine && S.machine && s.machine !== S.machine, cmd = away ? `ssh -t ${s.machine} ${shq(here)}` : here;
+    const away = s.machine && S.machine && s.machine !== S.machine, cmd = away ? `ssh -t ${s.machine} ${shq(here)}` : here, desk = s.desktopId || (l && l.desktopId);
     const sub = [l && stLabel(st), s.agent || (l && l.agent) || 'Claude Code', away && s.machine, s.id.slice(0, 8), s.last && fmtRel(s.last)].filter(Boolean).join(' · ');
-    return `<li class="st-${esc(st)}${l ? ' is-live' : ''}"${l ? ` data-act="goto-live" data-sid="${esc(s.id)}"` : ''}><span class="ldot"></span><span class="s-name">${esc(s.title || (l ? liveTitle(l) : s.id))}</span><span class="act">${esc(sub)}</span><button class="btn" data-act="copy-cmd" data-cmd="${esc(cmd)}" title="${esc(cmd)}">${esc(t('copyResume'))}</button></li>`;
+    return `<li class="st-${esc(st)}${l ? ' is-live' : ''}"${l ? ` data-act="goto-live" data-sid="${esc(s.id)}"` : ''}><span class="ldot"></span><span class="s-name">${esc(s.title || (l ? liveTitle(l) : s.id))}</span><span class="act">${esc(sub)}</span><span class="s-acts">${desk && !away ? `<a class="btn btn-primary" href="${esc(chatHref(desk))}">${esc(t('openChat'))}</a>` : ''}<button class="btn" data-act="copy-cmd" data-cmd="${esc(cmd)}" title="${esc(cmd)}">${esc(t('copyResume'))}</button></span></li>`;
   };
   return `<div class="sec-label">${esc(t('lineSessions'))}</div><ul class="l-list s-list">${rows.slice(0, 8).map(li).join('')}</ul>
       <p style="margin:0;color:var(--faint);font-size:12px">${rows.length > 8 ? `+${rows.length - 8} · ` : ''}${esc(t('lineSessionsHint'))}</p>`;

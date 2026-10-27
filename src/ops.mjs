@@ -128,7 +128,7 @@ export function liveSessions(d, env = process.env) {
   const desk = desktopSessions(env);
   const sessions = listLive(env).map(s => {
     const k = desk.get(s.id) || {};
-    return { ...s, ...sessionThread(d, s, env), title: s.title || k.title || '', parent: k.parent || null };
+    return { ...s, ...sessionThread(d, s, env), title: s.title || k.title || '', parent: k.parent || null, desktopId: k.desktopId || null };
   });
   const seen = new Set(sessions.map(s => s.id)), others = [];
   for (const s of sessions) {
@@ -136,7 +136,7 @@ export function liveSessions(d, env = process.env) {
       const k = desk.get(p);
       if (!k) break;
       seen.add(p);
-      others.push({ id: p, title: k.title, parent: k.parent, status: 'off', agents: [] });
+      others.push({ id: p, title: k.title, parent: k.parent, status: 'off', agents: [], desktopId: k.desktopId || null });
     }
   }
   return { sessions, others };

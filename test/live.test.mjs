@@ -6,12 +6,12 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { handleHook, sessionThread } from '../src/hook.mjs';
 import { activityOf, listLive, readLive, updateLive, STALE_MS } from '../src/live.mjs';
-import { bindLiveSession } from '../src/ops.mjs';
+import { bindLiveSession, liveSessions } from '../src/ops.mjs';
 import { mutate, readData } from '../src/store.mjs';
 
 function sandbox(sid = 's1') {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-live-'));
-  const env = { ...process.env, TRACE_CANVAS_HOME: path.join(root, 'home'), TRACE_CANVAS_LANG: 'en' };
+  const env = { ...process.env, TRACE_CANVAS_HOME: path.join(root, 'home'), TRACE_CANVAS_LANG: 'en', TRACE_CANVAS_DESKTOP_DIR: path.join(root, 'desktop') };
   delete env.TRACE_CANVAS_DISABLE;
   const repo = path.join(root, 'thesis');
   fs.mkdirSync(repo);
@@ -85,8 +85,43 @@ test('a session bound by hand logs to that thread, and unbinding returns it to i
   assert.deepEqual(sessionThread(d, s.live(), s.env), { threadId: repoLine.id, bound: false });
 });
 
+test('parallel subagents each keep their own status, and the session end clears them', () => {
+  const s = sandbox();
+  const meta = path.join(s.root, 's1', 'subagents');
+  fs.mkdirSync(meta, { recursive: true });
+  fs.writeFileSync(path.join(meta, 'agent-a1.meta.json'), JSON.stringify({ agentType: 'Explore', description: 'Find the callers of rel()', spawnDepth: 1 }));
+  s.fire('SessionStart', { source: 'startup' });
+  s.fire('SubagentStart', { agent_id: 'a1', agent_type: 'Explore' });
+  s.fire('SubagentStart', { agent_id: 'a2', agent_type: 'general-purpose' });
+  s.fire('SubagentStop', { agent_id: 'a1', agent_type: 'Explore', last_assistant_message: 'rel() has 3 callers, all in hook.mjs.' });
+  s.fire('SubagentStart', { agent_id: 'a1', agent_type: 'Explore' }); // late duplicate: stays done
+  const [live] = listLive(s.env);
+  assert.deepEqual(live.agents.map(a => [a.id, a.type, a.status, a.description, a.last || '']), [
+    ['a1', 'Explore', 'done', 'Find the callers of rel()', 'rel() has 3 callers, all in hook.mjs.'],
+    ['a2', 'general-purpose', 'running', '', ''],
+  ]);
+  s.fire('SessionEnd', { reason: 'other' });
+  assert.deepEqual(fs.readdirSync(path.join(s.env.TRACE_CANVAS_HOME, 'live')), []);
+});
+
+test('the desktop app records give each session the one that started it, and keep idle ancestors in the chain', () => {
+  const s = sandbox();
+  const dir = path.join(s.env.TRACE_CANVAS_DESKTOP_DIR, 'org', 'acct');
+  fs.mkdirSync(dir, { recursive: true });
+  const rec = (local, cli, title, parent) => fs.writeFileSync(path.join(dir, `local_${local}.json`), JSON.stringify({ sessionId: `local_${local}`, cliSessionId: cli, title, ...(parent ? { spawnedFrom: { sessionId: `local_${parent}` } } : {}) }));
+  rec('A', 'cli-a', 'Plan the release', null);
+  rec('B', 'cli-b', 'Fix the mirror', 'A');
+  rec('C', 'cli-c', 'Render the videos', 'B');
+  for (const [cli, ev] of [['cli-b', 'Stop'], ['cli-c', 'PreToolUse']]) updateLive({ session_id: cli, hook_event_name: ev, tool_name: 'Bash', tool_input: { command: 'npx remotion render' } }, { env: s.env });
+  const { sessions, others } = liveSessions(readData(s.env), s.env);
+  const by = Object.fromEntries(sessions.map(x => [x.id, x]));
+  assert.deepEqual([by['cli-c'].parent, by['cli-c'].title, by['cli-b'].parent], ['cli-b', 'Render the videos', 'cli-a']);
+  assert.deepEqual(others.map(o => [o.id, o.title, o.status]), [['cli-a', 'Plan the release', 'off']]);
+});
+
 test('server lists running sessions with their thread and binds only with its header', async () => {
   process.env.TRACE_CANVAS_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-live-srv-'));
+  process.env.TRACE_CANVAS_DESKTOP_DIR = path.join(process.env.TRACE_CANVAS_HOME, 'no-desktop');
   updateLive({ session_id: 'abc', hook_event_name: 'PreToolUse', cwd: '/x', tool_name: 'Read', tool_input: { file_path: '/x/notes.md' } }, { env: process.env, info: { repo: 'x', branch: 'main', root: '/x' }, key: 'x' });
   const { startServer } = await import('../src/server.mjs');
   const { server, url } = await startServer({ port: 0 });

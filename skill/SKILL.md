@@ -45,7 +45,7 @@ Call `trace_list_sessions` and show a short table: when, title, prompts, files c
 
 ## live: what is running now
 
-Call `trace_live` and show a short table: status (working, needs you, idle), title, what it is doing, and its thread. Put sessions that need the user first.
+Call `trace_live` and show a short table: status (working, needs you, idle), title, what it is doing, its thread, which session started it, and its subagents. Put sessions that need the user first.
 
 ## bind <thread>: put this session on a thread
 

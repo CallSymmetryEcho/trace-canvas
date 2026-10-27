@@ -156,15 +156,15 @@ async function main() {
       break;
     }
     case 'live': {
-      const { listLive } = await import('../src/live.mjs');
-      const { sessionThread } = await import('../src/hook.mjs');
+      const { liveSessions } = await import('../src/ops.mjs');
       const { readData } = await import('../src/store.mjs');
-      const d = readData(), list = listLive();
-      if (!list.length) { console.log('No running sessions.'); break; }
-      for (const s of list) {
-        const { threadId, bound } = sessionThread(d, s);
-        const where = threadId ? `${d.threads[threadId].name}${bound ? ' (bound)' : ''}` : '-';
-        console.log(`${s.status.padEnd(8)} ${s.id}  ${(s.title || s.prompt || s.repo || '').slice(0, 50).padEnd(50)}  ${where}\n         ${s.activity || ''}`);
+      const d = readData(), { sessions } = liveSessions(d);
+      if (!sessions.length) { console.log('No running sessions.'); break; }
+      for (const s of sessions) {
+        const where = s.threadId ? `${d.threads[s.threadId].name}${s.bound ? ' (bound)' : ''}` : '-';
+        console.log(`${s.status.padEnd(8)} ${s.id}  ${(s.title || s.prompt || s.repo || '').slice(0, 50).padEnd(50)}  ${where}`);
+        console.log(`         ${s.activity || ''}${s.parent ? `\n         started by ${s.parent}` : ''}`);
+        for (const a of s.agents) console.log(`         ${a.status === 'running' ? '▸' : '✓'} ${a.type}${a.description ? `: ${a.description}` : ''}`);
       }
       break;
     }

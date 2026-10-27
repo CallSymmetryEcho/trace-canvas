@@ -446,6 +446,32 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .l-list .act { grid-column: 2; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .l-cmd { display: flex; gap: 6px; align-items: center; }
 .l-cmd code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--f-mono); font-size: 12px; padding: 6px 8px; background: var(--surface-2); border: 1px solid var(--rule-soft); border-radius: 6px; }
+
+/* ---------- agents view ---------- */
+.ag-scroll { flex: 1 1 auto; overflow: auto; position: relative; }
+.ag-inner { position: relative; }
+.ag-links { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; }
+.ag-links path { fill: none; stroke-width: 2; }
+.ag-links .l-session { stroke: var(--edge); }
+.ag-links .l-agent { stroke: var(--faint); stroke-dasharray: 4 4; stroke-width: 1.5; }
+.ag-node { position: absolute; box-sizing: border-box; cursor: pointer; }
+.ag-session { width: 270px; height: 80px; padding: 9px 12px 8px 14px; background: var(--surface); border: 1px solid var(--rule); border-left: 4px solid var(--c, var(--rule)); border-radius: 10px; box-shadow: 0 1px 2px rgba(20, 24, 28, .05); display: grid; gap: 2px; align-content: start; }
+.ag-session:hover { border-color: var(--faint); border-left-color: var(--c, var(--faint)); }
+.ag-session.is-sel { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ag-session.st-waiting { box-shadow: 0 0 0 2px color-mix(in srgb, var(--warn) 45%, transparent); }
+.ag-session.st-off { background: var(--surface-2); border-style: dashed; cursor: default; }
+.ag-session .ag-t { display: flex; align-items: center; gap: 7px; font-weight: 600; min-width: 0; }
+.ag-session .ag-t span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ag-session .ag-a, .ag-session .ag-m { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ag-session .ag-m { color: var(--faint); display: flex; gap: 6px; align-items: center; }
+.ag-session .ag-m .roundel { width: 9px; height: 9px; border-width: 2.5px; }
+.ag-agent { width: 240px; height: 38px; padding: 0 11px; display: flex; align-items: center; gap: 7px; background: var(--surface); border: 1px dashed var(--rule); border-radius: 999px; font-size: 12px; }
+.ag-agent b { font-weight: 600; white-space: nowrap; }
+.ag-agent span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.ag-agent.st-running { border-style: solid; border-color: var(--ok); }
+.ag-agent.st-running .ldot { background: var(--ok); animation: lpulse 1.6s ease-in-out infinite; }
+.ag-agent.st-done { opacity: .72; }
+.ag-empty { padding: 48px 24px; max-width: 520px; color: var(--muted); }
 </style>
 
 <div id="app">
@@ -464,6 +490,7 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
       <button class="tab" role="tab" id="tab-canvas" data-view="canvas" aria-selected="true" data-i18n="tabCanvas">Canvas</button>
       <button class="tab" role="tab" id="tab-git" data-view="git" aria-selected="false" data-i18n="tabGit">Branches</button>
       <button class="tab" role="tab" id="tab-timeline" data-view="timeline" aria-selected="false" data-i18n="tabTimeline">Timeline</button>
+      <button class="tab" role="tab" id="tab-agents" data-view="agents" aria-selected="false" data-i18n="tabAgents">Agents</button>
     </nav>
     <span class="sync" id="sync" data-mode="loading"><span class="sync-text" id="sync-text"></span></span>
     <span class="ex-chip" id="ex-banner" hidden data-i18n-title="exChipTitle"><span data-i18n="exChip">Example data</span><button id="ex-clear" data-i18n="exClear">Clear</button></span>
@@ -531,6 +558,12 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
       </div>
     </section>
 
+    <section class="view" id="view-agents" hidden>
+      <div class="tl-wrap">
+        <div class="tl-bar"><span class="tl-hint" data-i18n="agHint"></span></div>
+        <div class="ag-scroll" id="ag-scroll"><div class="ag-inner" id="ag-inner"></div></div>
+      </div>
+    </section>
     <section class="view" id="view-timeline" hidden>
       <div class="tl-wrap">
         <div class="tl-bar">
@@ -718,6 +751,10 @@ const I18N = {
     livePrompt: 'Latest instruction', liveThread: 'Thread', liveAuto: 'Automatic (repository and branch)', liveNow: 'Now on',
     liveResume: 'Resume in a terminal', liveRunning: 'Running now', liveBadge: (n, w) => `${n} running${w ? `, ${w} need${w === 1 ? 's' : ''} you` : ''}`,
     tBound: n => `Bound to “${n}”`, tUnbound: 'Back to the repository and branch line',
+    tabAgents: 'Agents', agHint: 'Who started whom: each session starts the sessions to its right; the small dashed cards are its subagents.',
+    agEmpty: 'No agents are running right now. Claude Code sessions appear here as soon as they run with the Trace Canvas hooks.',
+    agLocalOnly: 'The agent view needs the local page (trace-canvas serve), which can see the sessions running on this computer.',
+    stOff: 'Not running', agStartedBy: 'Started by', agStarted: 'Sessions it started', agSubs: 'Subagents', agSubCount: n => `${n} subagent${n === 1 ? '' : 's'}`,
     agentPrompt: url => `Please log the key progress of this task to my Trace Canvas: ${url}
 Use the ArtifactData tool to write to this artifact's database:
 1. First list the threads collection. Reuse the document id of a thread with the same name; otherwise create threads/<new id>:
@@ -852,6 +889,10 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     livePrompt: '最近的指令', liveThread: '所属线', liveAuto: '自动（按仓库和分支）', liveNow: '当前在',
     liveResume: '在终端里恢复', liveRunning: '正在运行', liveBadge: (n, w) => `${n} 个运行中${w ? `，${w} 个等你` : ''}`,
     tBound: n => `已绑定到「${n}」`, tUnbound: '已改回按仓库和分支自动归线',
+    tabAgents: 'Agent', agHint: '谁启动了谁：每个会话启动它右边的会话，虚线小卡片是它的子 agent。',
+    agEmpty: '现在没有运行中的 agent。装好 Trace Canvas hooks 的 Claude Code 会话一运行就会出现在这里。',
+    agLocalOnly: 'Agent 视图需要本地页面（trace-canvas serve），它才能看到这台电脑上正在运行的会话。',
+    stOff: '未运行', agStartedBy: '由谁启动', agStarted: '它启动的会话', agSubs: '子 agent', agSubCount: n => `${n} 个子 agent`,
     agentPrompt: url => `请把这次任务的关键进展留痕到我的 Trace Canvas：${url}
 用 ArtifactData 工具写入这个 artifact 的数据库：
 1. 先 list 一下 threads 集合。已有同名线程就复用它的文档 id；没有就新建 threads/<新id>：
@@ -910,7 +951,7 @@ const S = {
   captureKind: 'idea', captureThread: ls.get('tc.captureThread', INBOX),
   mode: 'loading', readOnly: false, offline: false, got: new Set(), dragId: null,
   ai: null, sheet: null,
-  live: [],
+  live: [], liveOthers: [],
 };
 
 function fmtAbs(ts) { const d = new Date(ts); return `${pad2(d.getMonth() + 1)}/${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
@@ -1048,7 +1089,7 @@ const liveOn = tid => S.live.filter(s => s.threadId === tid);
 const stLabel = st => t({ working: 'stWorking', waiting: 'stWaiting' }[st] || 'stIdle');
 let liveRefresh = 0;
 async function loadLive() {
-  try { S.live = (await (await fetch('/api/live', { cache: 'no-store' })).json()).sessions || []; } catch { S.live = []; }
+  try { const j = await (await fetch('/api/live', { cache: 'no-store' })).json(); S.live = j.sessions || []; S.liveOthers = j.others || []; } catch { S.live = []; S.liveOthers = []; }
   render();
 }
 async function bindLive(sid, tid) {
@@ -1098,10 +1139,96 @@ function liveDetail(s) {
         <span>${esc(t('liveStarted', fmtRel(s.startedAt)))}${esc(t('liveSeen', fmtRel(s.lastSeen)))}</span>
       </div>
       ${s.prompt && s.prompt !== liveTitle(s) ? `<div class="sec-label">${esc(t('livePrompt'))}</div><p style="margin:0">${esc(s.prompt)}</p>` : ''}
+      ${agentRelations(s)}
       <label class="fld"><span>${esc(t('liveThread'))}</span><select id="l-thread">${opts}</select></label>
       ${s.threadId && S.threads.has(s.threadId) ? `<div class="meta"><span>${esc(t('liveNow'))} <button class="linkish" data-act="goto-thread" data-tid="${esc(s.threadId)}">${esc(S.threads.get(s.threadId).name)}</button></span></div>` : ''}
       <div class="fld"><span>${esc(t('liveResume'))}</span><div class="l-cmd"><code>${esc(cmd)}</code><button class="btn" data-act="copy-cmd" data-cmd="${esc(cmd)}">${esc(t('copy'))}</button></div></div>
     </div>`;
+}
+
+/* ---- agents view: who started whom ---- */
+const AG = { col: 310, row: 96, pad: 24, sessionH: 80, agentH: 38 };
+function agentTree() {
+  const all = [...S.liveOthers, ...S.live];
+  const byId = new Map(all.map(s => [s.id, s]));
+  const kids = new Map(), roots = [];
+  for (const s of all) {
+    if (s.parent && byId.has(s.parent)) { if (!kids.has(s.parent)) kids.set(s.parent, []); kids.get(s.parent).push(s); }
+    else roots.push(s);
+  }
+  // A tree that holds a session needing you comes first, then by thread (in canvas order).
+  const order = new Map(orderedThreads().map((th, i) => [th.id, i]));
+  const best = s => [s, ...(kids.get(s.id) || [])].reduce((m, x) => {
+    const sub = x === s ? { rank: LIVE_RANK[s.status] ?? 3, ord: order.get(s.threadId) ?? 1e9 } : best(x);
+    return { rank: Math.min(m.rank, sub.rank), ord: Math.min(m.ord, sub.ord) };
+  }, { rank: 3, ord: 1e9 });
+  const key = new Map(roots.map(r => [r.id, best(r)]));
+  roots.sort((a, b) => key.get(a.id).rank - key.get(b.id).rank || key.get(a.id).ord - key.get(b.id).ord || a.startedAt - b.startedAt);
+  return { byId, kids, roots };
+}
+// Tidy tree, left to right: every node takes one row slot, a parent sits in the middle of its children.
+function layoutAgents() {
+  const { kids, roots } = agentTree();
+  let slot = 0, maxDepth = 0;
+  const nodes = [], links = [];
+  const place = (n, kind, depth, color) => {
+    maxDepth = Math.max(maxDepth, depth);
+    const children = kind === 'session'
+      ? [...(kids.get(n.id) || []).sort((a, b) => a.startedAt - b.startedAt).map(c => ({ n: c, kind: 'session' })), ...(n.agents || []).map(a => ({ n: a, kind: 'agent' }))]
+      : [];
+    const th = kind === 'session' && n.threadId ? S.threads.get(n.threadId) : null;
+    const c = th ? th.color : color;
+    const placed = children.map(ch => place(ch.n, ch.kind, depth + 1, c));
+    const cy = placed.length ? (placed[0].cy + placed[placed.length - 1].cy) / 2 : AG.pad + (slot++) * AG.row + AG.row / 2;
+    const node = { n, kind, depth, cy, x: AG.pad + depth * AG.col, color: c };
+    nodes.push(node);
+    for (const p of placed) links.push({ from: node, to: p });
+    return node;
+  };
+  for (const r of roots) place(r, 'session', 0, null);
+  return { nodes, links, w: AG.pad * 2 + maxDepth * AG.col + 280, h: AG.pad * 2 + slot * AG.row };
+}
+function renderAgents() {
+  const inner = $('#ag-inner');
+  if (!SERVER) { inner.innerHTML = `<div class="ag-empty">${esc(t('agLocalOnly'))}</div>`; return; }
+  if (!S.live.length) { inner.innerHTML = `<div class="ag-empty">${esc(t('agEmpty'))}</div>`; return; }
+  const { nodes, links, w, h } = layoutAgents();
+  const selS = S.sel && S.sel.type === 'live' ? S.sel.id : null;
+  const H = k => (k === 'session' ? AG.sessionH : AG.agentH);
+  const paths = links.map(({ from, to }) => {
+    const x1 = from.x + 270, y1 = from.cy, x2 = to.x, y2 = to.cy, mx = (x1 + x2) / 2;
+    return `<path class="${to.kind === 'agent' ? 'l-agent' : 'l-session'}" d="M${x1} ${y1} C${mx} ${y1} ${mx} ${y2} ${x2} ${y2}"/>`;
+  }).join('');
+  const cards = nodes.map(({ n, kind, x, cy, color }) => {
+    const top = cy - H(kind) / 2;
+    if (kind === 'agent') {
+      return `<div class="ag-node ag-agent st-${esc(n.status)}" data-sid="${esc(n.session)}" style="left:${x}px;top:${top}px" title="${esc([n.description, n.last].filter(Boolean).join(' — '))}"><span class="ldot"></span><b>${esc(n.type || 'agent')}</b>${n.description ? `<span>${esc(n.description)}</span>` : ''}</div>`;
+    }
+    const th = n.threadId ? S.threads.get(n.threadId) : null;
+    const meta = [th ? `<span class="roundel" style="--c:${th.color}"></span><span>${esc(th.name)}</span>` : '', n.agents && n.agents.length ? `<span>· ${esc(t('agSubCount', n.agents.length))}</span>` : ''].join('');
+    const off = n.status === 'off';
+    return `<div class="ag-node ag-session st-${esc(n.status)} ${n.id === selS ? 'is-sel' : ''}" ${off ? '' : `data-sid="${esc(n.id)}"`} style="left:${x}px;top:${top}px;--c:${color || 'var(--rule)'}">
+      <div class="ag-t"><span class="ldot"></span><span>${esc(off ? n.title || n.id : liveTitle(n))}</span></div>
+      <div class="ag-a">${esc(off ? t('stOff') : n.activity || stLabel(n.status))}</div>
+      <div class="ag-m">${meta || esc([n.repo, n.branch].filter(Boolean).join(' · '))}</div>
+    </div>`;
+  }).join('');
+  inner.style.width = w + 'px';
+  inner.style.height = h + 'px';
+  inner.innerHTML = `<svg class="ag-links" width="${w}" height="${h}">${paths}</svg>${cards}`;
+}
+$('#ag-inner').addEventListener('click', e => { const b = e.target.closest('[data-sid]'); if (b && S.live.some(s => s.id === b.dataset.sid)) select({ type: 'live', id: b.dataset.sid }); });
+function agentRelations(s) {
+  const all = [...S.liveOthers, ...S.live];
+  const parent = s.parent ? all.find(x => x.id === s.parent) : null;
+  const children = S.live.filter(x => x.parent === s.id);
+  const subs = s.agents || [];
+  const name = x => (x.status === 'off' ? x.title || x.id : liveTitle(x));
+  return [
+    parent ? `<div class="meta"><span>${esc(t('agStartedBy'))} ${parent.status === 'off' ? esc(name(parent)) : `<button class="linkish" data-act="goto-live" data-sid="${esc(parent.id)}">${esc(name(parent))}</button>`}</span></div>` : '',
+    children.length ? `<div class="sec-label">${esc(t('agStarted'))}</div>${liveList(children)}` : '',
+    subs.length ? `<div class="sec-label">${esc(t('agSubs'))}</div><ul class="l-list">${subs.map(a => `<li class="st-${a.status === 'running' ? 'working' : 'idle'}"><span class="ldot"></span><span><b>${esc(a.type || 'agent')}</b>${a.description ? ` · ${esc(a.description)}` : ''}</span>${a.last ? `<span class="act">${esc(a.last)}</span>` : ''}</li>`).join('')}</ul>` : '',
+  ].join('');
 }
 
 let serverRefresh = 0;
@@ -1292,6 +1419,7 @@ function renderAll() {
   $('#toggle-done-label').textContent = S.hideDone ? t('menuShowDone') : t('menuHideDone');
   if (S.view === 'canvas') renderCanvas();
   else if (S.view === 'git') renderGit();
+  else if (S.view === 'agents') renderAgents();
   else renderTimeline();
   renderEmpty();
   renderDetail();
@@ -1313,7 +1441,7 @@ function renderEmpty() {
     return;
   }
   const noCommits = S.commits.size === 0;
-  const show = S.view === 'canvas' ? (noCommits && S.threads.size === 0) : noCommits;
+  const show = S.view === 'agents' ? false : S.view === 'canvas' ? (noCommits && S.threads.size === 0) : noCommits;
   el.hidden = !show;
   if (!show) return;
   el.innerHTML = `<div class="empty-card">
@@ -2030,12 +2158,13 @@ function doCapture() {
 
 /* ================= views, menu, keys ================= */
 function setView(v) {
-  if (!['canvas', 'git', 'timeline'].includes(v)) v = 'canvas';
+  if (!['canvas', 'git', 'timeline', 'agents'].includes(v)) v = 'canvas';
   S.view = v;
   $$('.tab').forEach(el => el.setAttribute('aria-selected', el.dataset.view === v ? 'true' : 'false'));
   $('#view-canvas').hidden = v !== 'canvas';
   $('#view-git').hidden = v !== 'git';
   $('#view-timeline').hidden = v !== 'timeline';
+  $('#view-agents').hidden = v !== 'agents';
   if (v === 'timeline') S.tlScroll = true;
   if (v !== 'canvas') S.connect = null;
   try { history.replaceState(null, '', location.pathname + location.search + '#' + v); } catch {}
@@ -2306,7 +2435,7 @@ applyStatic();
 renderKinds();
 autosize();
 const h = (location.hash || '').slice(1);
-setView(h === 'git' || h === 'timeline' ? h : 'canvas');
+setView(['git', 'timeline', 'agents'].includes(h) ? h : 'canvas');
 initStore();
 initSample();
 })();

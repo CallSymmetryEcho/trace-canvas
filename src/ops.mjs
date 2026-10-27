@@ -2,7 +2,9 @@
 // putting a session on the canvas, merging threads, and merging data sets.
 import { INBOX, COLS, addCommit, createThread, findThreadByName, lastCommit, readConfig, threadIdOf } from './store.mjs';
 import { headline, firstLine } from './git-events.mjs';
-import { AGENT, bindSession, logGitEvents, repoInfo, resumeLink, turnBody, rel } from './hook.mjs';
+import { AGENT, bindSession, logGitEvents, repoInfo, resumeLink, sessionThread, turnBody, rel } from './hook.mjs';
+import { listLive } from './live.mjs';
+import { desktopSessions } from './desktop.mjs';
 import { tr } from './i18n.mjs';
 
 // Stable ids, so capturing the same session twice updates instead of duplicating.
@@ -17,6 +19,29 @@ export function resolveThreadRef(d, ref) {
   if (!ref) return null;
   if (ref === INBOX || d.threads[ref]) return ref;
   return findThreadByName(d, ref);
+}
+
+/**
+ * Running sessions with their thread, title and the session that started them (from the
+ * desktop app's records), plus `others`: sessions that started a running one but are not
+ * running themselves, so each chain stays whole in the agent view.
+ */
+export function liveSessions(d, env = process.env) {
+  const desk = desktopSessions(env);
+  const sessions = listLive(env).map(s => {
+    const k = desk.get(s.id) || {};
+    return { ...s, ...sessionThread(d, s, env), title: s.title || k.title || '', parent: k.parent || null };
+  });
+  const seen = new Set(sessions.map(s => s.id)), others = [];
+  for (const s of sessions) {
+    for (let p = s.parent; p && !seen.has(p); p = (desk.get(p) || {}).parent) {
+      const k = desk.get(p);
+      if (!k) break;
+      seen.add(p);
+      others.push({ id: p, title: k.title, parent: k.parent, status: 'off', agents: [] });
+    }
+  }
+  return { sessions, others };
 }
 
 /**

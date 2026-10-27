@@ -118,7 +118,15 @@ node bin/trace-canvas.mjs setup --user
 
 每张卡片会显示这条线上有几个会话在运行。点开一个会话，可以看到它的仓库、分支、目录和最近的指令，复制 `claude --resume <id>`，或者把它换到另一条线。会话默认按仓库和分支自动归线；要手动绑定，可以在页面上选线，运行 `trace-canvas bind "<线名>"`，或者让 Claude 来做（`trace_bind`）。绑定之后，这个会话的记录也会记到那条线上。
 
-实时状态需要 SessionStart、PreToolUse 和 Notification 这三个 hook，`setup` 会自动加上（更新后再运行一次）。状态存在 `~/.trace-canvas/live/` 里，每个会话一个小文件，和你的记录分开。会话结束或 12 小时没有动静后就不再显示。只有本地页面能看到实时会话。
+实时状态需要 SessionStart、PreToolUse、Notification 和 SubagentStart/Stop 这几个 hook，`setup` 会自动加上（更新后再运行一次）。状态存在 `~/.trace-canvas/live/` 里，每个会话、每个子 agent 各一个小文件，和你的记录分开。会话结束或 12 小时没有动静后就不再显示。只有本地页面能看到实时会话。
+
+### Agent 视图：谁启动了谁
+
+**Agent** 标签页把正在运行的 agent 画成一棵从左到右的树。每个会话启动它右边的会话；虚线小卡片是它的子 agent（Explore、general-purpose、fork 等），运行中显示为绿色。启动过别的会话、自己已经不在运行的会话，会以虚线的"未运行"卡片留在链条里；有会话在等你的那棵树排在最前。点开一个会话，看到的面板和实时栏里的一样，另外多了：由谁启动、它启动的会话，以及各个子 agent 和它们最后一句话。
+
+![Agent 视图](docs/scenarios/live-agents.zh.png)
+
+子 agent 来自 SubagentStart/Stop 这两个 hook，以及 Claude Code 在每个子 agent 会话记录旁边保存的 `.meta.json`。谁启动了谁，读的是 Claude 桌面版自己的会话记录（`~/Library/Application Support/Claude/claude-code-sessions/`），只读、尽力而为：这个格式属于桌面版，随时可能变；没有桌面版时，每个会话各自成一棵树。可以用 `TRACE_CANVAS_DESKTOP_DIR` 指向别的位置。截图里的虚构会话由 `node docs/scenarios/agents.mjs <数据目录> <桌面记录目录>` 生成。
 
 ## 合并会话与线程
 
@@ -208,7 +216,8 @@ skill/SKILL.md        /trace-canvas skill
 src/server.mjs        只监听 127.0.0.1 的本地服务：页面、JSON API、用 SSE 实时推送更新
 src/mcp.mjs           MCP 服务（stdio JSON-RPC，无依赖）
 src/hook.mjs          Claude Code hook 处理
-src/live.mjs          实时会话：每个运行中的会话一个状态文件，由 hooks 写入
+src/live.mjs          实时会话：每个运行中的会话、每个子 agent 各一个状态文件，由 hooks 写入
+src/desktop.mjs       谁启动了谁：读取 Claude 桌面版的会话记录
 src/transcript.mjs    读取 Claude Code 会话记录（~/.claude/projects/…/<session>.jsonl）
 src/ops.mjs           放入会话、合并线程、合并数据集
 src/git-events.mjs    从 shell 命令及其输出里识别提交、推送、合并和 PR

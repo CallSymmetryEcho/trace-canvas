@@ -5,9 +5,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { addCommit, dataFile, ensureThread, importText, INBOX, mutate, readData } from './store.mjs';
-import { bindLiveSession, captureSession, listThreads, mergeDataset, mergeThreads, readThread } from './ops.mjs';
-import { listLive } from './live.mjs';
-import { sessionThread } from './hook.mjs';
+import { bindLiveSession, captureSession, listThreads, liveSessions, mergeDataset, mergeThreads, readThread } from './ops.mjs';
 import { describeSession, findTranscript, findTranscripts, parseTranscript } from './transcript.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -96,7 +94,7 @@ const TOOLS = [
   {
     name: 'trace_live',
     title: 'Running sessions',
-    description: 'Lists the Claude Code sessions running right now: status (working, waiting for the user, idle), what each is doing, its repository and branch, and the thread it belongs to.',
+    description: 'Lists the Claude Code sessions running right now: status (working, waiting for the user, idle), what each is doing, its repository and branch, the thread it belongs to, the session that started it, and its subagents.',
     inputSchema: { type: 'object', properties: { project_dir: { type: 'string', description: 'Only sessions working in this folder.' } } },
     annotations: { readOnlyHint: true },
   },
@@ -198,10 +196,12 @@ async function callTool(name, a = {}) {
     case 'trace_live': {
       const d = readData();
       const dir = a.project_dir ? path.resolve(a.project_dir) : null;
-      const sessions = listLive().filter(s => !dir || (s.cwd || '').startsWith(dir)).map(s => {
-        const { threadId, bound } = sessionThread(d, s);
-        return { sessionId: s.id, status: s.status, activity: s.activity, title: s.title || s.prompt || '', repo: s.repo, branch: s.branch, cwd: s.cwd, thread: threadId ? d.threads[threadId].name : null, bound, startedAt: new Date(s.startedAt).toISOString(), lastSeen: new Date(s.lastSeen).toISOString() };
-      });
+      const sessions = liveSessions(d).sessions.filter(s => !dir || (s.cwd || '').startsWith(dir)).map(s => ({
+        sessionId: s.id, status: s.status, activity: s.activity, title: s.title || s.prompt || '', repo: s.repo, branch: s.branch, cwd: s.cwd,
+        thread: s.threadId ? d.threads[s.threadId].name : null, bound: s.bound, startedBy: s.parent,
+        subagents: s.agents.map(a => ({ type: a.type, description: a.description, status: a.status, last: a.last || '' })),
+        startedAt: new Date(s.startedAt).toISOString(), lastSeen: new Date(s.lastSeen).toISOString(),
+      }));
       const waiting = sessions.filter(s => s.status === 'waiting').length;
       return { text: `${sessions.length} running session${sessions.length === 1 ? '' : 's'}${waiting ? `, ${waiting} waiting for the user` : ''}.`, data: { sessions } };
     }

@@ -9,21 +9,24 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { scenarioData } from './scenarios.mjs';
+import { writeAgentsDemo } from './agents.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const PORT = 4790, DEBUG = 9339, W = 1440, H = 900, SCALE = 1.5;
-// [name, scenario, view, action, height]; action: 'fit' or 'month'.
+// [name, scenario, view, action, height]; action: 'fit', 'month', or 'live' (adds the running-sessions demo from agents.mjs).
 const SHOTS = [
   ['vibe-git', 'vibe', 'git'],
   ['vibe-canvas', 'vibe', 'canvas', 'fit'],
   ['life-timeline', 'life', 'timeline', 'month', 640],
   ['life-canvas', 'life', 'canvas', 'fit'],
   ['agents-git', 'agents', 'git'],
+  ['live-agents', 'vibe', 'agents', 'live', 820],
 ];
 
 const home = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-shots-'));
 process.env.TRACE_CANVAS_HOME = path.join(home, 'data');
+process.env.TRACE_CANVAS_DESKTOP_DIR = path.join(home, 'desktop'); // never the real desktop app's records
 const { startServer } = await import('../../src/server.mjs');
 const { server } = await startServer({ port: PORT });
 const chrome = spawn(CHROME, ['--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run', '--no-default-browser-check',
@@ -45,12 +48,16 @@ const js = async expr => (await cdp('Runtime.evaluate', { expression: expr, awai
 
 const only = process.argv[2] || '';
 const now = Date.now();
+await cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }] }); // same look whatever the Mac's appearance
 for (const lang of ['en', 'zh']) {
   for (const [name, scenario, view, action, height = H] of SHOTS.filter(s => s[0].startsWith(only))) {
     await cdp('Emulation.setDeviceMetricsOverride', { width: W, height, deviceScaleFactor: SCALE, mobile: false });
     fs.mkdirSync(process.env.TRACE_CANVAS_HOME, { recursive: true });
     fs.writeFileSync(path.join(process.env.TRACE_CANVAS_HOME, 'data.json'), JSON.stringify(scenarioData(scenario, lang, now)));
     fs.writeFileSync(path.join(process.env.TRACE_CANVAS_HOME, 'config.json'), JSON.stringify({ lang }));
+    fs.rmSync(path.join(process.env.TRACE_CANVAS_HOME, 'live'), { recursive: true, force: true });
+    fs.rmSync(process.env.TRACE_CANVAS_DESKTOP_DIR, { recursive: true, force: true });
+    if (action === 'live') writeAgentsDemo({ home: process.env.TRACE_CANVAS_HOME, desktop: process.env.TRACE_CANVAS_DESKTOP_DIR, lang, now });
     // Same origin first, to forget the language and view the last shot left in localStorage.
     await cdp('Page.navigate', { url: `http://localhost:${PORT}/api/health` });
     await sleep(300);

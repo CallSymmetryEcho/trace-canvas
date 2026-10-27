@@ -118,7 +118,15 @@ The local page shows which Claude Code sessions are running right now. A bar und
 
 Each card shows how many sessions are running on its thread. Click a session to see its repository, branch, folder and latest instruction, copy `claude --resume <id>`, or put it on another thread. A session lands on its repository/branch line by itself; to bind it by hand, pick a thread in the page, run `trace-canvas bind "<thread>"`, or ask Claude (`trace_bind`). From then on its records go to that thread too.
 
-Live status needs the SessionStart, PreToolUse and Notification hooks, which `setup` adds (run it again after updating). It lives in one small file per session in `~/.trace-canvas/live/`, apart from your records. A session drops off when it ends, or after 12 hours without activity. Only the local page shows live sessions.
+Live status needs the SessionStart, PreToolUse, Notification and SubagentStart/Stop hooks, which `setup` adds (run it again after updating). It lives in small files in `~/.trace-canvas/live/` (one per session and one per subagent), apart from your records. A session drops off when it ends, or after 12 hours without activity. Only the local page shows live sessions.
+
+### Agent view: who started whom
+
+The **Agents** tab draws the running agents as a tree, left to right. Each session starts the sessions to its right; the small dashed cards are its subagents (Explore, general-purpose, forks, …), green while they run. A session that started others but is no longer running stays in the chain as a dashed "not running" card, and the tree that holds a session needing you comes first. Click a session for the same panel as in the live bar, now with who started it, the sessions it started and its subagents with their last message.
+
+![Agent view](docs/scenarios/live-agents.en.png)
+
+Subagents come from the SubagentStart/Stop hooks and the `.meta.json` file Claude Code keeps next to each subagent transcript. Which session started which comes from the Claude desktop app's own session records (`~/Library/Application Support/Claude/claude-code-sessions/`), read-only and best-effort: that format belongs to the app and may change, and without the desktop app every session simply starts its own tree. `TRACE_CANVAS_DESKTOP_DIR` points it somewhere else. The made-up sessions in the screenshot come from `node docs/scenarios/agents.mjs <data dir> <desktop dir>`.
 
 ## Merging sessions and threads
 
@@ -208,7 +216,8 @@ skill/SKILL.md        The /trace-canvas skill.
 src/server.mjs        Local server on 127.0.0.1: page, JSON API, live updates over server-sent events.
 src/mcp.mjs           MCP server (stdio JSON-RPC, no dependencies).
 src/hook.mjs          Claude Code hook handler.
-src/live.mjs          Live sessions: one status file per running session, written by the hooks.
+src/live.mjs          Live sessions: one status file per running session and per subagent, written by the hooks.
+src/desktop.mjs       Which session started which, read from the Claude desktop app's session records.
 src/transcript.mjs    Reads Claude Code session transcripts (~/.claude/projects/…/<session>.jsonl).
 src/ops.mjs           Capturing sessions, merging threads, merging data sets.
 src/git-events.mjs    Reads commits, pushes, merges and pull requests from shell commands and their output.

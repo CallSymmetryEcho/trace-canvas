@@ -1,6 +1,6 @@
 // Claude Code hook handler. Reads one hook event (JSON on stdin) and turns the
 // moments that matter into records:
-//   SessionStart, PreToolUse, Notification  only update the live status (live.mjs)
+//   SessionStart, PreToolUse, Notification, SubagentStart/Stop  only update the live status (live.mjs)
 //   UserPromptSubmit  the session's first instruction becomes a task
 //   PostToolUse       file edits are collected; git commit / push / merge and
 //                     `gh pr create` are logged as they happen
@@ -89,7 +89,7 @@ function eventKey(input) {
 }
 
 const LOG_EVENTS = ['UserPromptSubmit', 'PostToolUse', 'Stop', 'SessionEnd'];
-const LIVE_EVENTS = [...LOG_EVENTS, 'SessionStart', 'PreToolUse', 'Notification'];
+const LIVE_EVENTS = [...LOG_EVENTS, 'SessionStart', 'PreToolUse', 'Notification', 'SubagentStart', 'SubagentStop'];
 
 export function handleHook(input, env = process.env) {
   if (!input || typeof input !== 'object') return { skipped: 'no input' };
@@ -102,7 +102,7 @@ export function handleHook(input, env = process.env) {
   // git calls happen outside the lock so parallel sessions don't wait on each other.
   // PreToolUse and Notification fire on every tool call, so they reuse what the live file already knows.
   const relevantTool = ev !== 'PostToolUse' || input.tool_name === 'Bash' || EDIT_TOOLS.has(input.tool_name) || input.tool_name === 'TodoWrite';
-  const quick = ev === 'PreToolUse' || ev === 'Notification';
+  const quick = ['PreToolUse', 'Notification', 'SubagentStart', 'SubagentStop'].includes(ev);
   const info = ev !== 'SessionEnd' && relevantTool && !(quick && readLive(sid, env)) ? repoInfo(cwd) : null;
   try { updateLive(input, { info, key: info ? threadKey(info, cfg, sid) : null, env }); } catch {}
   if (!LOG_EVENTS.includes(ev)) return { live: ev };

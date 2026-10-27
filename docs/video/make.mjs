@@ -288,6 +288,33 @@ const PROMO = [
   { page: { card: { big: 'Trace Canvas', small: ['Open source · MIT · works with Claude Code', '开源 · MIT · 支持 Claude Code'], foot: `${REPO} ⭐` } },
     text: [['Give your agents a map. Trace Canvas is free on GitHub.', '给你的 agent 一张地图。Trace Canvas 在 GitHub 上免费开源。']] },
 ];
+// The hook: a 20-second short for Shorts, Xiaohongshu and X, made for --vertical. `head` is the
+// headline above the picture in the vertical frame.
+const HOOK_HEAD = ['Too many AI agents to keep track of?', 'AI agent 一多，就乱了？'];
+const HOOK = [
+  { page: 'app', head: HOOK_HEAD, preload: h => { h.loadScenario(); h.addSessions(); h.loadAgents(); },
+    text: [
+      ['Five agents running, and you have lost track of who is doing what?', '同时开五个 agent，记不清谁在干什么了？'],
+      ['Trace Canvas puts all of it on one map.', 'Trace Canvas 把它们画在同一张地图上。'],
+    ],
+    run: PROMO[1].run },
+  { page: { terminal: 'claude — ~/code/tripsplit' }, head: HOOK_HEAD,
+    text: [['A new agent reads the map and catches up in seconds.', '新开的 agent 读一下这张图，几秒就接上进度。']],
+    run: PROMO[2].run },
+  { page: 'app', head: HOOK_HEAD,
+    text: [['And you see at a glance which one is waiting for you.', '哪个 agent 在等你批准，一眼就能看到。']],
+    run: async h => {
+      const p = h.speak(0);
+      await h.click('#tab-agents');
+      await h.wait(700);
+      await h.move('#ag-inner .ag-session[data-sid="demo-ocr"]');
+      await h.wait(500);
+      await h.move('#ag-inner .ag-agent.st-running');
+      await p;
+    } },
+  { page: { card: { big: 'Trace Canvas', small: ['Free and open source · Claude Code', '免费开源 · 支持 Claude Code'], foot: `${REPO} ⭐` } },
+    text: [['Give your agents a map. Free on GitHub.', '给你的 agent 一张地图。Trace Canvas，免费开源。']] }, // the Chinese voice garbles "GitHub"
+];
 // The Agents view: who started whom, and who needs you. Data from docs/scenarios/agents.mjs.
 const AGENTS = [
   { page: { card: { big: 'Trace Canvas', small: ['Who started whom, and who needs you', '谁启动了谁，谁在等你'] } },
@@ -550,7 +577,7 @@ const GIFS = [
     } },
 ];
 // TC_GIFS=branches,merge records only those GIFs.
-const VIDEOS = { tutorial: SCENES, promo: PROMO, agents: AGENTS, goals: GOALS, gifs: process.env.TC_GIFS ? GIFS.filter(g => process.env.TC_GIFS.split(',').includes(g.name)) : GIFS };
+const VIDEOS = { tutorial: SCENES, promo: PROMO, hook: HOOK, agents: AGENTS, goals: GOALS, gifs: process.env.TC_GIFS ? GIFS.filter(g => process.env.TC_GIFS.split(',').includes(g.name)) : GIFS };
 
 /* ---------- narration ---------- */
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -667,6 +694,7 @@ async function record(video, lang) {
     if (scene.captionAt) sc.captionAt = scene.captionAt;
     if (scene.zoom) sc.zoom = scene.zoom;
     if (scene.focus) sc.focus = scene.focus;
+    if (scene.head) sc.head = pick(scene.head, lang);
     const center = (sel, n) => js(`(() => { const all = document.querySelectorAll(${JSON.stringify(sel)}); const e = all[${n} < 0 ? all.length + ${n} : ${n}]; if (!e) return null; const r = e.getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + Math.min(r.height / 2, 22)) }; })()`);
     const h = {
       lang, js, wait,
@@ -797,9 +825,10 @@ function writeSrt(video, lang, scenes) {
 }
 
 // Concurrency 2 was fastest on an M2 Pro: 13 fps against 10 fps at the default 6; more tabs only compete for decoding the recorded clips.
+// --vertical renders 1080 x 1920 to out/short-<video>.<lang>.mp4 instead.
 function render(video, lang) {
-  const mp4 = path.join(OUT, `trace-canvas-${video}.${lang}.mp4`);
-  execFileSync('npx', ['remotion', 'render', 'src/index.jsx', 'Tutorial', mp4, `--props=${JSON.stringify({ video, lang })}`, `--browser-executable=${CHROME}`, `--concurrency=${process.env.TC_CONCURRENCY || 2}`, '--log=error'], { cwd: REMOTION, stdio: 'inherit' });
+  const mp4 = path.join(OUT, vertical ? `short-${video}.${lang}.mp4` : `trace-canvas-${video}.${lang}.mp4`);
+  execFileSync('npx', ['remotion', 'render', 'src/index.jsx', vertical ? 'Vertical' : 'Tutorial', mp4, `--props=${JSON.stringify({ video, lang })}`, `--browser-executable=${CHROME}`, `--concurrency=${process.env.TC_CONCURRENCY || 2}`, '--log=error'], { cwd: REMOTION, stdio: 'inherit' });
   console.log(`${path.relative(process.cwd(), mp4)}  ${duration(mp4).toFixed(1)} s`);
 }
 
@@ -818,6 +847,7 @@ function renderGifs(lang) {
 const args = process.argv.slice(2);
 // --render-only: animate the last recordings again, e.g. after changing the Remotion compositions.
 const renderOnly = args.includes('--render-only');
+const vertical = args.includes('--vertical');
 const videos = Object.keys(VIDEOS).filter(v => !args.some(a => a in VIDEOS) || args.includes(v));
 const langs = ['en', 'zh'].filter(l => !args.some(a => a === 'en' || a === 'zh') || args.includes(l));
 const jobs = videos.flatMap(v => langs.map(l => [v, l]));

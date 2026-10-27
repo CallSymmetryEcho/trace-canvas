@@ -1,11 +1,12 @@
 # Videos and feature GIFs
 
-`make.mjs` builds four narrated videos, each in English and Chinese, and the silent feature GIFs that the READMEs show:
+`make.mjs` builds five narrated videos, each in English and Chinese, and the silent feature GIFs that the READMEs show:
 
 | Name | What it shows | Length |
 | --- | --- | --- |
 | `tutorial` | the whole tool, from install to merging threads | about 2¼ min |
 | `promo` | Trace Canvas as the entry point for agents: one shared map, catching up through MCP, the Agents view | under a minute |
+| `hook` | a 20-second short: one map for all your agents, catching up through MCP, who is waiting for you; made for `--vertical` | about 20 s |
 | `agents` | the Agents view: who started whom, and which session needs you | about a minute |
 | `goals` | goals and to-dos, one list shared with your agents | about a minute |
 | `gifs` | `docs/gif-<agents\|branches\|merge\|goals\|timeline>.<lang>.gif`, no sound; `TC_GIFS=merge,goals` records only those | 10–13 s each |
@@ -14,9 +15,10 @@
 node docs/video/make.mjs                        # everything, both languages
 node docs/video/make.mjs promo zh               # one video, one language
 node docs/video/make.mjs promo --render-only    # animate the last recording again, e.g. after editing Tutorial.jsx
+node docs/video/make.mjs hook --vertical        # 1080 x 1920 for Shorts, Xiaohongshu and X
 ```
 
-Output: `docs/video/out/trace-canvas-<video>.<lang>.mp4` and `.srt` caption files for YouTube or Bilibili (not committed); the GIFs go to `docs/` and are committed. The opening GIF of the READMEs, `docs/demo.<lang>.gif`, was cut by hand from an earlier recording; `make.mjs` does not rebuild it.
+Output: `docs/video/out/trace-canvas-<video>.<lang>.mp4` (with `--vertical`, `short-<video>.<lang>.mp4`: a headline from the scenes' `head` on top, the camera in a square window below) and `.srt` caption files for YouTube or Bilibili (not committed); the GIFs go to `docs/` and are committed. The opening GIF of the READMEs, `docs/demo.<lang>.gif`, was cut by hand from an earlier recording; `make.mjs` does not rebuild it.
 
 How it works:
 

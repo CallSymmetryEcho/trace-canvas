@@ -83,6 +83,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .tab:hover { color: var(--ink); }
 .tab[aria-selected="true"] { background: var(--ink); color: var(--surface); }
+.tab-goals, .gl-acts .gl-view { display: none; } /* phone only (narrow screens below) */
+.gl-acts { display: contents; }
 .spacer { flex: 1 1 0; }
 .search { flex: 0 1 220px; min-width: 120px; position: relative; }
 .search input {
@@ -423,7 +425,6 @@ body.sheet-open .top { z-index: 80; }
   .brand-name { font-size: 18px; }
   .search { order: 10; flex: 1 1 100%; }
   .tab { padding: 4px 10px; }
-  .detail { top: auto; left: 0; right: 0; bottom: 0; width: auto; max-height: 72%; border-radius: 14px 14px 0 0; border-bottom: 0; }
   .g-row .kind-tag, .g-row .agent-tag { display: none; }
   .pill { max-width: 96px; }
   .g-time { min-width: 0; }
@@ -439,6 +440,30 @@ body.sheet-open .top { z-index: 80; }
   .git-legend > * { flex: none; }
   .capture:not(:focus-within) .cap-meta { display: none; }
   .capture:not(:focus-within) .cap-input textarea { height: 38px !important; overflow: hidden; }
+
+  /* ---- A phone shows pages, not layers ----
+     Goals is a tab whose page sits under the header; a line, record or session opens as a full page with ←
+     (the back gesture closes it too); the other sheets fill the screen. Inputs are 16px so iOS does not zoom. */
+  .tab-goals { display: inline-block; }
+  #goals-btn { display: none; }
+  .tabs { overflow-x: auto; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { flex: none; padding: 4px 9px; }
+  .search { order: 0; flex: 1 1 110px; }
+  input, select, textarea { font-size: 16px; }
+  .scrim { padding: 0; }
+  .sheet { width: 100%; max-height: none; height: 100%; border-radius: 0; box-shadow: none; }
+  body.sheet-open:not(.goals-page) .top { z-index: 40; }
+  body.goals-page .scrim { top: var(--top-h, 0px); background: var(--bg); }
+  body.goals-page .sheet { background: var(--bg); }
+  body.goals-page .sheet-head { display: none; }
+  body.goals-page .sheet-body { padding: 12px 12px 32px; gap: 12px; }
+  .detail { position: fixed; z-index: 85; inset: 0; width: auto; border: 0; border-radius: 0; box-shadow: none; padding-top: env(safe-area-inset-top, 0px); }
+  .d-head [data-act="close"] { order: -1; width: 40px; height: 40px; font-size: 0; }
+  .d-head [data-act="close"]::before { content: "←"; font-size: 22px; }
+  .d-actions .btn { min-height: 40px; }
+  .detail .fld input, .detail .fld select, .detail .fld textarea { box-sizing: border-box; min-width: 0; max-width: 100%; }
+
 }
 @media (max-width: 480px) {
   .brand-name { display: none; }
@@ -552,6 +577,31 @@ body.sheet-open .top { z-index: 80; }
 .gl-hand { flex: none; font-size: 11.5px; padding: 1px 7px; }
 .gl-add { width: 100%; padding: 6px 9px; border: 1px dashed var(--rule); border-radius: 7px; background: transparent; font-size: 13px; }
 .gl-add:focus { outline: none; border-style: solid; border-color: var(--accent); background: var(--surface); }
+@media (max-width: 760px) {
+  /* Goals on a phone (after the rules above, so it wins): one to-do per row, checkbox and title as big targets; tapping the title opens its actions in place. */
+  .gl-help { font-size: 14px; color: var(--muted); }
+  .gl-help summary { padding: 6px 0; cursor: pointer; color: var(--accent); }
+  .gl-help span { display: block; padding: 4px 0 2px; }
+  .gl-bar-top { justify-content: space-between; font-size: 14px; }
+  .gl-bar-top .check { padding: 8px 0; }
+  .gl-group { padding: 12px 14px; gap: 8px; border-radius: 12px; background: var(--surface); }
+  .gl-head { min-height: 36px; }
+  .gl-head b { font-size: 16px; }
+  .gl-head .linkish { padding: 8px 0; font-size: 13px; }
+  .gl-goal { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 14px; }
+  .gl-tasks { gap: 0; }
+  .gl-tasks li { display: grid; grid-template-columns: 30px 1fr auto; align-items: start; gap: 4px 8px; padding: 10px 0; border-top: 1px solid var(--rule-soft); font-size: 15px; line-height: 1.4; }
+  .gl-tasks li input[type="checkbox"] { width: 22px; height: 22px; margin: 0 4px; }
+  .gl-tasks .gl-t { grid-column: 2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .gl-tasks .gl-t:hover { text-decoration: none; }
+  .gl-tasks li.open .gl-t { display: block; }
+  .gl-tasks time { grid-column: 3; grid-row: 1; padding-top: 2px; }
+  .gl-tasks .gl-by { grid-column: 2 / -1; }
+  .gl-acts { display: none; }
+  .gl-tasks li.open .gl-acts { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 8px; padding-top: 6px; }
+  .gl-acts .gl-who, .gl-acts .gl-hand, .gl-acts .gl-view { display: inline-flex; min-height: 36px; font-size: 14px; padding: 4px 10px; }
+  .gl-add { box-sizing: border-box; padding: 10px 12px; }
+}
 </style>
 
 <div id="app">
@@ -569,6 +619,7 @@ body.sheet-open .top { z-index: 80; }
     <nav class="tabs" role="tablist" data-i18n-aria="viewsAria">
       <button class="tab" role="tab" id="tab-canvas" data-view="canvas" aria-selected="true" data-i18n="tabCanvas">Canvas</button>
       <button class="tab" role="tab" id="tab-git" data-view="git" aria-selected="false" data-i18n="tabGit">Branches</button>
+      <button class="tab tab-goals" role="tab" id="tab-goals" data-open="goals" aria-selected="false" data-i18n="goalsBtn">Goals</button>
       <button class="tab" role="tab" id="tab-timeline" data-view="timeline" aria-selected="false" data-i18n="tabTimeline">Timeline</button>
       <button class="tab" role="tab" id="tab-agents" data-view="agents" aria-selected="false" data-i18n="tabAgents">Agents</button>
     </nav>
@@ -701,6 +752,8 @@ body.sheet-open .top { z-index: 80; }
 /* ================= constants & helpers ================= */
 const ARTIFACT_URL = 'https://claude.ai/artifact/Y7kykkrWyU4rH31MttYLMj';
 const SERVER = window.TRACE_CANVAS_SERVER || null;
+// A phone gets its own layout (the narrow-screen CSS): Goals as a tab, panels as pages. Desktop never takes these paths.
+const PHONE = matchMedia('(max-width: 760px)');
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -850,7 +903,7 @@ const I18N = {
     actorHuman: 'You', actorAgent: 'Agent', liveTipTime: 'now',
     goalsBtn: 'Goals', goalsBtnTitle: 'Goals and to-dos of every line', goalsTitle: 'Goals and to-dos',
     goalsTip: 'How it fits together: the <b>inbox</b> holds loose ideas you have not thought through; a <b>to-do</b> □ belongs to a line and is a next step you or an agent can take; a line\'s <b>goal</b> is the outcome it is working towards (write it in the line\'s panel). Agents read goals and to-dos with the MCP tool <b>trace_tasks</b> and tick what they finish with <b>trace_task_done</b>, so you can see progress here without asking.',
-    goalsTipHide: 'Got it', goalsShowDone: 'Show done', goalsSummary: (open, lines) => `${open} open to-do${open === 1 ? '' : 's'} on ${lines} line${lines === 1 ? '' : 's'}`,
+    goalsTipHide: 'Got it', goalsHelp: 'How it works', goalsView: 'Open the record', goalsShowDone: 'Show done', goalsSummary: (open, lines) => `${open} open to-do${open === 1 ? '' : 's'} on ${lines} line${lines === 1 ? '' : 's'}`,
     goalsNoGoal: 'No goal yet. Write one in the line\'s panel.', goalsAdd: '+ Add a to-do, Enter to save', goalsOpenLine: 'Open line',
     goalsOthers: n => `${n} more line${n === 1 ? ' has' : 's have'} no goal or to-do yet.`, goalsEmpty: 'No goals or to-dos yet. Open a line, write its goal, and add to-dos here or with the □ kind below.',
     goalsBy: name => `ticked by ${name}`, tTaskAdded: 'To-do added',
@@ -1007,7 +1060,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     actorHuman: '你', actorAgent: 'Agent', liveTipTime: '此刻',
     goalsBtn: '目标', goalsBtnTitle: '每条线的目标和待办', goalsTitle: '目标和待办',
     goalsTip: '怎么用：<b>收件箱</b>放还没想清楚的零散想法；<b>待办</b> □ 挂在具体的线上，是你或 agent 可以去做的下一步；线的<b>目标</b>是它要达到的结果，写在这条线的面板里。agent 用 MCP 工具 <b>trace_tasks</b> 读取目标和待办，做完用 <b>trace_task_done</b> 勾上，你在这里就能看到进度，不用去问。',
-    goalsTipHide: '知道了', goalsShowDone: '显示已完成', goalsSummary: (open, lines) => `${lines} 条线上还有 ${open} 项待办`,
+    goalsTipHide: '知道了', goalsHelp: '怎么用？', goalsView: '查看记录', goalsShowDone: '显示已完成', goalsSummary: (open, lines) => `${lines} 条线上还有 ${open} 项待办`,
     goalsNoGoal: '还没写目标，可以在这条线的面板里填写。', goalsAdd: '+ 添加待办，回车保存', goalsOpenLine: '打开这条线',
     goalsOthers: n => `另外 ${n} 条线还没有目标或待办。`, goalsEmpty: '还没有目标或待办。打开一条线写下目标，再在这里或用下方的 □ 类型添加待办。',
     goalsBy: name => `由 ${name} 勾选`, tTaskAdded: '已添加待办',
@@ -2253,9 +2306,13 @@ let lastKey = '', lastHTML = '', detailHold = false;
 detail.addEventListener('pointerdown', () => { detailHold = true; });
 window.addEventListener('pointerup', () => { if (detailHold) { detailHold = false; setTimeout(render, 0); } }, true);
 function select(sel) {
+  // On a phone a panel is a page of its own: opening one adds a history entry, so ← and the back gesture both close it.
+  if (PHONE.matches && !sel && S.sel && history.state && history.state.tcPanel) { history.back(); return; }
+  if (PHONE.matches && sel && !S.sel) history.pushState({ tcPanel: 1 }, '');
   S.sel = sel; S.ui = {};
   render();
 }
+window.addEventListener('popstate', () => { if (S.sel) { S.sel = null; S.ui = {}; render(); } });
 function threadOptions(selected, { excludeId, onlyOpen } = {}) {
   const opts = [{ id: INBOX, name: t('inbox') }, ...orderedThreads().filter(th => th.id !== excludeId && (!onlyOpen || th.status === 'active' || th.status === 'parked' || th.id === selected))];
   return opts.map(th => `<option value="${esc(th.id)}" ${th.id === selected ? 'selected' : ''}>${esc(th.name)}${th.status && th.status !== 'active' && th.id !== INBOX ? ` (${esc(statusLabel(th.status))})` : ''}</option>`).join('');
@@ -2561,7 +2618,7 @@ function doCapture() {
 function setView(v) {
   if (!['canvas', 'git', 'timeline', 'agents'].includes(v)) v = 'canvas';
   S.view = v;
-  $$('.tab').forEach(el => el.setAttribute('aria-selected', el.dataset.view === v ? 'true' : 'false'));
+  markTabs();
   $('#view-canvas').hidden = v !== 'canvas';
   $('#view-git').hidden = v !== 'git';
   $('#view-timeline').hidden = v !== 'timeline';
@@ -2571,7 +2628,12 @@ function setView(v) {
   try { history.replaceState(null, '', location.pathname + location.search + '#' + v); } catch {}
   render();
 }
-$$('.tab').forEach(el => el.addEventListener('click', () => setView(el.dataset.view)));
+$$('.tab[data-view]').forEach(el => el.addEventListener('click', () => { if (PHONE.matches && S.sheet) closeSheet(); setView(el.dataset.view); }));
+// On a phone Goals is a tab too (its page is the Goals sheet laid out under the header).
+function markTabs() {
+  const goals = PHONE.matches && S.sheet === 'goals';
+  $$('.tab').forEach(el => el.setAttribute('aria-selected', String(goals ? el.id === 'tab-goals' : el.dataset.view === S.view)));
+}
 let qTimer = 0;
 $('#q').addEventListener('input', e => { clearTimeout(qTimer); qTimer = setTimeout(() => { S.q = e.target.value.trim(); render(); }, 120); });
 $('#lang-btn').onclick = () => setLang(LANG === 'en' ? 'zh' : 'en');
@@ -2617,11 +2679,14 @@ document.addEventListener('keydown', e => {
   else if (e.key === 'f' && S.view === 'canvas') fit();
 });
 window.addEventListener('resize', () => render());
+PHONE.addEventListener('change', () => { markTabs(); if (S.sheet === 'goals') renderGoals(); });
+// The Goals page starts where the header ends, whatever its height.
+new ResizeObserver(([e]) => document.documentElement.style.setProperty('--top-h', `${e.target.offsetHeight}px`)).observe($('.top'));
 
 /* ================= sheets ================= */
 const scrim = $('#scrim');
 function closeSheet() {
-  scrim.hidden = true; S.sheet = null; document.body.classList.remove('sheet-open');
+  scrim.hidden = true; S.sheet = null; document.body.classList.remove('sheet-open', 'goals-page'); markTabs();
   if (S.ai && S.ai.ctl && S.ai.status === 'thinking') S.ai.ctl.abort();
 }
 $('#sheet-close').onclick = closeSheet;
@@ -2667,7 +2732,7 @@ function agentSheet() {
   setSheet(t('agentTitle'), body);
 }
 function openSheet(kind) {
-  S.sheet = kind; document.body.classList.add('sheet-open');
+  S.sheet = kind; document.body.classList.add('sheet-open'); document.body.classList.toggle('goals-page', kind === 'goals'); markTabs();
   if (kind === 'agent') agentSheet();
   else if (kind === 'io') {
     setSheet(t('ioTitle'), `
@@ -2754,9 +2819,9 @@ function renderGoals() {
   const row = c => {
     const by = c.done && c.doneBy && c.doneBy !== 'human' ? `<span class="gl-by"><span class="actor a-agent">${ACTOR_ICON.agent}</span>${esc(t('goalsBy', c.doneBy))}</span>` : '';
     const who = c.done ? '' : `<select class="gl-who" data-who="${esc(c.id)}" title="${esc(t('goalsWho'))}"><option value="">${esc(t('goalsAnyone'))}</option>${Object.entries(AGENT_NAMES).map(([k, n]) => `<option value="${k}" ${c.assignee === k ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>${c.assignee ? `<button class="btn gl-hand" data-hand="${esc(c.id)}">${esc(t('goalsHand'))}</button>${S.mode === 'server' && S.platform === 'darwin' ? `<button class="btn gl-hand" data-hand-open="${esc(c.id)}">${esc(t('openInTerminal'))}</button>` : ''}` : ''}`;
-    return `<li class="${c.done ? 'done' : ''}"><input type="checkbox" data-task="${esc(c.id)}" ${c.done ? 'checked' : ''} aria-label="${esc(c.title)}"><span class="gl-t" data-cid="${esc(c.id)}">${esc(c.title)}</span>${who}${by}<time>${fmtShort(c.doneAt || c.ts)}</time></li>`;
+    return `<li class="${c.done ? 'done' : ''} ${S.glOpen === c.id ? 'open' : ''}"><input type="checkbox" data-task="${esc(c.id)}" ${c.done ? 'checked' : ''} aria-label="${esc(c.title)}"><span class="gl-t" data-cid="${esc(c.id)}">${esc(c.title)}</span><span class="gl-acts">${who}<button class="btn gl-view" data-view-rec="${esc(c.id)}">${esc(t('goalsView'))}</button></span>${by}<time>${fmtShort(c.doneAt || c.ts)}</time></li>`;
   };
-  const body = (tipHidden ? '' : `<div class="gl-tip"><span>${t('goalsTip')}</span><button class="btn" id="gl-tip-hide">${esc(t('goalsTipHide'))}</button></div>`)
+  const body = (PHONE.matches ? `<details class="gl-help"><summary>${esc(t('goalsHelp'))}</summary><span>${t('goalsTip')}</span></details>` : tipHidden ? '' : `<div class="gl-tip"><span>${t('goalsTip')}</span><button class="btn" id="gl-tip-hide">${esc(t('goalsTipHide'))}</button></div>`)
     + `<div class="gl-bar-top"><span>${esc(t('goalsSummary', totalOpen, groups.filter(g => g.open.length).length))}</span><label class="check"><input type="checkbox" id="gl-show-done" ${S.goalsShowDone ? 'checked' : ''}>${esc(t('goalsShowDone'))}</label></div>`
     + (groups.length ? groups.map(({ th, tasks, open, goal }) => {
       const shown = S.goalsShowDone ? tasks : open;
@@ -2818,7 +2883,10 @@ sheetBody.addEventListener('click', e => {
   }
   const hand = e.target.closest('[data-hand]');
   if (hand) { const cmd = handCommand(S.commits.get(hand.dataset.hand)); if (cmd) copyText(cmd, t('tHandCopied')); return; }
-  const go = e.target.closest('[data-goto]'), rec = e.target.closest('.gl-t');
+  const go = e.target.closest('[data-goto]'), rec = e.target.closest('.gl-t'), view = e.target.closest('[data-view-rec]');
+  // On a phone the Goals page stays under the line or record page, so ← comes back to it; a title opens its row.
+  if (PHONE.matches && rec) { S.glOpen = S.glOpen === rec.dataset.cid ? null : rec.dataset.cid; renderGoals(); return; }
+  if (PHONE.matches && (go || view)) { select(go ? { type: 'thread', id: go.dataset.goto } : { type: 'commit', id: view.dataset.viewRec }); return; }
   if (go) { closeSheet(); select({ type: 'thread', id: go.dataset.goto }); }
   else if (rec) { closeSheet(); select({ type: 'commit', id: rec.dataset.cid }); }
 });

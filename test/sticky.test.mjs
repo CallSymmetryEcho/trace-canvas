@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { bindSession, handleHook } from '../src/hook.mjs';
-import { mergeThreads, readThread } from '../src/ops.mjs';
+import { bindLiveSession, mergeThreads, readThread } from '../src/ops.mjs';
 import { addCommit, createThread, mutate, readData } from '../src/store.mjs';
 
 function sandbox() {
@@ -73,4 +73,12 @@ test('a line lists its sessions, newest first, with the command that resumes eac
   const r = readThread(readData(s.env), 'tripsplit', {}, s.env);
   assert.deepEqual(r.sessions.map(x => [x.id, x.agent, x.title, x.status]), [['s2', 'Codex', 'Second session', 'working'], ['s1', 'Claude Code', 'First session', 'working']]);
   assert.equal(r.sessions[0].resume, `cd '${s.repo}' && codex resume s2`);
+});
+
+test('a session bound through the tools says which agent and machine it is, before any hook has run', () => {
+  const s = sandbox();
+  const env = { ...s.env, TRACE_CANVAS_MACHINE: 'bsuperstation' };
+  mutate(d => { createThread(d, { name: 'Cross-machine test' }); bindLiveSession(d, { sessionId: 'cx9', thread: 'Cross-machine test', agent: 'codex' }, env); }, env);
+  const e = readData(env).sessions.cx9;
+  assert.deepEqual([e.agent, e.agentKey, e.resume, e.machine, e.bound], ['Codex', 'codex', 'codex resume cx9', 'bsuperstation', true]);
 });

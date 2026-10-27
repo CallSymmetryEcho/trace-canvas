@@ -237,7 +237,7 @@ async function callTool(name, a = {}) {
     case 'trace_fork': {
       const sessionId = a.bind ? currentSessionId({ sessionId: a.session_id, projectDir: projectDir() }) : null;
       if (a.bind && !sessionId) throw new Error('No session to bind; pass session_id');
-      const r = mutate(d => { const f = forkThread(d, { from: a.from, name: a.name, agent: agentOf(agentKey()).name }); if (sessionId) bindLiveSession(d, { sessionId, thread: f.thread.id }); return f; });
+      const r = mutate(d => { const f = forkThread(d, { from: a.from, name: a.name, agent: agentOf(agentKey()).name }); if (sessionId) bindLiveSession(d, { sessionId, thread: f.thread.id, agent: agentKey() }); return f; });
       return { text: `Forked "${r.thread.name}"${sessionId ? `; session ${sessionId} is on it now` : ''}.`, data: { thread: { id: r.thread.id, name: r.thread.name }, forkOf: r.thread.forkOf, record: r.record.id, sessionId } };
     }
     case 'trace_tasks': {
@@ -268,7 +268,7 @@ async function callTool(name, a = {}) {
       const sessionId = currentSessionId({ sessionId: a.session_id, projectDir: projectDir() });
       if (!sessionId) throw new Error('No session to bind; pass session_id');
       if (!a.unbind && !String(a.thread || '').trim()) throw new Error('Pass thread, or unbind: true');
-      const t = mutate(d => bindLiveSession(d, { sessionId, thread: a.unbind ? null : a.thread }));
+      const t = mutate(d => bindLiveSession(d, { sessionId, thread: a.unbind ? null : a.thread, agent: agentKey() }));
       return { text: t ? `Session ${sessionId} is on "${t.name}" now.` : `Session ${sessionId} follows its repository/branch line again.`, data: { sessionId, thread: t ? { id: t.id, name: t.name } : null } };
     }
     case 'trace_where': {

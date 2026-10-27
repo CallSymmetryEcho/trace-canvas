@@ -166,7 +166,7 @@ export function forkThread(d, { from, name, agent = '' } = {}, env = process.env
  * Binds a running session to a thread (id or name; a new name creates the thread),
  * or unbinds it when thread is empty. Returns the thread, or null after unbinding.
  */
-export function bindLiveSession(d, { sessionId, thread }, env = process.env) {
+export function bindLiveSession(d, { sessionId, thread, agent }, env = process.env) {
   if (!sessionId) throw new Error('No session to bind; pass its id');
   let tid = null;
   if (thread) {
@@ -175,6 +175,10 @@ export function bindLiveSession(d, { sessionId, thread }, env = process.env) {
     if (!tid) tid = createThread(d, { name: String(thread).trim() }).id;
   }
   bindSession(d, sessionId, tid, env);
+  // The tools know who calls them; the hooks fill this in too, but they may not have run yet
+  // (or at all, when Codex has not trusted them), and the line's session list needs it.
+  const e = d.sessions[sessionId], ag = AGENTS[agent];
+  if (e && ag && !e.agent) Object.assign(e, { agent: ag.name, agentKey: agent, resume: ag.resume(sessionId), machine: e.machine || readConfig(env).machine, last: Date.now() });
   return tid ? d.threads[tid] : null;
 }
 

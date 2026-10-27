@@ -57,7 +57,7 @@ Four views of the same data:
 
 *Timeline: day, week and month. Each band shows when a line was active; dashed curves are forks and merges. Made-up data.*
 
-The page is in English by default. Switch with the **中文 / EN** button in the header.
+The page is in English by default. Switch with the **中文 / EN** button in the header. **More → Theme** switches between matching the system, light, dark and Mist, a soft blue-grey palette that also tones down the lines' colours.
 
 **What is it good for?** Three scenarios with made-up data (four agents building an app in parallel, three weeks of a PhD student's life, one analysis spread over three agents and two computers), the advantages for vibe coding and AI collaboration, and the open problems: [docs/why.md](docs/why.md).
 

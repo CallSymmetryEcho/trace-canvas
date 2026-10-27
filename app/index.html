@@ -47,26 +47,14 @@
   --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px rgba(0, 0, 0, .45);
   color-scheme: dark;
 }
-/* Fresh, light palettes (More → Theme). Line colours are the lines' own, so these soften them where they are drawn. */
-:root[data-theme="mint"], :root[data-theme="mist"], :root[data-theme="oat"] { --line-filter: saturate(.55) brightness(1.04); }
+/* Mist, a fresh light palette (More → Theme). Line colours are the lines' own, so it softens them where they are drawn. */
 #cv-world, #git-body, #git-legend, #tl-inner { filter: var(--line-filter, none); }
-:root[data-theme="mint"] {
-  --bg: #EAF2EE; --surface: #FBFDFC; --surface-2: #F2F7F4; --ink: #1E2B26; --muted: #5B6D65; --faint: #8FA198;
-  --rule: #D2E0D8; --rule-soft: #E2ECE6; --grid: #C9DBD1; --accent: #2E8B76; --accent-soft: #D5ECE4; --accent-ink: #FFFFFF;
-  --inbox: #84968E; --edge: #74877F; --danger: #C24A43; --ok: #2E8B57; --warn: #D2691E;
-  --shadow: 0 1px 2px rgba(30, 60, 50, .05), 0 8px 24px rgba(30, 60, 50, .08);
-}
 :root[data-theme="mist"] {
+  --line-filter: saturate(.55) brightness(1.04);
   --bg: #ECF1F6; --surface: #FCFDFE; --surface-2: #F3F6FA; --ink: #1D2633; --muted: #5A6878; --faint: #93A0AF;
   --rule: #D5DDE7; --rule-soft: #E4EAF1; --grid: #CCD6E2; --accent: #4677AE; --accent-soft: #DAE6F3; --accent-ink: #FFFFFF;
   --inbox: #8794A3; --edge: #748294; --danger: #C24A4A; --ok: #2F8A5E; --warn: #D2691E;
   --shadow: 0 1px 2px rgba(30, 45, 70, .05), 0 8px 24px rgba(30, 45, 70, .08);
-}
-:root[data-theme="oat"] {
-  --bg: #F4F1EA; --surface: #FFFEFB; --surface-2: #F9F7F2; --ink: #2A2722; --muted: #6B665C; --faint: #A29C90;
-  --rule: #E3DED3; --rule-soft: #EDE9E1; --grid: #DDD7CA; --accent: #5E8C6A; --accent-soft: #E1EDE3; --accent-ink: #FFFFFF;
-  --inbox: #9A9488; --edge: #888174; --danger: #BF4A3F; --ok: #4E8A5C; --warn: #C8702A;
-  --shadow: 0 1px 2px rgba(60, 50, 30, .05), 0 8px 24px rgba(60, 50, 30, .08);
 }
 
 html, body { height: 100%; }
@@ -814,10 +802,11 @@ const ls = {
 };
 const pad2 = n => String(n).padStart(2, '0');
 // Theme: auto follows the system's light or dark; the rest are fixed (More → Theme, kept in this browser).
-const THEMES = ['auto', 'light', 'dark', 'mint', 'mist', 'oat'];
+const THEMES = ['auto', 'light', 'dark', 'mist'];
+const themeNow = () => { const th = ls.get('tc.theme', 'auto'); return THEMES.includes(th) ? th : 'auto'; };
 function applyTheme() {
-  const th = ls.get('tc.theme', 'auto');
-  if (th === 'auto' || !THEMES.includes(th)) delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = th;
+  const th = themeNow();
+  if (th === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = th;
 }
 applyTheme();
 
@@ -835,7 +824,7 @@ const I18N = {
     langBtn: '中文', langTitle: '切换到中文', more: 'More',
     menuNewThread: 'New thread', menuHideDone: 'Hide finished threads', menuShowDone: 'Show finished threads',
     arrange: 'Arrange', arrangeTitle: 'Lay the lines out by group, forks next to the lines they came from', tArranged: 'Arranged', tUndo: 'Undo',
-    groupLabel: 'Group', groupName: 'Name', groupLines: 'Lines in this group', groupCount: n => `${n} line${n === 1 ? '' : 's'}`, groupArrange: 'Arrange this group', groupFocus: 'Focus on this group', menuFocus: 'Focus on a group…', menuTheme: n => `Theme: ${n}`, theme_auto: 'match the system', theme_light: 'light', theme_dark: 'dark', theme_mint: 'mint', theme_mist: 'mist', theme_oat: 'oat', focusTitle: 'Focus on a group', focusLabel: 'Focus', focusPick: 'Change', focusExit: 'Leave focus',
+    groupLabel: 'Group', groupName: 'Name', groupLines: 'Lines in this group', groupCount: n => `${n} line${n === 1 ? '' : 's'}`, groupArrange: 'Arrange this group', groupFocus: 'Focus on this group', menuFocus: 'Focus on a group…', menuTheme: n => `Theme: ${n}`, theme_auto: 'match the system', theme_light: 'light', theme_dark: 'dark', theme_mist: 'mist', focusTitle: 'Focus on a group', focusLabel: 'Focus', focusPick: 'Change', focusExit: 'Leave focus',
     focusIntro: 'Every view then shows only the lines of the group you pick: the canvas, the branches, the timeline and the goals. It stays on, also after a reload, until you leave it.',
     focusNoGroups: 'No groups yet. Select lines on the canvas and press Group, or fill in a group in a line\'s panel.', groupUngroup: 'Ungroup',
     threadGroup: 'Group', threadGroupPh: 'None', multiGroup: 'Group', multiGroupPh: 'Group name', tGroupNeedName: 'Type a group name first',
@@ -995,7 +984,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     langBtn: 'EN', langTitle: 'Switch to English', more: '更多',
     menuNewThread: '新建线程', menuHideDone: '隐藏已完成的线程', menuShowDone: '显示已完成的线程',
     arrange: '整理', arrangeTitle: '按分组排好线程，分叉排在原线旁边', tArranged: '已整理', tUndo: '撤销',
-    groupLabel: '分组', groupName: '名称', groupLines: '组里的线', groupCount: n => `${n} 条线`, groupArrange: '整理这一组', groupFocus: '专注这一组', menuFocus: '专注某个分组…', menuTheme: n => `主题：${n}`, theme_auto: '跟随系统', theme_light: '浅色', theme_dark: '深色', theme_mint: '薄荷', theme_mist: '雾蓝', theme_oat: '燕麦', focusTitle: '专注模式', focusLabel: '专注', focusPick: '换一个', focusExit: '退出专注',
+    groupLabel: '分组', groupName: '名称', groupLines: '组里的线', groupCount: n => `${n} 条线`, groupArrange: '整理这一组', groupFocus: '专注这一组', menuFocus: '专注某个分组…', menuTheme: n => `主题：${n}`, theme_auto: '跟随系统', theme_light: '浅色', theme_dark: '深色', theme_mist: '雾蓝', focusTitle: '专注模式', focusLabel: '专注', focusPick: '换一个', focusExit: '退出专注',
     focusIntro: '选一个分组后，画布、分支、时间线和目标都只显示这个组里的线。刷新后也保持，直到你退出。',
     focusNoGroups: '还没有分组。在画布上选中几条线点「编组」，或者在线面板里填写分组。', groupUngroup: '解散分组',
     threadGroup: '分组', threadGroupPh: '无', multiGroup: '编组', multiGroupPh: '分组名称', tGroupNeedName: '先填分组名称',
@@ -1720,7 +1709,7 @@ function renderAll() {
   $('#ex-banner').hidden = !(loaded() && hasExamples());
   $('#clear-ex-item').hidden = !hasExamples();
   $('#toggle-done-label').textContent = S.hideDone ? t('menuShowDone') : t('menuHideDone');
-  $('#theme-label').textContent = t('menuTheme', t('theme_' + ls.get('tc.theme', 'auto')));
+  $('#theme-label').textContent = t('menuTheme', t('theme_' + themeNow()));
   if (S.view === 'canvas') renderCanvas();
   else if (S.view === 'git') renderGit();
   else if (S.view === 'agents') renderAgents();
@@ -2756,7 +2745,7 @@ menu.addEventListener('click', e => {
   const b = e.target.closest('[data-menu]'); if (!b) return;
   closeMenu();
   const k = b.dataset.menu;
-  if (k === 'theme') { ls.set('tc.theme', THEMES[(THEMES.indexOf(ls.get('tc.theme', 'auto')) + 1) % THEMES.length]); applyTheme(); render(); menu.hidden = false; return; }
+  if (k === 'theme') { ls.set('tc.theme', THEMES[(THEMES.indexOf(themeNow()) + 1) % THEMES.length]); applyTheme(); render(); menu.hidden = false; return; }
   if (k === 'new-thread') { setView('canvas'); createThreadAndEdit(); }
   else if (k === 'toggle-done') { S.hideDone = !S.hideDone; ls.set('tc.hideDone', S.hideDone); render(); }
   else if (k === 'clear-examples') { if (canWrite()) clearExamples(); }

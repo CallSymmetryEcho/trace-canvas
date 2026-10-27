@@ -6,6 +6,7 @@
 - **Focus mode:** pick a group (More → Focus on a group…, or its panel) and every view shows only its lines: the canvas, the branches, the timeline and the goals. A bar under the header names the group; the choice stays after a reload until you leave it. Arrange then arranges just them.
 - **On a phone:** Goals is a tab with a page of its own, one to-do per row; lines and records open as full pages with ← (the back gesture closes them); Branches keeps the graph to two fifths of the screen so titles stay readable. The desktop layout is unchanged.
 - Branches: each title stays level with its station (rows were a pixel taller than the graph's step).
+- **Themes:** More → Theme switches between matching the system, light, dark and Mist, a soft blue-grey palette that also tones down the lines' colours.
 - **Goals:** click a line's goal to edit it in place, and on a phone a to-do's row has Edit. A half-typed to-do stays when you tap elsewhere, with an Add button next to it. On a phone, ← on a line or record page no longer misses a tap while sessions are updating.
 - **Open in Terminal (macOS):** next to Hand to it, starts the agent on the line in a new Terminal window. **`/trace-canvas pick`** has an agent take its next to-do.
 - A part of a line's name finds the line when only one line has it (resume, bind, tasks, trace_read_thread). Commit records keep the repository's real path, and More works while a sheet is open.

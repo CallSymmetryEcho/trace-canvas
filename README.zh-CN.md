@@ -149,6 +149,8 @@ node bin/trace-canvas.mjs setup --user
 
 会话会一直留在它的线上。桌面 app 会结束会话进程，之后再用同一个 id 恢复；每个会话在哪条线上，记在画布数据里（不再放在会话自己的状态文件里），所以恢复后的会话会接着记在原来的线上，也不会把第一条指令再记一遍。每条线的面板里有「这条线上的会话」，运行中的排在前面，每个都有按钮复制从它的目录恢复它的命令（`cd … && claude --resume <id>`、`codex resume <id>`）。`trace-canvas resume "<线名>"` 和 `trace_read_thread` 也能拿到同一份列表，你或别的 agent 可以接着这条线上的会话做，不用新开。合并（combine）几条线时，保留下来的线会接管被并掉的线的仓库 key 和 id，所以那个文件夹里的会话，不论是否绑定，都会记到它上面，而不是重新建一条文件夹的线。
 
+![恢复的会话接着记在原来的线上；线面板列出这条线上的会话，每个都能复制恢复命令（虚构数据）](docs/gif-sessions.zh.gif)
+
 实时状态需要 SessionStart、PreToolUse、Notification 和 SubagentStart/Stop 这几个 hook，`setup` 会自动加上（更新后再运行一次）。状态存在 `~/.trace-canvas/live/` 里，每个会话、每个子 agent 各一个小文件，和你的记录分开。会话结束或 12 小时没有动静后就不再显示。只有本地页面能看到实时会话。
 
 ### Agent 视图：谁启动了谁

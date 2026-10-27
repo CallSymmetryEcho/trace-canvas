@@ -149,6 +149,8 @@ In every view, stations you wrote (your instructions and decisions) are drawn da
 
 A session stays on its line. The desktop app ends sessions and resumes them under the same id; the line each session is on is kept in the canvas data (not in the session's own state), so a resumed session goes on where it was and does not log its first instruction again. Each thread panel lists **Sessions on this line**, running ones first, each with a button that copies the command that resumes it from its folder (`cd … && claude --resume <id>`, `codex resume <id>`). The same list comes from `trace-canvas resume "<thread>"` and from `trace_read_thread`, so you or another agent can pick a line's session up again instead of starting a new one. When you combine lines, the line you keep takes over the folded lines' repository key and ids, so sessions in that folder, bound or not, land on it instead of on a re-created folder line.
 
+![A resumed session logs on its line again; the line panel lists its sessions, each with a resume command (made-up data)](docs/gif-sessions.en.gif)
+
 Live status needs the SessionStart, PreToolUse, Notification and SubagentStart/Stop hooks, which `setup` adds (run it again after updating). It lives in small files in `~/.trace-canvas/live/` (one per session and one per subagent), apart from your records. A session drops off when it ends, or after 12 hours without activity. Only the local page shows live sessions.
 
 ### Agent view: who started whom

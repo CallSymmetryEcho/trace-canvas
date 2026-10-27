@@ -16,7 +16,10 @@ node docs/video/make.mjs                        # everything, both languages
 node docs/video/make.mjs promo zh               # one video, one language
 node docs/video/make.mjs promo --render-only    # animate the last recording again, e.g. after editing Tutorial.jsx
 node docs/video/make.mjs hook --vertical        # 1080 x 1920 for Shorts, Xiaohongshu and X
+node docs/video/make.mjs replay                 # this Claude Code / Codex session, replayed from your own canvas
 ```
+
+**Replay a session.** `replay` turns one session into a video from your own data: a title card, then its records arriving on the canvas in time order, so you watch its line fork off and fill up next to the lines it came from, forked into or merged with; then the Branches view of the result, and a closing card. Run from inside a Claude Code session it takes that session (`CLAUDE_CODE_SESSION_ID`); elsewhere pass `--session <id>` (from `/trace-canvas sessions`). Put the session on the canvas first with `/trace-canvas`. It has no narration, so it needs no voice models, only Chrome, ffmpeg and Remotion. It renders in your page's language unless you add `en` or `zh`, and writes `out/trace-canvas-replay.<lang>.mp4`. Your data is only read; the recording runs on a copy. The video shows your real records, so look it over before sharing it.
 
 Output: `docs/video/out/trace-canvas-<video>.<lang>.mp4` (with `--vertical`, `short-<video>.<lang>.mp4`: a headline from the scenes' `head` on top, the camera in a square window below) and `.srt` caption files for YouTube or Bilibili (not committed); the GIFs go to `docs/` and are committed. The opening GIF of the READMEs, `docs/demo.<lang>.gif`, was cut by hand from an earlier recording; `make.mjs` does not rebuild it.
 

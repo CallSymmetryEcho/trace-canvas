@@ -26,7 +26,7 @@ const REMOTION = path.join(here, 'remotion');
 const PUB = path.join(REMOTION, 'public');
 const PY = path.join(here, '.venv', 'bin', 'python');
 const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const PORT = 4791, DEBUG = 9341, W = 1280, H = 720, SCALE = 1.5;
+const PORT = 4791, W = 1280, H = 720, SCALE = 1.5;
 const CHAR = 0.042; // seconds per typed character in the terminal scenes
 const REPO = 'github.com/CallSymmetryEcho/trace-canvas';
 const MODELS = { kokoro: 'mlx-community/Kokoro-82M-bf16', qwen: 'mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16' };
@@ -585,6 +585,7 @@ const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { stdio: ['ignore'
 const duration = file => Number(run('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file]));
 
 function narrate(scenes, lang) {
+  if (!scenes.some(s => s.text.length)) return scenes.map(() => []); // nothing to say, no voices needed
   const [engine, voice] = VOICE[lang].split(':');
   if (!MODELS[engine]) throw new Error(`TC_VOICE_${lang.toUpperCase()} must look like kokoro:af_heart or qwen:Serena`);
   if (!fs.existsSync(PY)) throw new Error('No voice environment yet; see "Setup" in docs/video/README.md');
@@ -612,21 +613,24 @@ function narrate(scenes, lang) {
 
 /* ---------- recording ---------- */
 const home = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-video-'));
+const REAL_ENV = { ...process.env }; // your own data folder, which only `replay` reads
 process.env.TRACE_CANVAS_HOME = path.join(home, 'data');
 process.env.TRACE_CANVAS_DESKTOP_DIR = path.join(home, 'desktop'); // never the real desktop app's records
 fs.mkdirSync(process.env.TRACE_CANVAS_HOME, { recursive: true });
 const { startServer } = await import('../../src/server.mjs');
-const { mutate, dataFile, emptyData, readData, addCommit } = await import('../../src/store.mjs');
+const { mutate, dataFile, emptyData, readData, readConfig, addCommit } = await import('../../src/store.mjs');
 const { listThreads, readThread, listTasks, setTaskDone } = await import('../../src/ops.mjs');
 const { updateLive } = await import('../../src/live.mjs');
 const { writeAgentsDemo } = await import('../scenarios/agents.mjs');
 const { server } = await startServer({ port: PORT });
 const chrome = spawn(CHROME, ['--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run', '--no-default-browser-check',
-  `--remote-debugging-port=${DEBUG}`, `--user-data-dir=${path.join(home, 'chrome')}`, 'about:blank'], { stdio: 'ignore' });
+  '--remote-debugging-port=0', `--user-data-dir=${path.join(home, 'chrome')}`, 'about:blank'], { stdio: 'ignore' });
 
 let target;
 for (let i = 0; i < 50 && !target; i++) {
-  try { target = (await (await fetch(`http://127.0.0.1:${DEBUG}/json/list`)).json()).find(t => t.type === 'page'); } catch {}
+  // Chrome picks a free debugging port and writes it to its profile, so a stale Chrome or a second build never answers instead.
+  try { const port = fs.readFileSync(path.join(home, 'chrome', 'DevToolsActivePort'), 'utf8').split('\n')[0];
+    target = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()).find(t => t.type === 'page'); } catch {}
   if (!target) await sleep(200);
 }
 const ws = new WebSocket(target.webSocketDebuggerUrl);
@@ -775,6 +779,7 @@ async function record(video, lang) {
         await sleep(1500);
         loaded = true;
       }
+      if (scene.ready) await scene.ready(h); // on the loaded page, before recording starts
       cast = { dir: fs.mkdtempSync(path.join(home, 'frames-')), frames: [] };
       t0 = cast.t0 = Date.now();
       await cdp('Page.startScreencast', { format: 'jpeg', quality: 90, maxWidth: W * SCALE, maxHeight: H * SCALE });
@@ -816,6 +821,69 @@ function addSessions(lang) {
   });
 }
 
+// The replay: one session's work as it happened on your own map (read only), on the canvas, then in the
+// Branches view. Its lines are the ones holding the session's records, plus the lines they forked from,
+// forked into or merged with. Earlier records are there from the start; the rest arrive in time order.
+function replayScenes(data, sid) {
+  const C = Object.values(data.commits), T = data.threads;
+  const own = C.filter(c => c.session === sid && T[c.thread]);
+  if (!own.length) throw new Error(`Session ${sid} has no records on the canvas yet; put it there with /trace-canvas first`);
+  const mine = new Set(own.map(c => c.thread)), lines = new Set(mine);
+  for (const id of mine) {
+    for (const k of [T[id].parent, T[id].mergedInto]) if (T[k]) lines.add(k);
+    for (const t of Object.values(T)) if (t.parent === id || t.mergedInto === id) lines.add(t.id);
+  }
+  // A line of the session made shortly before its first record (the fork it was started on) belongs to the story.
+  const first = Math.min(...own.map(c => c.ts));
+  const start = Math.min(first, ...[...mine].map(id => T[id].createdAt).filter(t => t >= first - 30 * 60e3));
+  const recs = C.filter(c => lines.has(c.thread)).sort((a, b) => a.ts - b.ts), later = recs.filter(c => c.ts >= start);
+  const edges = Object.values(data.edges || {}).filter(e => lines.has(e.from) && lines.has(e.to));
+  // ponytail: merged lines show as merged only at the end; time each one by its merge record if that ever matters.
+  const stateAt = ts => {
+    const d = { version: 1, threads: {}, commits: {}, edges: {} };
+    for (const c of recs) if (c.ts <= ts) d.commits[c.id] = c;
+    for (const id of lines) {
+      if (T[id].createdAt > ts && !recs.some(c => c.thread === id && c.ts <= ts)) continue;
+      d.threads[id] = ts === Infinity || !T[id].mergedInto ? T[id] : { ...T[id], mergedInto: null, status: 'active' };
+    }
+    for (const e of edges) if (d.threads[e.from] && d.threads[e.to]) d.edges[e.id] = e;
+    return d;
+  };
+  const put = d => fs.writeFileSync(dataFile(), JSON.stringify(d));
+  const size = Math.ceil(later.length / 30) || 1, beats = []; // about 30 beats, whatever the session's size
+  for (let i = 0; i < later.length; i += size) beats.push(later.slice(i, i + size));
+  const count = id => own.filter(c => c.thread === id).length;
+  const name = T[[...mine].sort((a, b) => count(b) - count(a))[0]].name;
+  // 'Claude' is what the MCP tools write for highlights; next to 'Claude Code' it says nothing new.
+  const by = [...new Set(own.map(c => c.agent).filter(Boolean))].filter((a, _, all) => a !== 'Claude' || !all.includes('Claude Code')).join(' · '), day = new Date(first).toISOString().slice(0, 10);
+  return [
+    { page: { card: { big: name, small: [`${by} · ${day} · ${own.length} records`, `${by} · ${day} · ${own.length} 条记录`] } }, text: [], run: h => h.wait(2600) },
+    // The page fits the finished map when it loads; then it steps back to where the session started.
+    // A real map is spread out, so the camera stays close to the newest station.
+    { page: 'app', text: [], zoom: 1.8, preload: () => put(stateAt(Infinity)),
+      ready: async h => { put(stateAt(start - 1)); await h.wait(1200); },
+      run: async h => {
+        for (const b of beats) {
+          const last = b.at(-1);
+          put(stateAt(last.ts));
+          await h.wait(450);
+          // Point at the newest station if its line's card shows it, else at the line.
+          const sel = (await h.at(`#cv-cards li[data-cid="${last.id}"]`)) ? `#cv-cards li[data-cid="${last.id}"]` : `#cv-cards [data-tid="${last.thread}"]`;
+          if (await h.at(sel)) await h.move(sel, 0, 350);
+        }
+        put(stateAt(Infinity));
+        await h.wait(1500);
+      } },
+    { page: 'app', text: [],
+      run: async h => {
+        await h.click('#tab-git');
+        await h.wait(900);
+        for (let i = 0; i < 6; i++) { await h.js(`document.getElementById('git-scroll').scrollBy({ top: 240, behavior: 'smooth' })`); await h.wait(900); }
+      } },
+    { page: { card: { big: 'Trace Canvas', small: [`${later.length} records · ${lines.size} lines`, `${later.length} 条记录 · ${lines.size} 条线`], foot: `${REPO} ⭐` } }, text: [], run: h => h.wait(2600) },
+  ];
+}
+
 function writeSrt(video, lang, scenes) {
   const ts = s => new Date(s * 1000).toISOString().slice(11, 23).replace('.', ',');
   let at = 0;
@@ -848,10 +916,19 @@ const args = process.argv.slice(2);
 // --render-only: animate the last recordings again, e.g. after changing the Remotion compositions.
 const renderOnly = args.includes('--render-only');
 const vertical = args.includes('--vertical');
-const videos = Object.keys(VIDEOS).filter(v => !args.some(a => a in VIDEOS) || args.includes(v));
-const langs = ['en', 'zh'].filter(l => !args.some(a => a === 'en' || a === 'zh') || args.includes(l));
-const jobs = videos.flatMap(v => langs.map(l => [v, l]));
+// replay [--session <id>]: the calling session (or that one) from your own map, in your page's language unless en/zh is given.
+const replay = args.includes('replay'), lang1 = !args.some(a => a === 'en' || a === 'zh');
+let jobs = [];
 try {
+  if (replay) {
+    const { currentSessionId } = await import('../../src/transcript.mjs');
+    const i = args.indexOf('--session'), sid = i >= 0 ? args[i + 1] : currentSessionId({ projectDir: process.cwd(), env: REAL_ENV });
+    if (!sid) throw new Error('Which session? Pass --session <id>');
+    VIDEOS.replay = replayScenes(readData(REAL_ENV), sid);
+  }
+  const videos = Object.keys(VIDEOS).filter(v => !args.some(a => a in VIDEOS) || args.includes(v));
+  const langs = replay && lang1 ? [readConfig(REAL_ENV).lang === 'zh' ? 'zh' : 'en'] : ['en', 'zh'].filter(l => lang1 || args.includes(l));
+  jobs = videos.flatMap(v => langs.map(l => [v, l]));
   if (!renderOnly) for (const [v, l] of jobs) await record(v, l);
 } finally {
   ws.close();

@@ -32,8 +32,10 @@ const VOICE = { en: process.env.TC_VOICE_EN || 'kokoro:af_heart', zh: process.en
 // Style instruction for Qwen3-TTS voices (Kokoro takes none).
 const STYLE = {
   en: 'Clear, crisp and upbeat, at a brisk pace, confident and energetic, like a tech product launch.',
-  zh: '吐字清晰，干净利落，语速稍快，语气自信有精神，像科技产品发布会的讲解。',
+  zh: '语气平稳、克制、中性，情绪平淡，语调起伏小，吐字清晰，语速适中偏快，像新闻主播在播报。',
 };
+// Lower sampling temperature for Qwen3-TTS (default 0.9) keeps the delivery even from line to line.
+const SAMPLING = { temperature: 0.5, top_p: 0.8 };
 const pick = (v, lang) => (Array.isArray(v) ? v[lang === 'zh' ? 1 : 0] : v);
 
 /* ---------- the script ---------- */
@@ -293,7 +295,7 @@ function narrate(scenes, lang) {
   const [engine, voice] = VOICE[lang].split(':');
   if (!MODELS[engine]) throw new Error(`TC_VOICE_${lang.toUpperCase()} must look like kokoro:af_heart or qwen:Serena`);
   if (!fs.existsSync(PY)) throw new Error('No voice environment yet; see "Setup" in docs/video/README.md');
-  const v = { model: MODELS[engine], voice, ...(engine === 'qwen' ? { instruct: STYLE[lang] } : {}) };
+  const v = { model: MODELS[engine], voice, ...(engine === 'qwen' ? { instruct: STYLE[lang], ...SAMPLING } : {}) };
   const dir = path.join(PUB, 'audio', lang);
   fs.mkdirSync(dir, { recursive: true });
   const lines = scenes.map(s => s.text.map(pair => {

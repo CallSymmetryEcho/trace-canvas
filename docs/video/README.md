@@ -39,4 +39,4 @@ TC_VOICE_EN=kokoro:am_fenrir TC_VOICE_ZH=qwen:Serena node docs/video/make.mjs
 ```
 
 - Kokoro, English: `af_heart`, `af_bella`, `am_michael`, `am_fenrir`, `bm_george` and more.
-- Qwen3-TTS, both languages: `Serena`, `Vivian`, `Uncle_Fu`, `Dylan` (native Chinese), `Ryan`, `Aiden` (native English). These voices also get a style instruction (warm, low, calm), set in `STYLE` in `make.mjs`.
+- Qwen3-TTS, both languages: `Serena`, `Vivian`, `Uncle_Fu`, `Dylan` (native Chinese), `Ryan`, `Aiden` (native English). These voices also get a style instruction (`STYLE` in `make.mjs`: calm and even for Chinese, crisp for English) and a sampling temperature of 0.5 instead of 0.9 (`SAMPLING`), which keeps the delivery from swinging from line to line. At low temperatures a voice can fail to end a line; `tts.py` caps each line at about twice its expected length and reads it again if it hits the cap.

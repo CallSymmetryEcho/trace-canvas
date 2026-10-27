@@ -46,8 +46,36 @@ export function listLive(env, now = Date.now()) {
   }
   return names.filter(n => !n.includes('.agent-')).map(n => readJson(path.join(liveDir(env), n)))
     .filter(s => s && s.id && now - (s.lastSeen || 0) < STALE_MS)
-    .map(s => ({ ...s, agents: (agents.get(s.id) || []).sort((a, b) => a.startedAt - b.startedAt).slice(-MAX_AGENTS) }))
+    .map(s => ({ ...s, agents: (agents.get(s.id) || []).sort((a, b) => a.startedAt - b.startedAt).slice(-MAX_AGENTS)
+      // Claude Code writes the .meta.json just after SubagentStart, so a running subagent picks up its description here.
+      .map(a => (a.description ? a : { ...a, description: metaOf(s.transcript, a.id).description || '' })) }))
     .sort((a, b) => (RANK[a.status] ?? 3) - (RANK[b.status] ?? 3) || b.lastSeen - a.lastSeen);
+}
+
+// A subagent's files sit next to the session transcript: <session>/subagents/agent-<id>.{meta.json,jsonl}.
+const subagentPath = (transcript, id, ext) => (transcript ? path.join(transcript.replace(/\.jsonl$/, ''), 'subagents', `agent-${id}.${ext}`) : '');
+const metaOf = (transcript, id) => (transcript && readJson(subagentPath(transcript, id, 'meta.json'))) || {};
+
+// A subagent's closing words, from the tail of its transcript: its last text reply, or the
+// report it handed back with SubagentHandback (which leaves SubagentStop without a message).
+export function lastWords(file) {
+  let fd;
+  try {
+    fd = fs.openSync(file, 'r');
+    const size = fs.fstatSync(fd).size, n = Math.min(size, 256 * 1024);
+    const buf = Buffer.alloc(n);
+    fs.readSync(fd, buf, 0, n, size - n);
+    for (const line of buf.toString('utf8').split('\n').reverse()) {
+      let d;
+      try { d = JSON.parse(line); } catch { continue; } // the first line of the tail may be cut
+      const blocks = d.type === 'assistant' && d.message && Array.isArray(d.message.content) ? d.message.content : [];
+      for (const b of [...blocks].reverse()) {
+        if (b.type === 'text' && String(b.text || '').trim()) return b.text;
+        if (b.type === 'tool_use' && b.name === 'SubagentHandback' && b.input && b.input.message) return String(b.input.message);
+      }
+    }
+  } catch {} finally { if (fd !== undefined) try { fs.closeSync(fd); } catch {} }
+  return '';
 }
 
 // SubagentStart / SubagentStop: running, then done with the first sentence of its last message.
@@ -57,11 +85,12 @@ function updateAgent(input, env, now) {
   if (!id) return null;
   const f = agentFile(sid, id, env);
   const prev = readJson(f) || { id, session: sid, startedAt: now, status: 'running' };
-  let meta = {};
-  const t = input.transcript_path;
-  if (t) meta = readJson(path.join(t.replace(/\.jsonl$/, ''), 'subagents', `agent-${id}.meta.json`)) || {};
+  const t = input.transcript_path, meta = metaOf(t, id);
   const a = { ...prev, lastSeen: now, type: input.agent_type || prev.type || meta.agentType || '', description: prev.description || meta.description || '', depth: meta.spawnDepth || prev.depth || 1 };
-  if (input.hook_event_name === 'SubagentStop') { a.status = 'done'; a.finishedAt = now; a.last = headline(input.last_assistant_message || '') || prev.last || ''; }
+  if (input.hook_event_name === 'SubagentStop') {
+    a.status = 'done'; a.finishedAt = now;
+    a.last = headline(input.last_assistant_message || '') || headline(lastWords(input.agent_transcript_path || subagentPath(t, id, 'jsonl'))) || prev.last || '';
+  }
   else if (prev.status !== 'done') a.status = 'running'; // a late SubagentStart never reopens a finished one
   writeJson(f, a, env);
   return a;

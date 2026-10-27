@@ -104,6 +104,28 @@ test('parallel subagents each keep their own status, and the session end clears 
   assert.deepEqual(fs.readdirSync(path.join(s.env.TRACE_CANVAS_HOME, 'live')), []);
 });
 
+test('a running subagent picks up its description late, and a hand-back report becomes its last words', () => {
+  const s = sandbox();
+  const dir = path.join(s.root, 's1', 'subagents');
+  s.fire('SessionStart', { source: 'startup' });
+  s.fire('SubagentStart', { agent_id: 'b1', agent_type: 'Explore' }); // no .meta.json yet, as in Claude Code
+  assert.equal(listLive(s.env)[0].agents[0].description, '');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'agent-b1.meta.json'), JSON.stringify({ agentType: 'Explore', description: 'Count the source files' }));
+  assert.equal(listLive(s.env)[0].agents[0].description, 'Count the source files');
+
+  const lines = [
+    '{"type":"assistant","message":{"content":[{"type":"text","text":"Looking at src/ now."}]}}',
+    '{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"…"}]}}',
+    '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"SubagentHandback","input":{"message":"12 .mjs files. All in src/."}}]}}',
+    '{"type":"user","message":{"content":[{"type":"tool_result","content":"ok"}]}}',
+  ];
+  fs.writeFileSync(path.join(dir, 'agent-b1.jsonl'), 'cut-off line from the tail\n' + lines.join('\n') + '\n');
+  s.fire('SubagentStop', { agent_id: 'b1', agent_type: 'Explore', last_assistant_message: '' });
+  const [a] = listLive(s.env)[0].agents;
+  assert.deepEqual([a.status, a.description, a.last], ['done', 'Count the source files', '12 .mjs files.']);
+});
+
 test('the desktop app records give each session the one that started it, and keep idle ancestors in the chain', () => {
   const s = sandbox();
   const dir = path.join(s.env.TRACE_CANVAS_DESKTOP_DIR, 'org', 'acct');

@@ -38,6 +38,11 @@ const STYLE = {
 };
 // Lower sampling temperature for Qwen3-TTS (default 0.9) keeps the delivery even from line to line.
 const SAMPLING = { temperature: 0.5, top_p: 0.8 };
+// Qwen3 still varies from take to take: some Chinese lines came out far higher, flatter or more sing-song than the
+// rest, or slow and laboured. New Chinese lines are read four times; tts.py keeps the take closest to the first
+// tutorial's lines, which sounded right: median pitch 127 Hz, pitch range 11.4 semitones, 4.5 syllables a second.
+// Not part of the cache key, so cached lines stay as they are.
+const TAKES = { zh: { takes: 4, target: { hz: 127, range: 11.4, rate: 4.5 } } };
 const pick = (v, lang) => (Array.isArray(v) ? v[lang === 'zh' ? 1 : 0] : v);
 
 /* ---------- the script ---------- */
@@ -698,13 +703,125 @@ const GIFS = [
       }
       await h.wait(1800);
     } },
+  // See what changed: open a commit station, its files, one file's diff, then the change since an earlier station.
+  { name: 'changes', page: 'app', fresh: true, view: 'canvas', text: [],
+    preload: h => { h.loadScenario(); changesDemo(h.lang); },
+    run: async h => {
+      await h.camera('#cv-cards [data-tid="sc_ocr"]', 1.6, 0);
+      await h.click(`#cv-cards li[data-cid="${CHG.recs[2]}"]`);
+      await h.wait(800);
+      await chgTop(h);
+      await h.wait(500);
+      await h.camera('#detail .gx-head', 1.5, 600);
+      await h.move('#detail .gx-file', 0, 350);
+      await h.click('#detail .gx-file[title="src/ocr.js"]');
+      await h.wait(800);
+      await chgShow(h, '.gx-diff', 'center');
+      await h.wait(400);
+      await h.camera('#detail .gx-diff', 1.5, 500);
+      await h.wait(1200);
+      await chgTop(h);
+      await h.wait(400);
+      await h.camera('#detail .gx-head', 1.5, 500);
+      await h.move('#detail .gx-against', 0, 350);
+      await chgCompare(h);
+      await h.wait(900);
+      await chgShow(h, '.gx-list', 'end');
+      await h.wait(400);
+      await h.camera('#detail .gx-list', 1.5, 500); // the list moved with the scroll; follow it
+      await h.wait(1500);
+    } },
 ];
 // TC_GIFS=branches,merge records only those GIFs.
 const VIDEOS = { tutorial: SCENES, promo: PROMO, hook: HOOK, agents: AGENTS, goals: GOALS, gifs: process.env.TC_GIFS ? GIFS.filter(g => process.env.TC_GIFS.split(',').includes(g.name)) : GIFS };
 
 VIDEOS.sessions = SESSIONS;
+// See what changed: a made-up tripsplit repository with three real commits in the build's temp folder, so the
+// page can ask git for their files and diffs. The records keep only each commit's sha and repository.
+const CHG = { recs: [] };
+const CHG_FILES = [
+  ['Read receipt totals with Tesseract', '2026-10-24T10:00:00Z', {
+    'src/ocr.js': "import Tesseract from 'tesseract.js';\nimport { parseTotal } from './receipts.js';\n\n// The total of a receipt, from a photo of it.\nexport async function readTotal(image) {\n  const { data } = await Tesseract.recognize(image, 'eng');\n  return parseTotal(data.text);\n}\n",
+    'src/receipts.js': "// The amount on the line that says TOTAL, in cents.\nexport function parseTotal(text) {\n  const line = text.split('\\n').find(l => /total/i.test(l));\n  const m = line && line.match(/(\\d+)[.,](\\d{2})/);\n  return m ? Number(m[1]) * 100 + Number(m[2]) : null;\n}\n",
+    'package.json': '{\n  "name": "tripsplit",\n  "type": "module",\n  "dependencies": {\n    "tesseract.js": "^5.1.0"\n  }\n}\n',
+    'package-lock.json': JSON.stringify({ name: 'tripsplit', lockfileVersion: 3, packages: { 'node_modules/tesseract.js': { version: '5.1.0', resolved: 'https://registry.npmjs.org/tesseract.js/-/tesseract.js-5.1.0.tgz' }, 'node_modules/tesseract.js-core': { version: '5.1.0' } } }, null, 2) + '\n',
+  }],
+  ['Deskew receipts before OCR', '2026-10-25T15:30:00Z', {
+    'src/deskew.js': "import sharp from 'sharp';\n\n// Straighten a photographed receipt: find the skew of its text lines and rotate it back.\nexport async function deskew(image) {\n  const img = sharp(image).greyscale();\n  const { width } = await img.metadata();\n  const angle = await skewAngle(img, width);\n  return img.rotate(-angle, { background: '#fff' }).toBuffer();\n}\n\nasync function skewAngle(img, width) {\n  const rows = await img.clone().resize(width >> 2).raw().toBuffer();\n  return estimateAngle(rows, width >> 2); // degrees, positive is clockwise\n}\n",
+    'src/ocr.js': "import Tesseract from 'tesseract.js';\nimport { deskew } from './deskew.js';\nimport { parseTotal } from './receipts.js';\n\n// The total of a receipt, from a photo of it, straightened first.\nexport async function readTotal(image) {\n  const { data } = await Tesseract.recognize(await deskew(image), 'eng');\n  return parseTotal(data.text);\n}\n",
+  }],
+  ['Use a vision model for totals', '2026-10-27T09:10:00Z', {
+    'src/ocr.js': "import Tesseract from 'tesseract.js';\nimport { deskew } from './deskew.js';\nimport { parseTotal } from './receipts.js';\nimport { askVision } from './vision.js';\n\n// The total of a receipt, from a photo of it. A vision model reads blurry and\n// crumpled receipts far better than Tesseract; Tesseract stays as the fallback\n// when the model is unsure or the network is down.\nexport async function readTotal(image, { minConfidence = 0.8 } = {}) {\n  try {\n    const r = await askVision(image, 'What is the total on this receipt, in cents?');\n    if (r.confidence >= minConfidence && Number.isInteger(r.cents)) return r.cents;\n  } catch (e) {\n    console.warn('vision model unavailable, falling back to Tesseract:', e.message);\n  }\n  const { data } = await Tesseract.recognize(await deskew(image), 'eng');\n  return parseTotal(data.text);\n}\n\n// Which reader to trust, for the benchmark.\nexport const READERS = ['vision', 'tesseract'];\n",
+    'src/vision.js': "// A small client for the vision model: send the photo, get back an amount and a confidence.\nconst ENDPOINT = process.env.VISION_URL || 'http://localhost:8080/v1/read';\n\nexport async function askVision(image, question) {\n  const body = new FormData();\n  body.append('image', new Blob([image]), 'receipt.jpg');\n  body.append('question', question);\n  const res = await fetch(ENDPOINT, { method: 'POST', body, signal: AbortSignal.timeout(8000) });\n  if (!res.ok) throw new Error(`vision model: HTTP ${res.status}`);\n  const { answer, confidence } = await res.json();\n  return { cents: toCents(answer), confidence };\n}\n\nfunction toCents(answer) {\n  const m = String(answer).match(/(\\d+)[.,](\\d{2})/);\n  return m ? Number(m[1]) * 100 + Number(m[2]) : null;\n}\n",
+    'test/ocr.test.js': "import { test } from 'node:test';\nimport assert from 'node:assert';\nimport { readTotal } from '../src/ocr.js';\n\ntest('reads the total of a blurry receipt', async () => {\n  assert.strictEqual(await readTotal('test/fixtures/blurry-42-80.jpg'), 4280);\n});\n\ntest('falls back to Tesseract when the model is unsure', async () => {\n  assert.strictEqual(await readTotal('test/fixtures/clear-12-50.jpg', { minConfidence: 1.1 }), 1250);\n});\n",
+    'package-lock.json': JSON.stringify({ name: 'tripsplit', lockfileVersion: 3, packages: { 'node_modules/sharp': { version: '0.33.5' }, 'node_modules/tesseract.js': { version: '5.1.0', resolved: 'https://registry.npmjs.org/tesseract.js/-/tesseract.js-5.1.0.tgz' }, 'node_modules/tesseract.js-core': { version: '5.1.0' } } }, null, 2) + '\n',
+    'docs/sample-receipt.png': Buffer.from('89504e470d0a1a0a0000000d49484452000000100000001008020000009091683600000012494441547801636060f8cfc0c0c000000d0004011e7a5f8b0000000049454e44ae426082', 'hex'),
+  }],
+];
+// The repository (made once per build; fixed author and dates keep the shas the same in both languages),
+// then a commit record for each on receipt-ocr, as the hooks write them: gitCommit and repo.
+function changesDemo(lang) {
+  fs.mkdirSync(path.join(home, 'tripsplit'), { recursive: true });
+  const repo = fs.realpathSync(path.join(home, 'tripsplit')); // as git names it (macOS's /var is /private/var); the panel compares the two
+  if (!CHG.shas) {
+    run('git', ['-C', repo, 'init', '-q', '-b', 'main']);
+    CHG.shas = CHG_FILES.map(([msg, date, files]) => {
+      for (const [f, body] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(repo, f)), { recursive: true }); fs.writeFileSync(path.join(repo, f), body); }
+      const env = { ...process.env, GIT_AUTHOR_NAME: 'Dev', GIT_AUTHOR_EMAIL: 'dev@example.com', GIT_COMMITTER_NAME: 'Dev', GIT_COMMITTER_EMAIL: 'dev@example.com', GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date };
+      run('git', ['-C', repo, 'add', '-A'], { env });
+      run('git', ['-C', repo, 'commit', '-q', '-m', msg], { env });
+      return run('git', ['-C', repo, 'rev-parse', 'HEAD']);
+    });
+  }
+  const t = Date.now(), H = 3600e3;
+  mutate(d => { CHG.recs = CHG_FILES.map(([msg], i) => addCommit(d, { thread: 'sc_ocr', kind: 'agent', agent: 'Claude Code', title: tr(lang, 'commit', CHG.shas[i].slice(0, 7), msg), ts: t - (5 - 2 * i) * H, extra: { gitCommit: CHG.shas[i], repo } }).id); });
+}
+// The Changes section, a diff or the file list sits below the panel's fold; scroll it into view first.
+const chgShow = (h, sel, block = 'start') => h.js(`document.querySelector('#detail ${sel}').scrollIntoView({ behavior: 'smooth', block: '${block}' })`);
+const chgTop = h => chgShow(h, '.gx-head');
+const chgCompare = h => h.js(`(() => { const s = document.querySelector('#detail .gx-against'); s.value = ${JSON.stringify(CHG.recs[0])}; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+const CHANGES = [
+  { page: 'app', zoom: 1.3, preload: h => { h.loadScenario(); changesDemo(h.lang); },
+    text: [
+      ['Open a commit station, and it shows what changed: the files, most-changed first, with lines added and removed.', '点开一个提交站点，就能看到改了什么：改得最多的文件排在前面，每个都标着增删行数。'],
+      ['Click a file to read its diff right there.', '点一个文件，就地展开它的 diff。'],
+      ['Compare with an earlier station to see everything that changed in between.', '在「对比」里选一个更早的站点，就能看到两点之间改了什么。'],
+    ],
+    run: async h => {
+      const p = h.speak(0);
+      await h.click('#zoom-fit');
+      await h.move('#cv-cards [data-tid="sc_ocr"]');
+      await h.click(`#cv-cards li[data-cid="${CHG.recs[2]}"]`);
+      await h.wait(900);
+      await chgTop(h);
+      await h.wait(700);
+      await h.move('#detail .gx-head');
+      for (const i of [0, 1, 2]) await h.move('#detail .gx-file', i, 450);
+      await p;
+      const q = h.speak(1);
+      await h.click('#detail .gx-file[title="src/ocr.js"]');
+      await h.wait(900);
+      await chgShow(h, '.gx-diff', 'center');
+      await h.wait(600);
+      await h.move('#detail .gx-diff');
+      await q;
+      const r = h.speak(2);
+      await chgTop(h);
+      await h.wait(500);
+      await h.move('#detail .gx-against');
+      await chgCompare(h);
+      await h.wait(1000);
+      await chgShow(h, '.gx-list', 'end');
+      await h.wait(500);
+      await h.move('#detail .gx-head');
+      await r;
+    } },
+  { page: { card: { big: 'Trace Canvas', small: ['See what changed · open source · MIT', '看改了什么 · 开源 · MIT'], foot: `${REPO} ⭐` } },
+    text: [['The canvas keeps only the commit and its repository; the diff comes from git when you open it.', '画布只记提交和它所在的仓库，diff 在你打开时直接向 git 要。']] },
+];
+VIDEOS.changes = CHANGES;
 // Feature shorts carry their number from the to-do list (功能短视频 N), so a file and its to-do match: 08-sessions.zh.mp4.
-const NUMBER = { sessions: 8, story: 9 };
+const NUMBER = { sessions: 8, story: 9, tutorial: 10, changes: 11 };
 const fileName = video => (NUMBER[video] ? `${String(NUMBER[video]).padStart(2, '0')}-${video}` : `trace-canvas-${video}`);
 
 /* ---------- narration ---------- */
@@ -728,7 +845,7 @@ function narrate(scenes, lang) {
   const todo = lines.flat().filter(l => !fs.existsSync(l.abs));
   console.log(`[${lang}] voice ${VOICE[lang]}: ${todo.length} of ${lines.flat().length} lines to read`);
   if (todo.length) {
-    execFileSync(PY, [path.join(here, 'tts.py')], { input: JSON.stringify(todo.map(l => ({ ...v, lang, text: l.spoken, out: `${l.abs}.raw.wav` }))), stdio: ['pipe', 'inherit', 'inherit'] });
+    execFileSync(PY, [path.join(here, 'tts.py')], { input: JSON.stringify(todo.map(l => ({ ...v, ...(engine === 'qwen' ? TAKES[lang] : {}), lang, text: l.spoken, out: `${l.abs}.raw.wav` }))), stdio: ['pipe', 'inherit', 'inherit'] });
     // Even loudness across lines and voices.
     for (const l of todo) {
       run('ffmpeg', ['-v', 'error', '-y', '-i', `${l.abs}.raw.wav`, '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11', '-ar', '48000', l.abs]);

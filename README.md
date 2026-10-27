@@ -223,6 +223,8 @@ A commit station opens with a **Changes** list: every file the commit touched, t
 
 Nothing is copied into the canvas: a record keeps the commit's sha and its repository, and the page asks git when you open it, so the data file stays small and the diff always matches the repository. If the repository is not on this computer or the commit is gone (rewritten history), the panel says so. Agents get the same sha and repository from `trace_read_thread` and can run git themselves.
 
+![A commit station lists the files it changed; a click opens a diff; Compare with shows what changed since an earlier station (made-up data)](docs/gif-changes.en.gif)
+
 ## Merging sessions and threads
 
 Several sessions about the same piece of work can become one line, in two ways:

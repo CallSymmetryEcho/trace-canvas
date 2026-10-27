@@ -142,6 +142,8 @@ test('the MCP server speaks JSON-RPC over stdio and captures the current session
     assert.equal(sessions.result.structuredContent.sessions[0].onCanvas, 'Methods chapter draft');
 
     await call('tools/call', { name: 'trace_log', arguments: { title: 'Ask the advisor about the sampling frame', thread: 'Advisor meeting', kind: 'task' } });
+    const again = await call('tools/call', { name: 'trace_log', arguments: { title: '  ask the advisor about  the sampling frame', thread: 'Advisor meeting', kind: 'task' } });
+    assert.match(again.result.content[0].text, /^Already an open to-do on "Advisor meeting"/);
     const merged = await call('tools/call', { name: 'trace_merge', arguments: { sources: ['Advisor meeting'], target: 'Methods chapter draft', mode: 'merge' } });
     assert.match(merged.result.content[0].text, /^Merged "Advisor meeting" into "Methods chapter draft"/);
     const bad = await call('tools/call', { name: 'trace_merge', arguments: { sources: ['Nope'] } });

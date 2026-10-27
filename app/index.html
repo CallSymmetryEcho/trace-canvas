@@ -1497,7 +1497,14 @@ function render() { if (rq) return; rq = requestAnimationFrame(() => { rq = 0; r
 function renderAll() {
   renderSync();
   renderLive();
-  if (S.sheet === 'goals' && !$('#sheet-body').contains(document.activeElement)) renderGoals();
+  // The goals list holds still only while a to-do is being typed: a checkbox or menu keeps focus
+  // after a click, and that must not stop new to-dos from showing.
+  const f = document.activeElement, adding = f && f.classList.contains('gl-add') ? f.dataset.thread : null;
+  if (S.sheet === 'goals' && !(adding && f.value)) {
+    renderGoals();
+    const again = adding && $(`.gl-add[data-thread="${CSS.escape(adding)}"]`);
+    if (again) again.focus();
+  }
   renderCaptureThreads();
   $('#ex-banner').hidden = !(loaded() && hasExamples());
   $('#clear-ex-item').hidden = !hasExamples();
@@ -2518,6 +2525,8 @@ sheetBody.addEventListener('change', e => {
     setTimeout(renderGoals, 0); // the box keeps focus, so the render loop would skip the sheet
   }
 });
+// Leaving a half-typed add box shows what arrived meanwhile; the delay lets a click land first.
+sheetBody.addEventListener('focusout', e => { if (e.target.classList.contains('gl-add')) setTimeout(render, 250); });
 sheetBody.addEventListener('keydown', e => {
   if (S.sheet !== 'goals' || e.key !== 'Enter' || e.isComposing || !e.target.classList.contains('gl-add')) return;
   const title = e.target.value.trim();

@@ -261,8 +261,22 @@ export function sessionStartContext(input, env = process.env) {
     for (const r of places) out.push(`- ${r.title}: ${(r.where || []).filter(w => w.local).slice(0, 4).map(w => `${w.role ? w.role + ' ' : ''}${w.local}`).join('; ')}${r.notes ? ` — ${String(r.notes).split('\n')[0]}` : ''}`);
   }
   if (!out.length) return '';
-  out.push('Use the MCP tool trace_tasks with mine: true to read your to-dos, trace_task_done when one is finished, and trace_log for decisions and results.');
+  out.push('Use the MCP tool trace_tasks with mine: true to read your to-dos, trace_task_done when one is finished, trace_log with kind "task" for new goals and next steps the person gives, and trace_log for decisions and results.');
   return out.join('\n');
+}
+
+/**
+ * Said to the agent with every instruction: the line it works on, and to add the new goals, ideas
+ * and next steps the person just gave as to-dos there, so the list keeps up without being asked.
+ * The open to-dos are listed so the agent skips what is already on it.
+ */
+export function promptContext(input, env = process.env) {
+  if (!input.session_id || cleanPrompt(input.prompt).startsWith('/')) return '';
+  const d = readData(env), { threadId } = sessionThread(d, { id: input.session_id }, env);
+  const th = threadId && d.threads[threadId];
+  if (!th) return '';
+  const open = Object.values(d.commits).filter(c => threadIdOfLocal(d, c) === th.id && c.kind === 'task' && !c.done && !(c.session && !c.highlight)).sort((a, b) => a.ts - b.ts);
+  return `Trace Canvas: you work on the line "${th.name}" (thread ${th.id}). If this message gives a new goal, idea or next step worth tracking, add each one now as a to-do with trace_log (kind "task", thread "${th.id}"), one short title per item; leave out what you will finish in this same turn${open.length ? `, and what is already open: ${open.slice(-8).map(c => firstLine(c.title, 60)).join('; ')}` : ''}.`;
 }
 
 export function turnBody(lang, msg, files, todos = []) {

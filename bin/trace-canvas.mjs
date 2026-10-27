@@ -100,21 +100,24 @@ async function main() {
       // Never break the Claude Code session: swallow everything, print nothing.
       // TRACE_CANVAS_DEBUG=1 appends each event and its outcome to <data dir>/debug.log.
       // --agent codex|gemini: that CLI's payload is turned into Claude's shape first. On SessionStart
-      // the hook prints the context the session starts with; for anything else it prints nothing.
+      // the hook prints the context the session starts with, and on each instruction a reminder to
+      // add new goals as to-dos; for anything else it prints nothing.
       const agent = str(flag('agent', '')) || 'claude';
-      let raw = '', outcome, context = '';
+      let raw = '', outcome, context = '', event = '';
       try {
         raw = await readStdin();
         if (raw.trim()) {
-          const input = normalize(agent, JSON.parse(raw));
+          const payload = JSON.parse(raw), input = normalize(agent, payload);
+          event = payload.hook_event_name; // the CLI's own name for it, which its output must repeat
           outcome = handleHook(input);
-          if (input.hook_event_name === 'SessionStart' && process.env.TRACE_CANVAS_DISABLE !== '1') {
-            const { sessionStartContext } = await import('../src/hook.mjs');
-            context = sessionStartContext(input);
+          if (process.env.TRACE_CANVAS_DISABLE !== '1') {
+            const { sessionStartContext, promptContext } = await import('../src/hook.mjs');
+            if (input.hook_event_name === 'SessionStart') context = sessionStartContext(input);
+            else if (input.hook_event_name === 'UserPromptSubmit') context = promptContext(input);
           }
         }
       } catch (e) { outcome = { error: String(e && e.stack || e) }; }
-      if (context) process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: context } }));
+      if (context) process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } }));
       if (process.env.TRACE_CANVAS_DEBUG) {
         try { fs.appendFileSync(path.join(path.dirname(dataFile()), 'debug.log'), `${new Date().toISOString()} ${raw.slice(0, 4000)}\n  -> ${JSON.stringify(outcome ?? 'logged')}\n`); } catch {}
       }

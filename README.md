@@ -2,6 +2,31 @@
 
 English | [中文](README.zh-CN.md)
 
+Every AI coding session becomes a line on one transit map: your instructions, edits, commits and decisions are its stations, forks and merges are drawn like git, and your agents read the same map to pick up where another left off. Runs locally, needs only Node.js 18.17+, MIT.
+
+**Install: paste this into Claude Code** (or Codex):
+
+> Install Trace Canvas: clone https://github.com/CallSymmetryEcho/trace-canvas.git into ~/trace-canvas, then run `node ~/trace-canvas/bin/trace-canvas.mjs setup --user` (add `--agents codex` if Codex is installed).
+
+**Or by hand:**
+
+```bash
+git clone https://github.com/CallSymmetryEcho/trace-canvas.git ~/trace-canvas
+node ~/trace-canvas/bin/trace-canvas.mjs setup --user   # hooks, MCP tools and the /trace-canvas skill
+```
+
+**Then start a new Claude Code session and type:**
+
+```
+/trace-canvas put all my sessions on the canvas
+```
+
+It puts this project's past sessions on the map and opens it at <http://localhost:4777/>. From then on every new session lands on it by itself.
+
+![Past sessions arrive on the canvas one after another, each as its own line (made-up data)](docs/gif-replay.en.gif)
+
+## What you see
+
 A transit map of your work. When you work with AI agents, ideas and tasks run in parallel and scatter across sessions. Trace Canvas keeps a trace of them and shows how they relate:
 
 - A **thread** is one piece of work in progress, like a git branch. It is drawn as a line.
@@ -36,22 +61,14 @@ The page is in English by default. Switch with the **中文 / EN** button in the
 
 **What is it good for?** Three scenarios with made-up data (four agents building an app in parallel, three weeks of a PhD student's life, one analysis spread over three agents and two computers), the advantages for vibe coding and AI collaboration, and the open problems: [docs/why.md](docs/why.md).
 
-## Run it on your Mac
+## Just the page
 
-Needs Node.js 18.17 or newer and nothing else (no `npm install`).
-
-```bash
-git clone https://github.com/CallSymmetryEcho/trace-canvas.git
-cd trace-canvas
-node bin/trace-canvas.mjs
-```
-
-This starts a local server on <http://localhost:4777/> and opens it in your browser. Data is stored in `~/.trace-canvas/data.json`. Click **Load example data** on the empty page for a first look, then **Clear** it from the header when you're done.
+To look around before setting anything up: `node bin/trace-canvas.mjs` in the clone starts the page at <http://localhost:4777/> (no `npm install`). Click **Load example data** on the empty page for a first look, then **Clear** it from the header. Data is stored in `~/.trace-canvas/data.json`.
 
 Optional: make `trace-canvas` a command.
 
 ```bash
-echo "alias trace-canvas='node \"$PWD/bin/trace-canvas.mjs\"'" >> ~/.zshrc
+echo "alias trace-canvas='node \"$HOME/trace-canvas/bin/trace-canvas.mjs\"'" >> ~/.zshrc
 ```
 
 ## Three ways Claude Code fills the canvas
@@ -159,7 +176,7 @@ Subagents come from the SubagentStart/Stop hooks and the `.meta.json` file Claud
 
 The list groups to-dos by line, shows each line's goal, a progress bar (done/total) and whether a session is working on it right now. Tick a to-do or add one right there. The first instruction of each session, which the hooks log as a task, is a record of what was asked, so it stays out of the list; next steps Claude writes when capturing a session do show up.
 
-Agents use the same list. At the start of work they read the goal and the open to-dos with `trace_tasks`; when they finish one they call `trace_task_done`, and the list shows who ticked it. So you can write down what you want, let agents work while you are away, and come back to see where things stand. From the command line: `trace-canvas tasks` and `trace-canvas done "<to-do>"` (`--agent Codex` for a script or another agent).
+Agents use the same list. At the start of work they read the goal and the open to-dos with `trace_tasks`; when they finish one they call `trace_task_done`, and the list shows who ticked it. So you can write down what you want, let agents work while you are away, and come back to see where things stand. New ideas get on the list as you say them: with every message, the hook tells the agent which line it works on and what is already open, and the agent adds each new goal or next step with `trace_log` (`kind: "task"`); the same open to-do twice stays one. From the command line: `trace-canvas tasks` and `trace-canvas done "<to-do>"` (`--agent Codex` for a script or another agent).
 
 ![Goals and to-dos: agents tick to-dos off on the shared list](docs/gif-goals.en.gif)
 

@@ -7,14 +7,14 @@ import { execFileSync } from 'node:child_process';
 
 const MARK = 'trace-canvas.mjs" hook';
 
-// PostToolUse and UserPromptSubmit fire often, so they run in the background, as do the
-// events that only update the live status (SessionStart, PreToolUse, Notification, SubagentStart/Stop).
-// Stop and SessionEnd stay synchronous so the record lands before the session moves on.
+// PostToolUse fires often, so it runs in the background, as do the events that only update the
+// live status (PreToolUse, Notification, SubagentStart/Stop). SessionStart and UserPromptSubmit print
+// context for the agent, and Stop and SessionEnd write before the session moves on, so they wait.
 export function hookConfig(command) {
   const h = (extra = {}) => [{ type: 'command', command, ...extra }];
   return {
     SessionStart: [{ hooks: h({ timeout: 10 }) }], // prints the context a session starts with, so it can't be async
-    UserPromptSubmit: [{ hooks: h({ async: true }) }],
+    UserPromptSubmit: [{ hooks: h({ timeout: 5 }) }], // prints the to-do reminder
     PreToolUse: [{ hooks: h({ async: true }) }],
     Notification: [{ hooks: h({ async: true }) }],
     SubagentStart: [{ hooks: h({ async: true }) }],

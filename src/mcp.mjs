@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { addCommit, dataFile, ensureThread, importText, INBOX, mutate, readData } from './store.mjs';
+import { addCommit, dataFile, ensureThread, importText, INBOX, mutate, readData, threadIdOf } from './store.mjs';
 import { agentKey, agentOf } from './agents.mjs';
 import { bindLiveSession, captureSession, forkThread, listTasks, listThreads, liveSessions, mergeDataset, mergeThreads, readThread, setTaskDone } from './ops.mjs';
 import { currentSessionId, describeSession, findTranscript, findTranscripts, parseTranscript } from './transcript.mjs';
@@ -18,7 +18,7 @@ const port = () => Number(process.env.TRACE_CANVAS_PORT || 4777);
 
 const INSTRUCTIONS = `Trace Canvas keeps a trace of parallel work as threads (like git branches) and records (like commits), shown as a canvas, a branch graph and a timeline.
 Use trace_capture_session to put the current Claude Code session on the canvas; write 2-6 highlights (decisions, outcomes, next steps) and a short summary yourself, in the user's language.
-Use trace_tasks at the start of work to read the goals and open to-dos of the thread you work on, and trace_task_done when you finish one, so the person can follow progress without asking.
+Use trace_tasks at the start of work to read the goals and open to-dos of the thread you work on, and trace_task_done when you finish one, so the person can follow progress without asking. When the person gives a new goal, idea or next step, add it right away as a to-do: trace_log with kind "task" on the thread you work on.
 Use trace_live to see which sessions are running now and whether one waits for the user; trace_bind puts a session on a thread.
 Use trace_list_threads before trace_merge, and confirm with the user which threads to merge and how: "merge" keeps every line and draws merges; "combine" folds them into one line and removes the others.`;
 
@@ -202,8 +202,17 @@ async function callTool(name, a = {}) {
     }
     case 'trace_log': {
       if (!String(a.title || '').trim()) throw new Error('title is required');
-      const c = mutate(d => addCommit(d, { thread: a.thread ? ensureThread(d, a.thread) : INBOX, kind: a.kind || (a.assignee ? 'task' : 'agent'), title: a.title, body: a.body || '', links: Array.isArray(a.links) ? a.links : [], agent: a.agent || agentOf(agentKey()).name, extra: a.assignee ? { assignee: a.assignee } : {} }));
-      return { text: `Logged to ${c.thread === INBOX ? 'the inbox' : `"${readData().threads[c.thread].name}"`}.`, data: { id: c.id, thread: c.thread } };
+      // Agents are reminded of new to-dos on every message, so the same open to-do twice stays one.
+      const norm = s => String(s).trim().toLowerCase().replace(/\s+/g, ' ');
+      let dup = false;
+      const c = mutate(d => {
+        const thread = a.thread ? ensureThread(d, a.thread) : INBOX, kind = a.kind || (a.assignee ? 'task' : 'agent');
+        const same = kind === 'task' && Object.values(d.commits).find(x => x.kind === 'task' && !x.done && threadIdOf(d, x) === thread && norm(x.title) === norm(a.title));
+        if (same) { dup = true; return same; }
+        return addCommit(d, { thread, kind, title: a.title, body: a.body || '', links: Array.isArray(a.links) ? a.links : [], agent: a.agent || agentOf(agentKey()).name, extra: a.assignee ? { assignee: a.assignee } : {} });
+      });
+      const where = c.thread === INBOX ? 'the inbox' : `"${readData().threads[c.thread].name}"`;
+      return { text: dup ? `Already an open to-do on ${where}.` : `Logged to ${where}.`, data: { id: c.id, thread: c.thread, ...(dup ? { existing: true } : {}) } };
     }
     case 'trace_import_data': {
       const text = a.path ? fs.readFileSync(a.path, 'utf8') : String(a.json || '');

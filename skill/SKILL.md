@@ -1,8 +1,8 @@
 ---
 name: trace-canvas
 description: Put this Claude Code session on the Trace Canvas, a transit map of parallel work (threads like git branches, records like commits), log a key moment, list past sessions, or merge sessions and threads into one line. Use when the user asks to trace, capture, save or log this session or conversation, to see how parallel work fits together, or to merge sessions or threads.
-when_to_use: Trigger phrases include "trace this", "put this session on the canvas", "log this", "merge these sessions", "留痕", "把这次会话放进画布", "合并会话", "合并线程".
-argument-hint: "[capture | sessions | tasks | live | bind <thread> | fork <thread> | merge <threads…> | open | log <text>]"
+when_to_use: Trigger phrases include "trace this", "put this session on the canvas", "put all my sessions on the canvas", "把所有会话展示在画布上", "log this", "merge these sessions", "留痕", "把这次会话放进画布", "合并会话", "合并线程".
+argument-hint: "[capture | all | sessions | tasks | live | bind <thread> | fork <thread> | merge <threads…> | open | log <text>]"
 allowed-tools: mcp__trace-canvas__trace_capture_session mcp__trace-canvas__trace_list_sessions mcp__trace-canvas__trace_list_threads mcp__trace-canvas__trace_read_thread mcp__trace-canvas__trace_log mcp__trace-canvas__trace_open mcp__trace-canvas__trace_live mcp__trace-canvas__trace_bind mcp__trace-canvas__trace_tasks mcp__trace-canvas__trace_task_done mcp__trace-canvas__trace_fork
 ---
 
@@ -29,6 +29,15 @@ Pick the matching action below. With no arguments, capture the current session.
    - If the user named a thread, pass it as `thread`.
    - If they want this session as its own line, pass `separate: true`.
 6. Reply in two or three lines: which thread it went to, how many records were added, and the address the tool returned. If the page is not running, offer to open it with `trace_open`.
+
+## all: put every session of this project on the canvas
+
+For "put all my sessions on the canvas" and the like (the first thing many people type after setup):
+
+1. Call `trace_list_sessions` with `limit: 50`.
+2. For each session that is not on the canvas yet, call `trace_capture_session` with its `session_id` and no highlights; the transcript import is enough. For the current session, write highlights and a summary as in **capture**.
+3. Call `trace_open` with `open_browser: true`.
+4. Reply in two or three lines: how many sessions went on, on which lines, and the address.
 
 ## sessions: list past sessions
 

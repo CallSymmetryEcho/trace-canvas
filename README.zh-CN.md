@@ -2,6 +2,31 @@
 
 [English](README.md) | 中文
 
+每个 AI 编程会话都是同一张地铁图上的一条线：你的指令、改动、提交和决定是线上的站点，分叉与合并像 git 一样画出来，你的 agent 也读同一张图，接着别人停下的地方继续做。本地运行，只需要 Node.js 18.17+，MIT 开源。
+
+**安装：把这句话贴给 Claude Code**（或 Codex）：
+
+> 安装 Trace Canvas：把 https://github.com/CallSymmetryEcho/trace-canvas.git 克隆到 ~/trace-canvas，然后运行 `node ~/trace-canvas/bin/trace-canvas.mjs setup --user`（装了 Codex 的话加上 `--agents codex`）。
+
+**或者手动：**
+
+```bash
+git clone https://github.com/CallSymmetryEcho/trace-canvas.git ~/trace-canvas
+node ~/trace-canvas/bin/trace-canvas.mjs setup --user   # hooks、MCP 工具和 /trace-canvas skill
+```
+
+**然后新开一个 Claude Code 会话，输入：**
+
+```
+/trace-canvas 把现在所有的会话展示在画布上
+```
+
+它会把这个项目过去的会话放上地图，并在 <http://localhost:4777/> 打开。之后每个新会话都会自动出现在上面。
+
+![过去的会话一个接一个落到画布上，每个会话一条线（虚构数据）](docs/gif-replay.zh.gif)
+
+## 你会看到什么
+
 把 AI agent 办公时零碎的想法和并行的工作，画成一张「地铁线路图」：
 
 - **线程**：一件在推进的事，相当于 git 分支，画成一条线路。
@@ -36,22 +61,14 @@
 
 **它能用来做什么？** 用虚构数据演示的三个场景（四个 agent 并行做一个应用、一个研究生的三周、一项分析分散在三个 agent 和两台电脑上），它在 vibe coding 和 AI 协作中的优势，以及还没解决的问题：[docs/why.zh-CN.md](docs/why.zh-CN.md)。
 
-## 在 Mac 上运行
+## 只看页面
 
-只需要 Node.js 18.17 以上，不用 `npm install`。
-
-```bash
-git clone https://github.com/CallSymmetryEcho/trace-canvas.git
-cd trace-canvas
-node bin/trace-canvas.mjs
-```
-
-会在 <http://localhost:4777/> 启动本地服务并自动打开浏览器。数据保存在 `~/.trace-canvas/data.json`。空页面上点 **Load example data（载入示例数据）** 可以先看效果，看完在顶栏点「清除」。
+想先看看再配置：在克隆下来的目录里运行 `node bin/trace-canvas.mjs`，会在 <http://localhost:4777/> 打开页面（不用 `npm install`）。空页面上点 **Load example data（载入示例数据）** 先看效果，看完在顶栏点「清除」。数据保存在 `~/.trace-canvas/data.json`。
 
 可选：加个快捷命令。
 
 ```bash
-echo "alias trace-canvas='node \"$PWD/bin/trace-canvas.mjs\"'" >> ~/.zshrc
+echo "alias trace-canvas='node \"$HOME/trace-canvas/bin/trace-canvas.mjs\"'" >> ~/.zshrc
 ```
 
 ## Claude Code 写入画布的三种方式
@@ -159,7 +176,7 @@ node bin/trace-canvas.mjs setup --user
 
 清单按线分组，显示每条线的目标、进度条（完成/总数），以及此刻有没有会话在做。待办可以直接在清单里勾选或新增。hooks 记下的每个会话第一条指令，记录的是"当时要求做什么"，不算待办，不会出现在清单里；Claude 导入会话时写下的"下一步"会出现。
 
-agent 用的是同一份清单：开工时用 `trace_tasks` 读目标和待办，做完一项就调用 `trace_task_done`，清单上会标出是谁勾的。这样你写下想要的结果，离开时 agent 照样推进，回来一看就知道做到哪了。命令行里是 `trace-canvas tasks` 和 `trace-canvas done "<待办>"`（脚本或其他 agent 加 `--agent Codex`）。
+agent 用的是同一份清单：开工时用 `trace_tasks` 读目标和待办，做完一项就调用 `trace_task_done`，清单上会标出是谁勾的。这样你写下想要的结果，离开时 agent 照样推进，回来一看就知道做到哪了。你说出的新想法也会随时进清单：每条消息发出时，hook 会告诉 agent 它在哪条线上、哪些待办已经有了，agent 再用 `trace_log`（`kind: "task"`）把新的目标和下一步加进去；同一条未完成的待办不会重复出现。命令行里是 `trace-canvas tasks` 和 `trace-canvas done "<待办>"`（脚本或其他 agent 加 `--agent Codex`）。
 
 ![目标和待办：agent 在共用的清单上勾掉待办](docs/gif-goals.zh.gif)
 

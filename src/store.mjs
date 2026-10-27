@@ -18,6 +18,12 @@ const lockDir = env => path.join(home(env), '.lock');
 const configFile = env => path.join(home(env), 'config.json');
 
 export const uid = prefix => prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+// Stable ids: the same session captured twice, or the same repository's line on two machines, gets one id.
+export function hashId(prefix, s) {
+  let h1 = 0x811c9dc5, h2 = 0x01000193;
+  for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); h1 = Math.imul(h1 ^ c, 16777619); h2 = Math.imul(h2 ^ c, 2246822519); }
+  return prefix + (h1 >>> 0).toString(36) + (h2 >>> 0).toString(36);
+}
 
 function sleepSync(ms) { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); }
 
@@ -58,13 +64,18 @@ export function withLock(fn, env) {
   try { return fn(); } finally { try { fs.rmdirSync(dir); } catch {} }
 }
 
-// Runs fn(data) under the lock. fn returns false to skip the write.
+// Runs fn(data) under the lock. fn returns false to skip the write. While it runs, new records and
+// lines are stamped with the machine of env's data folder.
+let current = process.env;
 export function mutate(fn, env) {
   return withLock(() => {
-    const d = readData(env);
-    const r = fn(d);
-    if (r !== false) writeData(d, env);
-    return r;
+    const d = readData(env), prev = current;
+    current = env || process.env;
+    try {
+      const r = fn(d);
+      if (r !== false) writeData(d, env);
+      return r;
+    } finally { current = prev; }
   }, env);
 }
 
@@ -78,7 +89,15 @@ export function readConfig(env = process.env) {
     turns: env.TRACE_CANVAS_TURNS || file.turns || 'changes',
     // The location map (key_locations.yaml + tools/where.py); ~/agent-map when it exists.
     map: env.TRACE_CANVAS_MAP || file.map || (fs.existsSync(path.join(os.homedir(), 'agent-map', 'tools', 'where.py')) ? path.join(os.homedir(), 'agent-map') : ''),
+    // Which computer this is, as the location map names it (setup --machine); records and sessions carry it.
+    machine: env.TRACE_CANVAS_MACHINE || file.machine || os.hostname().split('.')[0].toLowerCase(),
   };
+}
+const machines = new Map(); // data folder → machine name; ponytail: read once per process
+export function machineName(env = process.env) {
+  const h = home(env);
+  if (!machines.has(h)) machines.set(h, readConfig(env).machine);
+  return machines.get(h);
 }
 export function writeConfig(patch, env) {
   fs.mkdirSync(home(env), { recursive: true });
@@ -104,6 +123,32 @@ export function absorb(target, gone) {
   const keys = gone.map(g => g.key).filter(Boolean);
   if (!target.key && keys.length) target.key = keys.shift();
   target.aliases = [...new Set([...(target.aliases || []), ...keys, ...gone.flatMap(g => [g.id, ...(g.aliases || [])])])];
+}
+
+// Points everything that refers to line `from` at line `to`.
+function retarget(d, from, to) {
+  for (const c of Object.values(d.commits)) { if (c.thread === from) c.thread = to; if (c.mergeOf === from) c.mergeOf = to; }
+  for (const t of Object.values(d.threads)) { if (t.parent === from) t.parent = to; if (t.mergedInto === from) t.mergedInto = to; }
+  for (const e of Object.values(d.edges)) { if (e.from === from) e.from = to; if (e.to === from) e.to = to; if (e.from === e.to) delete d.edges[e.id]; }
+  for (const s of Object.values(d.sessions || {})) if (s.thread === from) s.thread = to;
+}
+/**
+ * Gives every line with a key the id hashId('t', key), so the same repository's line made on two
+ * machines is one line once they sync. The old id stays as an alias. If that id is taken already
+ * (the other machine's copy arrived first), the two are folded into one. Returns how many moved.
+ */
+export function canonicalize(d) {
+  let n = 0;
+  for (const t of Object.values(d.threads)) {
+    const want = t.key ? hashId('t', t.key) : null;
+    if (!want || t.id === want) continue;
+    const old = t.id, there = d.threads[want];
+    delete d.threads[old];
+    if (there) absorb(there, [t]); else d.threads[want] = { ...t, id: want, aliases: [...new Set([...(t.aliases || []), old])] };
+    retarget(d, old, want);
+    n++;
+  }
+  return n;
 }
 
 export function lastCommit(d, tid) {
@@ -136,28 +181,29 @@ function freeSpot(d, near) {
   return { x: 300, y: pts.length * 250 };
 }
 
-export function createThread(d, { name, key = null, parent = null, forkOf = null, note = '', extra = {} }) {
+export function createThread(d, { id, name, key = null, parent = null, forkOf = null, note = '', extra = {} }) {
   const used = new Set(Object.values(d.threads).map(t => t.color));
   const color = LINE_COLORS.find(c => !used.has(c)) || LINE_COLORS[Object.keys(d.threads).length % LINE_COLORS.length];
   const near = parent && d.threads[parent] ? d.threads[parent] : null;
   const pos = freeSpot(d, near);
-  const t = { id: uid('t'), name: String(name || 'Thread').slice(0, 120), color, status: 'active', createdAt: Date.now(), parent, forkOf, mergedInto: null, x: pos.x, y: pos.y, note, ...(key ? { key } : {}), ...extra };
+  const t = { id: id || uid('t'), name: String(name || 'Thread').slice(0, 120), color, status: 'active', createdAt: Date.now(), parent, forkOf, mergedInto: null, x: pos.x, y: pos.y, note, ...(key ? { key } : {}), machine: machineName(current), ...extra };
   d.threads[t.id] = t;
   return t;
 }
 
 export function ensureThread(d, name) {
-  return findThreadByName(d, name) || createThread(d, { name: String(name).trim() }).id;
+  const t = threadById(d, name); // an id, also one a line had before it got a stable one
+  return t ? t.id : findThreadByName(d, name) || createThread(d, { name: String(name).trim() }).id;
 }
 
 export function addCommit(d, { thread, kind = 'idea', title, body = '', links = [], agent = '', ts = Date.now(), parents, extra = {} }) {
-  const tid = thread && (thread === INBOX || d.threads[thread]) ? thread : INBOX;
+  const tid = thread === INBOX ? INBOX : (threadById(d, thread) || { id: INBOX }).id;
   const prev = lastCommit(d, tid);
   const c = {
     id: uid('c'), thread: tid, kind: KINDS.includes(kind) ? kind : 'agent',
     title: String(title || '').slice(0, 500), body: String(body || '').slice(0, 8000),
     links: (links || []).map(String).slice(0, 20), agent: String(agent || ''), ts,
-    parents: parents || (prev ? [prev.id] : []), done: false, ...extra,
+    parents: parents || (prev ? [prev.id] : []), done: false, machine: machineName(current), ...extra,
   };
   d.commits[c.id] = c;
   const t = d.threads[tid];

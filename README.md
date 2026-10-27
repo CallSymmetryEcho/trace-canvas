@@ -201,6 +201,22 @@ This adds the hooks to `~/.codex/hooks.json` and `~/.gemini/settings.json` (afte
 
 Codex has no notification event, so a permission request stands in for "needs you". Checked against real Codex 0.164 sessions (`test/fixtures/codex/`): prompts, shell commands, `apply_patch` edits, commits, permission requests, the context at session start and ticking a to-do over MCP. Gemini CLI support follows its documented hook events and will be checked against a current `@google/gemini-cli`.
 
+## Several machines, one canvas
+
+Your laptop, a workstation and a lab PC can share one canvas through a private git repository all of them can reach. Give each machine a name and the repository's clone:
+
+```bash
+node bin/trace-canvas.mjs setup --user --machine laptop --map ~/agent-map
+node bin/trace-canvas.mjs sync
+```
+
+Each machine writes only its own `canvas/<machine>.jsonl` there: every line, record, link and session with the time it last changed. Syncing pulls, takes the newest version of each document from the other machines' files, writes this machine's file and pushes it. Run it with `trace-canvas sync` or **More → Sync with other machines**; after a session ends it also runs in the background, once a machine has synced by hand. Without a connection the sync says so and pushes next time.
+
+- **What travels:** a session's first instruction goes as its title only, and public IP addresses and secret-looking text are blanked. Your own data keeps everything.
+- **One repository, one line:** a repository's line is named after its remote, so the same repository is one line on every machine, whatever its folder is called. Lines that belong to a repository get the same id everywhere; an old id stays as an alias, so bindings and tools that use it still work.
+- **Whose is what:** records and sessions from another machine show its name, and their resume command runs over `ssh -t <machine>`, so name machines after their ssh aliases.
+- **A new machine:** if the repository also holds a location map (`tools/where.py`, which knows where code, data and NAS folders live on each machine), a session there is told where things are, `trace_where` and `trace-canvas where <words>` look things up, and a `bootstrap.sh` next to it can set a machine up in one go. `setup` refuses a name another computer already writes under.
+
 ## See what changed
 
 A commit station opens with a **Changes** list: every file the commit touched, the biggest change first, with the lines added and removed; lock files, build output and binary files are folded at the end. Click a file for its diff. **Compare with** picks another commit station on the line or in the same repository and shows what differs between the two. An agent's turn that changed files points to the session's next commit.

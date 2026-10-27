@@ -14,7 +14,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { home, mutate, readConfig, readData, createThread, addCommit, lastCommit, goalOf, threadById, threadByKey } from './store.mjs';
+import { home, mutate, readConfig, readData, createThread, addCommit, lastCommit, goalOf, hashId, threadById, threadByKey } from './store.mjs';
 import { gitEvents, redirectTargets, BASH_WRITES, EDIT_TOOLS, GIT_COMMIT, commandDir, headline, firstLine, cleanPrompt } from './git-events.mjs';
 import { tr } from './i18n.mjs';
 const threadIdOfLocal = (d, c) => (c && c.thread && d.threads[c.thread] ? c.thread : 'inbox');
@@ -38,8 +38,17 @@ export function repoInfo(cwd) {
   if (!branch || branch === 'HEAD') branch = null;
   // In a worktree, name the thread after the main repository, not the worktree folder.
   const common = git(cwd, ['rev-parse', '--path-format=absolute', '--git-common-dir']);
-  const repo = common && path.basename(common) === '.git' ? path.basename(path.dirname(common)) : path.basename(top);
-  return { repo, root: top, branch };
+  const folder = common && path.basename(common) === '.git' ? path.basename(path.dirname(common)) : path.basename(top);
+  return { repo: remoteName(cwd) || folder, folder, root: top, branch };
+}
+
+// The repository's name from its remote (gitea, then origin, then the first one), so the same
+// repository is the same line on every machine, whatever its folder is called there.
+function remoteName(cwd) {
+  const urls = new Map(git(cwd, ['config', '--get-regexp', '^remote\\..*\\.url$']).split('\n').map(l => l.match(/^remote\.(.+)\.url (.+)$/)).filter(Boolean).map(m => [m[1], m[2]]));
+  const url = urls.get('gitea') || urls.get('origin') || urls.values().next().value;
+  const m = url && url.replace(/\/+$/, '').match(/([^/:]+?)(?:\.git)?$/);
+  return m ? m[1] : '';
 }
 
 // The main repository a folder belongs to (a worktree points back to it), so a commit made in a
@@ -79,16 +88,20 @@ export function resolveThread(d, info, { cfg, sid, prevThreadId = null, promptFo
   const key = threadKey(info, cfg, sid);
   let t = threadByKey(d, key);
   if (t) return t;
+  // Lines from before keys came from the remote are named after the folder: take such a line over.
+  const old = info.folder && info.folder !== info.repo ? threadKey({ ...info, repo: info.folder }, cfg, sid) : null;
+  t = old && threadByKey(d, old);
+  if (t) { t.aliases = [...new Set([...(t.aliases || []), t.key, old].filter(k => k && k !== key))]; t.key = key; return t; }
   if (cfg.group === 'session') {
     const date = new Date().toISOString().slice(5, 10);
-    return createThread(d, { name: firstLine(promptForName, 60) || tr(cfg.lang, 'sessionThread', info.repo, date), key });
+    return createThread(d, { id: hashId('t', key), name: firstLine(promptForName, 60) || tr(cfg.lang, 'sessionThread', info.repo, date), key });
   }
-  if (!key.includes('@')) return createThread(d, { name: info.repo, key, note: info.root });
+  if (!key.includes('@')) return createThread(d, { id: hashId('t', key), name: info.repo, key, note: info.root });
   // A new branch forks from the thread this session was on, else from the repository's main line.
   const prev = prevThreadId && d.threads[prevThreadId];
-  const parent = prev && prev.key !== key ? prev : threadByKey(d, info.repo) || createThread(d, { name: info.repo, key: info.repo, note: info.root });
+  const parent = prev && prev.key !== key ? prev : threadByKey(d, info.repo) || createThread(d, { id: hashId('t', info.repo), name: info.repo, key: info.repo, note: info.root });
   const forkPoint = lastCommit(d, parent.id);
-  t = createThread(d, { name: `${info.repo} · ${info.branch}`, key, parent: parent.id, forkOf: forkPoint ? forkPoint.id : null, note: info.root });
+  t = createThread(d, { id: hashId('t', key), name: `${info.repo} · ${info.branch}`, key, parent: parent.id, forkOf: forkPoint ? forkPoint.id : null, note: info.root });
   addCommit(d, { thread: t.id, kind: 'fork', title: tr(cfg.lang, 'branchedFrom', info.branch, parent.name), parents: forkPoint ? [forkPoint.id] : [], agent });
   return t;
 }
@@ -120,7 +133,7 @@ export function handleHook(input, env = process.env) {
   // The repository a commit landed in, which is often not cwd's (`cd other && git commit`).
   const bashCmd = ev === 'PostToolUse' && input.tool_name === 'Bash' ? String((input.tool_input || {}).command || '') : '';
   const commitRepo = GIT_COMMIT.test(bashCmd) ? gitRoot(commandDir(bashCmd, cwd)) : null;
-  try { updateLive(input, { info, key: info ? threadKey(info, cfg, sid) : null, env, agent: ag.name, agentKey: input._agent || 'claude', resume: ag.resume(sid) }); } catch {}
+  try { updateLive(input, { info, key: info ? threadKey(info, cfg, sid) : null, env, agent: ag.name, agentKey: input._agent || 'claude', resume: ag.resume(sid), machine: cfg.machine }); } catch {}
   if (!LOG_EVENTS.includes(ev)) return { live: ev };
 
   return mutate(d => {
@@ -132,7 +145,7 @@ export function handleHook(input, env = process.env) {
     // The session's entry outlives this process: the desktop app ends sessions and resumes them
     // under the same id, and a resumed session stays on its line and does not log a first prompt again.
     const s = d.sessions[sid] || adoptSession(d, sid, state);
-    const touch = () => { d.sessions[sid] = Object.assign(s, { id: sid, agent: ag.name, agentKey: input._agent || 'claude', resume: ag.resume(sid), cwd, last: Date.now() }); changed = true; };
+    const touch = () => { d.sessions[sid] = Object.assign(s, { id: sid, agent: ag.name, agentKey: input._agent || 'claude', resume: ag.resume(sid), cwd, machine: cfg.machine, last: Date.now() }); changed = true; };
     const thread = prompt => {
       const t = (s.bound && threadById(d, s.thread)) || resolveThread(d, info, { cfg, sid, prevThreadId: s.thread, promptForName: prompt || state.lastPrompt, agent: ag.name });
       s.thread = t.id; touch(); return t;
@@ -228,12 +241,22 @@ export function sessionThread(d, s, env = process.env) {
 
 // Where things are on this machine, from the location map: the entries whose local path holds cwd
 // (or sits inside it). Empty when no map is set up or where.py is too old to answer in JSON.
+function whereRows(cfg) {
+  const py = cfg.map && path.join(cfg.map, 'tools', 'where.py');
+  if (!py || !fs.existsSync(py)) return [];
+  try { return JSON.parse(execFileSync('python3', [py, '--json'], { encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'] })); } catch { return []; }
+}
+// Location-map entries matching every word of query (in their id, title, notes, tags or paths),
+// with only the places on `machine` when one is given.
+export function whereFind(cfg, query, machine = '') {
+  const words = String(query || '').toLowerCase().split(/\s+/).filter(Boolean);
+  return whereRows(cfg).filter(r => words.every(w => JSON.stringify(r).toLowerCase().includes(w)))
+    .map(r => ({ id: r.id, title: r.title, notes: r.notes || '', where: (r.where || []).filter(w => !machine || w.host === machine) }))
+    .filter(r => !machine || r.where.length);
+}
 function whereHere(cfg, cwd) {
-  if (!cfg.map) return [];
-  const py = path.join(cfg.map, 'tools', 'where.py');
-  if (!fs.existsSync(py)) return [];
   try {
-    const rows = JSON.parse(execFileSync('python3', [py, '--json'], { encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'] }));
+    const rows = whereRows(cfg);
     const here = path.resolve(cwd);
     // Entries that contain cwd come first, the most specific (longest path) first, then things inside cwd.
     const score = r => Math.max(0, ...(r.where || []).filter(w => w.local).map(w => (here === w.local || here.startsWith(w.local + path.sep) ? 1e6 + w.local.length : w.local.startsWith(here + path.sep) ? 1 : 0)));
@@ -250,7 +273,8 @@ export function sessionStartContext(input, env = process.env) {
   const sid = input.session_id, cwd = input.cwd || process.cwd(), key = input._agent || 'claude', ag = agentOf(key);
   const cfg = readConfig(env);
   const d = readData(env);
-  let tid = env.TRACE_CANVAS_THREAD && d.threads[env.TRACE_CANVAS_THREAD] ? env.TRACE_CANVAS_THREAD : null;
+  const handed = env.TRACE_CANVAS_THREAD && threadById(d, env.TRACE_CANVAS_THREAD);
+  let tid = handed ? handed.id : null;
   if (tid && sid) mutate(dd => bindSession(dd, sid, tid, env), env);
   if (!tid && sid) tid = sessionThread(d, { id: sid, key: threadKey(repoInfo(cwd), cfg, sid) }, env).threadId;
   const out = [];

@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { addCommit, dataFile, ensureThread, importText, INBOX, mutate, readData, threadIdOf } from './store.mjs';
+import { addCommit, dataFile, ensureThread, importText, INBOX, mutate, readConfig, readData, threadById, threadIdOf } from './store.mjs';
+import { whereFind } from './hook.mjs';
 import { agentKey, agentOf } from './agents.mjs';
 import { bindLiveSession, captureSession, forkThread, listTasks, listThreads, liveSessions, mergeDataset, mergeThreads, readThread, setTaskDone } from './ops.mjs';
 import { currentSessionId, describeSession, findTranscript, findTranscripts, parseTranscript } from './transcript.mjs';
@@ -135,6 +136,13 @@ const TOOLS = [
     inputSchema: { type: 'object', properties: { open_browser: { type: 'boolean' }, view: { type: 'string', enum: ['canvas', 'git', 'timeline'] } } },
     annotations: { readOnlyHint: true },
   },
+  {
+    name: 'trace_where',
+    title: 'Where things are',
+    description: 'Looks things up in the location map (~/agent-map): repositories, data folders, NAS paths, and which machine has them where. Every word of query must match; machine (e.g. "mac", "bsuperstation") keeps only that computer\'s places.',
+    inputSchema: { type: 'object', properties: { query: { type: 'string' }, machine: { type: 'string' } }, required: ['query'] },
+    annotations: { readOnlyHint: true },
+  },
 ];
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -234,7 +242,7 @@ async function callTool(name, a = {}) {
     }
     case 'trace_tasks': {
       const d = readData();
-      const thread = a.thread || (process.env.TRACE_CANVAS_THREAD && d.threads[process.env.TRACE_CANVAS_THREAD] ? process.env.TRACE_CANVAS_THREAD : undefined);
+      const thread = a.thread || (process.env.TRACE_CANVAS_THREAD && threadById(d, process.env.TRACE_CANVAS_THREAD) ? process.env.TRACE_CANVAS_THREAD : undefined);
       const rows = listTasks(d, { thread, includeDone: !!a.include_done, assignee: a.mine ? agentKey() : a.assignee });
       const open = rows.reduce((n, r) => n + (r.total - r.done), 0);
       return { text: `${open} open to-do${open === 1 ? '' : 's'} on ${rows.length} thread${rows.length === 1 ? '' : 's'}.`, data: { threads: rows } };
@@ -262,6 +270,11 @@ async function callTool(name, a = {}) {
       if (!a.unbind && !String(a.thread || '').trim()) throw new Error('Pass thread, or unbind: true');
       const t = mutate(d => bindLiveSession(d, { sessionId, thread: a.unbind ? null : a.thread }));
       return { text: t ? `Session ${sessionId} is on "${t.name}" now.` : `Session ${sessionId} follows its repository/branch line again.`, data: { sessionId, thread: t ? { id: t.id, name: t.name } : null } };
+    }
+    case 'trace_where': {
+      const rows = whereFind(readConfig(), a.query, a.machine || '');
+      const text = rows.map(r => `${r.title} [${r.id}]${r.notes ? ` — ${String(r.notes).split('\n')[0]}` : ''}\n${r.where.map(w => `  ${w.host}${w.role ? ` ${w.role}` : ''}: ${w.local || w.path || ''}`).join('\n')}`).join('\n');
+      return { text: text || 'Nothing in the location map matches.', data: { entries: rows } };
     }
     case 'trace_open': {
       const { url, started } = await ensureServer();

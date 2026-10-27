@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 // Operations shared by the MCP server and the command line:
 // putting a session on the canvas, merging threads, and merging data sets.
-import { INBOX, COLS, absorb, addCommit, createThread, findThreadByName, goalOf, lastCommit, readConfig, threadById, threadIdOf } from './store.mjs';
+import { INBOX, COLS, absorb, addCommit, createThread, findThreadByName, goalOf, hashId, lastCommit, readConfig, threadById, threadIdOf } from './store.mjs';
 import { headline, firstLine } from './git-events.mjs';
 import { AGENT, bindSession, gitRoot, logGitEvents, repoInfo, resumeLink, sessionThread, turnBody, rel } from './hook.mjs';
 import { listLive } from './live.mjs';
@@ -9,18 +9,13 @@ import { AGENTS, q } from './agents.mjs';
 import { desktopSessions } from './desktop.mjs';
 import { tr } from './i18n.mjs';
 
-// Stable ids, so capturing the same session twice updates instead of duplicating.
-function hashId(prefix, s) {
-  let h1 = 0x811c9dc5, h2 = 0x01000193;
-  for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); h1 = Math.imul(h1 ^ c, 16777619); h2 = Math.imul(h2 ^ c, 2246822519); }
-  return prefix + (h1 >>> 0).toString(36) + (h2 >>> 0).toString(36);
-}
 const norm = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
 export function resolveThreadRef(d, ref) {
   if (!ref) return null;
-  if (ref === INBOX || d.threads[ref]) return ref;
-  return findThreadByName(d, ref);
+  if (ref === INBOX) return ref;
+  const t = threadById(d, ref); // also an id the line had before it got a stable one
+  return t ? t.id : findThreadByName(d, ref);
 }
 
 // A to-do is a task meant to be ticked. The first instruction of a session, which hooks and
@@ -108,7 +103,7 @@ export function sessionList(d, tid = null) {
   for (const c of Object.values(d.commits)) {
     if (!c.session) continue;
     const r = rec.get(c.session) || { last: 0, at: Infinity };
-    if (c.ts > r.last) Object.assign(r, { last: c.ts, thread: threadIdOf(d, c), agent: c.agent || r.agent });
+    if (c.ts > r.last) Object.assign(r, { last: c.ts, thread: threadIdOf(d, c), agent: c.agent || r.agent, machine: c.machine || r.machine });
     if (c.kind === 'task' && c.ts < r.at) Object.assign(r, { at: c.ts, title: c.title });
     const link = (c.links || []).find(l => RESUME.test(l));
     if (link) r.resume = link;
@@ -119,7 +114,7 @@ export function sessionList(d, tid = null) {
     const r = rec.get(id) || {}, e = table[id] || {};
     const th = table[id] ? threadById(d, e.thread) : d.threads[r.thread] || null;
     const cwd = e.cwd || lineDir(th), resume = e.resume || r.resume || resumeLink(id);
-    return { id, thread: th ? th.id : null, agent: e.agent || r.agent || AGENT, title: e.title || r.title || '', bound: !!e.bound, last: Math.max(e.last || 0, r.last || 0), cwd, resume, command: `${cwd ? `cd ${q(cwd)} && ` : ''}${resume}` };
+    return { id, thread: th ? th.id : null, agent: e.agent || r.agent || AGENT, title: e.title || r.title || '', bound: !!e.bound, last: Math.max(e.last || 0, r.last || 0), machine: e.machine || r.machine || '', cwd, resume, command: `${cwd ? `cd ${q(cwd)} && ` : ''}${resume}` };
   }).sort((a, b) => b.last - a.last);
   return tid ? all.filter(s => s.thread === tid) : all;
 }

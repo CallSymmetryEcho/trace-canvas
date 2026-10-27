@@ -4,13 +4,29 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { addCommit, dataFile, ensureThread, home, importText, INBOX, mutate, writeConfig } from '../src/store.mjs';
+import { addCommit, dataFile, ensureThread, home, importText, INBOX, mutate, readConfig, writeConfig } from '../src/store.mjs';
+import { execFileSync } from 'node:child_process';
 import { handleHook, readStdin } from '../src/hook.mjs';
 import { agentFiles, allowSafeTools, codexHooks, codexWritable, geminiHooks, install, installAgentMcp, installMcp, installSkill, onPath, settingsPath, uninstall } from '../src/install.mjs';
 import { normalize } from '../src/agents.mjs';
 import os from 'node:os';
 
 const SELF = fileURLToPath(import.meta.url);
+
+// After a session ends, sync with the other machines in the background, at most every 2 minutes.
+// Only once this machine has synced by hand (its file exists), so the first sync is a choice.
+function syncSoon() {
+  const cfg = readConfig();
+  if (!cfg.map || !fs.existsSync(path.join(cfg.map, 'canvas', `${cfg.machine}.jsonl`))) return;
+  let last = 0;
+  try { last = Number(fs.readFileSync(path.join(home(), '.sync-last'), 'utf8')) || 0; } catch {}
+  if (Date.now() - last > 120000) spawn(process.execPath, [SELF, 'sync', '--quiet'], { detached: true, stdio: 'ignore' }).unref();
+}
+// This computer's name in the location map (tools/where.py --whoami), or '' without one.
+function whoami(map) {
+  const py = map && path.join(map, 'tools', 'where.py');
+  try { return py && fs.existsSync(py) ? execFileSync('python3', [py, '--whoami'], { encoding: 'utf8', timeout: 5000 }).trim() : ''; } catch { return ''; }
+}
 const SKILL_DIR = path.join(path.dirname(SELF), '..', 'skill');
 const argv = process.argv.slice(2);
 const cmd = argv[0] && !argv[0].startsWith('-') ? argv.shift() : 'serve';
@@ -72,6 +88,9 @@ Setup (pass --user for every project, or --project dir for one)
   trace-canvas mcp              Run the MCP server on stdio (Claude Code starts this)
   trace-canvas lang <en|zh>     Language of records the hooks write
   trace-canvas where            Show where data is stored
+  trace-canvas where <words> [--machine M]   Look things up in the location map (~/agent-map)
+  trace-canvas sync             Sync the canvas with your other machines through the location map
+  (setup also takes --machine NAME and --map DIR: this computer's name and the map repository)
 
 Data: ${dataFile()}`;
 
@@ -110,6 +129,7 @@ async function main() {
           const payload = JSON.parse(raw), input = normalize(agent, payload);
           event = payload.hook_event_name; // the CLI's own name for it, which its output must repeat
           outcome = handleHook(input);
+          if (input.hook_event_name === 'SessionEnd' && process.env.TRACE_CANVAS_DISABLE !== '1') syncSoon();
           if (process.env.TRACE_CANVAS_DISABLE !== '1') {
             const { sessionStartContext, promptContext } = await import('../src/hook.mjs');
             if (input.hook_event_name === 'SessionStart') context = sessionStartContext(input);
@@ -292,6 +312,18 @@ async function main() {
       console.log(m.ok ? `2. MCP server added: ${m.where}` : `2. Couldn't add the MCP server. Run this yourself:\n   ${m.hint}`);
       console.log(`   Capturing, logging and reading run without asking; merging and importing still ask (${file}).`);
       console.log(`3. Skill installed at ${installSkill(s, SKILL_DIR)}`);
+      // Which computer this is: --machine, else what it was set to before, else the location map's name for it.
+      {
+        const { machineOwner } = await import('../src/sync.mjs');
+        let saved = '';
+        try { saved = JSON.parse(fs.readFileSync(path.join(home(), 'config.json'), 'utf8')).machine || ''; } catch {}
+        if (flag('map', '')) writeConfig({ map: path.resolve(str(flag('map', ''))) });
+        const cfg = readConfig(), machine = str(flag('machine', '')) || saved || whoami(cfg.map) || cfg.machine;
+        const owner = cfg.map && machineOwner(cfg.map, machine);
+        if (owner && !flag('force', false)) { console.error(`   "${machine}" is ${owner}'s name in ${cfg.map}/canvas. Pick another with --machine (or --force).`); process.exit(1); }
+        writeConfig({ machine });
+        console.log(`4. This computer is "${machine}"${cfg.map ? `; the canvas syncs through ${cfg.map} with trace-canvas sync` : ''}`);
+      }
       // --agents claude,codex,gemini also wires the other CLIs (user scope only); missing ones are skipped.
       const others = str(flag('agents', '')).split(',').map(x => x.trim()).filter(x => x === 'codex' || x === 'gemini');
       for (const a of s.user ? others : []) {
@@ -316,7 +348,27 @@ async function main() {
       console.log(`Hooks will write records in ${lang === 'en' ? 'English' : 'Chinese'}`);
       break;
     }
-    case 'where': console.log(dataFile()); break;
+    case 'where': {
+      const q = argv.join(' ').trim();
+      if (!q) { console.log(dataFile()); break; }
+      const { whereFind } = await import('../src/hook.mjs');
+      const rows = whereFind(readConfig(), q, str(flag('machine', '')));
+      if (!rows.length) { console.log('Nothing in the location map matches.'); break; }
+      for (const r of rows) {
+        console.log(`${r.title} [${r.id}]`);
+        for (const w of r.where) console.log(`  ${w.host}${w.role ? ` ${w.role}` : ''}: ${w.local || w.path || ''}`);
+      }
+      break;
+    }
+    case 'sync': {
+      const { runSync } = await import('../src/sync.mjs');
+      const r = runSync();
+      if (flag('quiet', false)) break;
+      if (r.error) { console.error(`Sync failed: ${r.error}`); process.exit(1); }
+      if (r.busy) { console.log('Another sync is running.'); break; }
+      console.log(`${r.machine}: ${r.imported} change${r.imported === 1 ? '' : 's'} from other machines, ${r.changed} here${r.moved ? `; ${r.moved} lines got stable ids` : ''}. ${r.offline ? 'Offline: pushes next time.' : r.pushed ? 'Pushed.' : r.committed ? 'Committed.' : 'Up to date.'}`);
+      break;
+    }
     case 'help': case '--help': case '-h': console.log(HELP); break;
     default: console.log(HELP); process.exit(1);
   }

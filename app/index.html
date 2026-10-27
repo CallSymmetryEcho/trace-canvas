@@ -573,6 +573,7 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
         <hr>
         <button data-menu="agent" data-i18n="menuAgent">Connect an AI agent</button>
         <button data-menu="io" data-i18n="menuIO">Import / export</button>
+        <button data-menu="sync" id="sync-item" hidden data-i18n="menuSync">Sync with other machines</button>
         <button data-menu="clear-examples" id="clear-ex-item" hidden data-i18n="menuClearEx">Clear example data</button>
         <hr>
         <button data-menu="help" data-i18n="menuHelp">Shortcuts and help</button>
@@ -703,6 +704,8 @@ const I18N = {
     searchPh: 'Search records…', aiBtn: 'AI tidy-up', aiBtnTitle: 'Ask Claude to sort the inbox and find links between threads',
     langBtn: '中文', langTitle: '切换到中文', more: 'More',
     menuNewThread: 'New thread', menuHideDone: 'Hide finished threads', menuShowDone: 'Show finished threads',
+    menuSync: 'Sync with other machines', tSyncing: 'Syncing…', tSyncBusy: 'A sync is already running', tSyncFailed: e => `Sync failed: ${e}`,
+    tSynced: (n, off) => `Synced: ${n} change${n === 1 ? '' : 's'} from other machines${off ? ' (offline; pushes next time)' : ''}`, onMachine: m => `On ${m}`,
     menuAgent: 'Connect an AI agent', menuIO: 'Import / export', menuClearEx: 'Clear example data', menuHelp: 'Shortcuts and help',
     zoomOut: 'Zoom out', zoomIn: 'Zoom in', zoomReset: 'Reset to 100%', fit: 'Fit', connect: 'Connect', connectTitle: 'Draw a link between two threads', newThread: 'New thread',
     selectMode: 'Select', selectTitle: 'Pick several threads (or Shift-click cards), then merge them',
@@ -855,6 +858,8 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     searchPh: '搜索记录…', aiBtn: 'AI 梳理', aiBtnTitle: '让 Claude 归类收件箱并找出线程间的关联',
     langBtn: 'EN', langTitle: 'Switch to English', more: '更多',
     menuNewThread: '新建线程', menuHideDone: '隐藏已完成的线程', menuShowDone: '显示已完成的线程',
+    menuSync: '和其他电脑同步', tSyncing: '正在同步…', tSyncBusy: '已经有一个同步在进行', tSyncFailed: e => `同步失败：${e}`,
+    tSynced: (n, off) => `已同步：从其他电脑收到 ${n} 处改动${off ? '（离线，下次再推送）' : ''}`, onMachine: m => `在 ${m} 上`,
     menuAgent: '接入 AI agent', menuIO: '导入 / 导出', menuClearEx: '清除示例数据', menuHelp: '快捷键与用法',
     zoomOut: '缩小', zoomIn: '放大', zoomReset: '重置为 100%', fit: '适配', connect: '连线', connectTitle: '在两个线程之间画一条关联', newThread: '新线程',
     selectMode: '多选', selectTitle: '点选多条线程（或 Shift+点击卡片），然后合并',
@@ -1041,7 +1046,7 @@ const S = {
   captureKind: 'idea', captureThread: ls.get('tc.captureThread', INBOX),
   mode: 'loading', readOnly: false, offline: false, got: new Set(), dragId: null,
   ai: null, sheet: null,
-  live: [], liveOthers: [], sessions: [], goalsShowDone: false,
+  live: [], liveOthers: [], sessions: [], machine: '', goalsShowDone: false,
 };
 
 function fmtAbs(ts) { const d = new Date(ts); return `${pad2(d.getMonth() + 1)}/${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
@@ -1343,12 +1348,14 @@ async function loadServer() {
     const data = await r.json();
     for (const col of COLS) applyRows(col, data[col] || []);
     S.sessions = data.sessions || [];
+    S.machine = data.machine || '';
     if (S.offline) { S.offline = false; renderSync(); }
   } catch { S.offline = true; COLS.forEach(c => S.got.add(c)); renderSync(); render(); }
 }
 async function initStore() {
   if (SERVER) {
     S.mode = 'server';
+    $('#sync-item').hidden = false;
     await loadServer();
     loadLive();
     const es = new EventSource('/api/events');
@@ -2157,6 +2164,7 @@ function commitDetail(c) {
       <label class="fld"><span>${esc(t('dBody'))}</span><textarea id="d-body" rows="5" placeholder="${esc(t('dBodyPh'))}">${esc(c.body || '')}</textarea></label>
       <label class="fld"><span>${esc(t('dLinks'))}</span><textarea id="d-links" rows="2" placeholder="${esc(t('dLinksPh'))}">${esc((c.links || []).join('\n'))}</textarea></label>
       ${linksView(c.links)}
+      ${c.machine && S.machine && c.machine !== S.machine ? `<div class="meta"><span>${esc(t('onMachine', c.machine))}</span></div>` : ''}
       <div class="fld-row">
         <label class="fld"><span>${esc(t('dAgent'))}</span><input id="d-agent" list="agent-list" value="${esc(c.agent || '')}" placeholder="${esc(t('dAgentPh'))}"></label>
         <label class="fld"><span>${esc(t('dTime'))}</span><input id="d-ts" type="datetime-local" value="${toLocalInput(c.ts)}"></label>
@@ -2186,8 +2194,10 @@ function lineSessions(tid) {
   if (!rows.length) return '';
   const li = s => {
     const l = byId.get(s.id), st = l ? l.status : 'off', cwd = s.cwd || (l && l.cwd);
-    const cmd = `${cwd ? `cd ${shq(cwd)} && ` : ''}${s.resume || (l && l.resume) || `claude --resume ${s.id}`}`;
-    const sub = [l && stLabel(st), s.agent || (l && l.agent) || 'Claude Code', s.id.slice(0, 8), s.last && fmtRel(s.last)].filter(Boolean).join(' · ');
+    const here = `${cwd ? `cd ${shq(cwd)} && ` : ''}${s.resume || (l && l.resume) || `claude --resume ${s.id}`}`;
+    // A session from another machine resumes there, over ssh (the machine names are the ssh aliases).
+    const away = s.machine && S.machine && s.machine !== S.machine, cmd = away ? `ssh -t ${s.machine} ${shq(here)}` : here;
+    const sub = [l && stLabel(st), s.agent || (l && l.agent) || 'Claude Code', away && s.machine, s.id.slice(0, 8), s.last && fmtRel(s.last)].filter(Boolean).join(' · ');
     return `<li class="st-${esc(st)}${l ? ' is-live' : ''}"${l ? ` data-act="goto-live" data-sid="${esc(s.id)}"` : ''}><span class="ldot"></span><span class="s-name">${esc(s.title || (l ? liveTitle(l) : s.id))}</span><span class="act">${esc(sub)}</span><button class="btn" data-act="copy-cmd" data-cmd="${esc(cmd)}" title="${esc(cmd)}">${esc(t('copyResume'))}</button></li>`;
   };
   return `<div class="sec-label">${esc(t('lineSessions'))}</div><ul class="l-list s-list">${rows.slice(0, 8).map(li).join('')}</ul>
@@ -2389,6 +2399,12 @@ const menu = $('#menu'), moreBtn = $('#more-btn');
 function closeMenu() { menu.hidden = true; moreBtn.setAttribute('aria-expanded', 'false'); }
 moreBtn.addEventListener('click', e => { e.stopPropagation(); menu.hidden = !menu.hidden; moreBtn.setAttribute('aria-expanded', String(!menu.hidden)); });
 document.addEventListener('click', e => { if (!menu.hidden && !e.target.closest('.menu-wrap')) closeMenu(); });
+// Syncs with the other machines through the location map repository (POST /api/sync, src/sync.mjs).
+async function syncNow() {
+  toast(t('tSyncing'));
+  const r = await fetch('/api/sync', { method: 'POST', headers: { 'X-Trace-Canvas': '1' } }).then(x => x.json()).catch(() => ({ error: t('syncOfflineTitle') }));
+  toast(r.error ? t('tSyncFailed', r.error) : r.busy ? t('tSyncBusy') : t('tSynced', r.imported || 0, r.offline));
+}
 menu.addEventListener('click', e => {
   const b = e.target.closest('[data-menu]'); if (!b) return;
   closeMenu();
@@ -2396,6 +2412,7 @@ menu.addEventListener('click', e => {
   if (k === 'new-thread') { setView('canvas'); createThreadAndEdit(); }
   else if (k === 'toggle-done') { S.hideDone = !S.hideDone; ls.set('tc.hideDone', S.hideDone); render(); }
   else if (k === 'clear-examples') { if (canWrite()) clearExamples(); }
+  else if (k === 'sync') syncNow();
   else openSheet(k);
 });
 $('#ex-clear').onclick = () => { if (canWrite()) clearExamples(); };

@@ -13,6 +13,7 @@ import { demoData } from './demo.mjs';
 import { liveDir } from './live.mjs';
 import { bindLiveSession, liveSessions, sessionList } from './ops.mjs';
 import { commitDiff, commitInfo } from './git-view.mjs';
+import { runSync } from './sync.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const APP = path.join(here, '..', 'app', 'index.html');
@@ -81,7 +82,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
 
       if (req.method === 'GET' && (p === '/' || p === '/index.html')) return send(res, 200, page(readConfig(), ai), 'text/html; charset=utf-8');
       if (req.method === 'GET' && p === '/api/health') return send(res, 200, { ok: true, version: VERSION, ai, dataFile: dataFile() });
-      if (req.method === 'GET' && p === '/api/data') { const d = readData(); return send(res, 200, { ...toArrays(d), sessions: sessionList(d) }); }
+      if (req.method === 'GET' && p === '/api/data') { const d = readData(); return send(res, 200, { ...toArrays(d), sessions: sessionList(d), machine: readConfig().machine }); }
       if (req.method === 'GET' && p === '/api/live') return send(res, 200, liveSessions(readData()));
       // What a commit record changed, read from git on demand (src/git-view.mjs).
       if (req.method === 'GET' && p === '/api/git/commit') return send(res, 200, await commitInfo(readData(), url.searchParams.get('record'), url.searchParams.get('against')));
@@ -104,6 +105,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         mutate(d => { if (doc) d[col][id] = { ...doc, id }; else delete d[col][id]; });
         return send(res, 200, { ok: true });
       }
+      if (req.method === 'POST' && p === '/api/sync') { const r = runSync(); broadcast('change'); return send(res, 200, r); }
       if (req.method === 'POST' && p === '/api/bind') {
         const body = JSON.parse(await readBody(req));
         const t = mutate(d => bindLiveSession(d, { sessionId: String(body.session || ''), thread: body.thread ? String(body.thread) : null }));

@@ -2,7 +2,11 @@
 
 ## Unreleased
 
+**Upgrading:** run `node bin/trace-canvas.mjs setup --user --machine <name> --map <repo clone>` once, then `trace-canvas sync`. The first sync gives lines that belong to a repository a stable id (the old one stays as an alias) and keeps a copy of the data first (`data.json.before-first-sync`).
+
 ### Added
+
+- **Several machines, one canvas.** `trace-canvas sync` (also **More → Sync with other machines**, and in the background after a session ends) shares the canvas through a private git repository: each machine writes `canvas/<machine>.jsonl`, and per document the newest change wins. Prompts travel as titles only; public IPs and secret-looking text are blanked. Records and sessions carry their machine; another machine's session resumes over ssh. `trace_where` and `trace-canvas where` look things up in a location map.
 
 - **See what changed.** A commit station lists the files it changed, biggest first, with a diff for each, and compares with another commit station. The diffs are read from git when you open them (`/api/git/commit`, `/api/git/diff`); the canvas keeps only each commit's sha and repository, which commit records now carry, also for commits made with `cd other && git commit` or in a worktree.
 

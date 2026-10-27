@@ -13,7 +13,7 @@ const MARK = 'trace-canvas.mjs" hook';
 export function hookConfig(command) {
   const h = (extra = {}) => [{ type: 'command', command, ...extra }];
   return {
-    SessionStart: [{ hooks: h({ async: true }) }],
+    SessionStart: [{ hooks: h({ timeout: 10 }) }], // prints the context a session starts with, so it can't be async
     UserPromptSubmit: [{ hooks: h({ async: true }) }],
     PreToolUse: [{ hooks: h({ async: true }) }],
     Notification: [{ hooks: h({ async: true }) }],
@@ -25,6 +25,25 @@ export function hookConfig(command) {
   };
 }
 
+// Codex (~/.codex/hooks.json): Claude's shape, timeouts in seconds. It has no Notification event;
+// PermissionRequest stands in for it. Codex trusts each hook by its position, so ours always go last.
+export function codexHooks(command) {
+  const h = (timeout = 5) => [{ type: 'command', command, timeout }];
+  return {
+    SessionStart: [{ hooks: h(10) }], UserPromptSubmit: [{ hooks: h() }], PreToolUse: [{ hooks: h() }], PermissionRequest: [{ hooks: h() }],
+    PostToolUse: [{ hooks: h() }], Stop: [{ hooks: h(10) }], Interrupt: [{ hooks: h() }], SubagentStart: [{ hooks: h() }], SubagentStop: [{ hooks: h() }], SessionEnd: [{ hooks: h(10) }],
+  };
+}
+// Gemini CLI (~/.gemini/settings.json): its own event names, timeouts in milliseconds.
+export function geminiHooks(command) {
+  const h = (timeout = 5000) => [{ type: 'command', command, timeout }];
+  return {
+    SessionStart: [{ hooks: h(10000) }], BeforeAgent: [{ hooks: h() }], AfterAgent: [{ hooks: h(10000) }], BeforeTool: [{ hooks: h() }],
+    AfterTool: [{ hooks: h() }], Notification: [{ hooks: h() }], SessionEnd: [{ hooks: h(10000) }],
+  };
+}
+export const agentFiles = home => ({ codex: path.join(home, '.codex', 'hooks.json'), gemini: path.join(home, '.gemini', 'settings.json') });
+
 export function settingsPath({ user, project }) {
   if (user) return path.join(os.homedir(), '.claude', 'settings.json');
   return path.join(path.resolve(project || process.cwd()), '.claude', 'settings.local.json');
@@ -32,7 +51,7 @@ export function settingsPath({ user, project }) {
 
 const isOurs = group => (group.hooks || []).some(x => typeof x.command === 'string' && x.command.includes(MARK));
 
-export function install(file, command) {
+export function install(file, command, events = hookConfig(command)) {
   let settings = {};
   if (fs.existsSync(file)) {
     const raw = fs.readFileSync(file, 'utf8');
@@ -40,7 +59,7 @@ export function install(file, command) {
     fs.writeFileSync(file + '.bak', raw);
   }
   settings.hooks = settings.hooks || {};
-  for (const [ev, groups] of Object.entries(hookConfig(command))) {
+  for (const [ev, groups] of Object.entries(events)) {
     const kept = (settings.hooks[ev] || []).filter(g => !isOurs(g));
     settings.hooks[ev] = [...kept, ...groups];
   }
@@ -82,6 +101,22 @@ export function installMcp({ user, project }, cli) {
   fs.writeFileSync(file, JSON.stringify(cfg, null, 2) + '\n');
   return { ok: true, where: file };
 }
+
+// MCP for Codex and Gemini, with TRACE_CANVAS_AGENT so the server knows who is calling.
+export function installAgentMcp(agent, cli, home = os.homedir()) {
+  if (agent === 'codex') {
+    try { execFileSync('codex', ['mcp', 'remove', 'trace-canvas'], { stdio: 'ignore' }); } catch {}
+    try { execFileSync('codex', ['mcp', 'add', 'trace-canvas', '--env', 'TRACE_CANVAS_AGENT=codex', '--', 'node', cli, 'mcp'], { stdio: 'pipe' }); return { ok: true }; }
+    catch (e) { return { ok: false, hint: `codex mcp add trace-canvas --env TRACE_CANVAS_AGENT=codex -- node "${cli}" mcp` }; }
+  }
+  const file = agentFiles(home).gemini;
+  const s = fs.existsSync(file) && fs.readFileSync(file, 'utf8').trim() ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
+  s.mcpServers = { ...(s.mcpServers || {}), 'trace-canvas': { command: 'node', args: [cli, 'mcp'], env: { TRACE_CANVAS_AGENT: 'gemini' } } };
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify(s, null, 2) + '\n');
+  return { ok: true };
+}
+export const onPath = cmd => { try { execFileSync('which', [cmd], { stdio: 'ignore' }); return true; } catch { return false; } };
 
 // Skill. Linked rather than copied, so pulling a newer Trace Canvas updates it too.
 export function installSkill({ user, project }, skillDir) {

@@ -5,6 +5,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { addCommit, dataFile, ensureThread, importText, INBOX, mutate, readData } from './store.mjs';
+import { agentKey, agentOf } from './agents.mjs';
 import { bindLiveSession, captureSession, forkThread, listTasks, listThreads, liveSessions, mergeDataset, mergeThreads, readThread, setTaskDone } from './ops.mjs';
 import { currentSessionId, describeSession, findTranscript, findTranscripts, parseTranscript } from './transcript.mjs';
 
@@ -82,7 +83,7 @@ const TOOLS = [
     name: 'trace_log',
     title: 'Log one record',
     description: 'Adds one record to a thread (created if the name is new) or to the inbox.',
-    inputSchema: { type: 'object', properties: { title: { type: 'string' }, kind: KIND, thread: { type: 'string' }, body: { type: 'string' }, links: { type: 'array', items: { type: 'string' } }, agent: { type: 'string' } }, required: ['title'] },
+    inputSchema: { type: 'object', properties: { title: { type: 'string' }, kind: KIND, thread: { type: 'string' }, body: { type: 'string' }, links: { type: 'array', items: { type: 'string' } }, agent: { type: 'string' }, assignee: { type: 'string', enum: ['claude', 'codex', 'gemini'], description: 'Hand this to-do to an agent (kind defaults to task).' } }, required: ['title'] },
     annotations: { readOnlyHint: false, destructiveHint: false },
   },
   {
@@ -103,7 +104,7 @@ const TOOLS = [
     name: 'trace_tasks',
     title: 'Goals and to-dos',
     description: 'Returns the goal and the to-dos of each thread (or of one thread), with how many are done. Read it before working on a thread; tick to-dos with trace_task_done when they are finished.',
-    inputSchema: { type: 'object', properties: { thread: { type: 'string', description: 'Thread id or name; omit for all threads.' }, include_done: { type: 'boolean', description: 'Also list finished to-dos (default false).' } } },
+    inputSchema: { type: 'object', properties: { thread: { type: 'string', description: 'Thread id or name; omit for all threads (or the thread this session was handed).' }, include_done: { type: 'boolean', description: 'Also list finished to-dos (default false).' }, mine: { type: 'boolean', description: 'Only the to-dos assigned to you.' }, assignee: { type: 'string', enum: ['claude', 'codex', 'gemini'] } } },
     annotations: { readOnlyHint: true },
   },
   {
@@ -201,7 +202,7 @@ async function callTool(name, a = {}) {
     }
     case 'trace_log': {
       if (!String(a.title || '').trim()) throw new Error('title is required');
-      const c = mutate(d => addCommit(d, { thread: a.thread ? ensureThread(d, a.thread) : INBOX, kind: a.kind || 'agent', title: a.title, body: a.body || '', links: Array.isArray(a.links) ? a.links : [], agent: a.agent || 'Claude' }));
+      const c = mutate(d => addCommit(d, { thread: a.thread ? ensureThread(d, a.thread) : INBOX, kind: a.kind || (a.assignee ? 'task' : 'agent'), title: a.title, body: a.body || '', links: Array.isArray(a.links) ? a.links : [], agent: a.agent || agentOf(agentKey()).name, extra: a.assignee ? { assignee: a.assignee } : {} }));
       return { text: `Logged to ${c.thread === INBOX ? 'the inbox' : `"${readData().threads[c.thread].name}"`}.`, data: { id: c.id, thread: c.thread } };
     }
     case 'trace_import_data': {
@@ -219,17 +220,19 @@ async function callTool(name, a = {}) {
     case 'trace_fork': {
       const sessionId = a.bind ? currentSessionId({ sessionId: a.session_id, projectDir: projectDir() }) : null;
       if (a.bind && !sessionId) throw new Error('No session to bind; pass session_id');
-      const r = mutate(d => { const f = forkThread(d, { from: a.from, name: a.name, agent: 'Claude' }); if (sessionId) bindLiveSession(d, { sessionId, thread: f.thread.id }); return f; });
+      const r = mutate(d => { const f = forkThread(d, { from: a.from, name: a.name, agent: agentOf(agentKey()).name }); if (sessionId) bindLiveSession(d, { sessionId, thread: f.thread.id }); return f; });
       return { text: `Forked "${r.thread.name}"${sessionId ? `; session ${sessionId} is on it now` : ''}.`, data: { thread: { id: r.thread.id, name: r.thread.name }, forkOf: r.thread.forkOf, record: r.record.id, sessionId } };
     }
     case 'trace_tasks': {
-      const rows = listTasks(readData(), { thread: a.thread, includeDone: !!a.include_done });
+      const d = readData();
+      const thread = a.thread || (process.env.TRACE_CANVAS_THREAD && d.threads[process.env.TRACE_CANVAS_THREAD] ? process.env.TRACE_CANVAS_THREAD : undefined);
+      const rows = listTasks(d, { thread, includeDone: !!a.include_done, assignee: a.mine ? agentKey() : a.assignee });
       const open = rows.reduce((n, r) => n + (r.total - r.done), 0);
       return { text: `${open} open to-do${open === 1 ? '' : 's'} on ${rows.length} thread${rows.length === 1 ? '' : 's'}.`, data: { threads: rows } };
     }
     case 'trace_task_done': {
       const done = a.done !== false;
-      const c = mutate(d => setTaskDone(d, { task: a.task, thread: a.thread, done, by: a.agent || 'Claude' }));
+      const c = mutate(d => setTaskDone(d, { task: a.task, thread: a.thread, done, by: a.agent || agentOf(agentKey()).name }));
       return { text: `${done ? 'Ticked' : 'Reopened'} "${c.title}".`, data: { id: c.id, title: c.title, done: c.done, doneBy: c.doneBy || null } };
     }
     case 'trace_live': {

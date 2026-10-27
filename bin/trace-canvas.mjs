@@ -6,7 +6,9 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { addCommit, dataFile, ensureThread, importText, INBOX, mutate, writeConfig } from '../src/store.mjs';
 import { handleHook, readStdin } from '../src/hook.mjs';
-import { allowSafeTools, install, installMcp, installSkill, settingsPath, uninstall } from '../src/install.mjs';
+import { agentFiles, allowSafeTools, codexHooks, geminiHooks, install, installAgentMcp, installMcp, installSkill, onPath, settingsPath, uninstall } from '../src/install.mjs';
+import { normalize } from '../src/agents.mjs';
+import os from 'node:os';
 
 const SELF = fileURLToPath(import.meta.url);
 const SKILL_DIR = path.join(path.dirname(SELF), '..', 'skill');
@@ -52,6 +54,8 @@ Goals and to-dos
   trace-canvas tasks [--thread T] [--all]          Each thread's goal and open to-dos (--all: finished too)
   trace-canvas done <task> [--thread T] [--agent A] [--undo]
                                                    Tick a to-do by id or title (--undo reopens it)
+  trace-canvas hand <to-do|thread> --to claude|codex|gemini
+                                                   Assign it and print the command that starts the agent on it
 
 Live sessions
   trace-canvas live                                Running sessions: status, activity, thread
@@ -94,9 +98,22 @@ async function main() {
     case 'hook': {
       // Never break the Claude Code session: swallow everything, print nothing.
       // TRACE_CANVAS_DEBUG=1 appends each event and its outcome to <data dir>/debug.log.
-      let raw = '', outcome;
-      try { raw = await readStdin(); if (raw.trim()) outcome = handleHook(JSON.parse(raw)); }
-      catch (e) { outcome = { error: String(e && e.stack || e) }; }
+      // --agent codex|gemini: that CLI's payload is turned into Claude's shape first. On SessionStart
+      // the hook prints the context the session starts with; for anything else it prints nothing.
+      const agent = str(flag('agent', '')) || 'claude';
+      let raw = '', outcome, context = '';
+      try {
+        raw = await readStdin();
+        if (raw.trim()) {
+          const input = normalize(agent, JSON.parse(raw));
+          outcome = handleHook(input);
+          if (input.hook_event_name === 'SessionStart' && process.env.TRACE_CANVAS_DISABLE !== '1') {
+            const { sessionStartContext } = await import('../src/hook.mjs');
+            context = sessionStartContext(input);
+          }
+        }
+      } catch (e) { outcome = { error: String(e && e.stack || e) }; }
+      if (context) process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: context } }));
       if (process.env.TRACE_CANVAS_DEBUG) {
         try { fs.appendFileSync(path.join(path.dirname(dataFile()), 'debug.log'), `${new Date().toISOString()} ${raw.slice(0, 4000)}\n  -> ${JSON.stringify(outcome ?? 'logged')}\n`); } catch {}
       }
@@ -108,10 +125,10 @@ async function main() {
       break;
     }
     case 'log': {
-      const thread = flag('thread', null), kind = flag('kind', 'agent'), body = flag('body', ''), link = flag('link', null), agent = flag('agent', '');
+      const thread = flag('thread', null), assignee = str(flag('assignee', '')), kind = flag('kind', assignee ? 'task' : 'agent'), body = flag('body', ''), link = flag('link', null), agent = flag('agent', '');
       const title = argv.join(' ').trim();
-      if (!title) { console.error('Usage: trace-canvas log "title" [--thread name] [--kind agent]'); process.exit(1); }
-      const c = mutate(d => addCommit(d, { thread: thread && thread !== true ? ensureThread(d, thread) : INBOX, kind: str(kind) || 'agent', title, body: str(body), links: str(link) ? [str(link)] : [], agent: str(agent) }));
+      if (!title) { console.error('Usage: trace-canvas log "title" [--thread name] [--kind agent] [--assignee codex]'); process.exit(1); }
+      const c = mutate(d => addCommit(d, { thread: thread && thread !== true ? ensureThread(d, thread) : INBOX, kind: str(kind) || 'agent', title, body: str(body), links: str(link) ? [str(link)] : [], agent: str(agent), extra: assignee ? { assignee } : {} }));
       console.log(`Logged ${c.id}`);
       break;
     }
@@ -177,12 +194,22 @@ async function main() {
     case 'tasks': {
       const { listTasks } = await import('../src/ops.mjs');
       const { readData } = await import('../src/store.mjs');
-      const rows = listTasks(readData(), { thread: str(flag('thread', '')) || undefined, includeDone: !!flag('all', false) });
+      const rows = listTasks(readData(), { thread: str(flag('thread', '')) || undefined, includeDone: !!flag('all', false), assignee: str(flag('assignee', '')) || undefined });
       if (!rows.length) { console.log('No goals or to-dos yet.'); break; }
       for (const r of rows) {
         console.log(`${r.name}  (${r.done}/${r.total})${r.goal ? `\n  goal: ${r.goal}` : ''}`);
-        for (const t of r.tasks) console.log(`  ${t.done ? '✓' : '□'} ${t.title}  [${t.id}]${t.doneBy && t.doneBy !== 'human' ? `  ticked by ${t.doneBy}` : ''}`);
+        for (const t of r.tasks) console.log(`  ${t.done ? '✓' : '□'} ${t.title}  [${t.id}]${t.assignee ? `  → ${t.assignee}` : ''}${t.doneBy && t.doneBy !== 'human' ? `  ticked by ${t.doneBy}` : ''}`);
       }
+      break;
+    }
+    case 'hand': {
+      const { handTo } = await import('../src/ops.mjs');
+      const to = str(flag('to', '')), thread = str(flag('thread', ''));
+      const ref = argv.join(' ').trim();
+      if (!ref || !to) { console.error('Usage: trace-canvas hand <to-do or thread> --to claude|codex|gemini [--thread T]'); process.exit(1); }
+      const r = mutate(d => handTo(d, { ref, to, thread: thread || undefined }));
+      console.error(r.todo ? `"${r.todo.title}" is assigned to ${to}. Run this to start it:` : `Run this to start ${to} on "${r.thread.name}":`);
+      console.log(r.command);
       break;
     }
     case 'done': {
@@ -248,6 +275,16 @@ async function main() {
       console.log(m.ok ? `2. MCP server added: ${m.where}` : `2. Couldn't add the MCP server. Run this yourself:\n   ${m.hint}`);
       console.log(`   Capturing, logging and reading run without asking; merging and importing still ask (${file}).`);
       console.log(`3. Skill installed at ${installSkill(s, SKILL_DIR)}`);
+      // --agents claude,codex,gemini also wires the other CLIs (user scope only); missing ones are skipped.
+      const others = str(flag('agents', '')).split(',').map(x => x.trim()).filter(x => x === 'codex' || x === 'gemini');
+      for (const a of s.user ? others : []) {
+        if (!onPath(a)) { console.log(`   ${a}: not found on PATH, skipped${a === 'gemini' ? ' (install a current @google/gemini-cli, then run setup again)' : ''}`); continue; }
+        const f = agentFiles(os.homedir())[a], cmd = `node "${SELF}" hook --agent ${a}`;
+        install(f, cmd, a === 'codex' ? codexHooks(cmd) : geminiHooks(cmd));
+        const r = installAgentMcp(a, SELF);
+        console.log(`   ${a}: hooks in ${f}; MCP ${r.ok ? 'registered' : `not registered, run: ${r.hint}`}`);
+        if (a === 'codex') console.log('   codex: start Codex once and trust the new hooks when it asks.');
+      }
       console.log('Start a new Claude Code session, then type /trace-canvas to put it on the canvas.');
       break;
     }

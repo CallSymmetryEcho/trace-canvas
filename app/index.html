@@ -512,6 +512,8 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .gl-tasks .gl-t:hover { text-decoration: underline; text-underline-offset: 2px; }
 .gl-tasks .gl-by { flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--muted); }
 .gl-tasks time { flex: none; font-family: var(--f-mono); font-size: 11px; color: var(--faint); }
+.gl-who { flex: none; font-size: 11.5px; padding: 1px 4px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); color: var(--muted); }
+.gl-hand { flex: none; font-size: 11.5px; padding: 1px 7px; }
 .gl-add { width: 100%; padding: 6px 9px; border: 1px dashed var(--rule); border-radius: 7px; background: transparent; font-size: 13px; }
 .gl-add:focus { outline: none; border-style: solid; border-color: var(--accent); background: var(--surface); }
 </style>
@@ -801,6 +803,8 @@ const I18N = {
     goalsNoGoal: 'No goal yet. Write one in the line\'s panel.', goalsAdd: '+ Add a to-do, Enter to save', goalsOpenLine: 'Open line',
     goalsOthers: n => `${n} more line${n === 1 ? ' has' : 's have'} no goal or to-do yet.`, goalsEmpty: 'No goals or to-dos yet. Open a line, write its goal, and add to-dos here or with the □ kind below.',
     goalsBy: name => `ticked by ${name}`, tTaskAdded: 'To-do added',
+    handNeedsLine: 'Move the to-do onto a line first', goalsWho: 'Who does it', goalsAnyone: 'Anyone', goalsHand: 'Hand to it', tHandCopied: 'Command copied: paste it in a terminal to start the agent on this line',
+    handPrompt: (name, tid, title) => `You are taking over the Trace Canvas line "${name}" (thread ${tid}). First call the MCP tool trace_bind with thread "${tid}". Then call trace_tasks with mine: true for the goal and your to-dos, work through them, and tick each one with trace_task_done when it is done. Log decisions and results with trace_log.${title ? ` Start with: ${title}` : ''}`,
     tabAgents: 'Agents', agHint: 'Who started whom: each session starts the sessions to its right; the small dashed cards are its subagents.',
     agEmpty: 'No agents are running right now. Claude Code sessions appear here as soon as they run with the Trace Canvas hooks.',
     agLocalOnly: 'The agent view needs the local page (trace-canvas serve), which can see the sessions running on this computer.',
@@ -946,6 +950,8 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     goalsNoGoal: '还没写目标，可以在这条线的面板里填写。', goalsAdd: '+ 添加待办，回车保存', goalsOpenLine: '打开这条线',
     goalsOthers: n => `另外 ${n} 条线还没有目标或待办。`, goalsEmpty: '还没有目标或待办。打开一条线写下目标，再在这里或用下方的 □ 类型添加待办。',
     goalsBy: name => `由 ${name} 勾选`, tTaskAdded: '已添加待办',
+    handNeedsLine: '先把这项待办放到一条线上', goalsWho: '由谁做', goalsAnyone: '任何人', goalsHand: '交给它', tHandCopied: '命令已复制：粘贴到终端运行，agent 就会在这条线上开工',
+    handPrompt: (name, tid, title) => `你接手 Trace Canvas 上的线「${name}」（thread ${tid}）。先调用 MCP 工具 trace_bind，thread 填 "${tid}"；再用 trace_tasks（mine: true）读取目标和分给你的待办，逐项完成，每做完一项就用 trace_task_done 勾上；决定和结果用 trace_log 记下来。${title ? `先从这一项开始：${title}` : ''}`,
     tabAgents: 'Agent', agHint: '谁启动了谁：每个会话启动它右边的会话，虚线小卡片是它的子 agent。',
     agEmpty: '现在没有运行中的 agent。装好 Trace Canvas hooks 的 Claude Code 会话一运行就会出现在这里。',
     agLocalOnly: 'Agent 视图需要本地页面（trace-canvas serve），它才能看到这台电脑上正在运行的会话。',
@@ -1194,7 +1200,7 @@ function liveList(list) {
   return `<ul class="l-list">${list.map(s => `<li class="st-${esc(s.status)}" data-act="goto-live" data-sid="${esc(s.id)}"><span class="ldot"></span><span>${esc(liveTitle(s))}</span>${s.activity ? `<span class="act">${esc(s.activity)}</span>` : ''}</li>`).join('')}</ul>`;
 }
 function liveDetail(s) {
-  const cmd = `claude --resume ${s.id}`;
+  const cmd = s.resume || `claude --resume ${s.id}`;
   const opts = `<option value="">${esc(t('liveAuto'))}</option>` + orderedThreads().filter(th => th.status !== 'merged' || th.id === s.threadId)
     .map(th => `<option value="${esc(th.id)}" ${s.bound && th.id === s.threadId ? 'selected' : ''}>${esc(th.name)}</option>`).join('');
   const where = [[s.repo, s.branch].filter(Boolean).join(' · '), s.model].filter(Boolean).join(' · ');
@@ -2442,7 +2448,8 @@ function renderGoals() {
   const totalOpen = groups.reduce((n, g) => n + g.open.length, 0);
   const row = c => {
     const by = c.done && c.doneBy && c.doneBy !== 'human' ? `<span class="gl-by"><span class="actor a-agent">${ACTOR_ICON.agent}</span>${esc(t('goalsBy', c.doneBy))}</span>` : '';
-    return `<li class="${c.done ? 'done' : ''}"><input type="checkbox" data-task="${esc(c.id)}" ${c.done ? 'checked' : ''} aria-label="${esc(c.title)}"><span class="gl-t" data-cid="${esc(c.id)}">${esc(c.title)}</span>${by}<time>${fmtShort(c.doneAt || c.ts)}</time></li>`;
+    const who = c.done ? '' : `<select class="gl-who" data-who="${esc(c.id)}" title="${esc(t('goalsWho'))}"><option value="">${esc(t('goalsAnyone'))}</option>${Object.entries(AGENT_NAMES).map(([k, n]) => `<option value="${k}" ${c.assignee === k ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>${c.assignee ? `<button class="btn gl-hand" data-hand="${esc(c.id)}">${esc(t('goalsHand'))}</button>` : ''}`;
+    return `<li class="${c.done ? 'done' : ''}"><input type="checkbox" data-task="${esc(c.id)}" ${c.done ? 'checked' : ''} aria-label="${esc(c.title)}"><span class="gl-t" data-cid="${esc(c.id)}">${esc(c.title)}</span>${who}${by}<time>${fmtShort(c.doneAt || c.ts)}</time></li>`;
   };
   const body = (tipHidden ? '' : `<div class="gl-tip"><span>${t('goalsTip')}</span><button class="btn" id="gl-tip-hide">${esc(t('goalsTipHide'))}</button></div>`)
     + `<div class="gl-bar-top"><span>${esc(t('goalsSummary', totalOpen, groups.filter(g => g.open.length).length))}</span><label class="check"><input type="checkbox" id="gl-show-done" ${S.goalsShowDone ? 'checked' : ''}>${esc(t('goalsShowDone'))}</label></div>`
@@ -2460,11 +2467,25 @@ function renderGoals() {
     + (others > 0 ? `<p>${esc(t('goalsOthers', others))}</p>` : '');
   setSheet(t('goalsTitle'), body);
 }
+// The command `trace-canvas hand` prints, built here too: start the assigned agent on the to-do's
+// line, in the line's folder (its repository path, else where a session on it works now).
+const AGENT_NAMES = { claude: 'Claude Code', codex: 'Codex', gemini: 'Gemini CLI' };
+const AGENT_LAUNCH = { claude: p => `claude ${shq(p)}`, codex: p => `codex ${shq(p)}`, gemini: p => `gemini -i ${shq(p)}` };
+const shq = v => `'${String(v).replace(/'/g, `'\\''`)}'`;
+function handCommand(c) {
+  if (!c || !c.assignee || !AGENT_LAUNCH[c.assignee]) return '';
+  const tid = tidOf(c), th = S.threads.get(tid);
+  if (!th) { toast(t('handNeedsLine')); return ''; }
+  const note = String(th.note || '').trim(), live = liveOn(tid).sort((a, b) => b.lastSeen - a.lastSeen)[0];
+  const dir = /^\/\S*$/.test(note) ? note : live ? live.cwd : '';
+  return `${dir ? `cd ${shq(dir)} && ` : ''}TRACE_CANVAS_THREAD=${tid} ${AGENT_LAUNCH[c.assignee](t('handPrompt', th.name, tid, c.title))}`;
+}
 const sheetBody = $('#sheet-body');
 sheetBody.addEventListener('change', e => {
   if (S.sheet !== 'goals') return;
   const el = e.target;
   if (el.id === 'gl-show-done') { S.goalsShowDone = el.checked; renderGoals(); return; }
+  if (el.dataset.who && canWrite()) { patchDoc('commits', el.dataset.who, { assignee: el.value || null }, 0); setTimeout(renderGoals, 0); return; }
   if (el.dataset.task && canWrite()) {
     patchDoc('commits', el.dataset.task, el.checked ? { done: true, doneBy: 'human', doneAt: Date.now() } : { done: false, doneBy: null, doneAt: null }, 0);
     setTimeout(renderGoals, 0); // the box keeps focus, so the render loop would skip the sheet
@@ -2481,6 +2502,8 @@ sheetBody.addEventListener('keydown', e => {
 sheetBody.addEventListener('click', e => {
   if (S.sheet !== 'goals') return;
   if (e.target.id === 'gl-tip-hide') { try { localStorage.setItem('tc.goalsTipHidden', '1'); } catch {} renderGoals(); return; }
+  const hand = e.target.closest('[data-hand]');
+  if (hand) { const cmd = handCommand(S.commits.get(hand.dataset.hand)); if (cmd) copyText(cmd, t('tHandCopied')); return; }
   const go = e.target.closest('[data-goto]'), rec = e.target.closest('.gl-t');
   if (go) { closeSheet(); select({ type: 'thread', id: go.dataset.goto }); }
   else if (rec) { closeSheet(); select({ type: 'commit', id: rec.dataset.cid }); }

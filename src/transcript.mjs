@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { gitEvents, redirectTargets, BASH_WRITES, EDIT_TOOLS, cleanPrompt } from './git-events.mjs';
+import { listLive } from './live.mjs';
 
 export function projectsRoot(env = process.env) {
   return env.CLAUDE_PROJECTS_DIR || path.join(env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude'), 'projects');
@@ -53,6 +54,13 @@ export function findTranscripts(projectDir, env = process.env) {
 export function currentSessionId({ sessionId, projectDir, env = process.env, now = Date.now() } = {}) {
   if (sessionId) return sessionId;
   if (env.CLAUDE_CODE_SESSION_ID) return env.CLAUDE_CODE_SESSION_ID;
+  // Codex and Gemini set no such variable; their hooks keep a live file per session, with the agent and cwd.
+  const key = env.TRACE_CANVAS_AGENT;
+  if (key && key !== 'claude') {
+    const mine = listLive(env).filter(s => s.agentKey === key && (!projectDir || s.cwd === path.resolve(projectDir)) && now - s.lastSeen < 10 * 60e3);
+    if (mine.length > 1) throw new Error(`${mine.length} ${key} sessions are active in ${projectDir}, so it is not clear which one is calling; pass session_id`);
+    if (mine.length) return mine[0].id;
+  }
   const files = projectDir ? findTranscripts(projectDir, env) : [];
   const recent = files.filter(f => now - f.mtime < 10 * 60e3);
   if (recent.length > 1) throw new Error(`${recent.length} sessions in ${projectDir} were active in the last 10 minutes, so it is not clear which one is calling; pass session_id`);

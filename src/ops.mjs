@@ -1,9 +1,11 @@
+import fs from 'node:fs';
 // Operations shared by the MCP server and the command line:
 // putting a session on the canvas, merging threads, and merging data sets.
-import { INBOX, COLS, addCommit, createThread, findThreadByName, lastCommit, readConfig, threadIdOf } from './store.mjs';
+import { INBOX, COLS, addCommit, createThread, findThreadByName, goalOf, lastCommit, readConfig, threadIdOf } from './store.mjs';
 import { headline, firstLine } from './git-events.mjs';
 import { AGENT, bindSession, logGitEvents, repoInfo, resumeLink, sessionThread, turnBody, rel } from './hook.mjs';
 import { listLive } from './live.mjs';
+import { AGENTS, q } from './agents.mjs';
 import { desktopSessions } from './desktop.mjs';
 import { tr } from './i18n.mjs';
 
@@ -26,24 +28,17 @@ export function resolveThreadRef(d, ref) {
 // writes as highlights are to-dos.
 export const isTodo = c => c.kind === 'task' && !(c.session && !c.highlight);
 
-// A thread's goal has its own field. Older data kept it in `note`, which also holds system notes
-// (the repository path hooks stored, "Combined from …" after a combine); those lines are not a goal.
-const SYSTEM_NOTE = /^(\/|~\/)\S*$|^(\/|~\/).*\/.*$|^Combined from |^由 .+ 合并而来$/;
-export const goalOf = th => {
-  if (!th) return '';
-  if (th.goal != null) return String(th.goal).trim();
-  return String(th.note || '').split('\n').map(l => l.trim()).filter(l => l && !SYSTEM_NOTE.test(l)).join('\n');
-};
+export { goalOf } from './store.mjs';
 
 /**
  * Goals and to-dos per thread: the thread's goal and its tasks (open ones only unless includeDone).
  * Threads that are done or merged show up only while they still have open tasks.
  */
-export function listTasks(d, { thread, includeDone = false } = {}) {
+export function listTasks(d, { thread, includeDone = false, assignee } = {}) {
   const only = thread ? resolveThreadRef(d, thread) : null;
   if (thread && !only) throw new Error(`No thread "${thread}"`);
   const by = {};
-  for (const c of Object.values(d.commits)) if (isTodo(c)) (by[threadIdOf(d, c)] ||= []).push(c);
+  for (const c of Object.values(d.commits)) if (isTodo(c) && (!assignee || c.assignee === assignee)) (by[threadIdOf(d, c)] ||= []).push(c);
   const ids = only ? [only] : [INBOX, ...Object.keys(d.threads)];
   return ids.map(id => {
     const th = id === INBOX ? { name: 'Inbox', status: 'active' } : d.threads[id];
@@ -51,7 +46,7 @@ export function listTasks(d, { thread, includeDone = false } = {}) {
     const open = tasks.filter(c => !c.done);
     return {
       id, name: th.name, goal: goalOf(th), status: th.status || 'active', done: tasks.length - open.length, total: tasks.length,
-      tasks: (includeDone ? tasks : open).map(c => ({ id: c.id, title: c.title, done: !!c.done, doneBy: c.doneBy || null, doneAt: c.doneAt ? new Date(c.doneAt).toISOString() : null })),
+      tasks: (includeDone ? tasks : open).map(c => ({ id: c.id, title: c.title, assignee: c.assignee || null, done: !!c.done, doneBy: c.doneBy || null, doneAt: c.doneAt ? new Date(c.doneAt).toISOString() : null })),
     };
   }).filter(r => r.total || r.goal).filter(r => only || !['done', 'merged'].includes(r.status) || r.total > r.done);
 }
@@ -60,23 +55,45 @@ export function listTasks(d, { thread, includeDone = false } = {}) {
  * Marks a task done, or open again with done: false. task is its id or its title (exact, else a
  * unique partial match), within thread if given. by records who ticked it: 'human' or an agent's name.
  */
-export function setTaskDone(d, { task, thread, done = true, by = 'human' }) {
+// A to-do by id, or by title (exact, else a unique partial match) among the open (or done) ones.
+export function findTodo(d, { task, thread, done = false }) {
   const ref = String(task || '').trim();
   if (!ref) throw new Error('Which task? Pass its id or title');
-  let c = d.commits[ref];
-  if (!c || c.kind !== 'task') {
-    const tid = thread ? resolveThreadRef(d, thread) : null;
-    if (thread && !tid) throw new Error(`No thread "${thread}"`);
-    const pool = Object.values(d.commits).filter(x => isTodo(x) && !!x.done !== !!done && (!tid || threadIdOf(d, x) === tid));
-    const q = norm(ref), exact = pool.filter(x => norm(x.title) === q);
-    const hits = exact.length ? exact : pool.filter(x => norm(x.title).includes(q));
-    if (hits.length !== 1) throw new Error(hits.length ? `${hits.length} tasks match "${ref}"; pass the id or the thread` : `No ${done ? 'open' : 'done'} task matches "${ref}"`);
-    c = hits[0];
-  }
+  if (d.commits[ref] && d.commits[ref].kind === 'task') return d.commits[ref];
+  const tid = thread ? resolveThreadRef(d, thread) : null;
+  if (thread && !tid) throw new Error(`No thread "${thread}"`);
+  const pool = Object.values(d.commits).filter(x => isTodo(x) && !!x.done === !!done && (!tid || threadIdOf(d, x) === tid));
+  const want = norm(ref), exact = pool.filter(x => norm(x.title) === want);
+  const hits = exact.length ? exact : pool.filter(x => norm(x.title).includes(want));
+  if (hits.length !== 1) throw new Error(hits.length ? `${hits.length} tasks match "${ref}"; pass the id or the thread` : `No ${done ? 'done' : 'open'} task matches "${ref}"`);
+  return hits[0];
+}
+
+export function setTaskDone(d, { task, thread, done = true, by = 'human' }) {
+  const c = findTodo(d, { task, thread, done: !done });
   c.done = !!done;
   if (done) { c.doneBy = by; c.doneAt = Date.now(); } else { delete c.doneBy; delete c.doneAt; }
   return c;
 }
+
+/**
+ * Hands a to-do (or a whole thread) to an agent: sets the to-do's assignee and returns the command
+ * that starts that agent on the thread. TRACE_CANVAS_THREAD binds the new session through the
+ * SessionStart hook; the prompt also asks for trace_bind in case the hook cannot see it.
+ */
+export function handTo(d, { ref, to, thread }, env = process.env) {
+  const ag = AGENTS[to];
+  if (!ag) throw new Error(`Hand to whom? One of ${Object.keys(AGENTS).join(', ')}`);
+  let todo = null, tid = d.commits[ref] && d.commits[ref].kind !== 'task' ? null : resolveThreadRef(d, ref);
+  if (!tid || tid === INBOX) { todo = findTodo(d, { task: ref, thread }); tid = threadIdOf(d, todo); todo.assignee = to; }
+  const th = tid === INBOX ? null : d.threads[tid];
+  if (!th) throw new Error('Put the to-do on a line first; the inbox has no folder or goal to hand over');
+  const live = listLive(env).filter(s => sessionThreadOf(d, s, env) === tid).sort((a, b) => b.lastSeen - a.lastSeen);
+  const dir = /^\/\S*$/.test(String(th.note || '').trim()) && fs.existsSync(th.note.trim()) ? th.note.trim() : live[0] ? live[0].cwd : '';
+  const prompt = `You are taking over the Trace Canvas line "${th.name}" (thread ${tid}). First call the MCP tool trace_bind with thread "${tid}". Then call trace_tasks with mine: true for the goal and your to-dos, work through them, and tick each one with trace_task_done when it is done. Log decisions and results with trace_log.${todo ? ` Start with: ${todo.title}` : ''}`;
+  return { thread: th, todo, command: `${dir ? `cd ${q(dir)} && ` : ''}TRACE_CANVAS_THREAD=${tid} ${ag.launch(prompt)}` };
+}
+const sessionThreadOf = (d, s, env) => sessionThread(d, s, env).threadId;
 
 /**
  * Running sessions with their thread, title and the session that started them (from the

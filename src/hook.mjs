@@ -12,10 +12,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { home, mutate, readConfig, createThread, addCommit, lastCommit } from './store.mjs';
+import { home, mutate, readConfig, readData, withLock, createThread, addCommit, lastCommit, goalOf } from './store.mjs';
 import { gitEvents, redirectTargets, BASH_WRITES, EDIT_TOOLS, headline, firstLine, cleanPrompt } from './git-events.mjs';
 import { tr } from './i18n.mjs';
-import { readLive, updateLive } from './live.mjs';
+const threadIdOfLocal = (d, c) => (c && c.thread && d.threads[c.thread] ? c.thread : 'inbox');
+import { readLive, updateLive, listLive as listLiveLocal } from './live.mjs';
+import { agentOf } from './agents.mjs';
 
 export { headline, redirectTargets };
 
@@ -63,7 +65,7 @@ function threadKey(info, cfg, sid) {
 }
 
 // Finds or creates the thread for a repository/branch. Exported for transcript capture.
-export function resolveThread(d, info, { cfg, sid, prevThreadId = null, promptForName = '' }) {
+export function resolveThread(d, info, { cfg, sid, prevThreadId = null, promptForName = '', agent = AGENT }) {
   const key = threadKey(info, cfg, sid);
   let t = Object.values(d.threads).find(x => x.key === key);
   if (t) return t;
@@ -77,7 +79,7 @@ export function resolveThread(d, info, { cfg, sid, prevThreadId = null, promptFo
   const parent = prev && prev.key !== key ? prev : Object.values(d.threads).find(x => x.key === info.repo) || createThread(d, { name: info.repo, key: info.repo, note: info.root });
   const forkPoint = lastCommit(d, parent.id);
   t = createThread(d, { name: `${info.repo} · ${info.branch}`, key, parent: parent.id, forkOf: forkPoint ? forkPoint.id : null, note: info.root });
-  addCommit(d, { thread: t.id, kind: 'fork', title: tr(cfg.lang, 'branchedFrom', info.branch, parent.name), parents: forkPoint ? [forkPoint.id] : [], agent: AGENT });
+  addCommit(d, { thread: t.id, kind: 'fork', title: tr(cfg.lang, 'branchedFrom', info.branch, parent.name), parents: forkPoint ? [forkPoint.id] : [], agent });
   return t;
 }
 
@@ -99,12 +101,13 @@ export function handleHook(input, env = process.env) {
   const sid = input.session_id || 'unknown';
   const cfg = readConfig(env);
   const cwd = input.cwd || process.cwd();
+  const ag = agentOf(input._agent); // normalize() sets it for Codex and Gemini; plain input is Claude Code
   // git calls happen outside the lock so parallel sessions don't wait on each other.
   // PreToolUse and Notification fire on every tool call, so they reuse what the live file already knows.
   const relevantTool = ev !== 'PostToolUse' || input.tool_name === 'Bash' || EDIT_TOOLS.has(input.tool_name) || input.tool_name === 'TodoWrite';
   const quick = ['PreToolUse', 'Notification', 'SubagentStart', 'SubagentStop'].includes(ev);
   const info = ev !== 'SessionEnd' && relevantTool && !(quick && readLive(sid, env)) ? repoInfo(cwd) : null;
-  try { updateLive(input, { info, key: info ? threadKey(info, cfg, sid) : null, env }); } catch {}
+  try { updateLive(input, { info, key: info ? threadKey(info, cfg, sid) : null, env, agent: ag.name, agentKey: input._agent || 'claude', resume: ag.resume(sid) }); } catch {}
   if (!LOG_EVENTS.includes(ev)) return { live: ev };
 
   return mutate(d => {
@@ -114,7 +117,7 @@ export function handleHook(input, env = process.env) {
     if (key) { state.seen.push(key); if (state.seen.length > 300) state.seen = state.seen.slice(-200); }
     let changed = false;
     const thread = prompt => {
-      const t = (state.bound && d.threads[state.threadId]) || resolveThread(d, info, { cfg, sid, prevThreadId: state.threadId, promptForName: prompt || state.lastPrompt });
+      const t = (state.bound && d.threads[state.threadId]) || resolveThread(d, info, { cfg, sid, prevThreadId: state.threadId, promptForName: prompt || state.lastPrompt, agent: ag.name });
       state.threadId = t.id; changed = true; return t;
     };
 
@@ -126,14 +129,16 @@ export function handleHook(input, env = process.env) {
       const log = !isCommand && prompt && (cfg.prompts === 'all' || (cfg.prompts === 'first' && !state.loggedFirstPrompt) || (cfg.prompts === 'long' && prompt.length >= 60));
       if (log) {
         const t = thread(prompt);
-        addCommit(d, { thread: t.id, kind: 'task', title: firstLine(prompt, 120), body: prompt.slice(0, 3000), agent: AGENT, links: [resumeLink(sid)], extra: { session: sid, actor: 'human' } });
+        addCommit(d, { thread: t.id, kind: 'task', title: firstLine(prompt, 120), body: prompt.slice(0, 3000), agent: ag.name, links: [ag.resume(sid)], extra: { session: sid, actor: 'human' } });
         state.loggedFirstPrompt = true;
       }
     } else if (ev === 'PostToolUse') {
       const tool = input.tool_name, ti = input.tool_input || {}, out = input.tool_response || {};
       if (EDIT_TOOLS.has(tool)) {
-        const f = ti.file_path || ti.notebook_path || out.filePath;
-        if (f) { const r = rel(info ? info.root : cwd, f); pushUnique(state.turnFiles, r); pushUnique(state.files, r); }
+        // Codex's apply_patch can touch several files at once (normalize puts them in `files`).
+        for (const f of ti.files || [ti.file_path || ti.notebook_path || out.filePath].filter(Boolean)) {
+          const r = rel(info ? info.root : cwd, path.resolve(cwd, f)); pushUnique(state.turnFiles, r); pushUnique(state.files, r);
+        }
       } else if (tool === 'TodoWrite' && Array.isArray(ti.todos)) {
         for (const td of ti.todos) {
           const name = td && (td.content || td.subject);
@@ -146,7 +151,7 @@ export function handleHook(input, env = process.env) {
         for (const f of targets) { pushUnique(state.turnFiles, f); pushUnique(state.files, f); }
         if (targets.length || BASH_WRITES.test(cmd)) state.turnActions = (state.turnActions || 0) + 1;
         const g = gitEvents(cmd, out.stdout, out.stderr, out.gitOperation);
-        if (logGitEvents(d, g, { info, cfg, sid, thread, state })) state.turnActions = (state.turnActions || 0) + 1;
+        if (logGitEvents(d, g, { info, cfg, sid, thread, state, agent: ag.name })) state.turnActions = (state.turnActions || 0) + 1;
       }
     } else if (ev === 'Stop') {
       const msg = String(input.last_assistant_message || '').trim();
@@ -155,16 +160,16 @@ export function handleHook(input, env = process.env) {
       const log = cfg.turns === 'all' ? !!(msg || acted) : cfg.turns === 'changes' ? acted : false;
       if (log) {
         const t = thread(state.lastPrompt);
-        addCommit(d, { thread: t.id, kind: 'agent', title: headline(msg) || tr(cfg.lang, 'turnChanged', files.length), body: turnBody(cfg.lang, msg, files, todos), agent: AGENT, links: [resumeLink(sid)], extra: { session: sid, files: files.slice(0, 50) } });
+        addCommit(d, { thread: t.id, kind: 'agent', title: headline(msg) || tr(cfg.lang, 'turnChanged', files.length), body: turnBody(cfg.lang, msg, files, todos), agent: ag.name, links: [ag.resume(sid)], extra: { session: sid, files: files.slice(0, 50) } });
       }
       state.turnFiles = []; state.turnTodos = []; state.turnActions = 0;
     } else if (ev === 'SessionEnd') {
       const tid = state.threadId && d.threads[state.threadId] ? state.threadId : null;
       if (tid && (state.prompts || state.files.length || state.commits.length)) {
         const mins = Math.max(1, Math.round((Date.now() - state.startedAt) / 60000));
-        const links = [resumeLink(sid)];
+        const links = [ag.resume(sid)];
         if (input.transcript_path) links.push(input.transcript_path);
-        addCommit(d, { thread: tid, kind: 'note', title: tr(cfg.lang, 'sessionEnd', mins, state.prompts, state.files.length, state.commits.length), body: sessionBody(cfg.lang, state.files, state.commits, input.reason), agent: AGENT, links, extra: { session: sid } });
+        addCommit(d, { thread: tid, kind: 'note', title: tr(cfg.lang, 'sessionEnd', mins, state.prompts, state.files.length, state.commits.length), body: sessionBody(cfg.lang, state.files, state.commits, input.reason), agent: ag.name, links, extra: { session: sid } });
         changed = true;
       }
       dropState(sid, env);
@@ -193,6 +198,54 @@ export function sessionThread(d, s, env = process.env) {
   return { threadId: t ? t.id : null, bound: false };
 }
 
+// Where things are on this machine, from the location map: the entries whose local path holds cwd
+// (or sits inside it). Empty when no map is set up or where.py is too old to answer in JSON.
+function whereHere(cfg, cwd) {
+  if (!cfg.map) return [];
+  const py = path.join(cfg.map, 'tools', 'where.py');
+  if (!fs.existsSync(py)) return [];
+  try {
+    const rows = JSON.parse(execFileSync('python3', [py, '--json'], { encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'] }));
+    const here = path.resolve(cwd);
+    return rows.filter(r => (r.where || []).some(w => w.local && (here.startsWith(w.local) || w.local.startsWith(here + path.sep))));
+  } catch { return []; }
+}
+
+/**
+ * What a new session should know first: its line and goal, the open to-dos for this agent, who else
+ * works on the line, and where things are on this machine. TRACE_CANVAS_THREAD (set by `hand`) binds
+ * the session to that line. Returns '' when there is nothing useful to say.
+ */
+export function sessionStartContext(input, env = process.env) {
+  const sid = input.session_id, cwd = input.cwd || process.cwd(), key = input._agent || 'claude', ag = agentOf(key);
+  const cfg = readConfig(env);
+  const d = readData(env);
+  let tid = env.TRACE_CANVAS_THREAD && d.threads[env.TRACE_CANVAS_THREAD] ? env.TRACE_CANVAS_THREAD : null;
+  if (tid && sid) withLock(() => bindSession(sid, tid, env), env);
+  if (!tid && sid) tid = sessionThread(d, { id: sid, key: threadKey(repoInfo(cwd), cfg, sid) }, env).threadId;
+  const out = [];
+  if (tid) {
+    const th = d.threads[tid];
+    const todos = Object.values(d.commits).filter(c => threadIdOfLocal(d, c) === tid && c.kind === 'task' && !c.done && !(c.session && !c.highlight)).sort((a, b) => a.ts - b.ts);
+    const mine = todos.filter(c => c.assignee === key), free = todos.filter(c => !c.assignee);
+    out.push(`Trace Canvas: this session works on the line "${th.name}" (thread ${tid}).`);
+    const goal = goalOf(th);
+    if (goal) out.push(`Goal: ${goal}`);
+    if (mine.length) out.push(`Open to-dos for you (${ag.name}):`, ...mine.slice(0, 10).map(c => `- ${c.title} [${c.id}]`));
+    if (free.length) out.push(`${free.length} open to-do${free.length === 1 ? ' is' : 's are'} not assigned to anyone yet.`);
+    const others = listLiveLocal(env).filter(s => s.id !== sid && sessionThread(d, s, env).threadId === tid);
+    if (others.length) out.push(`Also working on this line now: ${others.map(s => `${s.agent || 'Claude Code'} (${s.status}${s.activity ? `: ${s.activity}` : ''})`).join('; ')}.`);
+  }
+  const places = whereHere(cfg, cwd).slice(0, 3);
+  if (places.length) {
+    out.push('Where things are on this machine (from the location map):');
+    for (const r of places) out.push(`- ${r.title}: ${(r.where || []).filter(w => w.local).slice(0, 4).map(w => `${w.role ? w.role + ' ' : ''}${w.local}`).join('; ')}${r.notes ? ` — ${String(r.notes).split('\n')[0]}` : ''}`);
+  }
+  if (!out.length) return '';
+  out.push('Use the MCP tool trace_tasks with mine: true to read your to-dos, trace_task_done when one is finished, and trace_log for decisions and results.');
+  return out.join('\n');
+}
+
 export function turnBody(lang, msg, files, todos = []) {
   return [String(msg || '').slice(0, 1500),
     files.length ? `${tr(lang, 'filesLabel')}:\n${files.slice(0, 30).map(f => '- ' + f).join('\n')}${files.length > 30 ? `\n- … +${files.length - 30}` : ''}` : '',
@@ -207,23 +260,23 @@ export function sessionBody(lang, files, commits, reason) {
 }
 
 // Writes the records for one command's git events. Returns true if anything was logged.
-export function logGitEvents(d, g, { info, cfg, sid, thread, state, ts }) {
+export function logGitEvents(d, g, { info, cfg, sid, thread, state, ts, agent = AGENT }) {
   let changed = false;
   const at = ts ? { ts } : {};
   for (const { sha, subject } of g.commits) {
     const t = thread();
-    addCommit(d, { thread: t.id, kind: 'agent', title: tr(cfg.lang, 'commit', sha.slice(0, 7), subject.slice(0, 160)), agent: AGENT, ...at, extra: { session: sid, gitCommit: sha } });
+    addCommit(d, { thread: t.id, kind: 'agent', title: tr(cfg.lang, 'commit', sha.slice(0, 7), subject.slice(0, 160)), agent, ...at, extra: { session: sid, gitCommit: sha } });
     if (state) state.commits.push(`${sha.slice(0, 7)} ${subject.slice(0, 100)}`);
     changed = true;
   }
   if (g.push) {
     const t = thread();
-    addCommit(d, { thread: t.id, kind: 'note', title: tr(cfg.lang, 'pushed', g.push), agent: AGENT, ...at, extra: { session: sid } });
+    addCommit(d, { thread: t.id, kind: 'note', title: tr(cfg.lang, 'pushed', g.push), agent, ...at, extra: { session: sid } });
     changed = true;
   }
   if (g.pr) {
     const t = thread();
-    addCommit(d, { thread: t.id, kind: 'decision', title: tr(cfg.lang, 'prOpened', g.pr.number), links: [g.pr.url], agent: AGENT, ...at, extra: { session: sid } });
+    addCommit(d, { thread: t.id, kind: 'decision', title: tr(cfg.lang, 'prOpened', g.pr.number), links: [g.pr.url], agent, ...at, extra: { session: sid } });
     changed = true;
   }
   if (g.merge && info) {
@@ -231,7 +284,7 @@ export function logGitEvents(d, g, { info, cfg, sid, thread, state, ts }) {
     const t = thread();
     if (src && src.id !== t.id) {
       const srcTip = lastCommit(d, src.id), tip = lastCommit(d, t.id);
-      addCommit(d, { thread: t.id, kind: 'merge', title: tr(cfg.lang, 'merged', src.name), parents: [tip && tip.id, srcTip && srcTip.id].filter(Boolean), agent: AGENT, ...at, extra: { session: sid, mergeOf: src.id } });
+      addCommit(d, { thread: t.id, kind: 'merge', title: tr(cfg.lang, 'merged', src.name), parents: [tip && tip.id, srcTip && srcTip.id].filter(Boolean), agent, ...at, extra: { session: sid, mergeOf: src.id } });
       src.status = 'merged'; src.mergedInto = t.id;
       changed = true;
     }

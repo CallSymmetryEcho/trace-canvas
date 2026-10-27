@@ -74,6 +74,8 @@ export function readConfig(env = process.env) {
     group: env.TRACE_CANVAS_GROUP || file.group || 'branch',
     prompts: env.TRACE_CANVAS_PROMPTS || file.prompts || 'first',
     turns: env.TRACE_CANVAS_TURNS || file.turns || 'changes',
+    // The location map (key_locations.yaml + tools/where.py); ~/agent-map when it exists.
+    map: env.TRACE_CANVAS_MAP || file.map || (fs.existsSync(path.join(os.homedir(), 'agent-map', 'tools', 'where.py')) ? path.join(os.homedir(), 'agent-map') : ''),
   };
 }
 export function writeConfig(patch, env) {
@@ -187,3 +189,12 @@ export function importText(d, text, { defaultThread = INBOX } = {}) {
   }
   return n;
 }
+
+// A thread's goal has its own field. Older data kept it in `note`, which also holds system notes
+// (the repository path hooks stored, "Combined from …" after a combine); those lines are not a goal.
+const SYSTEM_NOTE = /^(\/|~\/)\S*$|^(\/|~\/).*\/.*$|^Combined from |^由 .+ 合并而来$/;
+export const goalOf = th => {
+  if (!th) return '';
+  if (th.goal != null) return String(th.goal).trim();
+  return String(th.note || '').split('\n').map(l => l.trim()).filter(l => l && !SYSTEM_NOTE.test(l)).join('\n');
+};

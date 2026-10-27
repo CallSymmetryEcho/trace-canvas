@@ -112,13 +112,14 @@ export function activityOf(rawTool, input = {}) {
  * working while Claude acts, waiting when it needs you, idle when its turn is done.
  * info and key come from the hook (repository, branch, thread key) when it computed them.
  */
-export function updateLive(input, { info = null, key = null, env = process.env, now = Date.now() } = {}) {
+export function updateLive(input, { info = null, key = null, env = process.env, now = Date.now(), agent = null, agentKey = null, resume = null } = {}) {
   const ev = input.hook_event_name, sid = input.session_id;
   if (!sid) return null;
   if (ev === 'SessionEnd') { dropLive(sid, env); return null; }
   if (ev === 'SubagentStart' || ev === 'SubagentStop') return updateAgent(input, env, now);
   const prev = readLive(sid, env) || { id: sid, agent: 'Claude Code', startedAt: now, status: 'idle', activity: '', ts: 0 };
   const doc = { ...prev, lastSeen: now, cwd: input.cwd || prev.cwd || '', transcript: input.transcript_path || prev.transcript || '' };
+  if (agent) Object.assign(doc, { agent, agentKey, resume });
   if (info) Object.assign(doc, { repo: info.repo, branch: info.branch, root: info.root });
   if (key) doc.key = key;
   if (input.session_title) doc.title = String(input.session_title).slice(0, 120);

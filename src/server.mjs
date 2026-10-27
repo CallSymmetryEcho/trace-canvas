@@ -5,6 +5,7 @@
 // form or fetch cannot send without a preflight this server never approves.
 import fs from 'node:fs';
 import http from 'node:http';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { execFile, spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -32,6 +33,8 @@ function page(cfg, ai) {
   return `<!doctype html><html lang="${cfg.lang === 'zh' ? 'zh-CN' : 'en'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}body{margin:0;font:14px system-ui}img{max-width:100%}[hidden]{display:none!important}</style><script>window.TRACE_CANVAS_SERVER=${boot.replace(/</g, '\\u003c')}</script></head><body>${body}</body></html>`;
 }
 
+const same = (a, b) => typeof a === 'string' && typeof b === 'string' && a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+export const phoneUrl = (phone, port) => `http://${phone.host}:${phone.port || port}/?k=${phone.token}`;
 function send(res, status, body, type = 'application/json; charset=utf-8') {
   res.writeHead(status, { 'Content-Type': type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
   res.end(typeof body === 'string' ? body : JSON.stringify(body));
@@ -73,17 +76,28 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
   try { fs.watch(liveDir(), () => broadcast('live')).unref(); } catch {}
   setInterval(() => { for (const res of clients) res.write(': ping\n\n'); }, 25000).unref();
 
-  const server = http.createServer(async (req, res) => {
+  // remote: the request came in on the phone listener (trace-canvas phone), not on 127.0.0.1.
+  const handle = remote => async (req, res) => {
     try {
+      const phone = readConfig().phone;
       const hostHeader = String(req.headers.host || '').replace(/:\d+$/, '');
-      if (!['127.0.0.1', 'localhost', '[::1]'].includes(hostHeader)) return send(res, 403, { error: 'host not allowed' });
+      const hosts = ['127.0.0.1', 'localhost', '[::1]', ...(remote && phone ? [phone.host, phone.ip].filter(Boolean) : [])];
+      if (!hosts.includes(hostHeader)) return send(res, 403, { error: 'host not allowed' });
       const url = new URL(req.url, 'http://localhost');
       const p = url.pathname;
+      if (remote) {
+        // From the phone: its token, from ?k= the first time and from a cookie after that.
+        const cookie = (String(req.headers.cookie || '').match(/(?:^|;\s*)tc_k=([^;]+)/) || [])[1], k = url.searchParams.get('k');
+        if (!phone || !phone.token || !(same(cookie, phone.token) || same(k, phone.token))) return send(res, 403, { error: 'Open the address trace-canvas phone printed' });
+        if (same(k, phone.token) && !same(cookie, phone.token)) res.setHeader('Set-Cookie', `tc_k=${phone.token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000`);
+        // These act on the computer itself (a terminal, git pushes, the claude CLI, the whole data set).
+        if (['/api/hand', '/api/sync', '/api/ai', '/api/demo'].includes(p)) return send(res, 403, { error: 'Only on the computer itself' });
+      }
       const write = req.method !== 'GET' && req.method !== 'HEAD';
       if (write && req.headers['x-trace-canvas'] !== '1') return send(res, 403, { error: 'missing header' });
 
       if (req.method === 'GET' && (p === '/' || p === '/index.html')) return send(res, 200, page(readConfig(), ai), 'text/html; charset=utf-8');
-      if (req.method === 'GET' && p === '/api/health') return send(res, 200, { ok: true, version: VERSION, ai, dataFile: dataFile() });
+      if (req.method === 'GET' && p === '/api/health') return send(res, 200, { ok: true, version: VERSION, ai, dataFile: dataFile(), ...(!remote && phone ? { phone: phoneUrl(phone, port) } : {}) });
       if (req.method === 'GET' && p === '/api/data') {
         // desktopId: the Claude desktop app's id of a session, so the page can open its chat (claude://…).
         const d = readData(), desk = desktopSessions();
@@ -158,9 +172,18 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
     } catch (e) {
       send(res, 500, { error: String(e && e.message || e) });
     }
-  });
+  };
+  const server = http.createServer(handle(false));
   return new Promise((resolve, reject) => {
     server.once('error', reject);
-    server.listen(port, host, () => resolve({ server, url: `http://localhost:${server.address().port}/`, ai }));
+    server.listen(port, host, () => {
+      port = server.address().port;
+      // With phone access on, a second listener on the Tailscale address (never 0.0.0.0 unless set).
+      const phone = readConfig().phone;
+      if (!phone || !phone.bind) return resolve({ server, url: `http://localhost:${port}/`, ai });
+      const phoneServer = http.createServer(handle(true));
+      phoneServer.once('error', e => { console.error(`Phone access: could not listen on ${phone.bind} (${e.code}); is Tailscale on?`); resolve({ server, url: `http://localhost:${port}/`, ai }); });
+      phoneServer.listen(phone.port ?? port, phone.bind, () => resolve({ server, phoneServer, url: `http://localhost:${port}/`, ai, phone: phoneUrl(phone, phoneServer.address().port) }));
+    });
   });
 }

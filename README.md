@@ -318,6 +318,7 @@ Setup (--user for every project, --project DIR for one)
   trace-canvas mcp              Run the MCP server on stdio (Claude Code starts this)
   trace-canvas lang <en|zh>     Language of records the hooks write
   trace-canvas where            Show where the data is stored
+  trace-canvas phone            Open the canvas on your phone (Tailscale and a QR code; see docs/phone.md; phone branch only)
 ```
 
 ## Online version

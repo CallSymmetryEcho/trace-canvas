@@ -91,6 +91,8 @@ export function readConfig(env = process.env) {
     map: env.TRACE_CANVAS_MAP || file.map || (fs.existsSync(path.join(os.homedir(), 'agent-map', 'tools', 'where.py')) ? path.join(os.homedir(), 'agent-map') : ''),
     // Which computer this is, as the location map names it (setup --machine); records and sessions carry it.
     machine: env.TRACE_CANVAS_MACHINE || file.machine || os.hostname().split('.')[0].toLowerCase(),
+    // Phone access (trace-canvas phone): { host, ip, bind, port?, token }, or null when off.
+    phone: file.phone || null,
   };
 }
 const machines = new Map(); // data folder → machine name; ponytail: read once per process

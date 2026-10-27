@@ -382,6 +382,8 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .cap-input .btn { padding: 8px 14px; }
 
 /* ---------- sheets ---------- */
+/* While a sheet is open the header stays above its scrim, so More and the other header buttons still work. */
+body.sheet-open .top { z-index: 80; }
 .scrim { position: fixed; inset: 0; z-index: 70; background: var(--scrim); display: grid; place-items: center; padding: 16px; }
 .sheet { width: min(660px, 100%); max-height: min(86vh, 100%); display: flex; flex-direction: column; background: var(--surface); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
 .sheet-head { display: flex; align-items: center; gap: 10px; padding: 14px 14px 10px 18px; border-bottom: 1px solid var(--rule-soft); }
@@ -2588,7 +2590,7 @@ window.addEventListener('resize', () => render());
 /* ================= sheets ================= */
 const scrim = $('#scrim');
 function closeSheet() {
-  scrim.hidden = true; S.sheet = null;
+  scrim.hidden = true; S.sheet = null; document.body.classList.remove('sheet-open');
   if (S.ai && S.ai.ctl && S.ai.status === 'thinking') S.ai.ctl.abort();
 }
 $('#sheet-close').onclick = closeSheet;
@@ -2634,7 +2636,7 @@ function agentSheet() {
   setSheet(t('agentTitle'), body);
 }
 function openSheet(kind) {
-  S.sheet = kind;
+  S.sheet = kind; document.body.classList.add('sheet-open');
   if (kind === 'agent') agentSheet();
   else if (kind === 'io') {
     setSheet(t('ioTitle'), `

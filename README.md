@@ -15,13 +15,18 @@ A transit map of your work. When you work with AI agents, ideas and tasks run in
 
 Videos: [2-minute tutorial](https://github.com/CallSymmetryEcho/trace-canvas/releases/tag/v0.1.0) in English and Chinese.
 
-Three views of the same data:
+![Branches view: live tips, an approval, your decision and the agent's result](docs/gif-branches.en.gif)
+
+*Branches: running sessions sit as live tips on top of their lines. The orange one waits for you; once approved it turns green, your decision appears dark and the agent's result in the line's colour. Made-up data.*
+
+Four views of the same data:
 
 | View | What it shows |
 | --- | --- |
 | Canvas | One card per thread with a mini line map. Drag, zoom, draw labeled links, and select several threads to merge them. |
 | Branches | A git graph: every record in time order, one lane per thread, forks and merges as curves. |
 | Timeline | A time axis (day / week / month). One row per thread; the band shows when it was active. |
+| Agents | The running sessions as a tree: who started whom, and each session's subagents (see [Agent view](#agent-view-who-started-whom)). |
 
 ![Timeline view: switching between day, week and month](docs/gif-timeline.en.gif)
 
@@ -108,6 +113,8 @@ Capturing is safe to repeat: records already on the canvas are skipped. If the h
 | `trace_import_data` | Merges another data set: an export, `data.json` from another computer, or JSON lines |
 | `trace_live` | Lists the sessions running now, with status, activity and thread |
 | `trace_bind` | Puts a running session (the current one by default) on a thread |
+| `trace_tasks` | Returns each thread's goal and its to-dos, with how many are done |
+| `trace_task_done` | Ticks a to-do (or reopens it) and records who ticked it |
 | `trace_open` | Starts the page if needed and returns its address |
 
 ## Live sessions
@@ -122,10 +129,6 @@ The local page shows which Claude Code sessions are running right now. A bar und
 
 In every view, stations you wrote (your instructions and decisions) are drawn dark with a person mark, and agents' stations in the line's colour with a star mark, so you can see who moved each line forward. In the Branches view, a session working on a line right now sits at the top of that line's lane as a pulsing tip (green working, orange needs you), joined to the line's newest record; click it for the session panel. Each card shows how many sessions are running on its thread. Click a session to see its repository, branch, folder and latest instruction, copy `claude --resume <id>`, or put it on another thread. A session lands on its repository/branch line by itself; to bind it by hand, pick a thread in the page, run `trace-canvas bind "<thread>"`, or ask Claude (`trace_bind`). From then on its records go to that thread too.
 
-![Branches view: live tips, an approval, your decision and the agent's result](docs/gif-branches.en.gif)
-
-*Branches: running sessions sit as live tips on top of their lines. The orange one waits for you; once approved it turns green, your decision appears dark and the agent's result in the line's colour. Made-up data.*
-
 Live status needs the SessionStart, PreToolUse, Notification and SubagentStart/Stop hooks, which `setup` adds (run it again after updating). It lives in small files in `~/.trace-canvas/live/` (one per session and one per subagent), apart from your records. A session drops off when it ends, or after 12 hours without activity. Only the local page shows live sessions.
 
 ### Agent view: who started whom
@@ -139,6 +142,21 @@ The **Agents** tab draws the running agents as a tree, left to right. Each sessi
 *A session waiting for approval turns green once approved, a subagent finishes and fades, and the panel shows who started the session. Made-up data.*
 
 Subagents come from the SubagentStart/Stop hooks and the `.meta.json` file Claude Code keeps next to each subagent transcript. Which session started which comes from the Claude desktop app's own session records (`~/Library/Application Support/Claude/claude-code-sessions/`), read-only and best-effort: that format belongs to the app and may change, and without the desktop app every session simply starts its own tree. `TRACE_CANVAS_DESKTOP_DIR` points it somewhere else. The made-up sessions in the screenshot come from `node docs/scenarios/agents.mjs <data dir> <desktop dir>`.
+
+## Goals and to-dos: working with agents asynchronously
+
+**Goals** in the header opens one list of what you want to achieve and how far along it is, without adding anything to the main page:
+
+| | What it is | Where it lives |
+| --- | --- | --- |
+| **Goal** | The outcome a line is working towards | The line's "Goal and context" field |
+| **To-do** □ | A concrete next step that you or an agent can take, ticked when done | A task record on the line |
+| **Progress** | What actually happened | Agent output, commits, decisions |
+| **Inbox** | Loose ideas you have not thought through yet | The inbox |
+
+The list groups to-dos by line, shows each line's goal, a progress bar (done/total) and whether a session is working on it right now. Tick a to-do or add one right there. The first instruction of each session, which the hooks log as a task, is a record of what was asked, so it stays out of the list; next steps Claude writes when capturing a session do show up.
+
+Agents use the same list. At the start of work they read the goal and the open to-dos with `trace_tasks`; when they finish one they call `trace_task_done`, and the list shows who ticked it. So you can write down what you want, let agents work while you are away, and come back to see where things stand. From the command line: `trace-canvas tasks` and `trace-canvas done "<to-do>"` (`--agent Codex` for a script or another agent).
 
 ## Merging sessions and threads
 
@@ -203,6 +221,11 @@ Records
   trace-canvas sessions [--project DIR]            List Claude Code sessions of a project
   trace-canvas merge <thread>... --into <thread> [--combine]
   trace-canvas import <file|->                     Merge an export, another data.json, or JSON lines
+
+Goals and to-dos
+  trace-canvas tasks [--thread T] [--all]          Each thread's goal and open to-dos
+  trace-canvas done <to-do> [--thread T] [--agent A] [--undo]
+                                                   Tick a to-do by id or title
 
 Live sessions
   trace-canvas live                                Running sessions: status, activity, thread

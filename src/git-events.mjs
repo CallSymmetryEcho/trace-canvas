@@ -74,5 +74,8 @@ export function cleanPrompt(p) {
     .replace(/<pasted_content[^>]*>[\s\S]*?<\/pasted_content>/g, '[pasted]')
     .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '')
     .replace(/<task-notification>[\s\S]*?<\/task-notification>/g, '')
+    // Messages the desktop app delivers from other sessions arrive as prompts too; nobody typed them.
+    .replace(/<cross-session-message\b[^>]*>[\s\S]*?<\/cross-session-message>/g, '')
+    .replace(/<side-sessions-event>[\s\S]*?<\/side-sessions-event>/g, '')
     .trim();
 }

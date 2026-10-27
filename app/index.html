@@ -490,6 +490,30 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .ag-agent.st-running .ldot { background: var(--ok); animation: lpulse 1.6s ease-in-out infinite; }
 .ag-agent.st-done { opacity: .72; }
 .ag-empty { padding: 48px 24px; max-width: 520px; color: var(--muted); }
+
+/* ---------- goals and to-dos ---------- */
+.gl-tip { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--rule-soft); border-radius: 10px; background: var(--surface-2); font-size: 13px; color: var(--muted); }
+.gl-tip b { color: var(--ink); }
+.gl-tip .btn { justify-self: start; }
+.gl-bar-top { display: flex; align-items: center; gap: 12px; font-size: 12.5px; color: var(--muted); }
+.gl-group { display: grid; gap: 6px; padding: 10px 12px 12px; border: 1px solid var(--rule-soft); border-left: 4px solid var(--c); border-radius: 10px; }
+.gl-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.gl-head b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gl-prog { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.gl-head .linkish { margin-left: auto; font-size: 12px; white-space: nowrap; }
+.gl-goal { font-size: 13px; color: var(--ink); }
+.gl-goal.none { color: var(--faint); }
+.gl-meter { height: 4px; border-radius: 2px; background: var(--rule-soft); overflow: hidden; }
+.gl-meter i { display: block; height: 100%; background: var(--c); }
+.gl-tasks { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.gl-tasks li { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 13px; }
+.gl-tasks li.done .gl-t { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--faint); }
+.gl-tasks .gl-t { flex: 1 1 auto; min-width: 0; cursor: pointer; }
+.gl-tasks .gl-t:hover { text-decoration: underline; text-underline-offset: 2px; }
+.gl-tasks .gl-by { flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--muted); }
+.gl-tasks time { flex: none; font-family: var(--f-mono); font-size: 11px; color: var(--faint); }
+.gl-add { width: 100%; padding: 6px 9px; border: 1px dashed var(--rule); border-radius: 7px; background: transparent; font-size: 13px; }
+.gl-add:focus { outline: none; border-style: solid; border-color: var(--accent); background: var(--surface); }
 </style>
 
 <div id="app">
@@ -517,6 +541,7 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
       <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="2" fill="none"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       <input id="q" type="search" data-i18n-ph="searchPh" autocomplete="off">
     </label>
+    <button class="btn" id="goals-btn" data-i18n="goalsBtn" data-i18n-title="goalsBtnTitle">Goals</button>
     <button class="btn btn-accent" id="ai-btn" hidden data-i18n="aiBtn" data-i18n-title="aiBtnTitle">AI tidy-up</button>
     <button class="btn lang-btn" id="lang-btn" data-i18n="langBtn" data-i18n-title="langTitle">中文</button>
     <div class="menu-wrap">
@@ -770,6 +795,12 @@ const I18N = {
     liveResume: 'Resume in a terminal', liveRunning: 'Running now', liveBadge: (n, w) => `${n} running${w ? `, ${w} need${w === 1 ? 's' : ''} you` : ''}`,
     tBound: n => `Bound to “${n}”`, tUnbound: 'Back to the repository and branch line',
     actorHuman: 'You', actorAgent: 'Agent', liveTipTime: 'now',
+    goalsBtn: 'Goals', goalsBtnTitle: 'Goals and to-dos of every line', goalsTitle: 'Goals and to-dos',
+    goalsTip: 'How it fits together: the <b>inbox</b> holds loose ideas you have not thought through; a <b>to-do</b> □ belongs to a line and is a next step you or an agent can take; a line\'s <b>goal</b> is the outcome it is working towards (write it in the line\'s panel). Agents read goals and to-dos with the MCP tool <b>trace_tasks</b> and tick what they finish with <b>trace_task_done</b>, so you can see progress here without asking.',
+    goalsTipHide: 'Got it', goalsShowDone: 'Show done', goalsSummary: (open, lines) => `${open} open to-do${open === 1 ? '' : 's'} on ${lines} line${lines === 1 ? '' : 's'}`,
+    goalsNoGoal: 'No goal yet. Write one in the line\'s panel.', goalsAdd: '+ Add a to-do, Enter to save', goalsOpenLine: 'Open line',
+    goalsOthers: n => `${n} more line${n === 1 ? ' has' : 's have'} no goal or to-do yet.`, goalsEmpty: 'No goals or to-dos yet. Open a line, write its goal, and add to-dos here or with the □ kind below.',
+    goalsBy: name => `ticked by ${name}`, tTaskAdded: 'To-do added',
     tabAgents: 'Agents', agHint: 'Who started whom: each session starts the sessions to its right; the small dashed cards are its subagents.',
     agEmpty: 'No agents are running right now. Claude Code sessions appear here as soon as they run with the Trace Canvas hooks.',
     agLocalOnly: 'The agent view needs the local page (trace-canvas serve), which can see the sessions running on this computer.',
@@ -909,6 +940,12 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     liveResume: '在终端里恢复', liveRunning: '正在运行', liveBadge: (n, w) => `${n} 个运行中${w ? `，${w} 个等你` : ''}`,
     tBound: n => `已绑定到「${n}」`, tUnbound: '已改回按仓库和分支自动归线',
     actorHuman: '你', actorAgent: 'Agent', liveTipTime: '此刻',
+    goalsBtn: '目标', goalsBtnTitle: '每条线的目标和待办', goalsTitle: '目标和待办',
+    goalsTip: '怎么用：<b>收件箱</b>放还没想清楚的零散想法；<b>待办</b> □ 挂在具体的线上，是你或 agent 可以去做的下一步；线的<b>目标</b>是它要达到的结果，写在这条线的面板里。agent 用 MCP 工具 <b>trace_tasks</b> 读取目标和待办，做完用 <b>trace_task_done</b> 勾上，你在这里就能看到进度，不用去问。',
+    goalsTipHide: '知道了', goalsShowDone: '显示已完成', goalsSummary: (open, lines) => `${lines} 条线上还有 ${open} 项待办`,
+    goalsNoGoal: '还没写目标，可以在这条线的面板里填写。', goalsAdd: '+ 添加待办，回车保存', goalsOpenLine: '打开这条线',
+    goalsOthers: n => `另外 ${n} 条线还没有目标或待办。`, goalsEmpty: '还没有目标或待办。打开一条线写下目标，再在这里或用下方的 □ 类型添加待办。',
+    goalsBy: name => `由 ${name} 勾选`, tTaskAdded: '已添加待办',
     tabAgents: 'Agent', agHint: '谁启动了谁：每个会话启动它右边的会话，虚线小卡片是它的子 agent。',
     agEmpty: '现在没有运行中的 agent。装好 Trace Canvas hooks 的 Claude Code 会话一运行就会出现在这里。',
     agLocalOnly: 'Agent 视图需要本地页面（trace-canvas serve），它才能看到这台电脑上正在运行的会话。',
@@ -971,7 +1008,7 @@ const S = {
   captureKind: 'idea', captureThread: ls.get('tc.captureThread', INBOX),
   mode: 'loading', readOnly: false, offline: false, got: new Set(), dragId: null,
   ai: null, sheet: null,
-  live: [], liveOthers: [],
+  live: [], liveOthers: [], goalsShowDone: false,
 };
 
 function fmtAbs(ts) { const d = new Date(ts); return `${pad2(d.getMonth() + 1)}/${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
@@ -1448,6 +1485,7 @@ function render() { if (rq) return; rq = requestAnimationFrame(() => { rq = 0; r
 function renderAll() {
   renderSync();
   renderLive();
+  if (S.sheet === 'goals' && !$('#sheet-body').contains(document.activeElement)) renderGoals();
   renderCaptureThreads();
   $('#ex-banner').hidden = !(loaded() && hasExamples());
   $('#clear-ex-item').hidden = !hasExamples();
@@ -2134,7 +2172,7 @@ detail.addEventListener('change', e => {
   if (s.type !== 'commit') return;
   if (el.id === 'd-kind') patchDoc('commits', s.id, { kind: el.value }, 0);
   else if (el.id === 'd-thread') { patchDoc('commits', s.id, { thread: el.value }, 0); toast(t('tMoved', getThread(el.value).name)); }
-  else if (el.id === 'd-done') patchDoc('commits', s.id, { done: el.checked }, 0);
+  else if (el.id === 'd-done') patchDoc('commits', s.id, el.checked ? { done: true, doneBy: 'human', doneAt: Date.now() } : { done: false, doneBy: null, doneAt: null }, 0);
   else if (el.id === 'd-ts') { const n = new Date(el.value).getTime(); if (!isNaN(n)) patchDoc('commits', s.id, { ts: n }, 0); }
   el.blur();
 });
@@ -2345,6 +2383,7 @@ function openSheet(kind) {
       <div class="ai-list">${t('help').map(([k, v]) => `<div class="ai-item" style="cursor:default"><span class="mono">${esc(k)}</span><span>${v}</span></div>`).join('')}</div>
       <p>${esc(t('helpShapes'))}</p>`);
   } else if (kind === 'ai') runAI();
+  else if (kind === 'goals') renderGoals();
 }
 async function saveExport() {
   const d = new Date();
@@ -2374,6 +2413,72 @@ async function initSample() {
   $('#ai-btn').hidden = !aiAvailable();
 }
 $('#ai-btn').onclick = () => openSheet('ai');
+$('#goals-btn').onclick = () => openSheet('goals');
+
+/* ---- goals and to-dos: a sheet, so the main page stays as it is ---- */
+// A to-do is a task meant to be ticked: the first instruction of a session (logged by hooks or
+// capture) records what was asked and stays out; next steps Claude writes as highlights count.
+const isTodo = c => c.kind === 'task' && !(c.session && !c.highlight);
+// A line's goal is its note; a bare repository path (what hooks used to put there) is not a goal.
+const goalOf = th => (th && th.note && !/^(\/|~\/)[^\n]*$/.test(th.note.trim()) ? th.note.trim() : '');
+function renderGoals() {
+  const by = byThread();
+  const groups = [inboxThread(), ...orderedThreads()].map(th => {
+    const tasks = (by.get(th.id) || []).filter(isTodo);
+    const open = tasks.filter(c => !c.done);
+    return { th, tasks, open, goal: th.id === INBOX ? '' : goalOf(th) };
+  }).filter(g => (g.tasks.length || g.goal) && (!['done', 'merged'].includes(g.th.status) || g.open.length));
+  // Lines that still have open to-dos first, then the ones with a running session, then by most open.
+  groups.sort((a, b) => (b.open.length > 0) - (a.open.length > 0) || liveOn(b.th.id).length - liveOn(a.th.id).length || b.open.length - a.open.length);
+  const others = orderedThreads().filter(th => !['done', 'merged'].includes(th.status)).length - groups.filter(g => g.th.id !== INBOX).length;
+  let tipHidden = false;
+  try { tipHidden = localStorage.getItem('tc.goalsTipHidden') === '1'; } catch {}
+  const totalOpen = groups.reduce((n, g) => n + g.open.length, 0);
+  const row = c => {
+    const by = c.done && c.doneBy && c.doneBy !== 'human' ? `<span class="gl-by"><span class="actor a-agent">${ACTOR_ICON.agent}</span>${esc(t('goalsBy', c.doneBy))}</span>` : '';
+    return `<li class="${c.done ? 'done' : ''}"><input type="checkbox" data-task="${esc(c.id)}" ${c.done ? 'checked' : ''} aria-label="${esc(c.title)}"><span class="gl-t" data-cid="${esc(c.id)}">${esc(c.title)}</span>${by}<time>${fmtShort(c.doneAt || c.ts)}</time></li>`;
+  };
+  const body = (tipHidden ? '' : `<div class="gl-tip"><span>${t('goalsTip')}</span><button class="btn" id="gl-tip-hide">${esc(t('goalsTipHide'))}</button></div>`)
+    + `<div class="gl-bar-top"><span>${esc(t('goalsSummary', totalOpen, groups.filter(g => g.open.length).length))}</span><label class="check"><input type="checkbox" id="gl-show-done" ${S.goalsShowDone ? 'checked' : ''}>${esc(t('goalsShowDone'))}</label></div>`
+    + (groups.length ? groups.map(({ th, tasks, open, goal }) => {
+      const shown = S.goalsShowDone ? tasks : open;
+      const pct = tasks.length ? Math.round(100 * (tasks.length - open.length) / tasks.length) : 0;
+      return `<section class="gl-group" style="--c:${th.color}">
+        <div class="gl-head"><span class="roundel" style="--c:${th.color}"></span><b>${esc(th.name)}</b><span class="gl-prog">${tasks.length - open.length}/${tasks.length}</span>${liveBadge(th.id)}<button class="linkish" data-goto="${esc(th.id)}">${esc(t('goalsOpenLine'))}</button></div>
+        ${th.id === INBOX ? '' : `<div class="gl-goal ${goal ? '' : 'none'}">${esc(goal || t('goalsNoGoal'))}</div>`}
+        ${tasks.length ? `<div class="gl-meter"><i style="width:${pct}%"></i></div>` : ''}
+        ${shown.length ? `<ul class="gl-tasks">${shown.map(row).join('')}</ul>` : ''}
+        <input class="gl-add" data-thread="${esc(th.id)}" placeholder="${esc(t('goalsAdd'))}">
+      </section>`;
+    }).join('') : `<p>${esc(t('goalsEmpty'))}</p>`)
+    + (others > 0 ? `<p>${esc(t('goalsOthers', others))}</p>` : '');
+  setSheet(t('goalsTitle'), body);
+}
+const sheetBody = $('#sheet-body');
+sheetBody.addEventListener('change', e => {
+  if (S.sheet !== 'goals') return;
+  const el = e.target;
+  if (el.id === 'gl-show-done') { S.goalsShowDone = el.checked; renderGoals(); return; }
+  if (el.dataset.task && canWrite()) {
+    patchDoc('commits', el.dataset.task, el.checked ? { done: true, doneBy: 'human', doneAt: Date.now() } : { done: false, doneBy: null, doneAt: null }, 0);
+    setTimeout(renderGoals, 0); // the box keeps focus, so the render loop would skip the sheet
+  }
+});
+sheetBody.addEventListener('keydown', e => {
+  if (S.sheet !== 'goals' || e.key !== 'Enter' || e.isComposing || !e.target.classList.contains('gl-add')) return;
+  const title = e.target.value.trim();
+  if (!title || !canWrite()) return;
+  addCommit({ thread: e.target.dataset.thread, kind: 'task', title, agent: '' });
+  toast(t('tTaskAdded'));
+  setTimeout(() => { renderGoals(); const again = $(`.gl-add[data-thread="${CSS.escape(e.target.dataset.thread)}"]`); if (again) again.focus(); }, 0);
+});
+sheetBody.addEventListener('click', e => {
+  if (S.sheet !== 'goals') return;
+  if (e.target.id === 'gl-tip-hide') { try { localStorage.setItem('tc.goalsTipHidden', '1'); } catch {} renderGoals(); return; }
+  const go = e.target.closest('[data-goto]'), rec = e.target.closest('.gl-t');
+  if (go) { closeSheet(); select({ type: 'thread', id: go.dataset.goto }); }
+  else if (rec) { closeSheet(); select({ type: 'commit', id: rec.dataset.cid }); }
+});
 function parseLooseJSON(text) {
   const s = String(text || '').trim();
   try { return JSON.parse(s); } catch {}

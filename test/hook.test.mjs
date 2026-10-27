@@ -125,6 +125,8 @@ test('only the first prompt is logged by default, and slash commands and task no
   const s = sandbox();
   s.fire('UserPromptSubmit', { prompt: '/clear', prompt_id: 'p0' });
   s.fire('UserPromptSubmit', { prompt: '<task-notification>\n<task-id>b1</task-id>\n<status>failed</status>\n</task-notification>', prompt_id: 'pn' });
+  s.fire('UserPromptSubmit', { prompt: '<cross-session-message from="local_ab12" name="Fix the mirror">\nPlease check the release.\n</cross-session-message>', prompt_id: 'px' });
+  s.fire('UserPromptSubmit', { prompt: '<side-sessions-event>None of the sessions you started is working now.</side-sessions-event>', prompt_id: 'py' });
   s.fire('UserPromptSubmit', { prompt: 'Compare the two survey datasets', prompt_id: 'p1' });
   s.fire('UserPromptSubmit', { prompt: 'yes, go ahead', prompt_id: 'p2' });
   assert.deepEqual(s.commits().map(c => c.title), ['Compare the two survey datasets']);

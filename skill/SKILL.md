@@ -2,8 +2,8 @@
 name: trace-canvas
 description: Put this Claude Code session on the Trace Canvas, a transit map of parallel work (threads like git branches, records like commits), log a key moment, list past sessions, or merge sessions and threads into one line. Use when the user asks to trace, capture, save or log this session or conversation, to see how parallel work fits together, or to merge sessions or threads.
 when_to_use: Trigger phrases include "trace this", "put this session on the canvas", "log this", "merge these sessions", "留痕", "把这次会话放进画布", "合并会话", "合并线程".
-argument-hint: "[capture | sessions | live | bind <thread> | merge <threads…> | open | log <text>]"
-allowed-tools: mcp__trace-canvas__trace_capture_session mcp__trace-canvas__trace_list_sessions mcp__trace-canvas__trace_list_threads mcp__trace-canvas__trace_read_thread mcp__trace-canvas__trace_log mcp__trace-canvas__trace_open mcp__trace-canvas__trace_live mcp__trace-canvas__trace_bind
+argument-hint: "[capture | sessions | tasks | live | bind <thread> | merge <threads…> | open | log <text>]"
+allowed-tools: mcp__trace-canvas__trace_capture_session mcp__trace-canvas__trace_list_sessions mcp__trace-canvas__trace_list_threads mcp__trace-canvas__trace_read_thread mcp__trace-canvas__trace_log mcp__trace-canvas__trace_open mcp__trace-canvas__trace_live mcp__trace-canvas__trace_bind mcp__trace-canvas__trace_tasks mcp__trace-canvas__trace_task_done
 ---
 
 # Trace Canvas
@@ -42,6 +42,10 @@ Call `trace_list_sessions` and show a short table: when, title, prompts, files c
    - the target: an existing thread, or a new name
    - the mode: **merge** keeps every line and draws the merge, like git; **combine** moves every record onto the target in time order and removes the source threads
 3. Call `trace_merge`. Report what happened in one line.
+
+## tasks: goals and to-dos
+
+Call `trace_tasks` (pass `thread` if the user named one) and show each thread's goal, its progress (done/total) and its open to-dos. When you finish a to-do during the session, call `trace_task_done` with its id. To add a to-do, call `trace_log` with `kind: "task"` and the thread.
 
 ## live: what is running now
 

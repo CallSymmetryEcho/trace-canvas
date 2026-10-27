@@ -5,7 +5,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { addCommit, dataFile, ensureThread, importText, INBOX, mutate, readData } from './store.mjs';
-import { bindLiveSession, captureSession, listThreads, liveSessions, mergeDataset, mergeThreads, readThread } from './ops.mjs';
+import { bindLiveSession, captureSession, listTasks, listThreads, liveSessions, mergeDataset, mergeThreads, readThread, setTaskDone } from './ops.mjs';
 import { describeSession, findTranscript, findTranscripts, parseTranscript } from './transcript.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -17,6 +17,7 @@ const port = () => Number(process.env.TRACE_CANVAS_PORT || 4777);
 
 const INSTRUCTIONS = `Trace Canvas keeps a trace of parallel work as threads (like git branches) and records (like commits), shown as a canvas, a branch graph and a timeline.
 Use trace_capture_session to put the current Claude Code session on the canvas; write 2-6 highlights (decisions, outcomes, next steps) and a short summary yourself, in the user's language.
+Use trace_tasks at the start of work to read the goals and open to-dos of the thread you work on, and trace_task_done when you finish one, so the person can follow progress without asking.
 Use trace_live to see which sessions are running now and whether one waits for the user; trace_bind puts a session on a thread.
 Use trace_list_threads before trace_merge, and confirm with the user which threads to merge and how: "merge" keeps every line and draws merges; "combine" folds them into one line and removes the others.`;
 
@@ -89,6 +90,20 @@ const TOOLS = [
     title: 'Merge another data set',
     description: 'Merges another Trace Canvas data set into this one: an export file, data.json copied from another computer, or JSON lines from an agent. Threads with the same repository/branch or session key, or the same name, become one line; records already present are skipped.',
     inputSchema: { type: 'object', properties: { path: { type: 'string', description: 'File to read.' }, json: { type: 'string', description: 'Or the data itself.' } } },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+  },
+  {
+    name: 'trace_tasks',
+    title: 'Goals and to-dos',
+    description: 'Returns the goal and the to-dos of each thread (or of one thread), with how many are done. Read it before working on a thread; tick to-dos with trace_task_done when they are finished.',
+    inputSchema: { type: 'object', properties: { thread: { type: 'string', description: 'Thread id or name; omit for all threads.' }, include_done: { type: 'boolean', description: 'Also list finished to-dos (default false).' } } },
+    annotations: { readOnlyHint: true },
+  },
+  {
+    name: 'trace_task_done',
+    title: 'Tick a to-do',
+    description: 'Marks a to-do as done (or open again with done: false) and records who ticked it. task is the id from trace_tasks, or its title.',
+    inputSchema: { type: 'object', properties: { task: { type: 'string', description: 'Task id or title.' }, thread: { type: 'string', description: 'Thread to look in when task is a title.' }, done: { type: 'boolean', description: 'Default true.' }, agent: { type: 'string', description: 'Who ticked it. Default "Claude".' } }, required: ['task'] },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
   },
   {
@@ -192,6 +207,16 @@ async function callTool(name, a = {}) {
       }
       const n = mutate(d => importText(d, text));
       return { text: `Imported ${n} record${n === 1 ? '' : 's'}.`, data: { records: n } };
+    }
+    case 'trace_tasks': {
+      const rows = listTasks(readData(), { thread: a.thread, includeDone: !!a.include_done });
+      const open = rows.reduce((n, r) => n + (r.total - r.done), 0);
+      return { text: `${open} open to-do${open === 1 ? '' : 's'} on ${rows.length} thread${rows.length === 1 ? '' : 's'}.`, data: { threads: rows } };
+    }
+    case 'trace_task_done': {
+      const done = a.done !== false;
+      const c = mutate(d => setTaskDone(d, { task: a.task, thread: a.thread, done, by: a.agent || 'Claude' }));
+      return { text: `${done ? 'Ticked' : 'Reopened'} "${c.title}".`, data: { id: c.id, title: c.title, done: c.done, doneBy: c.doneBy || null } };
     }
     case 'trace_live': {
       const d = readData();

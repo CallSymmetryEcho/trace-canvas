@@ -46,6 +46,11 @@ Records
                                                    Merge threads (combine folds them into one line)
   trace-canvas import <file|->                     Merge an export, another data.json, or JSON lines
 
+Goals and to-dos
+  trace-canvas tasks [--thread T] [--all]          Each thread's goal and open to-dos (--all: finished too)
+  trace-canvas done <task> [--thread T] [--agent A] [--undo]
+                                                   Tick a to-do by id or title (--undo reopens it)
+
 Live sessions
   trace-canvas live                                Running sessions: status, activity, thread
   trace-canvas bind <thread> [--session id]        Put a running session on a thread (default: this one)
@@ -153,6 +158,26 @@ async function main() {
         const n = mutate(d => importText(d, text));
         console.log(`Imported ${n} item${n === 1 ? '' : 's'}`);
       }
+      break;
+    }
+    case 'tasks': {
+      const { listTasks } = await import('../src/ops.mjs');
+      const { readData } = await import('../src/store.mjs');
+      const rows = listTasks(readData(), { thread: str(flag('thread', '')) || undefined, includeDone: !!flag('all', false) });
+      if (!rows.length) { console.log('No goals or to-dos yet.'); break; }
+      for (const r of rows) {
+        console.log(`${r.name}  (${r.done}/${r.total})${r.goal ? `\n  goal: ${r.goal}` : ''}`);
+        for (const t of r.tasks) console.log(`  ${t.done ? '✓' : '□'} ${t.title}  [${t.id}]${t.doneBy && t.doneBy !== 'human' ? `  ticked by ${t.doneBy}` : ''}`);
+      }
+      break;
+    }
+    case 'done': {
+      const { setTaskDone } = await import('../src/ops.mjs');
+      const thread = str(flag('thread', '')), agent = str(flag('agent', '')), undo = !!flag('undo', false);
+      const ref = argv.join(' ').trim(); // after the flags are taken out
+      if (!ref) { console.error('Usage: trace-canvas done <task id or title> [--thread T] [--agent A] [--undo]'); process.exit(1); }
+      const c = mutate(d => setTaskDone(d, { task: ref, thread: thread || undefined, done: !undo, by: agent || 'human' }));
+      console.log(`${undo ? 'Reopened' : 'Ticked'} "${c.title}"`);
       break;
     }
     case 'live': {

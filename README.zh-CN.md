@@ -15,13 +15,18 @@
 
 视频：[中英文教程](https://github.com/CallSymmetryEcho/trace-canvas/releases/tag/v0.1.0)。
 
-同一份数据，三个视图：
+![分支视图：实时线头、批准、你的决定和 agent 的产出](docs/gif-branches.zh.gif)
+
+*分支视图：正在运行的会话以线头显示在各自线路的顶端。橙色的在等你；批准后变绿，你的决定显示为深色，agent 的产出用线路的颜色。虚构数据。*
+
+同一份数据，四个视图：
 
 | 视图 | 用途 |
 | --- | --- |
 | 画布 | 每条线程是一张带迷你线路图的卡片，可拖拽、缩放、画带标签的关联，也可以多选线程一起合并 |
 | 分支 | git graph：所有记录按时间排列，每条线程一条泳道，分叉与合并画成曲线 |
 | 时间线 | 横向时间轴（日 / 周 / 月），每行一条线程，色带是它活跃的时段 |
+| Agent | 正在运行的会话画成一棵树：谁启动了谁，以及每个会话的子 agent（见 [Agent 视图](#agent-视图谁启动了谁)） |
 
 ![时间线视图：在日、周、月之间切换](docs/gif-timeline.zh.gif)
 
@@ -108,6 +113,8 @@ node bin/trace-canvas.mjs setup --user
 | `trace_import_data` | 合并另一份数据：导出文件、另一台电脑的 `data.json`、或 JSON 行 |
 | `trace_live` | 列出正在运行的会话：状态、当前动作、所属线 |
 | `trace_bind` | 把一个运行中的会话（默认是当前会话）放到某条线上 |
+| `trace_tasks` | 返回每条线的目标和待办，以及完成了几项 |
+| `trace_task_done` | 勾选一项待办（或重新打开），并记下是谁勾的 |
 | `trace_open` | 必要时启动页面，返回地址 |
 
 ## 实时会话
@@ -122,10 +129,6 @@ node bin/trace-canvas.mjs setup --user
 
 所有视图里，你写的站点（你的指令和决定）画成深色并带人形标记，agent 的站点用线路颜色并带星形标记，一眼能看出每条线是谁推进的。分支视图里，正在某条线上工作的会话会出现在这条泳道的顶端，是一个脉动的线头（绿色是工作中，橙色是等你），并用虚线连到这条线最新的记录；点它会打开会话面板。每张卡片会显示这条线上有几个会话在运行。点开一个会话，可以看到它的仓库、分支、目录和最近的指令，复制 `claude --resume <id>`，或者把它换到另一条线。会话默认按仓库和分支自动归线；要手动绑定，可以在页面上选线，运行 `trace-canvas bind "<线名>"`，或者让 Claude 来做（`trace_bind`）。绑定之后，这个会话的记录也会记到那条线上。
 
-![分支视图：实时线头、批准、你的决定和 agent 的产出](docs/gif-branches.zh.gif)
-
-*分支视图：正在运行的会话以线头显示在各自线路的顶端。橙色的在等你；批准后变绿，你的决定显示为深色，agent 的产出用线路的颜色。虚构数据。*
-
 实时状态需要 SessionStart、PreToolUse、Notification 和 SubagentStart/Stop 这几个 hook，`setup` 会自动加上（更新后再运行一次）。状态存在 `~/.trace-canvas/live/` 里，每个会话、每个子 agent 各一个小文件，和你的记录分开。会话结束或 12 小时没有动静后就不再显示。只有本地页面能看到实时会话。
 
 ### Agent 视图：谁启动了谁
@@ -139,6 +142,21 @@ node bin/trace-canvas.mjs setup --user
 *等待批准的会话批准后变成绿色，子 agent 完成后变淡，面板显示这个会话由谁启动。虚构数据。*
 
 子 agent 来自 SubagentStart/Stop 这两个 hook，以及 Claude Code 在每个子 agent 会话记录旁边保存的 `.meta.json`。谁启动了谁，读的是 Claude 桌面版自己的会话记录（`~/Library/Application Support/Claude/claude-code-sessions/`），只读、尽力而为：这个格式属于桌面版，随时可能变；没有桌面版时，每个会话各自成一棵树。可以用 `TRACE_CANVAS_DESKTOP_DIR` 指向别的位置。截图里的虚构会话由 `node docs/scenarios/agents.mjs <数据目录> <桌面记录目录>` 生成。
+
+## 目标和待办：和 agent 异步推进
+
+页头的**目标**按钮会打开一个清单，列出你想达到什么、做到哪了，主页面不会因此多出任何东西：
+
+| | 是什么 | 放在哪 |
+| --- | --- | --- |
+| **目标** | 一条线要达到的结果 | 这条线的"目标和背景"字段 |
+| **待办** □ | 具体的下一步，你或 agent 都可以去做，做完勾上 | 线上的任务记录 |
+| **进度** | 实际发生了什么 | agent 的产出、提交、决定 |
+| **收件箱** | 还没想清楚的零散想法 | 收件箱 |
+
+清单按线分组，显示每条线的目标、进度条（完成/总数），以及此刻有没有会话在做。待办可以直接在清单里勾选或新增。hooks 记下的每个会话第一条指令，记录的是"当时要求做什么"，不算待办，不会出现在清单里；Claude 导入会话时写下的"下一步"会出现。
+
+agent 用的是同一份清单：开工时用 `trace_tasks` 读目标和待办，做完一项就调用 `trace_task_done`，清单上会标出是谁勾的。这样你写下想要的结果，离开时 agent 照样推进，回来一看就知道做到哪了。命令行里是 `trace-canvas tasks` 和 `trace-canvas done "<待办>"`（脚本或其他 agent 加 `--agent Codex`）。
 
 ## 合并会话与线程
 
@@ -203,6 +221,11 @@ node bin/trace-canvas.mjs log "文献对比表完成" \
   trace-canvas sessions [--project 目录]           列出某个项目的 Claude Code 会话
   trace-canvas merge <线程>... --into <线程> [--combine]
   trace-canvas import <文件|->                     合并导出文件、另一份 data.json 或 JSON 行
+
+目标和待办
+  trace-canvas tasks [--thread 线程] [--all]       每条线的目标和未完成的待办
+  trace-canvas done <待办> [--thread 线程] [--agent 来源] [--undo]
+                                                   按 id 或标题勾选待办
 
 实时会话
   trace-canvas live                                正在运行的会话：状态、当前动作、所属线

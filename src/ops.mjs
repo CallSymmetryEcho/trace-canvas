@@ -21,6 +21,58 @@ export function resolveThreadRef(d, ref) {
   return findThreadByName(d, ref);
 }
 
+// A to-do is a task meant to be ticked. The first instruction of a session, which hooks and
+// capture log as a task, is a record of what was asked, not a to-do; next steps Claude
+// writes as highlights are to-dos.
+export const isTodo = c => c.kind === 'task' && !(c.session && !c.highlight);
+
+// A thread's goal is its note. Hooks used to put the repository path there, which is not a goal.
+// ponytail: "a single line starting with / or ~/" counts as a path; a goal field of its own is the upgrade.
+export const goalOf = th => (th && th.note && !/^(\/|~\/)[^\n]*$/.test(th.note.trim()) ? th.note.trim() : '');
+
+/**
+ * Goals and to-dos per thread: the thread's goal and its tasks (open ones only unless includeDone).
+ * Threads that are done or merged show up only while they still have open tasks.
+ */
+export function listTasks(d, { thread, includeDone = false } = {}) {
+  const only = thread ? resolveThreadRef(d, thread) : null;
+  if (thread && !only) throw new Error(`No thread "${thread}"`);
+  const by = {};
+  for (const c of Object.values(d.commits)) if (isTodo(c)) (by[threadIdOf(d, c)] ||= []).push(c);
+  const ids = only ? [only] : [INBOX, ...Object.keys(d.threads)];
+  return ids.map(id => {
+    const th = id === INBOX ? { name: 'Inbox', status: 'active' } : d.threads[id];
+    const tasks = (by[id] || []).sort((a, b) => a.ts - b.ts);
+    const open = tasks.filter(c => !c.done);
+    return {
+      id, name: th.name, goal: goalOf(th), status: th.status || 'active', done: tasks.length - open.length, total: tasks.length,
+      tasks: (includeDone ? tasks : open).map(c => ({ id: c.id, title: c.title, done: !!c.done, doneBy: c.doneBy || null, doneAt: c.doneAt ? new Date(c.doneAt).toISOString() : null })),
+    };
+  }).filter(r => r.total || r.goal).filter(r => only || !['done', 'merged'].includes(r.status) || r.total > r.done);
+}
+
+/**
+ * Marks a task done, or open again with done: false. task is its id or its title (exact, else a
+ * unique partial match), within thread if given. by records who ticked it: 'human' or an agent's name.
+ */
+export function setTaskDone(d, { task, thread, done = true, by = 'human' }) {
+  const ref = String(task || '').trim();
+  if (!ref) throw new Error('Which task? Pass its id or title');
+  let c = d.commits[ref];
+  if (!c || c.kind !== 'task') {
+    const tid = thread ? resolveThreadRef(d, thread) : null;
+    if (thread && !tid) throw new Error(`No thread "${thread}"`);
+    const pool = Object.values(d.commits).filter(x => isTodo(x) && !!x.done !== !!done && (!tid || threadIdOf(d, x) === tid));
+    const q = norm(ref), exact = pool.filter(x => norm(x.title) === q);
+    const hits = exact.length ? exact : pool.filter(x => norm(x.title).includes(q));
+    if (hits.length !== 1) throw new Error(hits.length ? `${hits.length} tasks match "${ref}"; pass the id or the thread` : `No ${done ? 'open' : 'done'} task matches "${ref}"`);
+    c = hits[0];
+  }
+  c.done = !!done;
+  if (done) { c.doneBy = by; c.doneAt = Date.now(); } else { delete c.doneBy; delete c.doneAt; }
+  return c;
+}
+
 /**
  * Running sessions with their thread, title and the session that started them (from the
  * desktop app's records), plus `others`: sessions that started a running one but are not

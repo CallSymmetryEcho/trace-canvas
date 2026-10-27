@@ -49,7 +49,7 @@ export function install(file, command) {
 }
 
 // MCP tools that only add records or read, so asking each time adds nothing. Merging and importing still ask.
-export const SAFE_TOOLS = ['trace_capture_session', 'trace_list_sessions', 'trace_list_threads', 'trace_read_thread', 'trace_log', 'trace_open', 'trace_live', 'trace_bind'].map(t => `mcp__trace-canvas__${t}`);
+export const SAFE_TOOLS = ['trace_capture_session', 'trace_list_sessions', 'trace_list_threads', 'trace_read_thread', 'trace_log', 'trace_open', 'trace_live', 'trace_bind', 'trace_tasks', 'trace_task_done'].map(t => `mcp__trace-canvas__${t}`);
 
 function readSettings(file) {
   if (!fs.existsSync(file)) return {};

@@ -23,6 +23,10 @@
 | 分支 | git graph：所有记录按时间排列，每条线程一条泳道，分叉与合并画成曲线 |
 | 时间线 | 横向时间轴（日 / 周 / 月），每行一条线程，色带是它活跃的时段 |
 
+![时间线视图：在日、周、月之间切换](docs/gif-timeline.zh.gif)
+
+*时间线：按日、周、月查看。色带是每条线活跃的时段，虚线曲线是分叉与合并。虚构数据。*
+
 页面默认英文，点右上角 **中文 / EN** 切换。
 
 **它能用来做什么？** 用虚构数据演示的三个场景（四个 agent 并行做一个应用、一个研究生的三周、一项分析分散在三个 agent 和两台电脑上），它在 vibe coding 和 AI 协作中的优势，以及还没解决的问题：[docs/why.zh-CN.md](docs/why.zh-CN.md)。
@@ -126,6 +130,10 @@ node bin/trace-canvas.mjs setup --user
 
 ![Agent 视图](docs/scenarios/live-agents.zh.png)
 
+![Agent 视图的实时变化](docs/gif-agents.zh.gif)
+
+*等待批准的会话批准后变成绿色，子 agent 完成后变淡，面板显示这个会话由谁启动。虚构数据。*
+
 子 agent 来自 SubagentStart/Stop 这两个 hook，以及 Claude Code 在每个子 agent 会话记录旁边保存的 `.meta.json`。谁启动了谁，读的是 Claude 桌面版自己的会话记录（`~/Library/Application Support/Claude/claude-code-sessions/`），只读、尽力而为：这个格式属于桌面版，随时可能变；没有桌面版时，每个会话各自成一棵树。可以用 `TRACE_CANVAS_DESKTOP_DIR` 指向别的位置。截图里的虚构会话由 `node docs/scenarios/agents.mjs <数据目录> <桌面记录目录>` 生成。
 
 ## 合并会话与线程
@@ -142,6 +150,10 @@ node bin/trace-canvas.mjs setup --user
 - **命令行**：`trace-canvas merge "问卷 A" "问卷 B" --into "问卷分析" --combine`。
 
 另一台电脑（比如工作站）上的数据用 `trace-canvas import other-data.json` 合并进来。仓库/分支或会话的 key 相同、或名字相同的线程会并成一条，已有的记录会跳过。
+
+![在画布上合并两条线](docs/gif-merge.zh.gif)
+
+*在画布上：选中两条线，选择目标后点「合并」，被合并的线汇入目标线。虚构数据。*
 
 ## 调整 hooks
 

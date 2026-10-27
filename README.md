@@ -23,6 +23,10 @@ Three views of the same data:
 | Branches | A git graph: every record in time order, one lane per thread, forks and merges as curves. |
 | Timeline | A time axis (day / week / month). One row per thread; the band shows when it was active. |
 
+![Timeline view: switching between day, week and month](docs/gif-timeline.en.gif)
+
+*Timeline: day, week and month. Each band shows when a line was active; dashed curves are forks and merges. Made-up data.*
+
 The page is in English by default. Switch with the **中文 / EN** button in the header.
 
 **What is it good for?** Three scenarios with made-up data (four agents building an app in parallel, three weeks of a PhD student's life, one analysis spread over three agents and two computers), the advantages for vibe coding and AI collaboration, and the open problems: [docs/why.md](docs/why.md).
@@ -126,6 +130,10 @@ The **Agents** tab draws the running agents as a tree, left to right. Each sessi
 
 ![Agent view](docs/scenarios/live-agents.en.png)
 
+![Agent view in motion](docs/gif-agents.en.gif)
+
+*A session waiting for approval turns green once approved, a subagent finishes and fades, and the panel shows who started the session. Made-up data.*
+
 Subagents come from the SubagentStart/Stop hooks and the `.meta.json` file Claude Code keeps next to each subagent transcript. Which session started which comes from the Claude desktop app's own session records (`~/Library/Application Support/Claude/claude-code-sessions/`), read-only and best-effort: that format belongs to the app and may change, and without the desktop app every session simply starts its own tree. `TRACE_CANVAS_DESKTOP_DIR` points it somewhere else. The made-up sessions in the screenshot come from `node docs/scenarios/agents.mjs <data dir> <desktop dir>`.
 
 ## Merging sessions and threads
@@ -142,6 +150,10 @@ The target can be an existing thread or a new one. Three places to do it:
 - **On the command line**: `trace-canvas merge "Survey A" "Survey B" --into "Survey analysis" --combine`.
 
 Data from another computer (for example a workstation) merges with `trace-canvas import other-data.json`. Threads with the same repository/branch or session key, or the same name, become one line, and records already present are skipped.
+
+![Merging two lines on the canvas](docs/gif-merge.en.gif)
+
+*On the canvas: select two lines, pick the target and **Merge**; the merged lines join the target line. Made-up data.*
 
 ## Tuning the hooks
 

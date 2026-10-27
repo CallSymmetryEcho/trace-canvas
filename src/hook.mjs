@@ -101,7 +101,7 @@ export function resolveThread(d, info, { cfg, sid, prevThreadId = null, promptFo
   const prev = prevThreadId && d.threads[prevThreadId];
   const parent = prev && prev.key !== key ? prev : threadByKey(d, info.repo) || createThread(d, { id: hashId('t', info.repo), name: info.repo, key: info.repo, note: info.root });
   const forkPoint = lastCommit(d, parent.id);
-  t = createThread(d, { id: hashId('t', key), name: `${info.repo} · ${info.branch}`, key, parent: parent.id, forkOf: forkPoint ? forkPoint.id : null, note: info.root });
+  t = createThread(d, { id: hashId('t', key), name: `${info.repo} · ${info.branch}`, key, parent: parent.id, forkOf: forkPoint ? forkPoint.id : null, note: info.root, extra: parent.group ? { group: parent.group } : {} });
   addCommit(d, { thread: t.id, kind: 'fork', title: tr(cfg.lang, 'branchedFrom', info.branch, parent.name), parents: forkPoint ? [forkPoint.id] : [], agent });
   return t;
 }

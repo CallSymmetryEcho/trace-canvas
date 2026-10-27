@@ -78,6 +78,7 @@ Live sessions
   trace-canvas bind <thread> [--session id]        Put a running session on a thread (default: this one)
   trace-canvas bind --unbind [--session id]        Back to its repository/branch line
   trace-canvas resume <thread>                     The line's sessions, newest first, each with the command that resumes it
+  trace-canvas group <thread>... --name G | --clear   Put lines in a group (on the canvas they sit in one frame)
 
 Setup (pass --user for every project, or --project dir for one)
   trace-canvas setup            Hooks + MCP server + /trace-canvas skill
@@ -222,7 +223,7 @@ async function main() {
       const rows = listTasks(readData(), { thread: str(flag('thread', '')) || undefined, includeDone: !!flag('all', false), assignee: str(flag('assignee', '')) || undefined });
       if (!rows.length) { console.log('No goals or to-dos yet.'); break; }
       for (const r of rows) {
-        console.log(`${r.name}  (${r.done}/${r.total})${r.goal ? `\n  goal: ${r.goal}` : ''}`);
+        console.log(`${r.name}${r.group ? `  [${r.group}]` : ''}  (${r.done}/${r.total})${r.goal ? `\n  goal: ${r.goal}` : ''}`);
         for (const t of r.tasks) console.log(`  ${t.done ? '✓' : '□'} ${t.title}  [${t.id}]${t.assignee ? `  → ${t.assignee}` : ''}${t.doneBy && t.doneBy !== 'human' ? `  ticked by ${t.doneBy}` : ''}`);
       }
       break;
@@ -257,6 +258,20 @@ async function main() {
         console.log(`         ${s.activity || ''}${s.parent ? `\n         started by ${s.parent}` : ''}`);
         for (const a of s.agents) console.log(`         ${a.status === 'running' ? '▸' : '✓'} ${a.type}${a.description ? `: ${a.description}` : ''}`);
       }
+      break;
+    }
+    case 'group': {
+      // trace-canvas group <thread>... --name G   puts lines in a group; --clear takes them out.
+      const { resolveThreadRef } = await import('../src/ops.mjs');
+      const name = str(flag('name', '')).trim(), clear = !!flag('clear', false), refs = argv.filter(Boolean);
+      if (!refs.length || (!name && !clear)) { console.error('Usage: trace-canvas group <thread>... --name <group>   (or --clear)'); process.exit(1); }
+      const done = mutate(d => refs.map(ref => {
+        const tid = resolveThreadRef(d, ref), th = tid && d.threads[tid];
+        if (!th) throw new Error(`No thread named "${ref}"`);
+        if (clear) delete th.group; else th.group = name;
+        return th.name;
+      }));
+      console.log(clear ? `Out of their group: ${done.join(', ')}` : `In "${name}": ${done.join(', ')}`);
       break;
     }
     case 'resume': {

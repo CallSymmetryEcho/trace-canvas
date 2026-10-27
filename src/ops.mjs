@@ -40,7 +40,7 @@ export function listTasks(d, { thread, includeDone = false, assignee } = {}) {
     const tasks = (by[id] || []).sort((a, b) => a.ts - b.ts);
     const open = tasks.filter(c => !c.done);
     return {
-      id, name: th.name, goal: goalOf(th), status: th.status || 'active', done: tasks.length - open.length, total: tasks.length,
+      id, name: th.name, ...(th.group ? { group: th.group } : {}), goal: goalOf(th), status: th.status || 'active', done: tasks.length - open.length, total: tasks.length,
       tasks: (includeDone ? tasks : open).map(c => ({ id: c.id, title: c.title, assignee: c.assignee || null, done: !!c.done, doneBy: c.doneBy || null, doneAt: c.doneAt ? new Date(c.doneAt).toISOString() : null })),
     };
   }).filter(r => r.total || r.goal).filter(r => only || !['done', 'merged'].includes(r.status) || r.total > r.done);
@@ -157,7 +157,7 @@ export function forkThread(d, { from, name, agent = '' } = {}, env = process.env
     if (!c) throw new Error(`"${from}" has no records to fork from yet`);
   }
   const ptid = threadIdOf(d, c), pname = ptid === INBOX ? tr(cfg.lang, 'inbox') : d.threads[ptid].name;
-  const thread = createThread(d, { name: String(name || '').trim() || tr(cfg.lang, 'branchDefault', pname), parent: ptid, forkOf: c.id });
+  const thread = createThread(d, { name: String(name || '').trim() || tr(cfg.lang, 'branchDefault', pname), parent: ptid, forkOf: c.id, extra: ptid !== INBOX && d.threads[ptid].group ? { group: d.threads[ptid].group } : {} });
   const record = addCommit(d, { thread: thread.id, kind: 'fork', title: tr(cfg.lang, 'forkTitle', pname, c.title).slice(0, 120), parents: [c.id], ts: Math.max(Date.now(), c.ts + 1), agent });
   return { thread, record };
 }
@@ -380,7 +380,7 @@ export function listThreads(d, { query, includeDone = true } = {}) {
       const cs = (by[t.id] || []).sort((a, b) => a.ts - b.ts);
       const hits = q ? cs.filter(c => norm(`${c.title} ${c.body}`).includes(q)).length : 0;
       return {
-        id: t.id, name: t.name, status: t.status || 'active', records: cs.length,
+        id: t.id, name: t.name, ...(t.group ? { group: t.group } : {}), status: t.status || 'active', records: cs.length,
         lastUpdate: cs.length ? new Date(cs[cs.length - 1].ts).toISOString() : null,
         sessions: [...new Set(cs.map(c => c.session).filter(Boolean))].length,
         ...(t.parent ? { forkedFrom: (d.threads[t.parent] || {}).name || 'Inbox' } : {}),
@@ -408,7 +408,7 @@ export function readThread(d, ref, { limit = 50 } = {}, env = process.env) {
   const t = id === INBOX ? { id: INBOX, name: 'Inbox', status: 'active' } : d.threads[id];
   const cs = Object.values(d.commits).filter(c => threadIdOf(d, c) === id).sort((a, b) => a.ts - b.ts);
   return {
-    id: t.id, name: t.name, status: t.status, goal: goalOf(t), note: t.note || '', total: cs.length,
+    id: t.id, name: t.name, ...(t.group ? { group: t.group } : {}), status: t.status, goal: goalOf(t), note: t.note || '', total: cs.length,
     sessions: threadSessions(d, id, env).slice(0, 10).map(s => ({ id: s.id, agent: s.agent, title: s.title, status: s.status, last: new Date(s.last).toISOString(), resume: s.command })),
     records: cs.slice(-limit).map(c => ({ id: c.id, at: new Date(c.ts).toISOString(), kind: c.kind, title: c.title, ...(c.body ? { body: c.body.slice(0, 600) } : {}), ...(c.agent ? { agent: c.agent } : {}), ...(c.session ? { session: c.session } : {}), ...(c.gitCommit ? { commit: c.gitCommit, ...(c.repo ? { repo: c.repo } : {}) } : {}), ...(c.links && c.links.length ? { links: c.links } : {}) })),
   };

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Groups and arranging.** Lines can be put in a group (Select → Group, the line's panel, or `trace-canvas group`); a group is a frame on the canvas whose label moves, renames, arranges or ungroups it, and forks join their line's group. **Arrange** lays the canvas out by group, forks after their lines, and can be undone.
+
 **Upgrading:** run `node bin/trace-canvas.mjs setup --user --machine <name> --map <repo clone>` once, then `trace-canvas sync`. The first sync gives lines that belong to a repository a stable id (the old one stays as an alias) and keeps a copy of the data first (`data.json.before-first-sync`).
 
 ### Added

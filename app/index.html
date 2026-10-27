@@ -129,6 +129,11 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .multi-banner select, .multi-banner input { padding: 4px 8px; border: 1px solid var(--rule); border-radius: 7px; background: var(--surface-2); font-size: 12.5px; max-width: 180px; }
 .multi-banner .btn { border-radius: 7px; }
 .card.is-multi { outline: 2px dashed var(--accent); outline-offset: 2px; }
+#cv-groups { position: absolute; left: 0; top: 0; }
+.grp { position: absolute; border: 1.5px dashed color-mix(in srgb, var(--c) 55%, transparent); border-radius: 14px; background: color-mix(in srgb, var(--c) 7%, transparent); }
+.grp-label { position: absolute; left: 10px; top: 5px; padding: 2px 10px; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--c) 18%, var(--surface)); color: var(--ink); font: 600 12.5px var(--f-display); letter-spacing: .03em; cursor: grab; white-space: nowrap; }
+.grp-label:hover { background: color-mix(in srgb, var(--c) 30%, var(--surface)); }
+.toast .toast-act { margin-left: 10px; padding: 0; border: 0; background: none; color: var(--accent-soft); font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
 .card.is-multi .roundel { box-shadow: 0 0 0 3px var(--accent-soft); }
 .ex-chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 3px 2px 9px; border: 1px dashed var(--faint); border-radius: 999px; font-size: 12px; color: var(--muted); white-space: nowrap; }
 .ex-chip button { border: 0; border-radius: 999px; padding: 2px 8px; background: var(--surface-2); color: var(--ink); font-size: 12px; cursor: pointer; }
@@ -586,6 +591,7 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
     <section class="view" id="view-canvas">
       <div class="cv-viewport" id="cv">
         <div class="cv-world" id="cv-world">
+          <div id="cv-groups"></div>
           <svg class="cv-edges" id="cv-edges"></svg>
           <div id="cv-cards"></div>
         </div>
@@ -598,6 +604,7 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
           <button class="btn hud-zoom" id="zoom-reset" data-i18n-title="zoomReset">100%</button>
           <button class="btn" id="zoom-in" data-i18n-aria="zoomIn">+</button>
           <button class="btn" id="zoom-fit" data-i18n="fit">Fit</button>
+          <button class="btn" id="arrange-btn" data-i18n="arrange" data-i18n-title="arrangeTitle">Arrange</button>
         </div>
         <div class="hud-group">
           <button class="btn" id="connect-btn" aria-pressed="false" data-i18n-title="connectTitle">
@@ -670,6 +677,7 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
     </div>
   </div>
   <div class="toast" id="toast" role="status" hidden></div>
+  <datalist id="group-list"></datalist>
   <datalist id="agent-list"><option value="Claude"></option><option value="Claude Code"></option><option value="ChatGPT"></option><option value="Codex"></option><option value="Cursor"></option></datalist>
 </div>
 
@@ -704,6 +712,10 @@ const I18N = {
     searchPh: 'Search records…', aiBtn: 'AI tidy-up', aiBtnTitle: 'Ask Claude to sort the inbox and find links between threads',
     langBtn: '中文', langTitle: '切换到中文', more: 'More',
     menuNewThread: 'New thread', menuHideDone: 'Hide finished threads', menuShowDone: 'Show finished threads',
+    arrange: 'Arrange', arrangeTitle: 'Lay the lines out by group, forks next to the lines they came from', tArranged: 'Arranged', tUndo: 'Undo',
+    groupLabel: 'Group', groupName: 'Name', groupLines: 'Lines in this group', groupCount: n => `${n} line${n === 1 ? '' : 's'}`, groupArrange: 'Arrange this group', groupUngroup: 'Ungroup',
+    threadGroup: 'Group', threadGroupPh: 'None', multiGroup: 'Group', multiGroupPh: 'Group name', tGroupNeedName: 'Type a group name first',
+    tGrouped: (n, g) => `${n} line${n === 1 ? '' : 's'} in "${g}"`, tUngrouped: 'Group dissolved; the lines stay',
     menuSync: 'Sync with other machines', tSyncing: 'Syncing…', tSyncBusy: 'A sync is already running', tSyncFailed: e => `Sync failed: ${e}`,
     tSynced: (n, off) => `Synced: ${n} change${n === 1 ? '' : 's'} from other machines${off ? ' (offline; pushes next time)' : ''}`, onMachine: m => `On ${m}`,
     menuAgent: 'Connect an AI agent', menuIO: 'Import / export', menuClearEx: 'Clear example data', menuHelp: 'Shortcuts and help',
@@ -858,6 +870,10 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     searchPh: '搜索记录…', aiBtn: 'AI 梳理', aiBtnTitle: '让 Claude 归类收件箱并找出线程间的关联',
     langBtn: 'EN', langTitle: 'Switch to English', more: '更多',
     menuNewThread: '新建线程', menuHideDone: '隐藏已完成的线程', menuShowDone: '显示已完成的线程',
+    arrange: '整理', arrangeTitle: '按分组排好线程，分叉排在原线旁边', tArranged: '已整理', tUndo: '撤销',
+    groupLabel: '分组', groupName: '名称', groupLines: '组里的线', groupCount: n => `${n} 条线`, groupArrange: '整理这一组', groupUngroup: '解散分组',
+    threadGroup: '分组', threadGroupPh: '无', multiGroup: '编组', multiGroupPh: '分组名称', tGroupNeedName: '先填分组名称',
+    tGrouped: (n, g) => `${n} 条线已放进「${g}」`, tUngrouped: '分组已解散，线都还在',
     menuSync: '和其他电脑同步', tSyncing: '正在同步…', tSyncBusy: '已经有一个同步在进行', tSyncFailed: e => `同步失败：${e}`,
     tSynced: (n, off) => `已同步：从其他电脑收到 ${n} 处改动${off ? '（离线，下次再推送）' : ''}`, onMachine: m => `在 ${m} 上`,
     menuAgent: '接入 AI agent', menuIO: '导入 / 导出', menuClearEx: '清除示例数据', menuHelp: '快捷键与用法',
@@ -1046,7 +1062,7 @@ const S = {
   captureKind: 'idea', captureThread: ls.get('tc.captureThread', INBOX),
   mode: 'loading', readOnly: false, offline: false, got: new Set(), dragId: null,
   ai: null, sheet: null,
-  live: [], liveOthers: [], sessions: [], machine: '', goalsShowDone: false,
+  live: [], liveOthers: [], sessions: [], machine: '', goalsShowDone: false, multiGroup: '', dragMembers: null,
 };
 
 function fmtAbs(ts) { const d = new Date(ts); return `${pad2(d.getMonth() + 1)}/${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
@@ -1180,6 +1196,7 @@ function applyRows(col, rows) {
     if (local) m.set(id, local); else m.delete(id);
   }
   if (col === 'threads' && S.dragId && S.threads.has(S.dragId)) m.set(S.dragId, S.threads.get(S.dragId));
+  if (col === 'threads' && S.dragMembers) for (const id of S.dragMembers) if (S.threads.has(id)) m.set(id, S.threads.get(id));
   S[col] = m;
   S.got.add(col);
   render();
@@ -1400,11 +1417,11 @@ function freeSpot(near) {
   for (let r = 0; r < 60; r++) for (let c = 1; c <= 4; c++) { const x = c * 300, y = r * 250; if (free(x, y)) return { x, y }; }
   return { x: 300, y: pts.length * 250 };
 }
-function newThread({ name, parent = null, forkOf = null, near = null }) {
+function newThread({ name, parent = null, forkOf = null, near = null, group = '' }) {
   const used = new Set([...S.threads.values()].map(th => th.color));
   const color = LINE_COLORS.find(c => !used.has(c)) || LINE_COLORS[S.threads.size % LINE_COLORS.length];
   const pos = freeSpot(near);
-  const th = { id: uid('t'), name: name || t('newThreadName', S.threads.size + 1), color, status: 'active', createdAt: Date.now(), parent, forkOf, mergedInto: null, x: pos.x, y: pos.y, note: '' };
+  const th = { id: uid('t'), name: name || t('newThreadName', S.threads.size + 1), color, status: 'active', createdAt: Date.now(), parent, forkOf, mergedInto: null, x: pos.x, y: pos.y, note: '', ...(group ? { group } : {}) };
   putDoc('threads', th, 0);
   return th;
 }
@@ -1421,7 +1438,7 @@ function addCommit({ thread, kind = 'idea', title, body = '', links = [], agent 
 function forkFrom(cid, name) {
   const c = S.commits.get(cid); if (!c) return;
   const ptid = tidOf(c), pt = getThread(ptid);
-  const th = newThread({ name: name.trim() || t('branchDefault', pt.name), parent: ptid, forkOf: cid, near: ptid === INBOX ? S.inboxPos : pt });
+  const th = newThread({ name: name.trim() || t('branchDefault', pt.name), parent: ptid, forkOf: cid, near: ptid === INBOX ? S.inboxPos : pt, group: pt.group || '' });
   addCommit({ thread: th.id, kind: 'fork', title: t('forkTitle', pt.name, c.title).slice(0, 120), parents: [cid], ts: Math.max(Date.now(), c.ts + 1) });
   setCaptureThread(th.id);
   select({ type: 'thread', id: th.id });
@@ -1524,6 +1541,7 @@ const mini = (kind, color, done) => `<svg class="g" width="16" height="16" viewB
 let rq = 0;
 function render() { if (rq) return; rq = requestAnimationFrame(() => { rq = 0; renderAll(); }); }
 function renderAll() {
+  $('#group-list').innerHTML = groupNames().map(g => `<option value="${esc(g)}">`).join('');
   renderSync();
   renderLive();
   // The goals list holds still only while a to-do is being typed: a checkbox or menu keeps focus
@@ -1598,6 +1616,7 @@ function renderCanvas() {
   const ths = [inboxThread(), ...orderedThreads().filter(th => !isHidden(th))];
   const selT = selThreadId();
   cardsEl.innerHTML = ths.map(th => cardHTML(th, by.get(th.id) || [], selT)).join('');
+  drawGroups();
   drawEdges();
   applyCam();
   if (!S.fitted && loaded() && (S.threads.size || S.commits.size)) { S.fitted = true; fit(); }
@@ -1629,6 +1648,8 @@ function renderMulti() {
     <input id="multi-name" placeholder="${esc(t('multiNamePh'))}" value="${esc(S.multiName)}">
     <button class="btn btn-primary" data-multi="merge" title="${esc(t('multiMergeTitle'))}">${esc(t('multiMerge'))}</button>
     <button class="btn" data-multi="combine" title="${esc(t('multiCombineTitle'))}">${esc(t('multiCombine'))}</button>
+    <input id="multi-group" list="group-list" placeholder="${esc(t('multiGroupPh'))}" value="${esc(S.multiGroup)}">
+    <button class="btn" data-multi="group">${esc(t('multiGroup'))}</button>
     <button class="btn btn-quiet" data-multi="clear">${esc(t('multiClear'))}</button>`;
   const sel = $('#multi-target');
   if ([...sel.options].some(o => o.value === prevTarget)) sel.value = prevTarget;
@@ -1640,12 +1661,18 @@ function toggleMulti(id) {
   render();
 }
 function clearMulti() { S.multi.clear(); S.selectMode = false; S.multiName = ''; render(); }
-$('#multi-banner').addEventListener('input', e => { if (e.target.id === 'multi-name') S.multiName = e.target.value; });
+$('#multi-banner').addEventListener('input', e => { if (e.target.id === 'multi-name') S.multiName = e.target.value; if (e.target.id === 'multi-group') S.multiGroup = e.target.value; });
 $('#multi-banner').addEventListener('change', e => { if (e.target.id === 'multi-target') $('#multi-name').hidden = e.target.value !== '__new'; });
 $('#multi-banner').addEventListener('click', e => {
   const b = e.target.closest('[data-multi]'); if (!b) return;
   if (b.dataset.multi === 'clear') { clearMulti(); return; }
   if (!canWrite()) return;
+  if (b.dataset.multi === 'group') {
+    const name = S.multiGroup.trim(), ids = [...S.multi];
+    if (!name) { toast(t('tGroupNeedName')); return; }
+    setGroup(ids, name); S.multiGroup = ''; clearMulti(); toast(t('tGrouped', ids.length, name));
+    return;
+  }
   mergeMany(b.dataset.multi, $('#multi-target').value);
 });
 $('#select-btn').onclick = () => { S.selectMode = !S.selectMode; if (!S.selectMode && !S.multi.size) S.multiName = ''; S.connect = null; render(); };
@@ -1698,6 +1725,87 @@ function mergeMany(mode, targetVal) {
   S.multi.clear(); S.selectMode = false; S.multiName = '';
   select({ type: 'thread', id: tid });
   toast(mode === 'combine' ? t('tCombinedMany', sources.length, targetName) : t('tMergedMany', sources.length, targetName));
+}
+/* ---- groups ---- */
+// A group is a name on its lines (th.group); its frame wraps their cards as drawn, under them.
+const groupsEl = $('#cv-groups');
+const groupNames = () => [...new Set([...S.threads.values()].map(th => th.group).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+function drawGroups() {
+  const box = new Map();
+  for (const el of cardsEl.children) {
+    const th = S.threads.get(el.dataset.tid);
+    if (!th || !th.group) continue;
+    const b = box.get(th.group) || { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity, n: 0, first: Infinity, color: th.color };
+    b.x0 = Math.min(b.x0, el.offsetLeft); b.y0 = Math.min(b.y0, el.offsetTop);
+    b.x1 = Math.max(b.x1, el.offsetLeft + el.offsetWidth); b.y1 = Math.max(b.y1, el.offsetTop + el.offsetHeight);
+    b.n++;
+    if ((th.createdAt || 0) < b.first) { b.first = th.createdAt || 0; b.color = th.color; }
+    box.set(th.group, b);
+  }
+  const pad = 16, label = 28;
+  groupsEl.innerHTML = [...box].map(([g, b]) => `<div class="grp" style="left:${b.x0 - pad}px;top:${b.y0 - pad - label}px;width:${b.x1 - b.x0 + 2 * pad}px;height:${b.y1 - b.y0 + 2 * pad + label}px;--c:${b.color}"><button class="grp-label" data-group="${esc(g)}">${esc(g)} · ${b.n}</button></div>`).join('');
+}
+// <arrange>
+// Positions for lines laid out by group: one block per group (by name), lines without a group last;
+// inside a block depth-first along forks (a line, then the lines forked from it, oldest first), up to
+// perCol cards a column. Pure: test/group.test.mjs runs this very function out of this file.
+function arrange(lines, { colW = 290, rowH = 230, perCol = 4, gap = 70, top = 260 } = {}) {
+  const blocks = new Map();
+  for (const th of lines) { const g = th.group || ''; if (!blocks.has(g)) blocks.set(g, []); blocks.get(g).push(th); }
+  const names = [...blocks.keys()].sort((a, b) => (a === '') - (b === '') || a.localeCompare(b));
+  const pos = new Map();
+  let x = 0;
+  for (const g of names) {
+    const ths = blocks.get(g).slice().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0) || String(a.id).localeCompare(String(b.id)));
+    const ids = new Set(ths.map(th => th.id)), kids = new Map(), seen = new Set(), order = [];
+    for (const th of ths) { const p = ids.has(th.parent) ? th.parent : ''; if (!kids.has(p)) kids.set(p, []); kids.get(p).push(th); }
+    const walk = p => { for (const th of kids.get(p) || []) if (!seen.has(th.id)) { seen.add(th.id); order.push(th); walk(th.id); } };
+    walk('');
+    for (const th of ths) if (!seen.has(th.id)) { seen.add(th.id); order.push(th); walk(th.id); } // forks in a loop
+    order.forEach((th, i) => pos.set(th.id, { x: x + Math.floor(i / perCol) * colW, y: top + (i % perCol) * rowH }));
+    x += Math.ceil(order.length / perCol) * colW + gap;
+  }
+  return pos;
+}
+// </arrange>
+// Arranges every visible line, or one group in place. Positions sync to other machines, so it can be undone for a while.
+function doArrange(only) {
+  if (!canWrite()) return;
+  const lines = orderedThreads().filter(th => !isHidden(th) && (!only || th.group === only));
+  if (!lines.length) return;
+  const before = new Map(lines.map(th => [th.id, { x: th.x || 0, y: th.y || 0 }])), inbox = { ...S.inboxPos };
+  let pos = arrange(lines);
+  if (only) { // keep the group where it was
+    const min = (m, k) => Math.min(...[...m.values()].map(p => p[k]));
+    const dx = min(before, 'x') - min(pos, 'x'), dy = min(before, 'y') - min(pos, 'y');
+    pos = new Map([...pos].map(([id, p]) => [id, { x: p.x + dx, y: p.y + dy }]));
+  } else { S.inboxPos = { x: 0, y: 0 }; ls.set('tc.inboxPos', S.inboxPos); }
+  for (const [id, p] of pos) patchDoc('threads', id, p, 0);
+  toast(t('tArranged'), { label: t('tUndo'), run: () => {
+    for (const [id, p] of before) patchDoc('threads', id, p, 0);
+    if (!only) { S.inboxPos = inbox; ls.set('tc.inboxPos', inbox); }
+    render();
+  } });
+  if (!only) requestAnimationFrame(() => requestAnimationFrame(fit)); // after the cards are redrawn
+}
+$('#arrange-btn').onclick = () => doArrange();
+function setGroup(ids, name) { for (const id of ids) patchDoc('threads', id, { group: name }, 0); }
+function groupDetail(name) {
+  const ths = orderedThreads().filter(th => th.group === name);
+  return `<div class="d-head">
+      <span class="d-eyebrow">${esc(t('groupLabel'))}<span class="mono">${esc(t('groupCount', ths.length))}</span></span>
+      <button class="icon-btn" data-act="close" aria-label="${esc(t('close'))}">×</button>
+    </div>
+    <div class="d-scroll">
+      <label class="fld"><span>${esc(t('groupName'))}</span><input id="g-name" class="big-input" value="${esc(name)}"></label>
+      <div class="sec-label">${esc(t('groupLines'))}</div>
+      <ul class="l-list">${ths.map(th => `<li data-act="goto-thread" data-tid="${esc(th.id)}"><span class="ldot" style="background:${th.color}"></span><span>${esc(th.name)}</span></li>`).join('')}</ul>
+      <div class="d-actions">
+        <button class="btn btn-primary" data-act="g-arrange">${esc(t('groupArrange'))}</button>
+        <span class="spacer"></span>
+        <button class="btn btn-quiet-danger" data-act="g-ungroup">${esc(t('groupUngroup'))}</button>
+      </div>
+    </div>`;
 }
 function cardHTML(th, cs, selT) {
   const isInbox = th.id === INBOX;
@@ -1794,7 +1902,11 @@ vp.addEventListener('pointerdown', e => {
   }
   const card = e.target.closest('.card');
   const edge = e.target.closest('.edge[data-eid]');
-  if (card) {
+  const lab = e.target.closest('.grp-label');
+  if (lab) {
+    const name = lab.dataset.group;
+    gesture = { type: 'group', name, sx: e.clientX, sy: e.clientY, moved: false, members: orderedThreads().filter(th => th.group === name).map(th => ({ id: th.id, ox: th.x || 0, oy: th.y || 0 })) };
+  } else if (card) {
     const th = getThread(card.dataset.tid);
     gesture = { type: 'card', id: card.dataset.tid, sx: e.clientX, sy: e.clientY, ox: th.x || 0, oy: th.y || 0, moved: false, el: card, target: e.target, multiKey: e.shiftKey || e.metaKey || e.ctrlKey };
   } else if (edge) gesture = { type: 'edge', id: edge.dataset.eid };
@@ -1821,6 +1933,22 @@ vp.addEventListener('pointermove', e => {
     else { const th = S.threads.get(g.id); if (!th) return; S.dragId = g.id; S.threads.set(g.id, { ...th, x, y }); }
     if (!g.el.isConnected) g.el = cardsEl.querySelector(`[data-tid="${CSS.escape(g.id)}"]`);
     if (g.el) { g.el.style.left = x + 'px'; g.el.style.top = y + 'px'; g.el.classList.add('dragging'); }
+    drawGroups();
+    drawEdges();
+  } else if (g.type === 'group' && !S.readOnly) {
+    // The whole group moves with its label.
+    const dx = (e.clientX - g.sx) / S.cam.z, dy = (e.clientY - g.sy) / S.cam.z;
+    if (!g.moved && Math.abs(dx) + Math.abs(dy) < 4) return;
+    g.moved = true;
+    S.dragMembers = new Set(g.members.map(m => m.id));
+    for (const m of g.members) {
+      const th = S.threads.get(m.id); if (!th) continue;
+      const x = Math.round(m.ox + dx), y = Math.round(m.oy + dy);
+      S.threads.set(m.id, { ...th, x, y });
+      const el = cardsEl.querySelector(`[data-tid="${CSS.escape(m.id)}"]`);
+      if (el) { el.style.left = x + 'px'; el.style.top = y + 'px'; }
+    }
+    drawGroups();
     drawEdges();
   }
 });
@@ -1832,7 +1960,12 @@ function endPointer(e) {
   if (!g) return;
   if (g.type === 'pinch') { if (ptrs.size === 0) { gesture = null; S.dragId = null; } return; }
   gesture = null;
-  if (e.type === 'pointercancel') { S.dragId = null; return; }
+  if (e.type === 'pointercancel') { S.dragId = null; S.dragMembers = null; return; }
+  if (g.type === 'group') {
+    if (g.moved) { for (const m of g.members) persist('threads', m.id, 0); S.dragMembers = null; render(); }
+    else select({ type: 'group', id: g.name });
+    return;
+  }
   if (g.type === 'card') {
     if (g.moved) {
       if (g.id === INBOX) ls.set('tc.inboxPos', S.inboxPos); else persist('threads', g.id, 0);
@@ -2218,6 +2351,7 @@ function threadDetail(th) {
       <div class="fld"><span>${esc(t('threadStatus'))}</span><div class="seg">${['active', 'parked', 'done'].map(s => `<button data-act="status" data-status="${s}" aria-pressed="${th.status === s}">${esc(statusLabel(s))}</button>`).join('')}${th.status === 'merged' ? `<button aria-pressed="true" disabled>${esc(statusLabel('merged'))}</button>` : ''}</div></div>
       <div class="fld"><span>${esc(t('threadColor'))}</span><div class="swatches">${LINE_COLORS.map(c => `<button class="swatch" data-act="color" data-color="${c}" style="--c:${c}" aria-pressed="${th.color === c}" aria-label="${esc(t('colorAria', c))}"></button>`).join('')}</div></div>
       <label class="fld"><span>${esc(t('threadGoal'))}</span><textarea id="t-goal" rows="3" placeholder="${esc(t('threadGoalPh'))}">${esc(goalOf(th))}</textarea></label>
+      <label class="fld"><span>${esc(t('threadGroup'))}</span><input id="t-group" list="group-list" value="${esc(th.group || '')}" placeholder="${esc(t('threadGroupPh'))}"></label>
       <div class="meta">
         <span>${esc(t('createdAt', fmtAbs(th.createdAt || Date.now())))}${cs[0] ? esc(t('lastUpdate', fmtRel(cs[0].ts))) : ''}</span>
         ${th.parent ? `<span>${esc(t('forkedFromThread'))} <button class="linkish" data-act="goto-thread" data-tid="${esc(th.parent)}">${esc(getThread(th.parent).name)}</button>${forkC ? ` ${esc(t('of'))} <button class="linkish" data-act="goto-commit" data-cid="${esc(forkC.id)}">${esc(forkC.title.slice(0, 40))}</button>` : ''}</span>` : ''}
@@ -2255,14 +2389,14 @@ function edgeDetail(e) {
 function renderDetail() {
   let sel = S.sel;
   if (sel) {
-    const ok = sel.type === 'commit' ? S.commits.has(sel.id) : sel.type === 'thread' ? (sel.id === INBOX || S.threads.has(sel.id)) : sel.type === 'live' ? S.live.some(s => s.id === sel.id) : S.edges.has(sel.id);
+    const ok = sel.type === 'commit' ? S.commits.has(sel.id) : sel.type === 'thread' ? (sel.id === INBOX || S.threads.has(sel.id)) : sel.type === 'live' ? S.live.some(s => s.id === sel.id) : sel.type === 'group' ? groupNames().includes(sel.id) : S.edges.has(sel.id);
     if (!ok) { S.sel = sel = null; }
   }
   if (!sel) { detail.hidden = true; detail.innerHTML = ''; lastKey = ''; lastHTML = ''; return; }
   const key = LANG + ':' + sel.type + ':' + sel.id + ':' + JSON.stringify(S.ui);
   const ae = document.activeElement;
   if (key === lastKey && (detailHold || (detail.contains(ae) && ae.matches('input, textarea, select')))) return;
-  const html = sel.type === 'commit' ? commitDetail(S.commits.get(sel.id)) : sel.type === 'thread' ? threadDetail(getThread(sel.id)) : sel.type === 'live' ? liveDetail(S.live.find(s => s.id === sel.id)) : edgeDetail(S.edges.get(sel.id));
+  const html = sel.type === 'commit' ? commitDetail(S.commits.get(sel.id)) : sel.type === 'thread' ? threadDetail(getThread(sel.id)) : sel.type === 'live' ? liveDetail(S.live.find(s => s.id === sel.id)) : sel.type === 'group' ? groupDetail(sel.id) : edgeDetail(S.edges.get(sel.id));
   if (key === lastKey && html === lastHTML && !S.focusAfter) return;
   lastKey = key; lastHTML = html;
   const sc = $('.d-scroll', detail);
@@ -2283,6 +2417,7 @@ detail.addEventListener('input', e => {
     else if (el.id === 'd-agent') patchDoc('commits', s.id, { agent: el.value }, 700);
   } else if (s.type === 'thread') {
     if (el.id === 't-name') patchDoc('threads', s.id, { name: el.value }, 600);
+    else if (el.id === 't-group') patchDoc('threads', s.id, { group: el.value.trim() }, 600);
     else if (el.id === 't-goal') patchDoc('threads', s.id, { goal: el.value }, 700);
   } else if (s.type === 'edge' && el.id === 'e-label') patchDoc('edges', s.id, { label: el.value }, 600);
 });
@@ -2290,6 +2425,11 @@ detail.addEventListener('change', e => {
   if (e.target.classList.contains('gx-against')) { GX.against.set(e.target.dataset.cid, e.target.value); e.target.blur(); render(); return; }
   const el = e.target, s = S.sel; if (!s || S.readOnly) return;
   if (s.type === 'live' && el.id === 'l-thread') { bindLive(s.id, el.value); el.blur(); return; }
+  if (s.type === 'group' && el.id === 'g-name') { // rename: every line of the group gets the new name
+    const name = el.value.trim();
+    if (name && name !== s.id) { setGroup(orderedThreads().filter(th => th.group === s.id).map(th => th.id), name); S.sel = { type: 'group', id: name }; render(); }
+    return;
+  }
   if (s.type !== 'commit') return;
   if (el.id === 'd-kind') patchDoc('commits', s.id, { kind: el.value }, 0);
   else if (el.id === 'd-thread') { patchDoc('commits', s.id, { thread: el.value }, 0); toast(t('tMoved', getThread(el.value).name)); }
@@ -2304,7 +2444,7 @@ detail.addEventListener('keydown', e => {
 detail.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
   const act = b.dataset.act, s = S.sel;
-  const writeActs = ['fork-open', 'fork-create', 'del-open', 'del-confirm', 'status', 'color', 'merge-open', 'merge', 'label', 'flip'];
+  const writeActs = ['fork-open', 'fork-create', 'del-open', 'del-confirm', 'status', 'color', 'merge-open', 'merge', 'label', 'flip', 'g-arrange', 'g-ungroup'];
   if (writeActs.includes(act) && !canWrite()) return;
   switch (act) {
     case 'close': select(null); break;
@@ -2312,6 +2452,8 @@ detail.addEventListener('click', e => {
     case 'gx-file': { const k = b.dataset.dk; if (GX.open.has(k)) GX.open.delete(k); else GX.open.add(k); render(); break; }
     case 'gx-more': GX.more.add(b.dataset.key); render(); break;
     case 'goto-thread': select({ type: 'thread', id: b.dataset.tid }); break;
+    case 'g-arrange': doArrange(s.id); break;
+    case 'g-ungroup': setGroup(orderedThreads().filter(th => th.group === s.id).map(th => th.id), ''); select(null); toast(t('tUngrouped')); break;
     case 'goto-live': select({ type: 'live', id: b.dataset.sid }); break;
     case 'copy-cmd': copyText(b.dataset.cmd); break;
     case 'fork-open': S.ui = { fork: true }; S.focusAfter = '#d-fork-name'; render(); break;
@@ -2744,10 +2886,12 @@ function applyAI() {
 
 /* ================= toast & boot ================= */
 let toastT = 0;
-function toast(msg) {
+function toast(msg, action) {
   const el = $('#toast');
-  el.textContent = msg; el.hidden = false;
-  clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; }, 2600);
+  el.textContent = msg;
+  if (action) { const b = document.createElement('button'); b.className = 'toast-act'; b.textContent = action.label; b.onclick = () => { el.hidden = true; action.run(); }; el.append(b); }
+  el.hidden = false;
+  clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; }, action ? 10000 : 2600);
 }
 
 applyStatic();

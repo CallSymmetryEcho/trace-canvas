@@ -1309,6 +1309,9 @@ function threadByName(name) {
 let db = null;
 const timers = new Map();
 const chains = new Map();
+// Server mode: a doc's last write landed after this many refreshes had started; older refreshes can't have it.
+const written = new Map();
+let loadSeq = 0;
 let active = 0; const waiters = [];
 async function withSlot(fn) {
   while (active >= 4) await new Promise(r => waiters.push(r));
@@ -1324,7 +1327,7 @@ function flush(col, id) {
   const key = col + '/' + id;
   const p = (chains.get(key) || Promise.resolve()).then(() => withSlot(() => writeDoc(col, id))).catch(onWriteError);
   chains.set(key, p);
-  p.finally(() => { if (chains.get(key) === p) chains.delete(key); });
+  p.finally(() => { if (chains.get(key) === p) { chains.delete(key); if (S.mode === 'server') written.set(key, loadSeq); } });
 }
 async function writeDoc(col, id, retried) {
   if (S.mode === 'local') { saveLocal(); return; }
@@ -1362,13 +1365,16 @@ function putDoc(col, doc, delay) { S[col].set(doc.id, doc); persist(col, doc.id,
 function patchDoc(col, id, patch, delay) { const cur = S[col].get(id); if (!cur) return; putDoc(col, { ...cur, ...patch }, delay); }
 function removeDoc(col, id) { S[col].delete(id); persist(col, id, 0); render(); }
 
-// Replace one collection with fresh rows, keeping local edits that haven't been written yet.
-function applyRows(col, rows) {
+// Replace one collection with fresh rows, keeping local edits the rows can't have yet:
+// waiting to be written, being written, or (server refresh `seq`) written after that refresh started.
+function applyRows(col, rows, seq) {
   const m = new Map();
   for (const r of rows) if (r && r.id) m.set(r.id, r);
-  for (const key of timers.keys()) {
+  for (const key of new Set([...timers.keys(), ...chains.keys(), ...written.keys()])) {
     const [c, id] = key.split('/');
     if (c !== col) continue;
+    if (seq > written.get(key)) written.delete(key);
+    if (!timers.has(key) && !chains.has(key) && !written.has(key)) continue;
     const local = S[col].get(id);
     if (local) m.set(id, local); else m.delete(id);
   }
@@ -1649,12 +1655,15 @@ function agentRelations(s) {
   ].join('');
 }
 
-let serverRefresh = 0;
+let serverRefresh = 0, shownSeq = 0;
 async function loadServer() {
+  const seq = ++loadSeq;
   try {
     const r = await fetch('/api/data', { cache: 'no-store' });
     const data = await r.json();
-    for (const col of COLS) applyRows(col, data[col] || []);
+    if (seq < shownSeq) return; // a later refresh already answered; this one is older
+    shownSeq = seq;
+    for (const col of COLS) applyRows(col, data[col] || [], seq);
     S.sessions = data.sessions || [];
     S.machine = data.machine || ''; S.platform = data.platform || ''; S.remote = !!data.remote; S.start = !!data.start;
     if (S.offline) { S.offline = false; renderSync(); }
@@ -2880,6 +2889,9 @@ capThread.addEventListener('change', () => setCaptureThread(capThread.value));
 function renderKinds() {
   $('#kinds').innerHTML = USER_KINDS.map(k => `<button type="button" data-kind="${k}" aria-pressed="${S.captureKind === k}" title="${esc(kindLabel(k))}">${mini(k, 'var(--ink)', false)}<span>${esc(kindLabel(k))}</span></button>`).join('');
 }
+// Keep focus in the text box while a kind is pressed: on a phone the row hides once the bar loses focus,
+// and Safari doesn't focus a tapped button, so the tap would land on the canvas below.
+$('#kinds').addEventListener('mousedown', e => e.preventDefault());
 $('#kinds').addEventListener('click', e => { const b = e.target.closest('[data-kind]'); if (!b) return; S.captureKind = b.dataset.kind; renderKinds(); capText.focus(); });
 function autosize() { capText.style.height = 'auto'; capText.style.height = Math.min(150, capText.scrollHeight + 2) + 'px'; }
 capText.addEventListener('input', autosize);

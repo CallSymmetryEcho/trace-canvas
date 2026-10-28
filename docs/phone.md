@@ -1,6 +1,6 @@
 # Trace Canvas on your phone
 
-*This lives on the `phone` branch only.* It opens your canvas to your phone, so you can read your lines away from the desk, drop ideas into them, and send an agent to read a line. Your agents keep running on the computer; the phone is a window onto the same canvas.
+This opens your canvas to your phone, so you can read your lines away from the desk, drop ideas into them, and send an agent to read a line. Your agents keep running on the computer; the phone is a window onto the same canvas.
 
 ## What you need
 

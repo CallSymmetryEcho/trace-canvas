@@ -136,10 +136,20 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
   background: var(--surface); border: 1px solid var(--rule); border-radius: 999px; box-shadow: var(--shadow); font-size: 12.5px; color: var(--muted);
 }
 .banner b { color: var(--ink); font-weight: 600; }
-.multi-banner { flex-wrap: wrap; justify-content: center; border-radius: 14px; padding: 8px 10px; gap: 8px; }
+.multi-banner { flex-wrap: wrap; justify-content: center; border-radius: 14px; padding: 8px 10px; gap: 8px; width: max-content; }
 .multi-banner select, .multi-banner input { padding: 4px 8px; border: 1px solid var(--rule); border-radius: 7px; background: var(--surface-2); font-size: 12.5px; max-width: 180px; }
 .multi-banner .btn { border-radius: 7px; }
 .card.is-multi { outline: 2px dashed var(--accent); outline-offset: 2px; }
+.card.is-multi-target { outline-style: solid; }
+.mb-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.mb-chip { display: inline-flex; align-items: center; border: 1.5px dashed var(--c); border-radius: 999px; background: var(--surface); }
+.mb-chip.is-target { border-style: solid; background: color-mix(in srgb, var(--c) 14%, var(--surface)); }
+.mb-chip button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; padding: 3px 4px 3px 9px; color: var(--ink); font: inherit; cursor: pointer; }
+.mb-chip button > span { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mb-chip i { width: 8px; height: 8px; border-radius: 50%; background: var(--c); flex: none; }
+.mb-chip em { font-style: normal; font-size: 11px; color: var(--muted); }
+.mb-chip .mb-x { padding: 3px 9px 3px 4px; color: var(--muted); }
+.mb-flow { flex-basis: 100%; text-align: center; color: var(--muted); }
 #cv-groups { position: absolute; left: 0; top: 0; }
 .grp { position: absolute; border: 1.5px dashed color-mix(in srgb, var(--c) 55%, transparent); border-radius: 14px; background: color-mix(in srgb, var(--c) 7%, transparent); }
 .grp-label { position: absolute; padding: 2px 10px; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--c) 18%, var(--surface)); color: var(--ink); font: 600 12.5px var(--f-display); letter-spacing: .03em; cursor: grab; white-space: nowrap; }
@@ -847,6 +857,8 @@ const I18N = {
     multiMerge: 'Merge', multiMergeTitle: 'Keep every line and draw the merges, like git',
     multiCombine: 'Combine', multiCombineTitle: 'Move every record onto one line and remove the other threads',
     multiClear: 'Clear', multiNeedMore: 'Pick at least two threads, or one thread and an existing target',
+    multiPick: 'Click the lines to merge or group', multiPickMore: 'Click one more line, or choose another line to merge into', multiInGroup: 'Picked', multiOthers: 'Other lines',
+    multiMakeTarget: 'Merge the others into this line', multiTargetMark: 'kept', multiDrop: 'Unselect',
     tMergedMany: (n, name) => `Merged ${n} thread${n === 1 ? '' : 's'} into “${name}”`, tCombinedMany: (n, name) => `Combined ${n} thread${n === 1 ? '' : 's'} into “${name}”`,
     combinedFrom: names => `Combined from ${names}`,
     tlDay: 'Day', tlWeek: 'Week', tlMonth: 'Month', tlNow: 'Now', tlHint: 'One row per thread. The band shows when it was active; dashed curves are forks and merges.',
@@ -1013,6 +1025,8 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     multiMerge: '合并', multiMergeTitle: '保留每条线路，像 git 一样画出合并',
     multiCombine: '并成一条', multiCombineTitle: '把所有记录移到一条线上，删除其余线程',
     multiClear: '取消', multiNeedMore: '至少选两条线程，或选一条并指定一条已有的目标线程',
+    multiPick: '点卡片选中要合并或编组的线', multiPickMore: '再点一条线，或在「合并到」里选另一条线', multiInGroup: '已选', multiOthers: '其他线',
+    multiMakeTarget: '把其余的线并进这条', multiTargetMark: '保留', multiDrop: '取消选中',
     tMergedMany: (n, name) => `已把 ${n} 条线程合并到「${name}」`, tCombinedMany: (n, name) => `已把 ${n} 条线程并成「${name}」`,
     combinedFrom: names => `由 ${names} 合并而来`,
     tlDay: '日', tlWeek: '周', tlMonth: '月', tlNow: '回到现在', tlHint: '每一行是一条线程，色带是它活跃的时段，虚线是分叉与合并',
@@ -1189,7 +1203,7 @@ const S = {
   cam: { x: 40, y: 40, z: 1 }, fitted: false,
   inboxPos: ls.get('tc.inboxPos', { x: 0, y: 0 }),
   tlZoom: ls.get('tc.tlZoom', 'week'), tlScroll: true,
-  connect: null, multi: new Set(), selectMode: false, multiName: '',
+  connect: null, multi: new Set(), multiTarget: null, selectMode: false, multiName: '',
   captureKind: 'idea', captureThread: ls.get('tc.captureThread', INBOX),
   mode: 'loading', readOnly: false, offline: false, got: new Set(), dragId: null,
   ai: null, sheet: null,
@@ -1499,7 +1513,7 @@ function liveList(list) {
 }
 function liveDetail(s) {
   const cmd = s.resume || `claude --resume ${s.id}`;
-  const opts = `<option value="">${esc(t('liveAuto'))}</option>` + orderedThreads().filter(th => th.status !== 'merged' || th.id === s.threadId)
+  const opts = `<option value="">${esc(t('liveAuto'))}</option>` + orderedThreads().filter(th => (th.status !== 'merged' && inFocus(th)) || th.id === s.threadId)
     .map(th => `<option value="${esc(th.id)}" ${s.bound && th.id === s.threadId ? 'selected' : ''}>${esc(th.name)}</option>`).join('');
   const where = [[s.repo, s.branch].filter(Boolean).join(' · '), s.model].filter(Boolean).join(' · ');
   return `<div class="d-head">
@@ -1903,33 +1917,41 @@ function renderMulti() {
   const show = !S.connect && (S.multi.size > 0 || S.selectMode);
   mb.hidden = !show;
   if (!show) { multiSig = ''; return; }
-  const targets = orderedThreads().filter(th => !S.multi.has(th.id) && th.status !== 'merged');
-  const sig = LANG + [...S.multi].join(',') + '|' + targets.map(th => th.id + th.name).join(',');
+  const picked = [...S.multi].map(id => S.threads.get(id));
+  const others = orderedThreads().filter(th => !S.multi.has(th.id) && th.status !== 'merged' && inFocus(th));
+  // The line the others go into: one of the picked lines (the first picked by default), another line, or a new one.
+  if (!picked.length) { S.multiTarget = null; multiSig = ''; mb.innerHTML = `<span>${esc(t('multiPick'))}</span><button class="btn btn-quiet" data-multi="clear">${esc(t('multiClear'))}</button>`; return; }
+  if (S.multiTarget !== '__new' && !S.multi.has(S.multiTarget) && !others.some(th => th.id === S.multiTarget)) S.multiTarget = picked[0].id;
+  const sig = LANG + [...S.multi].join(',') + '|' + S.multiTarget + '|' + [...picked, ...others].map(th => th.id + th.name).join(',');
   if (sig === multiSig && mb.contains(document.activeElement)) return;
-  const prevTarget = $('#multi-target') ? $('#multi-target').value : '__new';
   multiSig = sig;
-  mb.innerHTML = `<span>${esc(t('multiCount', S.multi.size))}</span>
+  const tgt = S.multiTarget, srcs = picked.filter(th => th.id !== tgt);
+  const chip = th => `<span class="mb-chip${th.id === tgt ? ' is-target' : ''}" style="--c:${th.color}"><button data-multi-target="${esc(th.id)}" title="${esc(t('multiMakeTarget'))}"><i></i><span>${esc(th.name)}</span>${th.id === tgt ? `<em>${esc(t('multiTargetMark'))}</em>` : ''}</button><button class="mb-x" data-multi-drop="${esc(th.id)}" aria-label="${esc(t('multiDrop'))}">×</button></span>`;
+  const opt = th => `<option value="${esc(th.id)}" ${th.id === tgt ? 'selected' : ''}>${esc(th.name)}</option>`;
+  const flow = !srcs.length ? esc(t('multiPickMore')) : `${srcs.map(th => esc(th.name)).join('、')} → ${tgt === '__new' ? esc(S.multiName.trim() || t('multiNew')) : esc(S.threads.get(tgt).name)}`;
+  mb.innerHTML = `<div class="mb-chips">${picked.map(chip).join('')}</div>
     <span>${esc(t('multiInto'))}</span>
-    <select id="multi-target"><option value="__new">${esc(t('multiNew'))}</option>${targets.map(th => `<option value="${esc(th.id)}">${esc(th.name)}</option>`).join('')}</select>
-    <input id="multi-name" placeholder="${esc(t('multiNamePh'))}" value="${esc(S.multiName)}">
+    <select id="multi-target"><optgroup label="${esc(t('multiInGroup'))}">${picked.map(opt).join('')}</optgroup><option value="__new" ${tgt === '__new' ? 'selected' : ''}>${esc(t('multiNew'))}</option>${others.length ? `<optgroup label="${esc(t('multiOthers'))}">${others.map(opt).join('')}</optgroup>` : ''}</select>
+    <input id="multi-name" placeholder="${esc(t('multiNamePh'))}" value="${esc(S.multiName)}" ${tgt === '__new' ? '' : 'hidden'}>
     <button class="btn btn-primary" data-multi="merge" title="${esc(t('multiMergeTitle'))}">${esc(t('multiMerge'))}</button>
     <button class="btn" data-multi="combine" title="${esc(t('multiCombineTitle'))}">${esc(t('multiCombine'))}</button>
     <input id="multi-group" list="group-list" placeholder="${esc(t('multiGroupPh'))}" value="${esc(S.multiGroup)}">
     <button class="btn" data-multi="group">${esc(t('multiGroup'))}</button>
-    <button class="btn btn-quiet" data-multi="clear">${esc(t('multiClear'))}</button>`;
-  const sel = $('#multi-target');
-  if ([...sel.options].some(o => o.value === prevTarget)) sel.value = prevTarget;
-  $('#multi-name').hidden = sel.value !== '__new';
+    <button class="btn btn-quiet" data-multi="clear">${esc(t('multiClear'))}</button>
+    <div class="mb-flow">${flow}</div>`;
 }
 function toggleMulti(id) {
   if (id === INBOX) return;
-  if (S.multi.has(id)) S.multi.delete(id); else S.multi.add(id);
+  if (S.multi.has(id)) { S.multi.delete(id); if (S.multiTarget === id) S.multiTarget = null; } else S.multi.add(id);
   render();
 }
-function clearMulti() { S.multi.clear(); S.selectMode = false; S.multiName = ''; render(); }
+function clearMulti() { S.multi.clear(); S.multiTarget = null; S.selectMode = false; S.multiName = ''; render(); }
 $('#multi-banner').addEventListener('input', e => { if (e.target.id === 'multi-name') S.multiName = e.target.value; if (e.target.id === 'multi-group') S.multiGroup = e.target.value; });
-$('#multi-banner').addEventListener('change', e => { if (e.target.id === 'multi-target') $('#multi-name').hidden = e.target.value !== '__new'; });
+$('#multi-banner').addEventListener('change', e => { if (e.target.id === 'multi-target') { S.multiTarget = e.target.value; render(); } });
 $('#multi-banner').addEventListener('click', e => {
+  const pick = e.target.closest('[data-multi-target]'), drop = e.target.closest('[data-multi-drop]');
+  if (pick) { S.multiTarget = pick.dataset.multiTarget; render(); return; }
+  if (drop) { toggleMulti(drop.dataset.multiDrop); return; }
   const b = e.target.closest('[data-multi]'); if (!b) return;
   if (b.dataset.multi === 'clear') { clearMulti(); return; }
   if (!canWrite()) return;
@@ -1939,7 +1961,7 @@ $('#multi-banner').addEventListener('click', e => {
     setGroup(ids, name); S.multiGroup = ''; clearMulti(); toast(t('tGrouped', ids.length, name));
     return;
   }
-  mergeMany(b.dataset.multi, $('#multi-target').value);
+  mergeMany(b.dataset.multi, S.multiTarget);
 });
 $('#select-btn').onclick = () => { S.selectMode = !S.selectMode; if (!S.selectMode && !S.multi.size) S.multiName = ''; S.connect = null; render(); };
 
@@ -1988,7 +2010,7 @@ function mergeMany(mode, targetVal) {
     }
   }
   const targetName = S.threads.get(tid).name;
-  S.multi.clear(); S.selectMode = false; S.multiName = '';
+  S.multi.clear(); S.multiTarget = null; S.selectMode = false; S.multiName = '';
   select({ type: 'thread', id: tid });
   toast(mode === 'combine' ? t('tCombinedMany', sources.length, targetName) : t('tMergedMany', sources.length, targetName));
 }
@@ -2097,7 +2119,7 @@ function cardHTML(th, cs, selT) {
   const last = cs[cs.length - 1];
   const anyHit = !S.q || cs.some(matches);
   const selC = S.sel && S.sel.type === 'commit' ? S.sel.id : null;
-  const cls = ['card', isInbox ? 'is-inbox' : `st-${th.status || 'active'}`, selT === th.id ? 'is-sel' : '', S.q && !anyHit ? 'is-dim' : '', S.connect && S.connect.from === th.id ? 'is-from' : '', S.multi.has(th.id) ? 'is-multi' : ''].filter(Boolean).join(' ');
+  const cls = ['card', isInbox ? 'is-inbox' : `st-${th.status || 'active'}`, selT === th.id ? 'is-sel' : '', S.q && !anyHit ? 'is-dim' : '', S.connect && S.connect.from === th.id ? 'is-from' : '', S.multi.has(th.id) ? 'is-multi' : '', S.multi.has(th.id) && th.id === S.multiTarget ? 'is-multi-target' : ''].filter(Boolean).join(' ');
   const items = recent.length
     ? recent.map(c => `<li data-cid="${esc(c.id)}" class="${c.id === selC ? 'is-sel' : ''} ${S.q && matches(c) ? 'hit' : ''}">${mini(c.kind, stationColor(c, th), c.done)}<span class="s-title">${esc(c.title)}</span><time class="s-time">${fmtShort(c.ts)}</time></li>`).join('')
       + (more > 0 ? `<li class="s-more"><span></span><span>${esc(t('moreEarlier', more))}</span><span></span></li>` : '')
@@ -2516,7 +2538,8 @@ window.addEventListener('popstate', () => {
   try { history.replaceState(null, '', location.pathname + location.search + '#' + S.view); } catch {} // the entry gone back to may name an older view
 });
 function threadOptions(selected, { excludeId, onlyOpen } = {}) {
-  const opts = [{ id: INBOX, name: t('inbox') }, ...orderedThreads().filter(th => th.id !== excludeId && (!onlyOpen || th.status === 'active' || th.status === 'parked' || th.id === selected))];
+  // In focus mode only the group's lines, and the one already chosen.
+  const opts = [...(S.focusGroup && selected !== INBOX ? [] : [{ id: INBOX, name: t('inbox') }]), ...orderedThreads().filter(th => th.id !== excludeId && (inFocus(th) || th.id === selected) && (!onlyOpen || th.status === 'active' || th.status === 'parked' || th.id === selected))];
   return opts.map(th => `<option value="${esc(th.id)}" ${th.id === selected ? 'selected' : ''}>${esc(th.name)}${th.status && th.status !== 'active' && th.id !== INBOX ? ` (${esc(statusLabel(th.status))})` : ''}</option>`).join('');
 }
 function linksView(links) {
@@ -2784,6 +2807,10 @@ const capText = $('#cap-text'), capThread = $('#cap-thread');
 let capSig = '';
 function renderCaptureThreads() {
   if (S.captureThread !== INBOX && !S.threads.has(S.captureThread)) S.captureThread = INBOX;
+  if (S.focusGroup && !inFocus(getThread(S.captureThread))) {
+    const f = orderedThreads().find(th => inFocus(th) && (th.status === 'active' || th.status === 'parked'));
+    if (f) S.captureThread = f.id;
+  }
   const opts = threadOptions(S.captureThread, { onlyOpen: true });
   if (opts !== capSig && document.activeElement !== capThread) { capThread.innerHTML = opts; capSig = opts; }
   capThread.value = S.captureThread;

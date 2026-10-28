@@ -244,7 +244,7 @@ Several sessions about the same piece of work can become one line, in two ways:
 
 The target can be an existing thread or a new one. Three places to do it:
 
-- **On the canvas**: Shift-click cards (or turn on **Select** in the toolbar, handy on touch screens), pick a target or type a new name, then **Merge** or **Combine**.
+- **On the canvas**: Shift-click cards (or turn on **Select** in the toolbar, handy on touch screens). The bar lists the lines you picked; the first one is kept and the others go into it (click another to keep that one, or pick another line or a new one under **into**), and a line under the buttons says what goes where. Then **Merge** or **Combine**.
 - **In Claude Code**: `/trace-canvas merge`, or ask in your own words.
 - **On the command line**: `trace-canvas merge "Survey A" "Survey B" --into "Survey analysis" --combine`.
 

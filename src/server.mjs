@@ -15,6 +15,7 @@ import { liveDir, readLive } from './live.mjs';
 import { bindLiveSession, findThreadLoose, handTo, liveSessions, sessionList } from './ops.mjs';
 import { applyRetro, askAgent, retroRecord, runRetro } from './retro.mjs';
 import { focusScript, terminalScript } from './agents.mjs';
+import { otherMachines, remoteLive } from './remote.mjs';
 import { commitDiff, commitInfo } from './git-view.mjs';
 import { runSync } from './sync.mjs';
 import { desktopSessions } from './desktop.mjs';
@@ -65,6 +66,16 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
   // ponytail: fs.watch on the folder; poll its files if a platform ever drops these events.
   try { fs.watch(liveDir(), () => broadcast('live')).unref(); } catch {}
   setInterval(() => { for (const res of clients) res.write(': ping\n\n'); }, 25000).unref();
+  // Other machines' running sessions, over ssh every 15 s while a page is open (src/remote.mjs); a change is a live event.
+  let away = [], awaySig = '';
+  const pollAway = async () => {
+    if (!clients.size) return;
+    const got = await Promise.all(otherMachines(readData()).map(remoteLive));
+    const sig = JSON.stringify(got.map(m => [m.machine, m.error ? 'x' : '', m.sessions.map(s => [s.id, s.status, s.activity, s.threadId])]));
+    away = got;
+    if (sig !== awaySig) { awaySig = sig; broadcast('live'); }
+  };
+  setInterval(pollAway, 15000).unref();
 
   // remote: the request came in on the phone listener (trace-canvas phone), not on 127.0.0.1.
   const handle = remote => async (req, res) => {
@@ -93,7 +104,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         const d = readData(), desk = desktopSessions();
         return send(res, 200, { ...toArrays(d), sessions: sessionList(d).map(s => ({ ...s, desktopId: (desk.get(s.id) || {}).desktopId || null })), machine: readConfig().machine, platform: process.platform, remote, start: canStart(remote) });
       }
-      if (req.method === 'GET' && p === '/api/live') return send(res, 200, liveSessions(readData()));
+      if (req.method === 'GET' && p === '/api/live') return send(res, 200, { ...liveSessions(readData()), away });
       // What a commit record changed, read from git on demand (src/git-view.mjs).
       if (req.method === 'GET' && p === '/api/git/commit') return send(res, 200, await commitInfo(readData(), url.searchParams.get('record'), url.searchParams.get('against')));
       if (req.method === 'GET' && p === '/api/git/diff') return send(res, 200, await commitDiff(readData(), url.searchParams.get('record'), url.searchParams.get('file'), url.searchParams.get('against')));
@@ -102,6 +113,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         res.write('retry: 2000\n\n');
         clients.add(res);
         req.on('close', () => clients.delete(res));
+        if (clients.size === 1) pollAway(); // the first page open: other machines now, not in 15 s
         return;
       }
       const m = p.match(/^\/api\/docs\/(threads|commits|edges)\/([\w\-.~:@+]{1,180})$/);

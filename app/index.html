@@ -1408,7 +1408,11 @@ const liveOn = tid => S.live.filter(s => s.threadId === tid);
 const stLabel = st => t({ working: 'stWorking', waiting: 'stWaiting' }[st] || 'stIdle');
 let liveRefresh = 0;
 async function loadLive() {
-  try { const j = await (await fetch('/api/live', { cache: 'no-store' })).json(); S.live = j.sessions || []; S.liveOthers = j.others || []; } catch { S.live = []; S.liveOthers = []; }
+  try {
+    const j = await (await fetch('/api/live', { cache: 'no-store' })).json();
+    // Other machines' running sessions (read over ssh by the server) join the list, marked away with their machine.
+    S.live = [...(j.sessions || []), ...(j.away || []).flatMap(m => m.sessions || [])]; S.liveOthers = j.others || [];
+  } catch { S.live = []; S.liveOthers = []; }
   render();
 }
 async function bindLive(sid, tid) {
@@ -1428,7 +1432,7 @@ function renderLive() {
   const selS = S.sel && S.sel.type === 'live' ? S.sel.id : null;
   bar.hidden = false;
   bar.innerHTML = `<span class="live-label">${esc(t('liveLabel'))}</span><span class="live-count">${esc(t('liveCount', list.length, waiting))}</span>`
-    + list.map(s => `<button class="live-chip st-${esc(s.status)} ${s.id === selS ? 'is-sel' : ''}" data-sid="${esc(s.id)}" title="${esc(`${stLabel(s.status)} · ${s.activity || ''}`)}"><span class="ldot"></span><b>${esc(liveTitle(s))}</b>${s.activity ? `<span class="act">${esc(s.activity)}</span>` : ''}</button>`).join('');
+    + list.map(s => `<button class="live-chip st-${esc(s.status)} ${s.id === selS ? 'is-sel' : ''}" data-sid="${esc(s.id)}" title="${esc(`${stLabel(s.status)} · ${s.activity || ''}`)}"><span class="ldot"></span><b>${s.away ? `${esc(s.machine)} · ` : ''}${esc(liveTitle(s))}</b>${s.activity ? `<span class="act">${esc(s.activity)}</span>` : ''}</button>`).join('');
 }
 $('#live-bar').addEventListener('click', e => { const b = e.target.closest('[data-sid]'); if (b) select({ type: 'live', id: b.dataset.sid }); });
 function liveBadge(tid) {
@@ -1537,6 +1541,7 @@ const chatHref = id => `claude://claude.ai/epitaxy/${encodeURIComponent(id)}`;
 // Where a session's chat is: the Claude desktop app, the Codex app (its thread id is the session id),
 // or the Terminal or iTerm2 tab a live session runs in (tty from the hook). cls styles it; text overrides the label.
 function jumpTo(s, cls, text) {
+  if (s.away) return ''; // another machine's session: its chat and terminal are not here
   const a = (href, key) => `<a class="${cls}" href="${esc(href)}" title="${esc(t(key))}">${text || esc(t(key))}</a>`;
   if (s.desktopId) return a(chatHref(s.desktopId), 'openChat');
   if (s.tty && !S.remote && ['Apple_Terminal', 'iTerm.app'].includes(s.term)) return `<button class="${cls}" data-act="focus-term" data-sid="${esc(s.id)}" title="${esc(t('goTerm'))}">${text || esc(t('goTerm'))}</button>`;
@@ -1551,7 +1556,9 @@ function liveList(list) {
   return `<ul class="l-list">${list.map(s => `<li class="st-${esc(s.status)}" data-act="goto-live" data-sid="${esc(s.id)}"><span class="ldot"></span><span>${esc(liveTitle(s))}</span>${s.activity ? `<span class="act">${esc(s.activity)}</span>` : ''}</li>`).join('')}</ul>`;
 }
 function liveDetail(s) {
-  const cmd = s.resume || `claude --resume ${s.id}`;
+  const here = s.resume || `claude --resume ${s.id}`;
+  // On another machine: resumed there over ssh, in its login shell; its chat, terminal and line are that machine's.
+  const cmd = s.away ? `ssh -t ${s.machine} ${shq(`exec "$SHELL" -lc ${shq(`${s.cwd ? `cd ${shq(s.cwd)} && ` : ''}${here}`)}`)}` : here;
   const opts = `<option value="">${esc(t('liveAuto'))}</option>` + orderedThreads().filter(th => (th.status !== 'merged' && inFocus(th)) || th.id === s.threadId)
     .map(th => `<option value="${esc(th.id)}" ${s.bound && th.id === s.threadId ? 'selected' : ''}>${esc(th.name)}</option>`).join('');
   const where = [[s.repo, s.branch].filter(Boolean).join(' · '), s.model].filter(Boolean).join(' · ');
@@ -1562,7 +1569,7 @@ function liveDetail(s) {
     <div class="d-scroll">
       <div class="l-title">${esc(liveTitle(s))}</div>
       <div class="l-status st-${esc(s.status)}"><span class="ldot"></span>${esc(stLabel(s.status))}${s.activity ? `<span class="act">${esc(s.activity)}</span>` : ''}</div>
-      ${jumpTo(s, 'btn btn-primary') ? `<div class="d-actions">${jumpTo(s, 'btn btn-primary')}</div>` : ''}
+      ${s.away ? `<div class="meta"><span>${esc(t('onMachine', s.machine))}</span></div>` : jumpTo(s, 'btn btn-primary') ? `<div class="d-actions">${jumpTo(s, 'btn btn-primary')}</div>` : ''}
       <div class="meta">
         ${where ? `<span>${esc(where)}</span>` : ''}
         ${s.cwd ? `<span class="mono">${esc(s.cwd)}</span>` : ''}
@@ -1570,7 +1577,7 @@ function liveDetail(s) {
       </div>
       ${s.prompt && s.prompt !== liveTitle(s) ? `<div class="sec-label">${esc(t('livePrompt'))}</div><p style="margin:0">${esc(s.prompt)}</p>` : ''}
       ${agentRelations(s)}
-      <label class="fld"><span>${esc(t('liveThread'))}</span><select id="l-thread">${opts}</select></label>
+      ${s.away ? '' : `<label class="fld"><span>${esc(t('liveThread'))}</span><select id="l-thread">${opts}</select></label>`}
       ${s.threadId && S.threads.has(s.threadId) ? `<div class="meta"><span>${esc(t('liveNow'))} <button class="linkish" data-act="goto-thread" data-tid="${esc(s.threadId)}">${esc(S.threads.get(s.threadId).name)}</button></span></div>` : ''}
       <div class="fld"><span>${esc(t('liveResume'))}</span><div class="l-cmd"><code>${esc(cmd)}</code><button class="btn" data-act="copy-cmd" data-cmd="${esc(cmd)}">${esc(t('copy'))}</button></div></div>
     </div>`;

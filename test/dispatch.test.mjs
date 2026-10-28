@@ -65,4 +65,15 @@ test('dispatch hands each line\'s new to-dos to the agent working on it, and say
   // A to-do named goes to its line's agent, even one that agent logged itself.
   assert.deepEqual(dispatch(d, { refs: ['Its own to-do'] }, env).map(r => [r.thread.name, r.session.id, r.todos.map(c => c.title)]), [['Thesis', 's1', ['Its own to-do']]]);
   assert.throws(() => dispatch(d, { refs: ['Nope'] }, env), /No line or open to-do "Nope"/);
+
+  // A line worked on from another machine: resumed there over ssh, in its login shell; running there, it is busy.
+  const far = createThread(d, { name: 'Far' }).id;
+  d.sessions.r1 = { id: 'r1', thread: far, agent: 'Claude Code', cwd: '/home/u/proj', last: now, machine: 'bsuper' };
+  todo(far, 'Rerun the benchmark');
+  const off = dispatch(d, { refs: ['Far'], awayLive: () => ({ sessions: [] }) }, env)[0];
+  assert.equal(off.action, 'resume');
+  assert.equal(off.session.machine, 'bsuper');
+  assert.match(off.command, /^ssh -t bsuper 'exec "\$SHELL" -lc .*cd .*\/home\/u\/proj.* && claude --resume r1 /);
+  todo(far, 'Plot the results');
+  assert.equal(dispatch(d, { refs: ['Far'], awayLive: () => ({ sessions: [{ id: 'r1', status: 'idle' }] }) }, env)[0].action, 'busy');
 });

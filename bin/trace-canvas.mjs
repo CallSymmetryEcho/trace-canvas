@@ -103,7 +103,7 @@ Goals and to-dos
                                                    (resume or start in a new Terminal window; --print only prints)
 
 Live sessions
-  trace-canvas live                                Running sessions: status, activity, thread
+  trace-canvas live [--json]                                Running sessions: status, activity, thread
   trace-canvas bind <thread> [--session id]        Put a running session on a thread (default: this one)
   trace-canvas bind --unbind [--session id]        Back to its repository/branch line
   trace-canvas resume <thread>                     The line's sessions, newest first, each with the command that resumes it
@@ -309,6 +309,8 @@ async function main() {
       const { liveSessions } = await import('../src/ops.mjs');
       const { readData } = await import('../src/store.mjs');
       const d = readData(), { sessions } = liveSessions(d);
+      // --json: for another machine reading this one's sessions over ssh (src/remote.mjs); what it can use there.
+      if (flag('json', false)) { console.log(JSON.stringify(sessions.map(({ id, agent, agentKey, status, title, prompt, activity, threadId, bound, cwd, repo, branch, model, startedAt, lastSeen, resume, agents }) => ({ id, agent, agentKey, status, title, prompt, activity, threadId, bound, cwd, repo, branch, model, startedAt, lastSeen, resume, agents })))); break; }
       if (!sessions.length) { console.log('No running sessions.'); break; }
       for (const s of sessions) {
         const where = s.threadId ? `${d.threads[s.threadId].name}${s.bound ? ' (bound)' : ''}` : '-';

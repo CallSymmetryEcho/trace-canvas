@@ -7,6 +7,7 @@ import { AGENT, bindSession, gitRoot, logGitEvents, repoInfo, resumeLink, sessio
 import { listLive } from './live.mjs';
 import { AGENTS, q } from './agents.mjs';
 import { desktopSessions } from './desktop.mjs';
+import { remoteLiveSync } from './remote.mjs';
 import { tr } from './i18n.mjs';
 
 const norm = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -102,18 +103,18 @@ export function handTo(d, { ref, to, thread, remote = false }, env = process.env
 }
 /**
  * Dispatch: hands each line's new to-dos to the agent that works on that line and says how to wake it.
- * The line's agent is the session on this machine that last did work there: its turns' records, or what it
- * logged there from elsewhere (not the note the hooks write when a session ends, which any idle session leaves),
- * else the session the line has; a line without one gets a new session, as with Hand to it. New means
- * open, nobody has it, and that session does not know it: the person logged it (on the page, the phone,
- * the command line) or another session did. all: every open to-do nobody has. refs are lines or to-dos
- * (id or title): a to-do named goes to its line's agent whoever logged it. Assigns them. One row per line:
- *   message  a running Claude Code session: send it `prompt` (desktopId is its address in the Claude app)
- *   busy     another agent, working right now: it can take the prompt only when it stops
- *   resume   run `command`, which resumes the session with the prompt    start  run `command`: a new session
- *   self     the caller's own line: the to-dos are the caller's
+ * The line's agent is the session that last did work there, on this machine or another: its turns' records, or what
+ * it logged there from elsewhere (not the note the hooks write when a session ends, which any idle session leaves),
+ * else the session the line has. New means open, nobody has it, and that session does not know it: the person logged
+ * it (on the page, the phone, the command line) or another session did. all: every open to-do nobody has. refs are
+ * lines or to-dos (id or title): a to-do named goes to its line's agent whoever logged it. Assigns them. One row per line:
+ *   message  a running Claude Code session here: send it `prompt` (desktopId is its address in the Claude app)
+ *   busy     another agent working right now, or a session running on another machine: it takes the prompt only there
+ *   resume   run `command`, which resumes the session with the prompt (over ssh for another machine's session)
+ *   start    run `command`: a new session        self  the caller's own line: the to-dos are the caller's
+ * awayLive(machine) gives another machine's running sessions (over ssh by default).
  */
-export function dispatch(d, { refs = [], all = false, self = null } = {}, env = process.env) {
+export function dispatch(d, { refs = [], all = false, self = null, awayLive = remoteLiveSync } = {}, env = process.env) {
   const me = readConfig(env).machine, lines = new Set(), named = new Set();
   for (const ref of refs) {
     const id = d.commits[ref] ? null : findThreadLoose(d, ref);
@@ -126,7 +127,7 @@ export function dispatch(d, { refs = [], all = false, self = null } = {}, env = 
   if (!refs.length) for (const t of Object.values(d.threads)) if (!['done', 'merged'].includes(t.status)) lines.add(t.id);
   const tids = [...lines, ...[...named].map(id => threadIdOf(d, d.commits[id]))].filter((t, i, a) => a.indexOf(t) === i);
   const known = new Map(threadSessions(d, null, env).map(s => [s.id, s]));
-  const live = new Map(liveSessions(d, env).sessions.map(s => [s.id, s]));
+  const live = new Map(liveSessions(d, env).sessions.map(s => [s.id, s])), awayCache = new Map();
   const rows = [];
   for (const tid of tids) {
     const th = d.threads[tid], cs = Object.values(d.commits).filter(c => threadIdOf(d, c) === tid);
@@ -134,8 +135,10 @@ export function dispatch(d, { refs = [], all = false, self = null } = {}, env = 
     for (const c of cs) worked(c.fromSession || (c.kind !== 'note' && c.session), c.ts);
     // No session has worked here yet: the sessions the line has (bound to it, or there by their folder).
     if (!at.size) for (const [id, e] of Object.entries(d.sessions || {})) if (e.thread === tid) worked(id, e.last || 1);
-    const sid = [...at].sort((a, b) => b[1] - a[1]).map(([id]) => id).find(id => known.has(id) && (!known.get(id).machine || known.get(id).machine === me));
-    const s = sid && known.get(sid), run = sid && live.get(sid);
+    const sid = [...at].sort((a, b) => b[1] - a[1]).map(([id]) => id).find(id => known.has(id));
+    const s = sid && known.get(sid), away = s && s.machine && s.machine !== me ? s.machine : '';
+    if (away && !awayCache.has(away)) awayCache.set(away, new Map(awayLive(away).sessions.map(x => [x.id, x])));
+    const run = sid && (away ? awayCache.get(away).get(sid) : live.get(sid));
     const todos = cs.filter(c => isTodo(c) && !c.done && (named.has(c.id) || (lines.has(tid) && !c.assignee && (all || !s || !c.agent || (c.fromSession && c.fromSession !== sid))))).sort((a, b) => a.ts - b.ts);
     if (!todos.length) continue;
     const key = s ? Object.keys(AGENTS).find(k => AGENTS[k].name === s.agent) || 'claude' : 'claude';
@@ -143,9 +146,10 @@ export function dispatch(d, { refs = [], all = false, self = null } = {}, env = 
     const row = { thread: { id: tid, name: th.name }, agent: key, todos: todos.map(c => ({ id: c.id, title: c.title })) };
     if (!s) { rows.push({ ...row, action: 'start', command: handTo(d, { ref: todos[0].id, to: key, remote: key === 'claude' }, env).command }); continue; }
     const prompt = oneLine(`New to-dos on the Trace Canvas line "${th.name}" (thread ${tid}) are yours: ${todos.map((c, i) => `${i + 1}) ${c.title} [${c.id}]`).join('; ')}. Do them in order; read the line with trace_read_thread for context, tick each with trace_task_done when it is done, and log results with trace_log.`);
-    const session = { id: sid, title: s.title || (run && (run.title || run.prompt)) || '', status: run ? run.status : 'off', ...(run && run.desktopId ? { desktopId: run.desktopId } : {}) };
-    const action = sid === self ? 'self' : run && key === 'claude' ? 'message' : run && run.status === 'working' ? 'busy' : 'resume';
-    rows.push({ ...row, action, session, prompt, ...(action === 'resume' ? { command: `${s.cwd ? `cd ${q(s.cwd)} && ` : ''}${AGENTS[key].wake(sid, prompt)}` } : {}) });
+    const session = { id: sid, title: s.title || (run && (run.title || run.prompt)) || '', status: run ? run.status : 'off', ...(away ? { machine: away } : {}), ...(run && run.desktopId ? { desktopId: run.desktopId } : {}) };
+    const action = sid === self ? 'self' : away ? (run ? 'busy' : 'resume') : run && key === 'claude' ? 'message' : run && run.status === 'working' ? 'busy' : 'resume';
+    const wake = `${s.cwd ? `cd ${q(s.cwd)} && ` : ''}${AGENTS[key].wake(sid, prompt)}`;
+    rows.push({ ...row, action, session, prompt, ...(action === 'resume' ? { command: away ? remote(away, wake) : wake } : {}) });
   }
   return rows;
 }

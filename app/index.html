@@ -562,7 +562,7 @@ body.sheet-open .top { z-index: 80; }
 .ag-open:hover { text-decoration: underline; }
 .l-list li.st-off .ldot { opacity: .35; }
 .l-list .act { grid-column: 2; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.l-cmd { display: flex; gap: 6px; align-items: center; }
+.l-cmd { display: flex; gap: 6px; align-items: center; min-width: 0; } /* in a grid .fld: let it shrink, so Copy stays on screen */
 .gx-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
 .gx-head select { font-size: 12px; max-width: 60%; }
 .gx-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
@@ -577,7 +577,7 @@ body.sheet-open .top { z-index: 80; }
 .gx-diff { margin: 2px 0 8px; padding: 8px 10px; max-height: 380px; overflow: auto; font: 11.5px/1.5 var(--f-mono); background: var(--rule-soft); border-radius: 6px; white-space: pre; }
 .gx-diff .a { color: var(--ok); } .gx-diff .d { color: var(--danger); } .gx-diff .h { color: var(--faint); }
 .gx-note { margin: 0; color: var(--faint); font-size: 12px; }
-.l-cmd code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--f-mono); font-size: 12px; padding: 6px 8px; background: var(--surface-2); border: 1px solid var(--rule-soft); border-radius: 6px; }
+.l-cmd code { flex: 1; min-width: 0; overflow-wrap: anywhere; max-height: 7.5em; overflow: auto; font-family: var(--f-mono); font-size: 12px; padding: 6px 8px; background: var(--surface-2); border: 1px solid var(--rule-soft); border-radius: 6px; }
 
 /* ---------- agents view ---------- */
 .ag-scroll { flex: 1 1 auto; overflow: auto; position: relative; }

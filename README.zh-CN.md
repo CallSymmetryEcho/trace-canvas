@@ -40,6 +40,8 @@ node ~/trace-canvas/bin/trace-canvas.mjs setup --user   # hooks、MCP 工具和 
 
 视频：[中英文教程](https://github.com/CallSymmetryEcho/trace-canvas/releases/tag/v0.1.0)。
 
+宣传站：https://trace-canvas.bin-lian.com（源文件在 [`site/`](site/README.md)），一页导览，沿着一张随滚动生长的分支图介绍功能，还有功能演示和教程视频（本地预览：`python3 -m http.server -d site`）。
+
 ![分支视图：实时线头、批准、你的决定和 agent 的产出](docs/gif-branches.zh.gif)
 
 *分支视图：正在运行的会话以线头显示在各自线路的顶端。橙色的在等你；批准后变绿，你的决定显示为深色，agent 的产出用线路的颜色。虚构数据。*

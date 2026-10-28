@@ -154,6 +154,7 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .grp { position: absolute; border: 1.5px dashed color-mix(in srgb, var(--c) 55%, transparent); border-radius: 14px; background: color-mix(in srgb, var(--c) 7%, transparent); }
 .grp-label { position: absolute; padding: 2px 10px; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--c) 18%, var(--surface)); color: var(--ink); font: 600 12.5px var(--f-display); letter-spacing: .03em; cursor: grab; white-space: nowrap; }
 .grp-label:hover { background: color-mix(in srgb, var(--c) 30%, var(--surface)); }
+.grp-folded { cursor: pointer; border: 1.5px dashed color-mix(in srgb, var(--c) 55%, transparent); padding: 5px 12px; color: var(--muted); }
 .phone-qr { display: grid; place-items: center; padding: 8px 0; }
 .phone-qr svg { max-width: 100%; height: auto; border-radius: 8px; }
 .toast .toast-act { margin-left: 10px; padding: 0; border: 0; background: none; color: var(--accent-soft); font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
@@ -515,6 +516,7 @@ body.sheet-open .top { z-index: 80; }
 .focus-list { display: grid; gap: 8px; }
 .focus-list .btn { justify-content: space-between; padding: 10px 12px; font-size: 14px; }
 .focus-list .btn span { opacity: .7; }
+.focus-list .btn[aria-pressed="true"] { border-style: dashed; color: var(--muted); }
 .live-bar::-webkit-scrollbar { display: none; }
 .live-label { flex: none; font-family: var(--f-display); font-weight: 600; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .live-count { flex: none; font-size: 12px; color: var(--faint); margin-right: 4px; }
@@ -848,7 +850,7 @@ const I18N = {
     langBtn: '中文', langTitle: '切换到中文', more: 'More',
     menuNewThread: 'New thread', menuHideDone: 'Hide finished threads', menuShowDone: 'Show finished threads',
     arrange: 'Arrange', arrangeTitle: 'Lay the lines out by group, forks next to the lines they came from', tArranged: 'Arranged', tUndo: 'Undo',
-    groupLabel: 'Group', groupName: 'Name', groupLines: 'Lines in this group', groupCount: n => `${n} line${n === 1 ? '' : 's'}`, groupArrange: 'Arrange this group', groupFocus: 'Focus on this group', menuFocus: 'Focus on a group…', menuTheme: n => `Theme: ${n}`, theme_auto: 'match the system', theme_light: 'light', theme_dark: 'dark', theme_mist: 'mist', focusTitle: 'Focus on a group', focusLabel: 'Focus', focusPick: 'Change', focusExit: 'Leave focus',
+    groupLabel: 'Group', groupName: 'Name', groupLines: 'Lines in this group', groupCount: n => `${n} line${n === 1 ? '' : 's'}`, groupArrange: 'Arrange this group', groupFocus: 'Focus on this group', menuFocus: 'Focus on a group…', menuTheme: n => `Theme: ${n}`, theme_auto: 'match the system', theme_light: 'light', theme_dark: 'dark', theme_mist: 'mist', focusTitle: 'Focus on a group', focusLabel: 'Focus', focusPick: 'Change', focusExit: 'Leave focus', groupFold: 'Fold this group', foldedLabel: 'Folded', foldOpenAll: 'Unfold all', foldOpen: 'Unfold', foldedChip: n => `${n} line${n === 1 ? '' : 's'} · folded`, foldTitle: 'Fold groups', foldIntro: 'Folded groups stay out of every view (the canvas keeps a small chip for each) until you unfold them. Focus still works on any group.', foldShown: 'Shown', tFolded: g => `Folded "${g}"`,
     focusIntro: 'Every view then shows only the lines of the group you pick: the canvas, the branches, the timeline and the goals. It stays on, also after a reload, until you leave it.',
     focusNoGroups: 'No groups yet. Select lines on the canvas and press Group, or fill in a group in a line\'s panel.', groupUngroup: 'Ungroup',
     threadGroup: 'Group', threadGroupPh: 'None', multiGroup: 'Group', multiGroupPh: 'Group name', tGroupNeedName: 'Type a group name first',
@@ -1022,7 +1024,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     langBtn: 'EN', langTitle: 'Switch to English', more: '更多',
     menuNewThread: '新建线程', menuHideDone: '隐藏已完成的线程', menuShowDone: '显示已完成的线程',
     arrange: '整理', arrangeTitle: '按分组排好线程，分叉排在原线旁边', tArranged: '已整理', tUndo: '撤销',
-    groupLabel: '分组', groupName: '名称', groupLines: '组里的线', groupCount: n => `${n} 条线`, groupArrange: '整理这一组', groupFocus: '专注这一组', menuFocus: '专注某个分组…', menuTheme: n => `主题：${n}`, theme_auto: '跟随系统', theme_light: '浅色', theme_dark: '深色', theme_mist: '雾蓝', focusTitle: '专注模式', focusLabel: '专注', focusPick: '换一个', focusExit: '退出专注',
+    groupLabel: '分组', groupName: '名称', groupLines: '组里的线', groupCount: n => `${n} 条线`, groupArrange: '整理这一组', groupFocus: '专注这一组', menuFocus: '专注某个分组…', menuTheme: n => `主题：${n}`, theme_auto: '跟随系统', theme_light: '浅色', theme_dark: '深色', theme_mist: '雾蓝', focusTitle: '专注模式', focusLabel: '专注', focusPick: '换一个', focusExit: '退出专注', groupFold: '折叠这一组', foldedLabel: '已折叠', foldOpenAll: '全部展开', foldOpen: '展开', foldedChip: n => `${n} 条线 · 已折叠`, foldTitle: '折叠分组', foldIntro: '折叠的分组不会出现在任何视图里（画布上只留一个小条），直到你展开。专注仍然可以选任何分组。', foldShown: '显示中', tFolded: g => `已折叠「${g}」`,
     focusIntro: '选一个分组后，画布、分支、时间线和目标都只显示这个组里的线。刷新后也保持，直到你退出。',
     focusNoGroups: '还没有分组。在画布上选中几条线点「编组」，或者在线面板里填写分组。', groupUngroup: '解散分组',
     threadGroup: '分组', threadGroupPh: '无', multiGroup: '编组', multiGroupPh: '分组名称', tGroupNeedName: '先填分组名称',
@@ -1230,7 +1232,7 @@ const S = {
   captureKind: 'idea', captureThread: ls.get('tc.captureThread', INBOX),
   mode: 'loading', readOnly: false, offline: false, got: new Set(), dragId: null,
   ai: null, sheet: null,
-  live: [], liveOthers: [], sessions: [], machine: '', goalsShowDone: false, multiGroup: '', dragMembers: null, focusGroup: ls.get('tc.focusGroup', null), platform: '',
+  live: [], liveOthers: [], sessions: [], machine: '', goalsShowDone: false, multiGroup: '', dragMembers: null, focusGroup: ls.get('tc.focusGroup', null), folded: ls.get('tc.folded', []), platform: '',
 };
 
 function fmtAbs(ts) { const d = new Date(ts); return `${pad2(d.getMonth() + 1)}/${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
@@ -1281,9 +1283,16 @@ function byThread() {
 function orderedThreads() { return [...S.threads.values()].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)); }
 function isHidden(th) { return S.hideDone && (th.status === 'done' || th.status === 'merged'); }
 // Focus mode: every view shows only one group's lines (More → Focus on a group, or the group's panel). Kept per device.
-function inFocus(th) { return !S.focusGroup || th.group === S.focusGroup; }
-// The lines a view shows: the inbox and every line, or in focus mode the group's lines only.
+// What every view shows: in focus mode one group's lines; otherwise every line but those of folded groups.
+function inFocus(th) { return S.focusGroup ? th.group === S.focusGroup : !(th.group && S.folded.includes(th.group)); }
+// The lines a view shows: the inbox and every line in view, or in focus mode the group's lines only.
 function viewLines(keep = th => !isHidden(th)) { return [...(S.focusGroup ? [] : [inboxThread()]), ...orderedThreads().filter(th => inFocus(th) && keep(th))]; }
+// Folding keeps groups you rarely use out of the way, in every view, until you unfold them (per browser, like focus).
+function setFold(g, on) {
+  S.folded = on ? [...new Set([...S.folded, g])] : g == null ? [] : S.folded.filter(x => x !== g);
+  ls.set('tc.folded', S.folded);
+  select(null); render();
+}
 function setFocus(g) {
   S.focusGroup = g || null; ls.set('tc.focusGroup', S.focusGroup);
   select(null); render();
@@ -1844,9 +1853,11 @@ let rq = 0;
 function renderFocus() {
   // A group that was renamed or ungrouped ends the focus, once the data has arrived.
   if (S.focusGroup && COLS.every(c => S.got.has(c)) && !groupNames().includes(S.focusGroup)) { S.focusGroup = null; ls.set('tc.focusGroup', null); }
+  if (S.folded.length && COLS.every(c => S.got.has(c)) && S.folded.some(g => !groupNames().includes(g))) { S.folded = S.folded.filter(g => groupNames().includes(g)); ls.set('tc.folded', S.folded); }
   const fb = $('#focus-banner'), n = orderedThreads().filter(th => th.group === S.focusGroup).length;
-  fb.hidden = !S.focusGroup;
+  fb.hidden = !S.focusGroup && !S.folded.length;
   if (S.focusGroup) fb.innerHTML = `<b>${esc(t('focusLabel'))}</b><span class="fb-name">${esc(S.focusGroup)}</span><span class="fb-n">${esc(t('groupCount', n))}</span><span class="spacer"></span><button class="btn" id="focus-pick">${esc(t('focusPick'))}</button><button class="btn" id="focus-off">${esc(t('focusExit'))}</button>`;
+  else if (S.folded.length) fb.innerHTML = `<b>${esc(t('foldedLabel'))}</b><span class="fb-name">${S.folded.map(esc).join(' · ')}</span><span class="spacer"></span><button class="btn" id="fold-open-all">${esc(t('foldOpenAll'))}</button>`;
 }
 function render() { if (rq) return; rq = requestAnimationFrame(() => { rq = 0; renderAll(); }); }
 function renderAll() {
@@ -2067,7 +2078,13 @@ function drawGroups() {
   // Labels go in their own layer above every frame: frames overlap while lines are scattered, and a
   // later frame would otherwise cover an earlier group's label (a click there would hit the frame).
   groupsEl.innerHTML = [...box].map(([, b]) => `<div class="grp" style="left:${b.x0 - pad}px;top:${b.y0 - pad - label}px;width:${b.x1 - b.x0 + 2 * pad}px;height:${b.y1 - b.y0 + 2 * pad + label}px;--c:${b.color}"></div>`).join('')
-    + [...box].map(([g, b]) => `<button class="grp-label" data-group="${esc(g)}" style="left:${b.x0 - pad + 10}px;top:${b.y0 - pad - label + 5}px;--c:${b.color}">${esc(g)} · ${b.n}</button>`).join('');
+    + [...box].map(([g, b]) => `<button class="grp-label" data-group="${esc(g)}" style="left:${b.x0 - pad + 10}px;top:${b.y0 - pad - label + 5}px;--c:${b.color}">${esc(g)} · ${b.n}</button>`).join('')
+    + (S.focusGroup ? '' : S.folded.map(g => {
+      const ths = orderedThreads().filter(th => th.group === g && !isHidden(th));
+      if (!ths.length) return '';
+      const x = Math.min(...ths.map(th => th.x || 0)), y = Math.min(...ths.map(th => th.y || 0));
+      return `<button class="grp-label grp-folded" data-group="${esc(g)}" data-unfold="1" title="${esc(t('foldOpen'))}" style="left:${x}px;top:${y}px;--c:${ths[0].color}">▸ ${esc(g)} · ${esc(t('foldedChip', ths.length))}</button>`;
+    }).join(''));
 }
 // <arrange>
 // Positions for lines laid out by group: one block per group (by name), lines without a group last;
@@ -2125,7 +2142,7 @@ function doArrange(only) {
   if (!only) requestAnimationFrame(() => requestAnimationFrame(fit)); // after the cards are redrawn
 }
 $('#arrange-btn').onclick = () => doArrange(S.focusGroup || undefined);
-$('#focus-banner').addEventListener('click', e => { if (e.target.id === 'focus-off') setFocus(null); else if (e.target.id === 'focus-pick') openSheet('focus'); });
+$('#focus-banner').addEventListener('click', e => { if (e.target.id === 'focus-off') setFocus(null); else if (e.target.id === 'focus-pick') openSheet('focus'); else if (e.target.id === 'fold-open-all') setFold(null, false); });
 function setGroup(ids, name) { for (const id of ids) patchDoc('threads', id, { group: name }, 0); }
 function groupDetail(name) {
   const ths = orderedThreads().filter(th => th.group === name);
@@ -2140,6 +2157,7 @@ function groupDetail(name) {
       <div class="d-actions">
         <button class="btn btn-primary" data-act="g-arrange">${esc(t('groupArrange'))}</button>
         <button class="btn" data-act="g-focus">${esc(t('groupFocus'))}</button>
+        <button class="btn" data-act="g-fold">${esc(t('groupFold'))}</button>
         <span class="spacer"></span>
         <button class="btn btn-quiet-danger" data-act="g-ungroup">${esc(t('groupUngroup'))}</button>
       </div>
@@ -2243,7 +2261,7 @@ vp.addEventListener('pointerdown', e => {
   const lab = e.target.closest('.grp-label');
   if (lab) {
     const name = lab.dataset.group;
-    gesture = { type: 'group', name, sx: e.clientX, sy: e.clientY, moved: false, members: orderedThreads().filter(th => th.group === name).map(th => ({ id: th.id, ox: th.x || 0, oy: th.y || 0 })) };
+    gesture = { type: 'group', name, folded: !!lab.dataset.unfold, sx: e.clientX, sy: e.clientY, moved: false, members: orderedThreads().filter(th => th.group === name).map(th => ({ id: th.id, ox: th.x || 0, oy: th.y || 0 })) };
   } else if (card) {
     const th = getThread(card.dataset.tid);
     gesture = { type: 'card', id: card.dataset.tid, sx: e.clientX, sy: e.clientY, ox: th.x || 0, oy: th.y || 0, moved: false, el: card, target: e.target, multiKey: e.shiftKey || e.metaKey || e.ctrlKey };
@@ -2301,6 +2319,7 @@ function endPointer(e) {
   if (e.type === 'pointercancel') { S.dragId = null; S.dragMembers = null; return; }
   if (g.type === 'group') {
     if (g.moved) { for (const m of g.members) persist('threads', m.id, 0); S.dragMembers = null; render(); }
+    else if (g.folded) setFold(g.name, false);
     else select({ type: 'group', id: g.name });
     return;
   }
@@ -2854,6 +2873,7 @@ detail.addEventListener('click', e => {
     case 'agent-prompt': { const th = getThread(s.id); copyText(t('agentPromptText', th.name, th.id), t('tAgentPrompt')); break; }
     case 'g-arrange': doArrange(s.id); break;
     case 'g-focus': setFocus(s.id); break;
+    case 'g-fold': setFold(s.id, true); toast(t('tFolded', s.id)); break;
     case 'g-ungroup': setGroup(orderedThreads().filter(th => th.group === s.id).map(th => th.id), ''); select(null); toast(t('tUngrouped')); break;
     case 'goto-live': select({ type: 'live', id: b.dataset.sid }); break;
     case 'copy-cmd': copyText(b.dataset.cmd); break;
@@ -2885,7 +2905,7 @@ function renderCaptureThreads() {
   if (S.focusGroup && !inFocus(getThread(S.captureThread))) {
     const f = orderedThreads().find(th => inFocus(th) && (th.status === 'active' || th.status === 'parked'));
     if (f) S.captureThread = f.id;
-  }
+  } else if (!S.focusGroup && !inFocus(getThread(S.captureThread))) S.captureThread = INBOX;
   const opts = threadOptions(S.captureThread, { onlyOpen: true });
   if (opts !== capSig && document.activeElement !== capThread) { capThread.innerHTML = opts; capSig = opts; }
   capThread.value = S.captureThread;
@@ -3099,7 +3119,8 @@ function openSheet(kind) {
     const gs = groupNames();
     setSheet(t('focusTitle'), `<p>${esc(t('focusIntro'))}</p>` + (gs.length
       ? `<div class="focus-list">${gs.map(g => `<button class="btn ${g === S.focusGroup ? 'btn-primary' : ''}" data-focus="${esc(g)}"><b>${esc(g)}</b><span>${esc(t('groupCount', orderedThreads().filter(th => th.group === g).length))}</span></button>`).join('')}</div>`
-      : `<p>${esc(t('focusNoGroups'))}</p>`) + (S.focusGroup ? `<div><button class="btn" data-focus="">${esc(t('focusExit'))}</button></div>` : ''));
+      : `<p>${esc(t('focusNoGroups'))}</p>`) + (S.focusGroup ? `<div><button class="btn" data-focus="">${esc(t('focusExit'))}</button></div>` : '')
+      + (gs.length ? `<h4>${esc(t('foldTitle'))}</h4><p>${esc(t('foldIntro'))}</p><div class="focus-list">${gs.map(g => `<button class="btn" data-fold="${esc(g)}" aria-pressed="${S.folded.includes(g)}"><b>${esc(g)}</b><span>${esc(S.folded.includes(g) ? t('foldedLabel') : t('foldShown'))}</span></button>`).join('')}</div>` : ''));
   }
 }
 async function saveExport() {
@@ -3193,7 +3214,10 @@ function handCommand(c) {
   return `${dir ? `cd ${shq(dir)} && ` : ''}TRACE_CANVAS_THREAD=${tid} ${AGENT_LAUNCH[c.assignee](t('handPrompt', th.name, tid, c.title))}`;
 }
 const sheetBody = $('#sheet-body');
-sheetBody.addEventListener('click', e => { const f = e.target.closest('[data-focus]'); if (f && S.sheet === 'focus') { closeSheet(); setFocus(f.dataset.focus); } });
+sheetBody.addEventListener('click', e => {
+  const f = e.target.closest('[data-focus]'); if (f && S.sheet === 'focus') { closeSheet(); setFocus(f.dataset.focus); return; }
+  const d = e.target.closest('[data-fold]'); if (d && S.sheet === 'focus') { setFold(d.dataset.fold, !S.folded.includes(d.dataset.fold)); openSheet('focus'); }
+});
 sheetBody.addEventListener('change', e => {
   if (S.sheet !== 'goals') return;
   const el = e.target;

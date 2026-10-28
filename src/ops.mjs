@@ -455,13 +455,16 @@ export function listThreads(d, { query, includeDone = true } = {}) {
   return q ? rows.filter(r => r.matches || norm(r.name).includes(q)) : rows;
 }
 
+// A command run on another machine over ssh (machine names are the ssh aliases), in the user's login shell there:
+// ssh alone runs it with a bare PATH (/usr/bin:/bin), without claude, codex or node.
+export const remote = (machine, cmd) => `ssh -t ${machine} ${q(`exec "$SHELL" -lc ${q(cmd)}`)}`;
 // A line's sessions with their live status ('off' when not running).
 export function threadSessions(d, tid, env = process.env) {
   const live = new Map(listLive(env).map(s => [s.id, s])), me = readConfig(env).machine;
   return sessionList(d, tid).map(s => {
     const l = live.get(s.id), cwd = s.cwd || (l && l.cwd) || '', here = `${cwd ? `cd ${q(cwd)} && ` : ''}${s.resume}`;
     // Another machine's session resumes there, over ssh (machine names are the ssh aliases).
-    return { ...s, status: l ? l.status : 'off', cwd, command: s.machine && s.machine !== me ? `ssh -t ${s.machine} ${q(here)}` : here };
+    return { ...s, status: l ? l.status : 'off', cwd, command: s.machine && s.machine !== me ? remote(s.machine, here) : here };
   });
 }
 

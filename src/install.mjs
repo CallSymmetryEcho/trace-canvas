@@ -144,20 +144,23 @@ export function codexWritable(file, dir) {
 }
 export const onPath = (cmd, env = process.env) => { try { execFileSync('which', [cmd], { stdio: 'ignore', env }); return true; } catch { return false; } };
 
-// The trace-canvas command: a link to this clone's CLI in the user's own bin folder, if it is on the PATH (never a
-// system folder), so the commands in the README work as typed. Otherwise the alias line to add, with this clone's path.
-export function linkCommand(cli, env = process.env, homeDir = os.homedir()) {
+// The trace-canvas command: a small script in the user's own bin folder, if it is on the PATH (never a system folder),
+// so the commands in the README work as typed. It runs this clone's CLI with the node that ran setup, as the hooks do:
+// another shell (a login shell over ssh, say) may find an older node first. Otherwise the alias line to add.
+const CMD_MARK = '# trace-canvas command (setup)';
+export function linkCommand(cli, env = process.env, homeDir = os.homedir(), node = NODE) {
   const onIt = (env.PATH || '').split(path.delimiter);
   for (const dir of [path.join(homeDir, '.local', 'bin'), path.join(homeDir, 'bin')]) {
     if (!onIt.includes(dir)) continue;
     try { fs.accessSync(dir, fs.constants.W_OK); } catch { continue; }
     const dest = path.join(dir, 'trace-canvas');
-    try { if (!fs.lstatSync(dest).isSymbolicLink()) continue; fs.unlinkSync(dest); } catch {} // not a link of ours: leave it
-    fs.symlinkSync(cli, dest);
-    try { fs.chmodSync(cli, 0o755); } catch {}
+    let st = null; try { st = fs.lstatSync(dest); } catch {}
+    if (st && !st.isSymbolicLink() && !fs.readFileSync(dest, 'utf8').includes(CMD_MARK)) continue; // not ours: leave it
+    if (st) fs.unlinkSync(dest);
+    fs.writeFileSync(dest, `#!/bin/sh\n${CMD_MARK}\nexec "${node}" "${cli}" "$@"\n`, { mode: 0o755 });
     return { ok: true, where: dest };
   }
-  return { hint: `echo "alias trace-canvas='node \\"${cli}\\"'" >> ~/.zshrc` };
+  return { hint: `echo "alias trace-canvas='\\"${node}\\" \\"${cli}\\"'" >> ~/.zshrc` };
 }
 
 // Skill. Linked rather than copied, so pulling a newer Trace Canvas updates it too.

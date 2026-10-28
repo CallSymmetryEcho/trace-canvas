@@ -81,9 +81,12 @@ test('a session bound through the tools says which agent and machine it is, befo
   mutate(d => { createThread(d, { name: 'Cross-machine test' }); bindLiveSession(d, { sessionId: 'cx9', thread: 'Cross-machine test', agent: 'codex' }, env); }, env);
   const e = readData(env).sessions.cx9;
   assert.deepEqual([e.agent, e.agentKey, e.resume, e.machine, e.bound], ['Codex', 'codex', 'codex resume cx9', 'bsuperstation', true]);
-  // Seen from the Mac, it resumes over ssh.
+  // Seen from the Mac, it resumes over ssh, in the login shell there (ssh alone has no codex on its PATH).
   const d = readData(env), tid = Object.values(d.threads)[0].id;
-  assert.equal(threadSessions(d, tid, { ...s.env, TRACE_CANVAS_MACHINE: 'mac' })[0].command, `ssh -t bsuperstation 'codex resume cx9'`);
+  const cmd = threadSessions(d, tid, { ...s.env, TRACE_CANVAS_MACHINE: 'mac' })[0].command;
+  assert.equal(cmd, `ssh -t bsuperstation 'exec "$SHELL" -lc '\\''codex resume cx9'\\'''`);
+  // What the remote end gets, once this shell has taken the quotes off: the login shell runs the command.
+  assert.equal(execFileSync('sh', ['-c', `printf %s ${cmd.slice('ssh -t bsuperstation '.length)}`], { encoding: 'utf8' }), `exec "$SHELL" -lc 'codex resume cx9'`);
 });
 
 test('a part of a line name finds the line when only one line has it', () => {

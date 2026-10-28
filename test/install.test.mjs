@@ -116,13 +116,14 @@ test('setup makes trace-canvas a command in the user\'s own bin folder on the PA
   t.after(() => fs.rmSync(home, { recursive: true, force: true }));
   const cli = path.join(home, 'clone', 'bin', 'trace-canvas.mjs'), local = path.join(home, '.local', 'bin');
   fs.mkdirSync(path.dirname(cli), { recursive: true }); fs.writeFileSync(cli, '#!/usr/bin/env node\n');
-  assert.match(linkCommand(cli, { PATH: '/usr/bin:/bin' }, home).hint, /alias trace-canvas='node .*clone\/bin\/trace-canvas\.mjs/);
+  const node = '/opt/node22/bin/node'; // the node that ran setup, not whichever a shell finds first
+  assert.match(linkCommand(cli, { PATH: '/usr/bin:/bin' }, home, node).hint, /alias trace-canvas='\\"\/opt\/node22\/bin\/node\\" \\".*clone\/bin\/trace-canvas\.mjs/);
   fs.mkdirSync(local, { recursive: true });
-  const env = { PATH: `/usr/bin${path.delimiter}${local}` };
-  assert.deepEqual(linkCommand(cli, env, home), { ok: true, where: path.join(local, 'trace-canvas') });
-  assert.equal(fs.readlinkSync(path.join(local, 'trace-canvas')), cli);
-  assert.ok(fs.statSync(cli).mode & 0o100); // runnable
-  assert.ok(linkCommand(cli, env, home).ok); // again: the link is replaced
+  const env = { PATH: `/usr/bin${path.delimiter}${local}` }, dest = path.join(local, 'trace-canvas');
+  assert.deepEqual(linkCommand(cli, env, home, node), { ok: true, where: dest });
+  assert.match(fs.readFileSync(dest, 'utf8'), new RegExp(`exec "${node}" "${cli}" "\\$@"`));
+  assert.ok(fs.statSync(dest).mode & 0o100); // runnable
+  assert.ok(linkCommand(cli, env, home, node).ok); // again: our script is replaced
   fs.unlinkSync(path.join(local, 'trace-canvas')); fs.writeFileSync(path.join(local, 'trace-canvas'), 'someone else\'s');
   assert.ok(linkCommand(cli, env, home).hint); // a file that is not our link stays
 });

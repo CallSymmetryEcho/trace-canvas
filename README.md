@@ -220,7 +220,7 @@ Each machine writes only its own `canvas/<machine>.jsonl` there: every line, rec
 
 - **What travels:** a session's first instruction goes as its title only, and public IP addresses and secret-looking text are blanked. Your own data keeps everything.
 - **One repository, one line:** a repository's line is named after its remote, so the same repository is one line on every machine, whatever its folder is called. Lines that belong to a repository get the same id everywhere; an old id stays as an alias, so bindings and tools that use it still work.
-- **Whose is what:** records and sessions from another machine show its name, and their resume command runs over `ssh -t <machine>`, so name machines after their ssh aliases.
+- **Whose is what:** records and sessions from another machine show its name, and their resume command runs over `ssh -t <machine>` in the login shell there (plain ssh has no `claude` or `codex` on its PATH), so name machines after their ssh aliases. To reach a Mac this way, turn on **System Settings → General → Sharing → Remote Login → ⓘ → Allow full disk access for remote users**: without it, macOS keeps ssh sessions out of Desktop and Documents, where projects usually live.
 - **A new machine:** if the repository also holds a location map (`tools/where.py`, which knows where code, data and NAS folders live on each machine), a session there is told where things are, `trace_where` and `trace-canvas where <words>` look things up, and a `bootstrap.sh` next to it can set a machine up in one go. `setup` refuses a name another computer already writes under.
 
 ![On the laptop a to-do goes to Codex; after a sync it comes back ticked by Codex, with its result marked On workstation (made-up data)](docs/gif-machines.en.gif)

@@ -2736,7 +2736,8 @@ function sessionItem(s, l) {
   const st = l ? l.status : 'off', cwd = s.cwd || (l && l.cwd);
   const here = `${cwd ? `cd ${shq(cwd)} && ` : ''}${s.resume || (l && l.resume) || `claude --resume ${s.id}`}`;
   // A session from another machine resumes there, over ssh (the machine names are the ssh aliases).
-  const away = s.machine && S.machine && s.machine !== S.machine, cmd = away ? `ssh -t ${s.machine} ${shq(here)}` : here;
+  // Over ssh, in the login shell there: ssh alone has a bare PATH without claude or codex.
+  const away = s.machine && S.machine && s.machine !== S.machine, cmd = away ? `ssh -t ${s.machine} ${shq(`exec "$SHELL" -lc ${shq(here)}`)}` : here;
   const jump = away ? '' : jumpTo({ ...l, ...s, desktopId: s.desktopId || (l && l.desktopId), tty: l && l.tty }, 'btn btn-primary');
   const sub = [l && stLabel(st), s.agent || (l && l.agent) || 'Claude Code', away && s.machine, s.id.slice(0, 8), s.last && fmtRel(s.last)].filter(Boolean).join(' · ');
   return `<li class="st-${esc(st)}${l ? ' is-live' : ''}"${l ? ` data-act="goto-live" data-sid="${esc(s.id)}"` : ''}><span class="ldot"></span><span class="s-name">${esc(s.title || (l ? liveTitle(l) : s.id))}</span><span class="act">${esc(sub)}</span><span class="s-acts">${jump}<button class="btn" data-act="copy-cmd" data-cmd="${esc(cmd)}" title="${esc(cmd)}">${esc(t('copyResume'))}</button></span></li>`;

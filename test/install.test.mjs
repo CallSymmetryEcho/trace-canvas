@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { hookCommand, install, installAgentMcp, installMcp, installSkill } from '../src/install.mjs';
+import { hookCommand, install, installAgentMcp, installMcp, installSkill, linkCommand } from '../src/install.mjs';
 
 const cli = new URL('../bin/trace-canvas.mjs', import.meta.url);
 const source = fileURLToPath(new URL('../skill', import.meta.url));
@@ -109,4 +109,20 @@ test('setup --machine and --map are saved as given', t => {
   run('setup', '--user', '--machine', 'lab', '--map', map);
   const cfg = JSON.parse(fs.readFileSync(path.join(root, 'data', 'config.json'), 'utf8'));
   assert.deepEqual([cfg.machine, cfg.map], ['lab', map]);
+});
+
+test('setup makes trace-canvas a command in the user\'s own bin folder on the PATH, else says how', t => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-cmd-'));
+  t.after(() => fs.rmSync(home, { recursive: true, force: true }));
+  const cli = path.join(home, 'clone', 'bin', 'trace-canvas.mjs'), local = path.join(home, '.local', 'bin');
+  fs.mkdirSync(path.dirname(cli), { recursive: true }); fs.writeFileSync(cli, '#!/usr/bin/env node\n');
+  assert.match(linkCommand(cli, { PATH: '/usr/bin:/bin' }, home).hint, /alias trace-canvas='node .*clone\/bin\/trace-canvas\.mjs/);
+  fs.mkdirSync(local, { recursive: true });
+  const env = { PATH: `/usr/bin${path.delimiter}${local}` };
+  assert.deepEqual(linkCommand(cli, env, home), { ok: true, where: path.join(local, 'trace-canvas') });
+  assert.equal(fs.readlinkSync(path.join(local, 'trace-canvas')), cli);
+  assert.ok(fs.statSync(cli).mode & 0o100); // runnable
+  assert.ok(linkCommand(cli, env, home).ok); // again: the link is replaced
+  fs.unlinkSync(path.join(local, 'trace-canvas')); fs.writeFileSync(path.join(local, 'trace-canvas'), 'someone else\'s');
+  assert.ok(linkCommand(cli, env, home).hint); // a file that is not our link stays
 });

@@ -144,6 +144,22 @@ export function codexWritable(file, dir) {
 }
 export const onPath = (cmd, env = process.env) => { try { execFileSync('which', [cmd], { stdio: 'ignore', env }); return true; } catch { return false; } };
 
+// The trace-canvas command: a link to this clone's CLI in the user's own bin folder, if it is on the PATH (never a
+// system folder), so the commands in the README work as typed. Otherwise the alias line to add, with this clone's path.
+export function linkCommand(cli, env = process.env, homeDir = os.homedir()) {
+  const onIt = (env.PATH || '').split(path.delimiter);
+  for (const dir of [path.join(homeDir, '.local', 'bin'), path.join(homeDir, 'bin')]) {
+    if (!onIt.includes(dir)) continue;
+    try { fs.accessSync(dir, fs.constants.W_OK); } catch { continue; }
+    const dest = path.join(dir, 'trace-canvas');
+    try { if (!fs.lstatSync(dest).isSymbolicLink()) continue; fs.unlinkSync(dest); } catch {} // not a link of ours: leave it
+    fs.symlinkSync(cli, dest);
+    try { fs.chmodSync(cli, 0o755); } catch {}
+    return { ok: true, where: dest };
+  }
+  return { hint: `echo "alias trace-canvas='node \\"${cli}\\"'" >> ~/.zshrc` };
+}
+
 // Skill. Linked rather than copied, so pulling a newer Trace Canvas updates it too.
 export function installSkill({ user, project }, skillDir, agent = 'claude') {
   if (agent !== 'claude' && agent !== 'codex') throw new Error(`Skill installation is not supported for ${agent}`);

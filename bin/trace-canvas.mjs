@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { addCommit, dataFile, ensureThread, home, importText, INBOX, mutate, readConfig, writeConfig } from '../src/store.mjs';
 import { execFileSync } from 'node:child_process';
 import { handleHook, readStdin } from '../src/hook.mjs';
-import { agentFiles, allowSafeTools, codexHooks, codexWritable, geminiHooks, hookCommand, install, installAgentMcp, installMcp, installSkill, onPath, settingsPath, uninstall } from '../src/install.mjs';
+import { agentFiles, allowSafeTools, codexHooks, codexWritable, geminiHooks, hookCommand, install, installAgentMcp, installMcp, installSkill, linkCommand, onPath, settingsPath, uninstall } from '../src/install.mjs';
 import { normalize } from '../src/agents.mjs';
 import os from 'node:os';
 import crypto from 'node:crypto';
@@ -436,6 +436,7 @@ async function main() {
       console.log(m.ok ? `2. MCP server added: ${m.where}` : `2. Couldn't add the MCP server. Run this yourself:\n   ${m.hint}`);
       console.log(`   Capturing, logging and reading run without asking; merging and importing still ask (${file}).`);
       console.log(`3. Skill installed at ${installSkill(s, SKILL_DIR)}`);
+      if (s.user) { const c = linkCommand(SELF); console.log(c.ok ? `   The trace-canvas command: ${c.where}` : `   To type trace-canvas instead of node ${SELF}, run:\n   ${c.hint}`); }
       // Which computer this is: --machine, else what it was set to before, else the location map's name for it.
       {
         const { machineOwner } = await import('../src/sync.mjs');

@@ -67,7 +67,7 @@ The page is in English by default. Switch with the **中文 / EN** button in the
 
 To look around before setting anything up: `node bin/trace-canvas.mjs` in the clone starts the page at <http://localhost:4777/> (no `npm install`). Click **Load example data** on the empty page for a first look, then **Clear** it from the header. Data is stored in `~/.trace-canvas/data.json`.
 
-Optional: make `trace-canvas` a command.
+The `trace-canvas` command: `setup --user` links it into `~/.local/bin` or `~/bin` when one of them is on your PATH. Otherwise it prints an alias line with your clone's path, like this one for a clone in `~/trace-canvas`:
 
 ```bash
 echo "alias trace-canvas='node \"$HOME/trace-canvas/bin/trace-canvas.mjs\"'" >> ~/.zshrc

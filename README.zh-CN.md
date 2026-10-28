@@ -67,7 +67,7 @@ node ~/trace-canvas/bin/trace-canvas.mjs setup --user   # hooks、MCP 工具和 
 
 想先看看再配置：在克隆下来的目录里运行 `node bin/trace-canvas.mjs`，会在 <http://localhost:4777/> 打开页面（不用 `npm install`）。空页面上点 **Load example data（载入示例数据）** 先看效果，看完在顶栏点「清除」。数据保存在 `~/.trace-canvas/data.json`。
 
-可选：加个快捷命令。
+`trace-canvas` 命令：`setup --user` 会把它链接到 `~/.local/bin` 或 `~/bin`（前提是其中一个在你的 PATH 里）；否则它会打印一行带你仓库路径的 alias，比如仓库在 `~/trace-canvas` 时是这样：
 
 ```bash
 echo "alias trace-canvas='node \"$HOME/trace-canvas/bin/trace-canvas.mjs\"'" >> ~/.zshrc

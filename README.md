@@ -290,7 +290,7 @@ For each piece with many rounds it names what was missing, quotes the sentence t
 
 ## What Trace Canvas costs in tokens
 
-Trace Canvas adds a little text to each session: a few lines when it starts (its line, goal, your to-dos, where things are) and one line with every message (its line and the open to-dos, at most eight), plus whatever the `trace_*` tools return when an agent calls them. That text stays in the context and is read again on every later call, so it grows with the number of messages in a session, not with the size of your canvas; `trace_tasks` answers for the session's own line unless asked for more. `trace-canvas tokens` reads your recent Claude Code transcripts and shows each session's share: about 1% over a few days of heavy use here.
+**About 1%, and it does not grow with your canvas.** The records are written by hooks that run outside the model, so tracing itself costs no tokens. What enters a session is short and capped: a few lines when it starts (its line, goal, your to-dos, where things are), one line with every message (its line and at most eight open to-dos), and the `trace_*` answers when an agent asks, which cover the session's own line unless it asks for more. That text stays in the context and is read again on later calls, so the cost follows the number of messages in a session, not the size of the canvas. `trace-canvas tokens` reads your recent Claude Code transcripts and shows each session's share.
 
 ## AI tidy-up
 

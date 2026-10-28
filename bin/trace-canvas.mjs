@@ -54,7 +54,8 @@ function terminalQr(text) {
   return lines.join('\n');
 }
 const argv = process.argv.slice(2);
-const cmd = argv[0] && !argv[0].startsWith('-') ? argv.shift() : 'serve';
+// --help or -h anywhere prints the help and runs nothing (`trace-canvas dispatch --help` must not dispatch).
+const cmd = argv.includes('--help') || argv.includes('-h') ? 'help' : argv[0] && !argv[0].startsWith('-') ? argv.shift() : 'serve';
 
 function flag(name, fallback) {
   const i = argv.indexOf(`--${name}`);

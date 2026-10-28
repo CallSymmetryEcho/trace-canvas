@@ -1384,12 +1384,13 @@ async function bindLive(sid, tid) {
 }
 function renderLive() {
   const bar = $('#live-bar');
-  if (!S.live.length) { bar.hidden = true; bar.innerHTML = ''; return; }
-  const waiting = S.live.filter(s => s.status === 'waiting').length;
+  const list = S.live.filter(s => inFocus(getThread(s.threadId))); // in focus mode, the group's lines only
+  if (!list.length) { bar.hidden = true; bar.innerHTML = ''; return; }
+  const waiting = list.filter(s => s.status === 'waiting').length;
   const selS = S.sel && S.sel.type === 'live' ? S.sel.id : null;
   bar.hidden = false;
-  bar.innerHTML = `<span class="live-label">${esc(t('liveLabel'))}</span><span class="live-count">${esc(t('liveCount', S.live.length, waiting))}</span>`
-    + S.live.map(s => `<button class="live-chip st-${esc(s.status)} ${s.id === selS ? 'is-sel' : ''}" data-sid="${esc(s.id)}" title="${esc(`${stLabel(s.status)} · ${s.activity || ''}`)}"><span class="ldot"></span><b>${esc(liveTitle(s))}</b>${s.activity ? `<span class="act">${esc(s.activity)}</span>` : ''}</button>`).join('');
+  bar.innerHTML = `<span class="live-label">${esc(t('liveLabel'))}</span><span class="live-count">${esc(t('liveCount', list.length, waiting))}</span>`
+    + list.map(s => `<button class="live-chip st-${esc(s.status)} ${s.id === selS ? 'is-sel' : ''}" data-sid="${esc(s.id)}" title="${esc(`${stLabel(s.status)} · ${s.activity || ''}`)}"><span class="ldot"></span><b>${esc(liveTitle(s))}</b>${s.activity ? `<span class="act">${esc(s.activity)}</span>` : ''}</button>`).join('');
 }
 $('#live-bar').addEventListener('click', e => { const b = e.target.closest('[data-sid]'); if (b) select({ type: 'live', id: b.dataset.sid }); });
 function liveBadge(tid) {

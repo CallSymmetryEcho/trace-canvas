@@ -10,7 +10,7 @@ Trace Canvas shows work as a transit map. A **thread** is one piece of work in p
 
 In Claude Code, invoke `/trace-canvas` (arguments: `$ARGUMENTS`). In Codex, invoke `$trace-canvas` and read the action from the user's request.
 
-Actions: `capture`, `all`, `sessions`, `tasks`, `pick`, `dispatch [lines or to-dos…]`, `retro <thread>`, `live`, `bind <thread>`, `fork <thread>`, `merge <threads…>`, `open`, `log <text>`.
+Actions: `capture`, `all`, `sessions`, `tasks`, `pick`, `dispatch [lines or to-dos…]`, `retro <thread>`, `sync`, `live`, `bind <thread>`, `fork <thread>`, `merge <threads…>`, `open`, `log <text>`.
 
 Pick the matching action below. With no arguments, capture the current session.
 
@@ -80,6 +80,10 @@ Call `trace_tasks` (it answers for the line this session works on; pass `thread`
 1. Run `node <this skill's folder>/../bin/trace-canvas.mjs retro "<thread>"` (the line the user named, or the one you work on; `trace-canvas retro` if it is on the PATH). It reads the line's conversations on this machine and asks the local claude or codex to group them, so it takes a minute or two; run it in the background if your tool times out sooner. It puts the ranking on the line as a note and writes nothing else.
 2. Show the top items: title, rounds, minutes, tokens, corrections, and for each suggested rule what it was stuck on, the sentence that made it clear and the rule with its layer (project = CLAUDE.md and AGENTS.md, line = a decision on the line, memory = long-term memory).
 3. Ask the user about each rule, one by one. Write only the ones they approve, in the layer they choose, with the same command: `… retro --apply <record> <n> [--layer project|line|memory]`. Never edit the rule files yourself.
+
+## sync: share the canvas with your other machines
+
+Run `node <this skill's folder>/../bin/trace-canvas.mjs sync` (`trace-canvas sync` if it is on the PATH). It pulls the other machines' changes from the private sync repository, writes this machine's and pushes them. Report its one line: changes from other machines, changes here, and whether it pushed or was offline (then it pushes next time). If it says there is no location map repository, tell the user to run `node bin/trace-canvas.mjs setup --user --machine <name> --map <repo clone>` once.
 
 ## live: what is running now
 

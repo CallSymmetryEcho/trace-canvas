@@ -2089,28 +2089,37 @@ function drawGroups() {
 // <arrange>
 // Positions for lines laid out by group: one block per group (by name), lines without a group last;
 // inside a block depth-first along forks (a line, then the lines forked from it, oldest first), up to
-// perCol cards a column. Pure: test/group.test.mjs runs this very function out of this file.
-function arrange(lines, { colW = 290, rowH = 230, perCol = 4, gap = 70, top = 260 } = {}) {
+// perCol cards a column. Folded groups take no block: they are shelved after the last one, one chip each
+// stacked shelf apart (a chip sits where its lines start), so unfolding one shows it there.
+// Pure: test/group.test.mjs runs this very function out of this file.
+function arrange(lines, { colW = 290, rowH = 230, perCol = 4, gap = 70, top = 260, folded = [], shelf = 56 } = {}) {
   const blocks = new Map();
   for (const th of lines) { const g = th.group || ''; if (!blocks.has(g)) blocks.set(g, []); blocks.get(g).push(th); }
   const names = [...blocks.keys()].sort((a, b) => (a === '') - (b === '') || a.localeCompare(b));
   const pos = new Map();
-  let x = 0;
-  for (const g of names) {
+  const order = g => {
     const ths = blocks.get(g).slice().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0) || String(a.id).localeCompare(String(b.id)));
-    const ids = new Set(ths.map(th => th.id)), kids = new Map(), seen = new Set(), order = [];
+    const ids = new Set(ths.map(th => th.id)), kids = new Map(), seen = new Set(), out = [];
     for (const th of ths) { const p = ids.has(th.parent) ? th.parent : ''; if (!kids.has(p)) kids.set(p, []); kids.get(p).push(th); }
-    const walk = p => { for (const th of kids.get(p) || []) if (!seen.has(th.id)) { seen.add(th.id); order.push(th); walk(th.id); } };
+    const walk = p => { for (const th of kids.get(p) || []) if (!seen.has(th.id)) { seen.add(th.id); out.push(th); walk(th.id); } };
     walk('');
-    for (const th of ths) if (!seen.has(th.id)) { seen.add(th.id); order.push(th); walk(th.id); } // forks in a loop
-    order.forEach((th, i) => pos.set(th.id, { x: x + Math.floor(i / perCol) * colW, y: top + (i % perCol) * rowH }));
-    x += Math.ceil(order.length / perCol) * colW + gap;
+    for (const th of ths) if (!seen.has(th.id)) { seen.add(th.id); out.push(th); walk(th.id); } // forks in a loop
+    return out;
+  };
+  const place = (ths, x0, y0) => ths.forEach((th, i) => pos.set(th.id, { x: x0 + Math.floor(i / perCol) * colW, y: y0 + (i % perCol) * rowH }));
+  let x = 0;
+  for (const g of names.filter(g => !folded.includes(g))) {
+    const ths = order(g);
+    place(ths, x, top);
+    x += Math.ceil(ths.length / perCol) * colW + gap;
   }
+  names.filter(g => folded.includes(g)).forEach((g, k) => place(order(g), x, top + k * shelf));
   return pos;
 }
 // How many cards a column so the arranged canvas has about the viewport's shape (fit then keeps cards large).
-function perColFor(lines, w, h, { colW = 290, rowH = 230, gap = 70, top = 260 } = {}) {
-  const sizes = [...lines.reduce((m, th) => m.set(th.group || '', (m.get(th.group || '') || 0) + 1), new Map()).values()];
+function perColFor(lines, w, h, { colW = 290, rowH = 230, gap = 70, top = 260, folded = [] } = {}) {
+  const sizes = [...lines.filter(th => !folded.includes(th.group)).reduce((m, th) => m.set(th.group || '', (m.get(th.group || '') || 0) + 1), new Map()).values()];
+  if (!sizes.length) return 4;
   let best = 4, bestScale = 0;
   for (let k = 2; k <= 12; k++) {
     const width = sizes.reduce((s, n) => s + Math.ceil(n / k) * colW + gap, 0), height = top + Math.min(k, Math.max(...sizes)) * rowH;
@@ -2127,7 +2136,8 @@ function doArrange(only) {
   if (!lines.length) return;
   const before = new Map(lines.map(th => [th.id, { x: th.x || 0, y: th.y || 0 }])), inbox = { ...S.inboxPos };
   const r = vp.getBoundingClientRect();
-  let pos = arrange(lines, { perCol: perColFor(lines, r.width || 1200, r.height || 800) });
+  const folded = only ? [] : S.folded; // the whole canvas: folded groups go on the shelf, not into blocks
+  let pos = arrange(lines, { folded, perCol: perColFor(lines, r.width || 1200, r.height || 800, { folded }) });
   if (only) { // keep the group where it was
     const min = (m, k) => Math.min(...[...m.values()].map(p => p[k]));
     const dx = min(before, 'x') - min(pos, 'x'), dy = min(before, 'y') - min(pos, 'y');
@@ -2228,7 +2238,7 @@ function zoomAt(cx, cy, f) {
   applyCam();
 }
 function fit() {
-  const els = [...cardsEl.children];
+  const els = [...cardsEl.children, ...groupsEl.querySelectorAll('.grp-folded')]; // folded groups' chips count too
   if (!els.length) return;
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const el of els) { x0 = Math.min(x0, el.offsetLeft); y0 = Math.min(y0, el.offsetTop); x1 = Math.max(x1, el.offsetLeft + el.offsetWidth); y1 = Math.max(y1, el.offsetTop + el.offsetHeight); }

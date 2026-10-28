@@ -31,6 +31,13 @@ test('arrange puts each group in its own block, forks right after their line, li
   assert.deepEqual(['video', 'video-short', 'promo'].map(row), [260, 490, 720]);
   assert.equal(col('p5'), col('proposal') + 290);
   assert.deepEqual(arrange(lines), pos);
+
+  // Folded groups take no block: shelved after the last one, a chip's height apart, in name order.
+  const f = arrange(lines, { folded: ['Proposal', 'Loop'] });
+  assert.equal(f.get('video').x, 0); // Video is the first block now
+  const shelfX = Math.max(f.get('loose').x, f.get('video').x) + 290 + 70;
+  assert.deepEqual([f.get('x'), f.get('proposal')].map(p => [p.x, p.y]), [[shelfX, 260], [shelfX, 316]]);
+  assert.equal(perColFor(lines, 1200, 800, { folded: ['Proposal', 'Loop', 'Video', ''] }), 4);
 });
 
 test('a fork joins the group of the line it came from, also a branch line made by the hooks', () => {

@@ -104,7 +104,7 @@ export function handTo(d, { ref, to, thread, remote = false }, env = process.env
 const oneLine = s => String(s).replace(/[\x00-\x1f\x7f]+/g, ' ');
 const sessionThreadOf = (d, s, env) => sessionThread(d, s, env).threadId;
 // The folder a line works in: the repository path the hooks keep in its note.
-const lineDir = th => { const n = String((th && th.note) || '').trim(); return /^\/\S*$/.test(n) && fs.existsSync(n) ? n : ''; };
+export const lineDir = th => { const n = String((th && th.note) || '').trim(); return /^\/\S*$/.test(n) && fs.existsSync(n) ? n : ''; };
 const RESUME = /^(claude --resume|codex resume|gemini --resume) \S+$/;
 
 /**

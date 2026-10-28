@@ -142,7 +142,7 @@ export function codexWritable(file, dir) {
   fs.writeFileSync(file, t);
   return true;
 }
-export const onPath = cmd => { try { execFileSync('which', [cmd], { stdio: 'ignore' }); return true; } catch { return false; } };
+export const onPath = (cmd, env = process.env) => { try { execFileSync('which', [cmd], { stdio: 'ignore', env }); return true; } catch { return false; } };
 
 // Skill. Linked rather than copied, so pulling a newer Trace Canvas updates it too.
 export function installSkill({ user, project }, skillDir, agent = 'claude') {

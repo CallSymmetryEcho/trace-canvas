@@ -12,7 +12,8 @@ import { fileURLToPath } from 'node:url';
 import { COLS, dataFile, home, mutate, readConfig, readData, toArrays, writeConfig } from './store.mjs';
 import { demoData } from './demo.mjs';
 import { liveDir, readLive } from './live.mjs';
-import { bindLiveSession, handTo, liveSessions, sessionList } from './ops.mjs';
+import { bindLiveSession, findThreadLoose, handTo, liveSessions, sessionList } from './ops.mjs';
+import { applyRetro, askAgent, retroRecord, runRetro } from './retro.mjs';
 import { focusScript, terminalScript } from './agents.mjs';
 import { commitDiff, commitInfo } from './git-view.mjs';
 import { runSync } from './sync.mjs';
@@ -50,19 +51,6 @@ function readBody(req, limit = 4 << 20) {
   });
 }
 
-function askClaude(prompt) {
-  return new Promise((resolve, reject) => {
-    const child = spawn('claude', ['-p', '--output-format', 'text'], { cwd: home(), env: { ...process.env, TRACE_CANVAS_DISABLE: '1' }, stdio: ['pipe', 'pipe', 'pipe'] });
-    let out = '', err = '';
-    const timer = setTimeout(() => { child.kill('SIGTERM'); reject(new Error('timeout')); }, 240000);
-    child.stdout.on('data', c => { out += c; });
-    child.stderr.on('data', c => { err += c; });
-    child.on('error', e => { clearTimeout(timer); reject(e); });
-    child.on('close', code => { clearTimeout(timer); code === 0 ? resolve(out) : reject(new Error(err.trim() || `claude exited with ${code}`)); });
-    child.stdin.end(prompt);
-  });
-}
-
 export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
   fs.mkdirSync(home(), { recursive: true });
   const ai = claudeAvailable();
@@ -93,7 +81,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         if (!phone || !phone.token || !(same(cookie, phone.token) || same(k, phone.token))) return send(res, 403, { error: 'Open the address trace-canvas phone printed' });
         if (same(k, phone.token) && !same(cookie, phone.token)) res.setHeader('Set-Cookie', `tc_k=${phone.token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000`);
         // These act on the computer itself (a terminal, git pushes, the claude CLI, the whole data set).
-        if (['/api/hand', '/api/focus', '/api/sync', '/api/ai', '/api/demo'].includes(p)) return send(res, 403, { error: 'Only on the computer itself' });
+        if (['/api/hand', '/api/focus', '/api/sync', '/api/ai', '/api/demo', '/api/retro', '/api/retro/apply'].includes(p)) return send(res, 403, { error: 'Only on the computer itself' });
       }
       const write = req.method !== 'GET' && req.method !== 'HEAD';
       if (write && req.headers['x-trace-canvas'] !== '1') return send(res, 403, { error: 'missing header' });
@@ -180,8 +168,21 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
       if (req.method === 'POST' && p === '/api/ai') {
         if (!ai) return send(res, 501, { error: 'claude CLI not found' });
         const body = JSON.parse(await readBody(req));
-        const text = await askClaude(String(body.prompt || '').slice(0, 200000));
+        const text = await askAgent(String(body.prompt || '').slice(0, 200000), { timeout: 240000 });
         return send(res, 200, { text });
+      }
+      // Retro: rank the line's work by rounds and suggest rules (minutes, through the local claude/codex);
+      // a rule is written only when the person applies it.
+      if (req.method === 'POST' && p === '/api/retro') {
+        const body = JSON.parse(await readBody(req));
+        const tid = findThreadLoose(readData(), String(body.thread || ''));
+        if (!tid) return send(res, 404, { error: 'No such line' });
+        const r = await runRetro(readData(), tid);
+        return send(res, 200, { id: mutate(d => retroRecord(d, tid, r)).id });
+      }
+      if (req.method === 'POST' && p === '/api/retro/apply') {
+        const body = JSON.parse(await readBody(req));
+        return send(res, 200, mutate(d => applyRetro(d, { record: String(body.record || ''), n: Number(body.n), layer: String(body.layer || '') })));
       }
       send(res, 404, { error: 'not found' });
     } catch (e) {

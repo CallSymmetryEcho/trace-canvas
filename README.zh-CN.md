@@ -282,6 +282,12 @@ node bin/trace-canvas.mjs log "文献对比表完成" \
 {"thread": "开题报告", "kind": "agent", "title": "第二章提纲完成", "body": "下一步：配图", "agent": "ChatGPT"}
 ```
 
+## 复盘：哪件事来回最多
+
+一个很简单的改动，只要缺了一个细节，也可能和 agent 来回十几轮；改完没总结，下次又从头讲。线面板里的**复盘**（或 `trace-canvas retro <线程>`、`/trace-canvas retro`）读这条线在本机的 Claude Code 和 Codex 对话，用你自己的 `claude`（或 `codex`）命令行把它们分成一件件事，能对上待办的就归到那条待办。每件事算出：轮次（你发了几条）、耗时（消息之间的间隔，每段最多算 30 分钟）、回复用掉的 token、纠正了 agent 几次、在几个会话里出现过；按「轮次 ÷ 难度」排行，简单却来回多的排在最前。
+
+每件来回多的事，会写出卡在哪（缺了什么信息）、最后说清楚的那句话，并建议一条规矩。你在某条规矩上点**写入**并选好位置之前，什么都不写：**项目规矩**（项目的 CLAUDE.md 和 AGENTS.md，放在「Rules from retros」下面）、**这条线**（线上的一条决定）、**长期记忆**（装了 Theatrum 就写进 Theatrum，否则写进 `~/.claude/CLAUDE.md`）。排行作为一条笔记留在线上。命令行：`trace-canvas retro --apply <记录> <序号> [--layer project|line|memory]`。
+
 ## AI 梳理
 
 本机装了 `claude` 命令时，顶栏的 **AI 梳理** 会让 Claude 把收件箱里的记录归到线程、建议线程之间的关联、指出看起来停滞的线程。勾选并点应用之前不会改动任何东西。它用你自己的账号运行 `claude -p`，这次调用不会触发留痕 hooks。
@@ -310,6 +316,8 @@ node bin/trace-canvas.mjs log "文献对比表完成" \
   trace-canvas live                                正在运行的会话：状态、当前动作、所属线
   trace-canvas bind <线程> [--session ID]          把运行中的会话放到某条线上（默认是当前会话）
   trace-canvas bind --unbind [--session ID]        改回按仓库和分支自动归线
+  trace-canvas retro <线程>                        按来回轮次给这条线的事排行，并建议规矩
+  trace-canvas retro --apply <记录> <序号> [--layer project|line|memory]   写入其中一条
   trace-canvas resume <线程>                       这条线上的会话（新的在前）和恢复每个会话的命令
 
 安装（--user 对所有项目，--project 目录 只对一个项目）

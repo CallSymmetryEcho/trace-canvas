@@ -1,4 +1,5 @@
 // Wording for records the hooks and CLI write. The page has its own table.
+export const fmtTokens = n => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(n || 0));
 const S = {
   en: {
     branchedFrom: (branch, parent) => `Branched ${branch} from ${parent}`,
@@ -16,6 +17,9 @@ const S = {
     sessionThread: (repo, date) => `${repo} session ${date}`,
     combinedFrom: names => `Combined from ${names}`,
     inbox: 'Inbox', branchDefault: n => `${n} · branch`, forkTitle: (p, ti) => `Forked from ${p}: ${ti}`,
+    retroTitle: (n, top, rounds) => `Retro: ${n} piece${n === 1 ? '' : 's'} of work; the most back-and-forth was "${top}" (${rounds} rounds)`,
+    retroNone: 'Retro: nothing to rank yet',
+    retroStats: r => `${r.rounds} rounds · ${r.minutes} min · ${fmtTokens(r.tokens)} tokens · ${r.corrections} corrections · ${r.sessions} session${r.sessions === 1 ? '' : 's'} · difficulty ${r.difficulty}`,
   },
   zh: {
     branchedFrom: (branch, parent) => `从 ${parent} 分出分支 ${branch}`,
@@ -33,6 +37,9 @@ const S = {
     sessionThread: (repo, date) => `${repo} 会话 ${date}`,
     combinedFrom: names => `由 ${names} 合并而来`,
     inbox: '收件箱', branchDefault: n => `${n} · 分支`, forkTitle: (p, ti) => `从「${p}」分叉：${ti}`,
+    retroTitle: (n, top, rounds) => `复盘：${n} 件事，来回最多的是「${top}」（${rounds} 轮）`,
+    retroNone: '复盘：还没有可排行的事',
+    retroStats: r => `${r.rounds} 轮 · ${r.minutes} 分钟 · ${fmtTokens(r.tokens)} token · 纠正 ${r.corrections} 次 · ${r.sessions} 个会话 · 难度 ${r.difficulty}`,
   },
 };
 export function tr(lang, key, ...args) {

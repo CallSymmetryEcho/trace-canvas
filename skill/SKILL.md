@@ -10,7 +10,7 @@ Trace Canvas shows work as a transit map. A **thread** is one piece of work in p
 
 In Claude Code, invoke `/trace-canvas` (arguments: `$ARGUMENTS`). In Codex, invoke `$trace-canvas` and read the action from the user's request.
 
-Actions: `capture`, `all`, `sessions`, `tasks`, `pick`, `live`, `bind <thread>`, `fork <thread>`, `merge <threads…>`, `open`, `log <text>`.
+Actions: `capture`, `all`, `sessions`, `tasks`, `pick`, `retro <thread>`, `live`, `bind <thread>`, `fork <thread>`, `merge <threads…>`, `open`, `log <text>`.
 
 Pick the matching action below. With no arguments, capture the current session.
 
@@ -67,6 +67,12 @@ Call `trace_tasks` (pass `thread` if the user named one) and show each thread's 
 1. Call `trace_tasks` with `mine: true`. If nothing is assigned to you, call `trace_tasks` for the line you work on and take its oldest open to-do that nobody has.
 2. Say in one line which to-do you take, then do it.
 3. When it is done, call `trace_task_done` with its id and `trace_log` the result on the same line.
+
+## retro <thread>: which work took the most back-and-forth, and what to keep
+
+1. Run `node <this skill's folder>/../bin/trace-canvas.mjs retro "<thread>"` (the line the user named, or the one you work on; `trace-canvas retro` if it is on the PATH). It reads the line's conversations on this machine and asks the local claude or codex to group them, so it takes a minute or two; run it in the background if your tool times out sooner. It puts the ranking on the line as a note and writes nothing else.
+2. Show the top items: title, rounds, minutes, tokens, corrections, and for each suggested rule what it was stuck on, the sentence that made it clear and the rule with its layer (project = CLAUDE.md and AGENTS.md, line = a decision on the line, memory = long-term memory).
+3. Ask the user about each rule, one by one. Write only the ones they approve, in the layer they choose, with the same command: `… retro --apply <record> <n> [--layer project|line|memory]`. Never edit the rule files yourself.
 
 ## live: what is running now
 

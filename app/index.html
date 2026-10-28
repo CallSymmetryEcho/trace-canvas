@@ -537,6 +537,17 @@ body.sheet-open .top { z-index: 80; }
 .l-status .ldot { align-self: center; }
 .l-status .act { font-weight: 400; color: var(--muted); overflow-wrap: anywhere; }
 .l-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.rt-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.rt-list li { display: grid; gap: 6px; padding: 10px 11px; border: 1px solid var(--rule-soft); border-radius: 10px; }
+.rt-bar { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.rt-bar i { display: block; height: 100%; border-radius: 3px; background: var(--c); filter: var(--line-filter, none); }
+.rt-stats { font-size: 12px; color: var(--muted); }
+.rt-why { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size: 13px; }
+.rt-why dt { color: var(--faint); }
+.rt-why dd { margin: 0; }
+.rt-act { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.rt-layer { padding: 5px 8px; border: 1px solid var(--rule); border-radius: 7px; background: var(--surface-2); color: var(--ink); font: inherit; font-size: 12.5px; max-width: 100%; }
+.rt-done { font-size: 12.5px; color: var(--accent); }
 .l-list li { display: grid; grid-template-columns: 10px 1fr; gap: 1px 8px; align-items: center; padding: 6px 9px; border: 1px solid var(--rule-soft); border-radius: 8px; cursor: pointer; }
 .l-list li:hover { border-color: var(--faint); }
 .l-list li.st-waiting { border-color: var(--warn); }
@@ -847,6 +858,12 @@ const I18N = {
     phoneAfter: 'On the phone you can read every line, add ideas and to-dos with the box at the bottom (pick a line, or start with #line name), and copy a prompt for an agent from a line\'s panel.',
     start: '▶ Start', startTitle: 'Start a Claude Code session on this line on your computer, with Remote Control on, so you can follow and approve it in the Claude app', startShow: 'Show it',
     tStarted: name => `Starting on "${name}": it shows in the Claude app in a moment`, tStartBusy: title => `A session is already running on this line${title ? `: ${title}` : ''}. Send it a message in the Claude app`,
+    retro: 'Retro', retroTitle: "Rank this line's work by back-and-forth with the agents and suggest rules. Your local claude or codex reads the conversations; nothing is written until you press Write on a rule.",
+    retroRunning: 'Reading the conversations… (a minute or two)', retroFail: e => `Retro failed: ${e}`,
+    retroHead: (p, n) => `${p} messages in ${n} session${n === 1 ? '' : 's'}, most back-and-forth first (rounds ÷ difficulty)`,
+    retroStats: (r, tok) => `${r.rounds} rounds · ${r.minutes} min · ${tok} tokens · ${r.corrections} correction${r.corrections === 1 ? '' : 's'} · ${r.sessions} session${r.sessions === 1 ? '' : 's'} · difficulty ${r.difficulty}`,
+    retroStuck: 'Stuck on', retroClear: 'Made clear by', retroRule: 'Rule', retroApply: 'Write', retroApplied: l => `Written: ${l}`,
+    retroLayers: { project: 'Project rules (CLAUDE.md, AGENTS.md)', line: 'This line', memory: 'Long-term memory' }, tRetroApplied: w => `Written to ${w}`,
     agentAsk: 'Prompt for an agent', agentPromptTitle: 'Copy a prompt that sends an agent to read this line and carry on', tAgentPrompt: 'Prompt copied: paste it to an agent, for example in the Claude app on your phone',
     agentPromptText: (name, id) => `Read the Trace Canvas line "${name}" (thread ${id}): use trace_read_thread and trace_tasks for its goal and open to-dos, carry on with them, and tick each one with trace_task_done when it is done.`, tSyncing: 'Syncing…', tSyncBusy: 'A sync is already running', tSyncFailed: e => `Sync failed: ${e}`,
     tSynced: (n, off) => `Synced: ${n} change${n === 1 ? '' : 's'} from other machines${off ? ' (offline; pushes next time)' : ''}`, onMachine: m => `On ${m}`,
@@ -1015,6 +1032,12 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     phoneAfter: '在手机上可以看每条线，用底部的输入框加想法和待办（选一条线，或者以 #线名 开头），也可以在线的面板里复制一段给 agent 的提示。',
     start: '▶ 开始', startTitle: '在电脑上为这条线开一个 Claude Code 会话（开着 Remote Control），在 Claude app 里就能跟进和批准', startShow: '查看',
     tStarted: name => `正在「${name}」上开工：稍等片刻就会出现在 Claude app 里`, tStartBusy: title => `这条线上已经有会话在跑${title ? `：${title}` : ''}。在 Claude app 里给它发消息就行`,
+    retro: '复盘', retroTitle: '按和 agent 来回的轮次给这条线的事排行，并建议规矩。由本机的 claude 或 codex 读对话；你在某条规矩上点「写入」之前，什么都不写。',
+    retroRunning: '正在读对话…（一两分钟）', retroFail: e => `复盘没做成：${e}`,
+    retroHead: (p, n) => `${n} 个会话里的 ${p} 条消息，来回最多的在前（轮次 ÷ 难度）`,
+    retroStats: (r, tok) => `${r.rounds} 轮 · ${r.minutes} 分钟 · ${tok} token · 纠正 ${r.corrections} 次 · ${r.sessions} 个会话 · 难度 ${r.difficulty}`,
+    retroStuck: '卡在', retroClear: '说清楚的那句', retroRule: '规矩', retroApply: '写入', retroApplied: l => `已写入：${l}`,
+    retroLayers: { project: '项目规矩（CLAUDE.md、AGENTS.md）', line: '这条线', memory: '长期记忆' }, tRetroApplied: w => `已写入 ${w}`,
     agentAsk: '给 agent 的提示', agentPromptTitle: '复制一段提示，让 agent 去读这条线并接着做', tAgentPrompt: '提示已复制：粘贴给 agent，比如手机 Claude app 里的会话',
     agentPromptText: (name, id) => `读 Trace Canvas 上的线「${name}」（thread ${id}）：用 trace_read_thread 和 trace_tasks 看它的目标和未完成的待办，接着做，每做完一项就用 trace_task_done 勾掉。`, tSyncing: '正在同步…', tSyncBusy: '已经有一个同步在进行', tSyncFailed: e => `同步失败：${e}`,
     tSynced: (n, off) => `已同步：从其他电脑收到 ${n} 处改动${off ? '（离线，下次再推送）' : ''}`, onMachine: m => `在 ${m} 上`,
@@ -2615,7 +2638,7 @@ function commitDetail(c) {
         <label class="fld"><span>${esc(t('dThread'))}</span><select id="d-thread">${threadOptions(tidOf(c))}</select></label>
       </div>
       ${c.kind === 'task' ? `<label class="check"><input type="checkbox" id="d-done" ${c.done ? 'checked' : ''}>${esc(t('dDone'))}</label>` : ''}
-      <label class="fld"><span>${esc(t('dBody'))}</span><textarea id="d-body" rows="5" placeholder="${esc(t('dBodyPh'))}">${esc(c.body || '')}</textarea></label>
+      ${c.retro ? retroView(c, th) : `<label class="fld"><span>${esc(t('dBody'))}</span><textarea id="d-body" rows="5" placeholder="${esc(t('dBodyPh'))}">${esc(c.body || '')}</textarea></label>`}
       <label class="fld"><span>${esc(t('dLinks'))}</span><textarea id="d-links" rows="2" placeholder="${esc(t('dLinksPh'))}">${esc((c.links || []).join('\n'))}</textarea></label>
       ${linksView(c.links)}
       ${c.machine && S.machine && c.machine !== S.machine ? `<div class="meta"><span>${esc(t('onMachine', c.machine))}</span></div>` : ''}
@@ -2640,6 +2663,37 @@ function commitDetail(c) {
 }
 // The line's sessions, running ones first, then the most recent. A running one opens its live panel;
 // each copies the command that resumes it, so work on a line goes on in its session.
+/* ---- retro ---- */
+const RETRO_LAYERS = ['project', 'line', 'memory'];
+const fmtTok = n => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(n || 0));
+function retroView(c, th) {
+  const R = c.retro, max = Math.max(1, ...R.items.map(r => r.rounds)), pick = S.ui.rt || {};
+  return `<div class="sec-label">${esc(t('retroHead', R.prompts, R.sessions))}</div>
+    <ol class="rt-list" style="--c:${th.color}">${R.items.map((r, k) => `<li>
+      <b>${k + 1}. ${esc(r.title)}</b>
+      <div class="rt-bar"><i style="width:${(r.rounds / max * 100).toFixed(1)}%"></i></div>
+      <div class="rt-stats">${esc(t('retroStats', r, fmtTok(r.tokens)))}</div>
+      ${r.rule ? `<dl class="rt-why">${r.stuck ? `<dt>${esc(t('retroStuck'))}</dt><dd>${esc(r.stuck)}</dd>` : ''}${r.clear ? `<dt>${esc(t('retroClear'))}</dt><dd>「${esc(r.clear)}」</dd>` : ''}<dt>${esc(t('retroRule'))}</dt><dd><b>${esc(r.rule)}</b></dd></dl>
+      ${r.applied ? `<span class="rt-done">${esc(t('retroApplied', t('retroLayers')[r.applied]))}</span>` : S.remote ? '' : `<div class="rt-act"><select class="rt-layer" data-n="${k + 1}">${RETRO_LAYERS.map(l => `<option value="${l}" ${l === (pick[k + 1] || r.layer) ? 'selected' : ''}>${esc(t('retroLayers')[l])}</option>`).join('')}</select><button class="btn btn-primary" data-act="retro-apply" data-n="${k + 1}">${esc(t('retroApply'))}</button></div>`}` : ''}
+    </li>`).join('')}</ol>`;
+}
+const postJSON = (url, body) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Trace-Canvas': '1' }, body: JSON.stringify(body) }).then(x => x.json()).catch(e => ({ error: String(e.message || e) }));
+async function runRetro(tid) {
+  if (S.retroBusy) return;
+  S.retroBusy = tid; render();
+  const r = await postJSON('/api/retro', { thread: tid });
+  S.retroBusy = null;
+  if (r.error) { toast(t('retroFail', r.error)); render(); return; }
+  // The note arrives with the next data change; open it once it is here.
+  let tries = 0;
+  const open = () => (S.commits.has(r.id) ? select({ type: 'commit', id: r.id }) : ++tries < 50 && setTimeout(open, 200));
+  open();
+}
+async function applyRetro(cid, n) {
+  const sel = detail.querySelector(`.rt-layer[data-n="${n}"]`);
+  const r = await postJSON('/api/retro/apply', { record: cid, n: Number(n), layer: sel ? sel.value : '' });
+  toast(r.error ? t('retroFail', r.error) : t('tRetroApplied', r.where));
+}
 function lineSessions(tid) {
   const live = liveOn(tid), byId = new Map(live.map(s => [s.id, s]));
   const known = new Set(S.sessions.map(s => s.id));
@@ -2687,6 +2741,7 @@ function threadDetail(th) {
         <button class="btn btn-primary" data-act="capture-here">${esc(t('captureHere'))}</button>
         ${!isInbox && S.start && th.status !== 'merged' ? `<button class="btn" data-act="start" title="${esc(t('startTitle'))}">${esc(t('start'))}</button>` : ''}
         ${!isInbox ? `<button class="btn" data-act="agent-prompt" title="${esc(t('agentPromptTitle'))}">${esc(t('agentAsk'))}</button>` : ''}
+        ${!isInbox && SERVER && !S.remote ? `<button class="btn" data-act="retro" title="${esc(t('retroTitle'))}" ${S.retroBusy ? 'disabled' : ''}>${esc(S.retroBusy === th.id ? t('retroRunning') : t('retro'))}</button>` : ''}
         ${!isInbox && th.status !== 'merged' ? (S.ui.merge
           ? `<div class="inline-form"><select id="t-merge">${threadOptions(th.parent && th.parent !== th.id ? th.parent : INBOX, { excludeId: th.id, onlyOpen: true })}</select><button class="btn btn-primary" data-act="merge">${esc(t('merge'))}</button><button class="btn" data-act="merge-cancel">${esc(t('cancel'))}</button></div>`
           : `<button class="btn" data-act="merge-open">${esc(t('mergeTo'))}</button>`) : ''}
@@ -2746,6 +2801,7 @@ detail.addEventListener('input', e => {
   } else if (s.type === 'edge' && el.id === 'e-label') patchDoc('edges', s.id, { label: el.value }, 600);
 });
 detail.addEventListener('change', e => {
+  if (e.target.classList.contains('rt-layer')) { (S.ui.rt ||= {})[e.target.dataset.n] = e.target.value; return; }
   if (e.target.classList.contains('gx-against')) { GX.against.set(e.target.dataset.cid, e.target.value); e.target.blur(); render(); return; }
   const el = e.target, s = S.sel; if (!s || S.readOnly) return;
   if (s.type === 'live' && el.id === 'l-thread') { bindLive(s.id, el.value); el.blur(); return; }
@@ -2777,6 +2833,8 @@ detail.addEventListener('click', e => {
     case 'gx-more': GX.more.add(b.dataset.key); render(); break;
     case 'goto-thread': select({ type: 'thread', id: b.dataset.tid }); break;
     case 'start': startOn({ thread: s.id }); break;
+    case 'retro': runRetro(s.id); break;
+    case 'retro-apply': applyRetro(s.id, b.dataset.n); break;
     case 'agent-prompt': { const th = getThread(s.id); copyText(t('agentPromptText', th.name, th.id), t('tAgentPrompt')); break; }
     case 'g-arrange': doArrange(s.id); break;
     case 'g-focus': setFocus(s.id); break;

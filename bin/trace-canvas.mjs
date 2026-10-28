@@ -104,6 +104,10 @@ Live sessions
   trace-canvas bind --unbind [--session id]        Back to its repository/branch line
   trace-canvas resume <thread>                     The line's sessions, newest first, each with the command that resumes it
   trace-canvas group <thread>... --name G | --clear   Put lines in a group (on the canvas they sit in one frame)
+  trace-canvas retro <thread>                      Rank the line's work by back-and-forth (rounds, time, tokens)
+                                                   and suggest rules, using your local claude or codex
+  trace-canvas retro --apply <record> <n> [--layer project|line|memory]
+                                                   Write suggestion n: CLAUDE.md/AGENTS.md, the line, or long-term memory
 
 Setup (pass --user for every project, or --project dir for one)
   trace-canvas setup            Hooks + MCP server + /trace-canvas skill
@@ -312,6 +316,33 @@ async function main() {
         console.log(`${s.status.padEnd(8)} ${s.agent.padEnd(11)} ${new Date(s.last).toISOString().slice(0, 16).replace('T', ' ')}  ${s.title.slice(0, 60)}`);
         console.log(`         ${s.command}`);
       }
+      break;
+    }
+    case 'retro': {
+      // trace-canvas retro <thread>: rank the line's work by rounds and suggest rules (nothing is written yet);
+      // trace-canvas retro --apply <record> <n> [--layer project|line|memory]: write suggestion n.
+      const { applyRetro, retroRecord, runRetro } = await import('../src/retro.mjs');
+      const { findThreadLoose } = await import('../src/ops.mjs');
+      const { readData } = await import('../src/store.mjs');
+      const { tr } = await import('../src/i18n.mjs');
+      const apply = str(flag('apply', '')), layer = str(flag('layer', '')), asJson = !!flag('json', false);
+      if (apply) {
+        const r = mutate(d => applyRetro(d, { record: apply, n: Number(argv[0]), layer }));
+        console.log(`Written to ${r.layer === 'project' ? r.where : r.layer === 'line' ? `the line "${r.where}"` : r.where}: ${r.rule}`);
+        break;
+      }
+      const ref = argv.join(' ').trim(), tid = ref && findThreadLoose(readData(), ref);
+      if (!tid) { console.error(ref ? `No thread named "${ref}"` : 'Usage: trace-canvas retro <thread>   (then --apply <record> <n> [--layer project|line|memory])'); process.exit(1); }
+      console.error('Reading the line\'s conversations and asking your local claude/codex to group them; this takes a minute or two…');
+      const res = await runRetro(readData(), tid), lang = readConfig().lang;
+      const c = mutate(d => retroRecord(d, tid, res, lang));
+      if (asJson) { console.log(JSON.stringify({ record: c.id, ...res }, null, 2)); break; }
+      console.log(`${c.title}\n${res.prompts} messages in ${res.sessions} session${res.sessions === 1 ? '' : 's'}; worst first (rounds ÷ difficulty):\n`);
+      res.items.forEach((r, k) => {
+        console.log(`${k + 1}. ${r.title}\n   ${tr(lang, 'retroStats', r)}`);
+        if (r.rule) console.log(`   stuck: ${r.stuck}\n   made clear by: ${r.clear}\n   rule (${r.layer}): ${r.rule}`);
+      });
+      if (res.items.some(r => r.rule)) console.log(`\nWrite one: trace-canvas retro --apply ${c.id} <n> [--layer project|line|memory]`);
       break;
     }
     case 'bind': {

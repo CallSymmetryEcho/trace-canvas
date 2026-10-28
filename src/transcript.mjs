@@ -91,7 +91,7 @@ const toolResultText = b => typeof b.content === 'string' ? b.content : Array.is
 export function parseTranscript(file) {
   const raw = fs.readFileSync(file, 'utf8');
   const s = { sessionId: path.basename(file, '.jsonl'), cwd: null, branch: null, title: null, startedAt: null, endedAt: null, turns: [] };
-  const pending = new Map();
+  const pending = new Map(), counted = new Set();
   let turn = null;
   for (const line of raw.split('\n')) {
     if (!line.trim()) continue;
@@ -123,9 +123,12 @@ export function parseTranscript(file) {
       if (j.isMeta || !text.trim() || isNoise(text)) continue;
       const prompt = cleanPrompt(text);
       if (!prompt) continue;
-      turn = { prompt, ts: ts || Date.now(), uuid: j.uuid || String(s.turns.length), files: [], actions: 0, git: [], todos: [], text: '', textTs: null };
+      turn = { prompt, ts: ts || Date.now(), uuid: j.uuid || String(s.turns.length), files: [], actions: 0, git: [], todos: [], text: '', textTs: null, tokens: 0 };
       s.turns.push(turn);
     } else if (j.type === 'assistant' && turn && Array.isArray(content)) {
+      // Tokens the turn used: every reply's input (cached or not) and output, once per reply (its blocks share one usage).
+      const u = j.message.usage;
+      if (u && !counted.has(j.message.id)) { counted.add(j.message.id); turn.tokens += (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.output_tokens || 0); }
       for (const b of content) {
         if (b.type === 'text' && b.text && b.text.trim()) { turn.text = b.text.trim(); turn.textTs = ts; }
         else if (b.type === 'tool_use') {

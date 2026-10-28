@@ -282,6 +282,12 @@ Agents without shell access (ChatGPT, for example) can end their answer with JSO
 {"thread": "Proposal", "kind": "agent", "title": "Outlined chapter 2", "body": "Next: figures", "agent": "ChatGPT"}
 ```
 
+## Retro: what took the most back-and-forth
+
+A simple change can still take a dozen rounds with an agent when one detail is missing, and the next time it starts from zero. **Retro** in a line's panel (or `trace-canvas retro <thread>`, or `/trace-canvas retro`) reads the line's Claude Code and Codex conversations on this machine and has your own `claude` (or `codex`) command line group them into pieces of work, matched to the line's to-dos where it can. Each piece gets its rounds (your messages), the time between them (a gap counts at most 30 minutes), the tokens its replies used, how often you corrected the agent and in how many sessions it came up, and they are ranked by rounds per unit of difficulty, so a simple thing that took many rounds comes first.
+
+For each piece with many rounds it names what was missing, quotes the sentence that finally made it clear and suggests a rule. Nothing is written until you press **Write** on a rule and pick where it goes: **project rules** (the project's CLAUDE.md and AGENTS.md, under "Rules from retros"), **this line** (a decision on the line), or **long-term memory** (Theatrum when it is installed, otherwise `~/.claude/CLAUDE.md`). The ranking stays on the line as a note. From the command line: `trace-canvas retro --apply <record> <n> [--layer project|line|memory]`.
+
 ## AI tidy-up
 
 If the `claude` command is installed, **AI tidy-up** in the header asks Claude to file inbox records into threads, suggest links between threads and point out threads that look stalled. Nothing changes until you tick the suggestions and apply them. It runs `claude -p` on your own account; the hooks are switched off for that call.
@@ -311,6 +317,8 @@ Live sessions
   trace-canvas bind <thread> [--session ID]        Put a running session on a thread (default: this one)
   trace-canvas bind --unbind [--session ID]        Back to its repository/branch line
   trace-canvas resume <thread>                     The line's sessions, newest first, each with the command that resumes it
+  trace-canvas retro <thread>                      Rank the line's work by back-and-forth and suggest rules
+  trace-canvas retro --apply <record> <n> [--layer project|line|memory]   Write one of them
 
 Setup (--user for every project, --project DIR for one)
   trace-canvas setup            Hooks + MCP server + skill

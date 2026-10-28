@@ -144,6 +144,12 @@ test('the MCP server speaks JSON-RPC over stdio and captures the current session
     await call('tools/call', { name: 'trace_log', arguments: { title: 'Ask the advisor about the sampling frame', thread: 'Advisor meeting', kind: 'task' } });
     const again = await call('tools/call', { name: 'trace_log', arguments: { title: '  ask the advisor about  the sampling frame', thread: 'Advisor meeting', kind: 'task' } });
     assert.match(again.result.content[0].text, /^Already an open to-do on "Advisor meeting"/);
+    // Without a thread, the session's own line; all: true for every line.
+    const mine = await call('tools/call', { name: 'trace_tasks', arguments: {} });
+    assert.deepEqual(mine.result.structuredContent.threads.map(r => r.name), ['Methods chapter draft']);
+    assert.deepEqual(mine.result.structuredContent.threads[0].tasks.map(t => Object.keys(t)), [['id', 'title']]); // an open to-do: no empty fields
+    const every = await call('tools/call', { name: 'trace_tasks', arguments: { all: true } });
+    assert.deepEqual(every.result.structuredContent.threads.map(r => r.name), ['Methods chapter draft', 'Advisor meeting']);
     const merged = await call('tools/call', { name: 'trace_merge', arguments: { sources: ['Advisor meeting'], target: 'Methods chapter draft', mode: 'merge' } });
     assert.match(merged.result.content[0].text, /^Merged "Advisor meeting" into "Methods chapter draft"/);
     const bad = await call('tools/call', { name: 'trace_merge', arguments: { sources: ['Nope'] } });

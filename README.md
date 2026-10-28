@@ -131,7 +131,7 @@ Capturing is safe to repeat: records already on the canvas are skipped. If the h
 | `trace_import_data` | Merges another data set: an export, `data.json` from another computer, or JSON lines |
 | `trace_live` | Lists the sessions running now, with status, activity and thread |
 | `trace_bind` | Puts a running session (the current one by default) on a thread |
-| `trace_tasks` | Returns each thread's goal and its to-dos, with how many are done |
+| `trace_tasks` | Returns the goal and the to-dos of the line the session works on (`thread` for another, `all: true` for every line), with how many are done |
 | `trace_task_done` | Ticks a to-do (or reopens it) and records who ticked it |
 | `trace_open` | Starts the page if needed and returns its address |
 
@@ -288,6 +288,10 @@ A simple change can still take a dozen rounds with an agent when one detail is m
 
 For each piece with many rounds it names what was missing, quotes the sentence that finally made it clear and suggests a rule. Nothing is written until you press **Write** on a rule and pick where it goes: **project rules** (the project's CLAUDE.md and AGENTS.md, under "Rules from retros"), **this line** (a decision on the line), or **long-term memory** (Theatrum when it is installed, otherwise `~/.claude/CLAUDE.md`). The ranking stays on the line as a note. From the command line: `trace-canvas retro --apply <record> <n> [--layer project|line|memory]`.
 
+## What Trace Canvas costs in tokens
+
+Trace Canvas adds a little text to each session: a few lines when it starts (its line, goal, your to-dos, where things are) and one line with every message (its line and the open to-dos, at most eight), plus whatever the `trace_*` tools return when an agent calls them. That text stays in the context and is read again on every later call, so it grows with the number of messages in a session, not with the size of your canvas; `trace_tasks` answers for the session's own line unless asked for more. `trace-canvas tokens` reads your recent Claude Code transcripts and shows each session's share: about 1% over a few days of heavy use here.
+
 ## AI tidy-up
 
 If the `claude` command is installed, **AI tidy-up** in the header asks Claude to file inbox records into threads, suggest links between threads and point out threads that look stalled. Nothing changes until you tick the suggestions and apply them. It runs `claude -p` on your own account; the hooks are switched off for that call.
@@ -318,6 +322,7 @@ Live sessions
   trace-canvas bind --unbind [--session ID]        Back to its repository/branch line
   trace-canvas resume <thread>                     The line's sessions, newest first, each with the command that resumes it
   trace-canvas retro <thread>                      Rank the line's work by back-and-forth and suggest rules
+  trace-canvas tokens [--days 7]                   How much of recent Claude Code sessions' tokens went to Trace Canvas
   trace-canvas retro --apply <record> <n> [--layer project|line|memory]   Write one of them
 
 Setup (--user for every project, --project DIR for one)

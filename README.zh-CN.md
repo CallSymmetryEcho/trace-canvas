@@ -131,7 +131,7 @@ node bin/trace-canvas.mjs setup --user
 | `trace_import_data` | 合并另一份数据：导出文件、另一台电脑的 `data.json`、或 JSON 行 |
 | `trace_live` | 列出正在运行的会话：状态、当前动作、所属线 |
 | `trace_bind` | 把一个运行中的会话（默认是当前会话）放到某条线上 |
-| `trace_tasks` | 返回每条线的目标和待办，以及完成了几项 |
+| `trace_tasks` | 返回会话所在这条线的目标和待办，以及完成了几项（`thread` 指定别的线，`all: true` 返回所有线） |
 | `trace_task_done` | 勾选一项待办（或重新打开），并记下是谁勾的 |
 | `trace_open` | 必要时启动页面，返回地址 |
 
@@ -288,6 +288,10 @@ node bin/trace-canvas.mjs log "文献对比表完成" \
 
 每件来回多的事，会写出卡在哪（缺了什么信息）、最后说清楚的那句话，并建议一条规矩。你在某条规矩上点**写入**并选好位置之前，什么都不写：**项目规矩**（项目的 CLAUDE.md 和 AGENTS.md，放在「Rules from retros」下面）、**这条线**（线上的一条决定）、**长期记忆**（装了 Theatrum 就写进 Theatrum，否则写进 `~/.claude/CLAUDE.md`）。排行作为一条笔记留在线上。命令行：`trace-canvas retro --apply <记录> <序号> [--layer project|line|memory]`。
 
+## Trace Canvas 花多少 token
+
+Trace Canvas 会往会话里加一点文字：开头几行（所在的线、目标、你的待办、东西在哪），每条消息一行（所在的线和已有的待办，最多八条），再加上 agent 调用 `trace_*` 工具时的返回。这些文字留在上下文里，之后每次调用都会再读一遍，所以开销随一个会话的消息条数增长，不随画布变大而增长；`trace_tasks` 默认只回答会话所在的这条线。`trace-canvas tokens` 读最近的 Claude Code 对话记录，列出每个会话里这部分的占比：这里几天的重度使用下大约 1%。
+
 ## AI 梳理
 
 本机装了 `claude` 命令时，顶栏的 **AI 梳理** 会让 Claude 把收件箱里的记录归到线程、建议线程之间的关联、指出看起来停滞的线程。勾选并点应用之前不会改动任何东西。它用你自己的账号运行 `claude -p`，这次调用不会触发留痕 hooks。
@@ -317,6 +321,7 @@ node bin/trace-canvas.mjs log "文献对比表完成" \
   trace-canvas bind <线程> [--session ID]          把运行中的会话放到某条线上（默认是当前会话）
   trace-canvas bind --unbind [--session ID]        改回按仓库和分支自动归线
   trace-canvas retro <线程>                        按来回轮次给这条线的事排行，并建议规矩
+  trace-canvas tokens [--days 7]                   最近的 Claude Code 会话里，有多少 token 花在 Trace Canvas 上
   trace-canvas retro --apply <记录> <序号> [--layer project|line|memory]   写入其中一条
   trace-canvas resume <线程>                       这条线上的会话（新的在前）和恢复每个会话的命令
 

@@ -149,6 +149,40 @@ export function parseTranscript(file) {
   return s;
 }
 
+/**
+ * What Trace Canvas adds to a Claude Code session: its hook text and its trace_* tool calls and results
+ * enter the context and are read again by every later call, until a compaction. `reread` sums that over
+ * the calls, next to `total`, every token the session processed. The Trace Canvas text is counted from its
+ * characters (ASCII / 3.5, other characters 1 each), an estimate; the session's own totals are exact.
+ */
+const estTokens = s => { let a = 0, n = 0; for (const ch of s) { n++; if (ch.charCodeAt(0) < 128) a++; } return a / 3.5 + (n - a); };
+export function canvasTokens(file) {
+  const r = { calls: 0, total: 0, reread: 0, notes: 0, noteTokens: 0, toolTokens: 0 };
+  const seen = new Set(), ours = new Set();
+  let now = 0;
+  for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
+    let j; try { j = JSON.parse(line); } catch { continue; }
+    const m = j.message || {}, a = j.attachment;
+    if (j.type === 'system' && j.subtype === 'compact_boundary') now = 0;
+    else if (j.type === 'attachment' && a && a.type === 'hook_additional_context') {
+      const s = (a.content || []).join('\n');
+      if (s.includes('Trace Canvas')) { const k = estTokens(s); now += k; r.notes++; r.noteTokens += k; }
+    } else if (j.type === 'user' && Array.isArray(m.content)) {
+      for (const b of m.content) if (b && b.type === 'tool_result' && ours.has(b.tool_use_id)) { const k = estTokens(toolResultText(b)); now += k; r.toolTokens += k; }
+    } else if (j.type === 'assistant') {
+      for (const b of Array.isArray(m.content) ? m.content : []) {
+        if (b && b.type === 'tool_use' && String(b.name).startsWith('mcp__trace-canvas__')) { ours.add(b.id); const k = estTokens(JSON.stringify(b.input || {})); now += k; r.toolTokens += k; }
+      }
+      const u = m.usage;
+      if (u && !seen.has(m.id)) {
+        seen.add(m.id); r.calls++; r.reread += now;
+        r.total += (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.output_tokens || 0);
+      }
+    }
+  }
+  return r;
+}
+
 // A short description of a session for listings.
 export function describeSession(file) {
   const s = parseTranscript(file);

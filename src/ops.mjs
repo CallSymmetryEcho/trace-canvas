@@ -52,7 +52,7 @@ export function listTasks(d, { thread, includeDone = false, assignee } = {}) {
     const open = tasks.filter(c => !c.done);
     return {
       id, name: th.name, ...(th.group ? { group: th.group } : {}), goal: goalOf(th), status: th.status || 'active', done: tasks.length - open.length, total: tasks.length,
-      tasks: (includeDone ? tasks : open).map(c => ({ id: c.id, title: c.title, assignee: c.assignee || null, done: !!c.done, doneBy: c.doneBy || null, doneAt: c.doneAt ? new Date(c.doneAt).toISOString() : null })),
+      tasks: (includeDone ? tasks : open).map(c => ({ id: c.id, title: c.title, ...(c.assignee ? { assignee: c.assignee } : {}), ...(c.done ? { done: true, doneBy: c.doneBy || null, doneAt: c.doneAt ? new Date(c.doneAt).toISOString() : null } : {}) })),
     };
   }).filter(r => r.total || r.goal).filter(r => only || !['done', 'merged'].includes(r.status) || r.total > r.done);
 }
@@ -396,11 +396,11 @@ export function listThreads(d, { query, includeDone = true } = {}) {
       return {
         id: t.id, name: t.name, ...(t.group ? { group: t.group } : {}), status: t.status || 'active', records: cs.length,
         lastUpdate: cs.length ? new Date(cs[cs.length - 1].ts).toISOString() : null,
-        sessions: [...new Set(cs.map(c => c.session).filter(Boolean))].length,
+        ...(cs.some(c => c.session) ? { sessions: new Set(cs.map(c => c.session).filter(Boolean)).size } : {}),
         ...(t.parent ? { forkedFrom: (d.threads[t.parent] || {}).name || 'Inbox' } : {}),
         ...(t.mergedInto ? { mergedInto: (d.threads[t.mergedInto] || {}).name } : {}),
         ...(q ? { matches: hits } : {}),
-        latest: cs.length ? cs[cs.length - 1].title : '',
+        latest: cs.length ? cs[cs.length - 1].title.slice(0, 80) : '',
       };
     });
   return q ? rows.filter(r => r.matches || norm(r.name).includes(q)) : rows;

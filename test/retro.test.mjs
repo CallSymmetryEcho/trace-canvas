@@ -102,3 +102,20 @@ test('a CLAUDE.md that imports AGENTS.md gets the rule once, through AGENTS.md',
   assert.equal(fs.readFileSync(path.join(proj, 'CLAUDE.md'), 'utf8'), '@AGENTS.md\n');
   assert.equal(fs.readFileSync(path.join(proj, 'AGENTS.md'), 'utf8'), '# Project\n\nBuild with make.\n\n## Rules from retros\n\n- Run make test first\n');
 });
+
+test('Trace Canvas\'s share of a session: its text is re-read by every later call, until a compaction', async () => {
+  const { canvasTokens } = await import('../src/transcript.mjs');
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tc-tok-')), 's.jsonl');
+  const call = (id, usage, content = []) => ({ type: 'assistant', message: { id, role: 'assistant', content, usage } });
+  fs.writeFileSync(file, jl([
+    { type: 'attachment', attachment: { type: 'hook_additional_context', content: ['Trace Canvas: ' + 'x'.repeat(21)] } }, // 35 chars: 10 tokens
+    call('m1', { input_tokens: 100, output_tokens: 10 }),
+    call('m2', { input_tokens: 120, output_tokens: 5 }, [{ type: 'tool_use', id: 't1', name: 'mcp__trace-canvas__trace_tasks', input: { x: 1 } }]), // {"x":1}: 2
+    call('m2', { input_tokens: 120, output_tokens: 5 }),
+    { type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 't1', content: 'abcdefghijklmn' }] } }, // 4
+    call('m3', { cache_read_input_tokens: 200, output_tokens: 5 }),
+    { type: 'system', subtype: 'compact_boundary' },
+    call('m4', { input_tokens: 50 }),
+  ]));
+  assert.deepEqual(canvasTokens(file), { calls: 4, total: 490, reread: 10 + 12 + 16, notes: 1, noteTokens: 10, toolTokens: 6 });
+});

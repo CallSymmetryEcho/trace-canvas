@@ -5,7 +5,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { addCommit, dataFile, ensureThread, importText, INBOX, mutate, readConfig, readData, threadById, threadIdOf } from './store.mjs';
-import { whereFind } from './hook.mjs';
+import { sessionThread, whereFind } from './hook.mjs';
 import { agentKey, agentOf } from './agents.mjs';
 import { bindLiveSession, captureSession, forkThread, listTasks, listThreads, liveSessions, mergeDataset, mergeThreads, readThread, setTaskDone } from './ops.mjs';
 import { currentSessionId, describeSession, findTranscript, findTranscripts, parseTranscript } from './transcript.mjs';
@@ -104,8 +104,8 @@ const TOOLS = [
   {
     name: 'trace_tasks',
     title: 'Goals and to-dos',
-    description: 'Returns the goal and the to-dos of each thread (or of one thread), with how many are done. Read it before working on a thread; tick to-dos with trace_task_done when they are finished.',
-    inputSchema: { type: 'object', properties: { thread: { type: 'string', description: 'Thread id or name; omit for all threads (or the thread this session was handed).' }, include_done: { type: 'boolean', description: 'Also list finished to-dos (default false).' }, mine: { type: 'boolean', description: 'Only the to-dos assigned to you.' }, assignee: { type: 'string', enum: ['claude', 'codex', 'gemini'] } } },
+    description: 'Returns the goal and the to-dos of the thread this session works on (or of another thread, or of all), with how many are done. Read it before working on a thread; tick to-dos with trace_task_done when they are finished.',
+    inputSchema: { type: 'object', properties: { thread: { type: 'string', description: 'Thread id or name; omit for the thread this session works on.' }, all: { type: 'boolean', description: 'Every thread instead of this session\'s.' }, include_done: { type: 'boolean', description: 'Also list finished to-dos (default false).' }, mine: { type: 'boolean', description: 'Only the to-dos assigned to you.' }, assignee: { type: 'string', enum: ['claude', 'codex', 'gemini'] } } },
     annotations: { readOnlyHint: true },
   },
   {
@@ -242,7 +242,10 @@ async function callTool(name, a = {}) {
     }
     case 'trace_tasks': {
       const d = readData();
-      const thread = a.thread || (process.env.TRACE_CANVAS_THREAD && threadById(d, process.env.TRACE_CANVAS_THREAD) ? process.env.TRACE_CANVAS_THREAD : undefined);
+      let thread = a.thread || (process.env.TRACE_CANVAS_THREAD && threadById(d, process.env.TRACE_CANVAS_THREAD) ? process.env.TRACE_CANVAS_THREAD : undefined);
+      // Without a thread: the line this session works on, so the answer stays small as the canvas grows; every line
+      // with all: true, for mine or an assignee, or when the session's line is not known.
+      if (!thread && !a.all && !a.mine && !a.assignee) try { const sid = currentSessionId({ sessionId: a.session_id, projectDir: projectDir() }); thread = (sid && sessionThread(d, { id: sid }).threadId) || undefined; } catch {}
       const rows = listTasks(d, { thread, includeDone: !!a.include_done, assignee: a.mine ? agentKey() : a.assignee });
       const open = rows.reduce((n, r) => n + (r.total - r.done), 0);
       return { text: `${open} open to-do${open === 1 ? '' : 's'} on ${rows.length} thread${rows.length === 1 ? '' : 's'}.`, data: { threads: rows } };
@@ -302,7 +305,7 @@ async function handle(msg) {
       if (!TOOLS.some(t => t.name === name)) return fail(-32602, `Unknown tool: ${name}`);
       try {
         const r = await callTool(name, (params && params.arguments) || {});
-        return reply({ content: [{ type: 'text', text: `${r.text}\n${JSON.stringify(r.data, null, 2)}` }], structuredContent: r.data });
+        return reply({ content: [{ type: 'text', text: `${r.text}\n${JSON.stringify(r.data)}` }], structuredContent: r.data }); // compact: agents that read the text pay for every space
       } catch (e) {
         return reply({ content: [{ type: 'text', text: String(e && e.message || e) }], isError: true });
       }

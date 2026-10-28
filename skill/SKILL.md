@@ -60,7 +60,7 @@ Call `trace_fork` with `from` (the thread or record the user named) and `name`. 
 
 ## tasks: goals and to-dos
 
-Call `trace_tasks` (pass `thread` if the user named one) and show each thread's goal, its progress (done/total) and its open to-dos. When you finish a to-do during the session, call `trace_task_done` with its id. To add a to-do, call `trace_log` with `kind: "task"` and the thread.
+Call `trace_tasks` (it answers for the line this session works on; pass `thread` if the user named another, or `all: true` when they want every line) and show each thread's goal, its progress (done/total) and its open to-dos. When you finish a to-do during the session, call `trace_task_done` with its id. To add a to-do, call `trace_log` with `kind: "task"` and the thread.
 
 ## pick: take the next to-do and do it
 

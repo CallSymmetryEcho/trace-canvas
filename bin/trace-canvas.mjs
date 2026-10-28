@@ -104,6 +104,7 @@ Live sessions
   trace-canvas bind --unbind [--session id]        Back to its repository/branch line
   trace-canvas resume <thread>                     The line's sessions, newest first, each with the command that resumes it
   trace-canvas group <thread>... --name G | --clear   Put lines in a group (on the canvas they sit in one frame)
+  trace-canvas tokens [--days 7]                   How much of recent Claude Code sessions' tokens went to Trace Canvas
   trace-canvas retro <thread>                      Rank the line's work by back-and-forth (rounds, time, tokens)
                                                    and suggest rules, using your local claude or codex
   trace-canvas retro --apply <record> <n> [--layer project|line|memory]
@@ -316,6 +317,26 @@ async function main() {
         console.log(`${s.status.padEnd(8)} ${s.agent.padEnd(11)} ${new Date(s.last).toISOString().slice(0, 16).replace('T', ' ')}  ${s.title.slice(0, 60)}`);
         console.log(`         ${s.command}`);
       }
+      break;
+    }
+    case 'tokens': {
+      // trace-canvas tokens [--days 7]: how much of recent Claude Code sessions' tokens went to Trace Canvas.
+      const { canvasTokens, projectsRoot } = await import('../src/transcript.mjs');
+      const { fmtTokens } = await import('../src/i18n.mjs');
+      const days = Number(flag('days', 7)) || 7, since = Date.now() - days * 864e5, root = projectsRoot(), rows = [];
+      const ls = dir => { try { return fs.readdirSync(dir); } catch { return []; } };
+      for (const dir of ls(root)) for (const f of ls(path.join(root, dir)).filter(f => f.endsWith('.jsonl'))) {
+        const p = path.join(root, dir, f);
+        if (fs.statSync(p).mtimeMs < since) continue;
+        const r = canvasTokens(p);
+        if (r.calls >= 5 && (r.notes || r.toolTokens)) rows.push({ ...r, name: `${f.slice(0, 8)} ${dir.replace(/^-Users-[^-]+-/, '').slice(0, 28)}` });
+      }
+      if (!rows.length) { console.log(`No Claude Code sessions with Trace Canvas in the last ${days} days.`); break; }
+      const pct = (a, b) => `${(100 * a / Math.max(1, b)).toFixed(2)}%`, k = n => fmtTokens(Math.round(n));
+      console.log(`${'session'.padEnd(38)}${'calls'.padStart(6)}${'notes'.padStart(6)}${'per note'.padStart(9)}${'tools'.padStart(7)}${'total'.padStart(8)}${'Trace Canvas'.padStart(13)}`);
+      for (const r of rows.sort((a, b) => b.total - a.total)) console.log(`${r.name.padEnd(38)}${String(r.calls).padStart(6)}${String(r.notes).padStart(6)}${k(r.noteTokens / (r.notes || 1)).padStart(9)}${k(r.toolTokens).padStart(7)}${k(r.total).padStart(8)}${pct(r.reread, r.total).padStart(13)}`);
+      const T = rows.reduce((n, r) => n + r.total, 0), R = rows.reduce((n, r) => n + r.reread, 0);
+      console.log(`\n${rows.length} session${rows.length === 1 ? '' : 's'} in the last ${days} days: ${k(T)} tokens processed, ${k(R)} of them (${pct(R, T)}) re-reading what Trace Canvas added (hook notes, trace_* calls and results; estimated from their characters).`);
       break;
     }
     case 'retro': {

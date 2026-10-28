@@ -144,13 +144,15 @@ export function codexWritable(file, dir) {
 }
 export const onPath = (cmd, env = process.env) => { try { execFileSync('which', [cmd], { stdio: 'ignore', env }); return true; } catch { return false; } };
 
-// The trace-canvas command: a small script in the user's own bin folder, if it is on the PATH (never a system folder),
-// so the commands in the README work as typed. It runs this clone's CLI with the node that ran setup, as the hooks do:
+// The trace-canvas command: a small script in the user's own bin folder on the PATH (~/.local/bin, ~/bin, else the
+// folder of the node on the PATH when it is the user's, as with npm -g; never a system folder), so the README's commands
+// work as typed. It runs this clone's CLI with the node that ran setup, as the hooks do:
 // another shell (a login shell over ssh, say) may find an older node first. Otherwise the alias line to add.
 const CMD_MARK = '# trace-canvas command (setup)';
 export function linkCommand(cli, env = process.env, homeDir = os.homedir(), node = NODE) {
-  const onIt = (env.PATH || '').split(path.delimiter);
-  for (const dir of [path.join(homeDir, '.local', 'bin'), path.join(homeDir, 'bin')]) {
+  const onIt = (env.PATH || '').split(path.delimiter).filter(Boolean);
+  const nodeDir = onIt.find(d => { try { return fs.statSync(path.join(d, 'node')).isFile() && fs.statSync(d).uid === process.getuid(); } catch { return false; } });
+  for (const dir of [path.join(homeDir, '.local', 'bin'), path.join(homeDir, 'bin'), nodeDir].filter(Boolean)) {
     if (!onIt.includes(dir)) continue;
     try { fs.accessSync(dir, fs.constants.W_OK); } catch { continue; }
     const dest = path.join(dir, 'trace-canvas');

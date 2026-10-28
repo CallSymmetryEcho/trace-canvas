@@ -126,4 +126,8 @@ test('setup makes trace-canvas a command in the user\'s own bin folder on the PA
   assert.ok(linkCommand(cli, env, home, node).ok); // again: our script is replaced
   fs.unlinkSync(path.join(local, 'trace-canvas')); fs.writeFileSync(path.join(local, 'trace-canvas'), 'someone else\'s');
   assert.ok(linkCommand(cli, env, home).hint); // a file that is not our link stays
+  // No ~/.local/bin or ~/bin on the PATH: the folder of the user's own node, as npm -g would use.
+  const nodeDir = path.join(home, 'brew', 'bin');
+  fs.mkdirSync(nodeDir, { recursive: true }); fs.writeFileSync(path.join(nodeDir, 'node'), '');
+  assert.deepEqual(linkCommand(cli, { PATH: `/usr/bin${path.delimiter}${nodeDir}` }, path.join(home, 'nohome'), node), { ok: true, where: path.join(nodeDir, 'trace-canvas') });
 });

@@ -704,6 +704,7 @@ body.sheet-open .top { z-index: 80; }
         <button data-menu="agent" data-i18n="menuAgent">Connect an AI agent</button>
         <button data-menu="io" data-i18n="menuIO">Import / export</button>
         <button data-menu="sync" id="sync-item" hidden data-i18n="menuSync">Sync with other machines</button>
+        <button data-menu="away" id="away-item" hidden><span id="away-label"></span></button>
         <button data-menu="phone" id="phone-item" hidden data-i18n="menuPhone">Open on your phone</button>
         <button data-menu="clear-examples" id="clear-ex-item" hidden data-i18n="menuClearEx">Clear example data</button>
         <hr>
@@ -855,7 +856,7 @@ const I18N = {
     focusNoGroups: 'No groups yet. Select lines on the canvas and press Group, or fill in a group in a line\'s panel.', groupUngroup: 'Ungroup',
     threadGroup: 'Group', threadGroupPh: 'None', multiGroup: 'Group', multiGroupPh: 'Group name', tGroupNeedName: 'Type a group name first',
     tGrouped: (n, g) => `${n} line${n === 1 ? '' : 's'} in "${g}"`, tUngrouped: 'Group dissolved; the lines stay',
-    menuSync: 'Sync with other machines', menuPhone: 'Open on your phone', phoneTitle: 'Open on your phone',
+    menuSync: 'Sync with other machines', menuAway: on => `Other machines' sessions: ${on ? 'shown' : 'off'}`, tAway: on => on ? 'The live bar now shows sessions running on your other machines (read over ssh every 15 s)' : 'Other machines\' sessions are off', menuPhone: 'Open on your phone', phoneTitle: 'Open on your phone',
     phoneIntro: 'Scan this with the phone camera. The phone needs Tailscale, signed in to the same account as this computer. The address carries a key: keep it to yourself.',
     phoneAfter: 'On the phone you can read every line, add ideas and to-dos with the box at the bottom (pick a line, or start with #line name), and copy a prompt for an agent from a line\'s panel.',
     start: '▶ Start', startTitle: 'Start a Claude Code session on this line on your computer, with Remote Control on, so you can follow and approve it in the Claude app', startShow: 'Show it',
@@ -1029,7 +1030,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     focusNoGroups: '还没有分组。在画布上选中几条线点「编组」，或者在线面板里填写分组。', groupUngroup: '解散分组',
     threadGroup: '分组', threadGroupPh: '无', multiGroup: '编组', multiGroupPh: '分组名称', tGroupNeedName: '先填分组名称',
     tGrouped: (n, g) => `${n} 条线已放进「${g}」`, tUngrouped: '分组已解散，线都还在',
-    menuSync: '和其他电脑同步', menuPhone: '在手机上打开', phoneTitle: '在手机上打开',
+    menuSync: '和其他电脑同步', menuAway: on => `其他电脑的会话：${on ? '显示中' : '已关闭'}`, tAway: on => on ? '实时栏会显示其他电脑上正在跑的会话（每 15 秒通过 ssh 读一次）' : '已关闭其他电脑的会话', menuPhone: '在手机上打开', phoneTitle: '在手机上打开',
     phoneIntro: '用手机相机扫这个二维码。手机要装 Tailscale，并登录和这台电脑相同的账号。地址里带着密钥，不要发给别人。',
     phoneAfter: '在手机上可以看每条线，用底部的输入框加想法和待办（选一条线，或者以 #线名 开头），也可以在线的面板里复制一段给 agent 的提示。',
     start: '▶ 开始', startTitle: '在电脑上为这条线开一个 Claude Code 会话（开着 Remote Control），在 Claude app 里就能跟进和批准', startShow: '查看',
@@ -1682,6 +1683,8 @@ async function loadServer() {
     for (const col of COLS) applyRows(col, data[col] || [], seq);
     S.sessions = data.sessions || [];
     S.machine = data.machine || ''; S.platform = data.platform || ''; S.remote = !!data.remote; S.start = !!data.start;
+    // Other machines' sessions in the live bar: offered once the canvas knows another machine (sync).
+    S.awayLive = !!data.awayLive; $('#away-item').hidden = !(data.machines || []).length; $('#away-label').textContent = t('menuAway', S.awayLive);
     if (S.offline) { S.offline = false; renderSync(); }
   } catch { S.offline = true; COLS.forEach(c => S.got.add(c)); renderSync(); render(); }
 }
@@ -1886,6 +1889,7 @@ function renderAll() {
   $('#clear-ex-item').hidden = !hasExamples();
   $('#toggle-done-label').textContent = S.hideDone ? t('menuShowDone') : t('menuHideDone');
   $('#theme-label').textContent = t('menuTheme', t('theme_' + themeNow()));
+  $('#away-label').textContent = t('menuAway', !!S.awayLive);
   if (S.view === 'canvas') renderCanvas();
   else if (S.view === 'git') renderGit();
   else if (S.view === 'agents') renderAgents();
@@ -3008,6 +3012,10 @@ menu.addEventListener('click', e => {
   else if (k === 'toggle-done') { S.hideDone = !S.hideDone; ls.set('tc.hideDone', S.hideDone); render(); }
   else if (k === 'clear-examples') { if (canWrite()) clearExamples(); }
   else if (k === 'sync') syncNow();
+  else if (k === 'away') {
+    S.awayLive = !S.awayLive; $('#away-label').textContent = t('menuAway', S.awayLive);
+    postJSON('/api/config', { awayLive: S.awayLive }).then(() => { toast(t('tAway', S.awayLive)); loadLive(); });
+  }
   else openSheet(k);
 });
 $('#ex-clear').onclick = () => { if (canWrite()) clearExamples(); };

@@ -70,7 +70,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
   let away = [], awaySig = '';
   const pollAway = async () => {
     if (!clients.size) return;
-    const got = await Promise.all(otherMachines(readData()).map(remoteLive));
+    const got = readConfig().awayLive ? await Promise.all(otherMachines(readData()).map(remoteLive)) : [];
     const sig = JSON.stringify(got.map(m => [m.machine, m.error ? 'x' : '', m.sessions.map(s => [s.id, s.status, s.activity, s.threadId])]));
     away = got;
     if (sig !== awaySig) { awaySig = sig; broadcast('live'); }
@@ -102,7 +102,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
       if (req.method === 'GET' && p === '/api/data') {
         // desktopId: the Claude desktop app's id of a session, so the page can open its chat (claude://…).
         const d = readData(), desk = desktopSessions();
-        return send(res, 200, { ...toArrays(d), sessions: sessionList(d).map(s => ({ ...s, desktopId: (desk.get(s.id) || {}).desktopId || null })), machine: readConfig().machine, platform: process.platform, remote, start: canStart(remote) });
+        return send(res, 200, { ...toArrays(d), sessions: sessionList(d).map(s => ({ ...s, desktopId: (desk.get(s.id) || {}).desktopId || null })), machine: readConfig().machine, platform: process.platform, remote, start: canStart(remote), awayLive: readConfig().awayLive, machines: otherMachines(d) });
       }
       if (req.method === 'GET' && p === '/api/live') return send(res, 200, { ...liveSessions(readData()), away });
       // What a commit record changed, read from git on demand (src/git-view.mjs).
@@ -168,7 +168,9 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         const body = JSON.parse(await readBody(req));
         const patch = {};
         if (body.lang === 'en' || body.lang === 'zh') patch.lang = body.lang;
+        if (typeof body.awayLive === 'boolean') patch.awayLive = body.awayLive;
         writeConfig(patch);
+        if ('awayLive' in patch) pollAway();
         return send(res, 200, { ok: true });
       }
       if (req.method === 'POST' && p === '/api/demo') {

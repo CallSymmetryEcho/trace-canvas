@@ -93,6 +93,8 @@ export function readConfig(env = process.env) {
     machine: env.TRACE_CANVAS_MACHINE || file.machine || os.hostname().split('.')[0].toLowerCase(),
     // Phone access (trace-canvas phone): { host, ip, bind, port?, token }, or null when off.
     phone: file.phone || null,
+    // The live bar also shows other machines' running sessions, read over ssh (More → Other machines' sessions).
+    awayLive: !!file.awayLive,
   };
 }
 const machines = new Map(); // data folder → machine name; ponytail: read once per process

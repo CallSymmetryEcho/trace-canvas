@@ -40,6 +40,8 @@ A transit map of your work. When you work with AI agents, ideas and tasks run in
 
 Videos: [2-minute tutorial](https://github.com/CallSymmetryEcho/trace-canvas/releases/tag/v0.1.0) in English and Chinese.
 
+Promo site: [`site/`](site/README.md), one page with a tour along a growing branch graph, the feature clips and the videos (preview with `python3 -m http.server -d site`).
+
 ![Branches view: live tips, an approval, your decision and the agent's result](docs/gif-branches.en.gif)
 
 *Branches: running sessions sit as live tips on top of their lines. The orange one waits for you; once approved it turns green, your decision appears dark and the agent's result in the line's colour. Made-up data.*

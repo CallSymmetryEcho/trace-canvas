@@ -1,0 +1,615 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trace Canvas — A map both people and agents can read</title>
+<meta name="description" content="Every AI coding session becomes a line on one transit map, and your agents read the same map to pick up where another left off. Runs locally, needs only Node.js, MIT.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Trace Canvas — A map both people and agents can read">
+<meta property="og:description" content="Every AI coding session becomes a line on one transit map, and your agents read the same map to pick up where another left off. Runs locally, needs only Node.js, MIT.">
+<!-- ponytail: relative until the site has a host; most scrapers want an absolute og:image URL -->
+<meta property="og:image" content="media/cover-tutorial.en.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<script>
+// Language before first paint: the saved choice, else the browser's first language.
+(function () {
+  var l;
+  try { l = localStorage.getItem('tc-site-lang'); } catch (e) {}
+  if (l !== 'en' && l !== 'zh') l = /^zh/i.test((navigator.languages && navigator.languages[0]) || navigator.language || '') ? 'zh' : 'en';
+  document.documentElement.lang = l === 'zh' ? 'zh-CN' : 'en';
+})();
+</script>
+<style>
+/* Tokens from app/index.html :root */
+:root {
+  --bg: #ECEEEA; --surface: #FFFFFF; --surface-2: #F5F6F3; --ink: #15181C; --muted: #59616B; --faint: #8A919A;
+  --rule: #D3D7D1; --rule-soft: #E3E6E1; --accent: #1D4ED8; --accent-soft: #DCE5FB; --accent-ink: #FFFFFF;
+  --shadow: 0 1px 2px rgba(20, 24, 28, .06), 0 8px 24px rgba(20, 24, 28, .10);
+  --code-bg: #15181C; --code-ink: #E6E9ED;
+  --f-display: "Barlow Condensed", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --f-body: "Barlow", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  /* the rail: gutter width, main lane x, lane spacing, line width */
+  --gut: 112px; --l0: 38px; --lg: 26px; --sw: 8;
+  --pad: 28px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #101317; --surface: #191D23; --surface-2: #14181D; --ink: #E6E9ED; --muted: #9AA3AD; --faint: #6D7681;
+    --rule: #2B3139; --rule-soft: #22272E; --accent: #7397FF; --accent-soft: #1E2A48; --accent-ink: #0B1020;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px rgba(0, 0, 0, .45);
+    --code-bg: #191D23;
+  }
+}
+@media (max-width: 720px) { :root { --gut: 50px; --l0: 15px; --lg: 12px; --sw: 5; --pad: 18px; } }
+
+html[lang="en"] [data-l="zh"], html[lang="zh-CN"] [data-l="en"] { display: none !important; }
+
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.6 var(--f-body); -webkit-font-smoothing: antialiased; }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+h1, h2, h3, p, figure, pre { margin: 0; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+code { font-family: var(--f-mono); font-size: .86em; background: var(--surface-2); border: 1px solid var(--rule-soft); padding: .05em .35em; border-radius: 5px; overflow-wrap: anywhere; }
+section { scroll-margin-top: 64px; }
+
+/* ---------- header ---------- */
+.top {
+  position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px 22px;
+  padding: 10px max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
+  background: color-mix(in srgb, var(--bg) 86%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--rule-soft);
+}
+.brand { display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none; }
+.brand svg { width: 64px; height: auto; display: block; }
+.brand b { font: 700 22px/1 var(--f-display); letter-spacing: .01em; white-space: nowrap; }
+.top nav { display: flex; gap: 20px; margin-left: auto; }
+.top nav a { color: var(--muted); text-decoration: none; font-weight: 500; font-size: 15px; }
+.top nav a:hover { color: var(--ink); }
+.pill { font: 600 14px/1 var(--f-body); color: var(--ink); background: var(--surface); border: 1px solid var(--rule); border-radius: 999px; padding: 8px 14px; cursor: pointer; text-decoration: none; white-space: nowrap; }
+.pill:hover { border-color: var(--faint); }
+@media (max-width: 720px) {
+  .top { gap: 10px; }
+  .top nav { display: none; }
+  #lang { margin-left: auto; }
+  .brand { gap: 8px; }
+  .brand svg { width: 46px; }
+  .brand b { font-size: 20px; }
+  .pill { padding: 8px 11px; font-size: 13px; }
+}
+
+/* ---------- background: git branches that grow as you scroll, in three depths ---------- */
+/* far and mid are fixed layers that move at a fraction of the scroll; near is the tour's own line (.rail) */
+.bg { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+.bg.still { position: absolute; bottom: auto; }
+.layer { position: absolute; inset: 0; }
+.layer .clip, .layer .inner { position: absolute; left: 0; top: 0; width: 100%; will-change: transform; }
+.layer .clip { overflow: hidden; }
+.layer svg { display: block; }
+.far { opacity: .42; }
+.mid { opacity: .62; }
+.bg circle, .rail circle { fill: var(--surface); transform-box: fill-box; transform-origin: center; transform: scale(0); transition: transform .5s cubic-bezier(.3, 1.7, .5, 1); }
+.bg circle.on, .rail circle.on { transform: none; }
+main, footer { position: relative; z-index: 1; }
+
+/* content sits on panels in front of the graph */
+.panel { background: color-mix(in srgb, var(--surface) 94%, transparent); border: 1px solid var(--rule); border-radius: 16px; padding: var(--pad); box-shadow: var(--shadow); }
+.veil { background: color-mix(in srgb, var(--bg) 82%, transparent); border: 1px solid transparent; border-radius: 18px; padding: var(--pad); }
+
+/* ---------- hero ---------- */
+.hero { padding: clamp(28px, 6vh, 72px) 16px clamp(36px, 7vh, 80px); }
+.hero-in { max-width: 1200px; margin: 0 auto; display: grid; gap: 28px; align-items: center; }
+@media (min-width: 980px) { .hero-in { grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 40px; } }
+.lockup { display: flex; align-items: center; gap: clamp(12px, 2.4vw, 26px); flex-wrap: wrap; }
+.lockup .mark { width: clamp(104px, 16vw, 200px); height: auto; display: block; flex: none; }
+.wordmark { font: 700 clamp(32px, 4.4vw, 58px)/1 var(--f-display); letter-spacing: .005em; }
+h1 { font: 700 clamp(38px, 5.8vw, 74px)/1.04 var(--f-display); letter-spacing: -.005em; margin: 24px 0 16px; text-wrap: balance; }
+html[lang="zh-CN"] h1 { line-height: 1.18; letter-spacing: .02em; }
+.lead { font-size: clamp(17px, 1.6vw, 19px); color: var(--muted); max-width: 36em; }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 26px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 22px; border-radius: 999px; font-weight: 600; text-decoration: none; border: 1px solid var(--rule); background: var(--surface); color: var(--ink); }
+.btn:hover { border-color: var(--faint); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.btn.primary:hover { filter: brightness(1.08); }
+
+/* the mark draws itself in on load */
+.mark path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 1.3s cubic-bezier(.35, .6, .2, 1) forwards; }
+.mark path:nth-child(2) { animation-delay: .2s; }
+.mark path:nth-child(3) { animation-delay: .38s; }
+.mark circle { opacity: 0; transform-box: fill-box; transform-origin: center; animation: pop .35s ease-out forwards; animation-delay: calc(var(--x) * 1.3s + .25s); }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes pop { from { opacity: 0; transform: scale(.3); } to { opacity: 1; transform: none; } }
+
+/* ---------- clips ---------- */
+.frame { border-radius: 10px; overflow: hidden; background: var(--surface-2); border: 1px solid var(--rule); }
+.frame video, .frame img { display: block; width: 100%; height: auto; }
+figcaption { font-size: 15px; line-height: 1.5; color: var(--muted); margin-top: 12px; }
+
+/* ---------- the near layer: the tour's line runs down the left of everything below the hero ---------- */
+.line { position: relative; max-width: 1200px; margin: 0 auto; padding: 0 16px 0 var(--gut); }
+.rail { position: absolute; left: 0; top: 0; bottom: 0; width: var(--gut); pointer-events: none; }
+/* Drawn to the tip by transforms only: the clip box moves up and its content moves back down by the same amount. */
+.rail-clip, .rail-inner { position: absolute; inset: 0; will-change: transform; }
+.rail-clip { overflow: hidden; }
+.rail svg { position: absolute; top: 0; left: 0; overflow: visible; }
+/* a station on the main line, placed in the gutter from inside its heading */
+.dot { position: absolute; left: calc(var(--l0) - var(--gut) - var(--pad) - 1px); top: .575em; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--surface); border: 5px solid var(--rule); transform: translate(-50%, -50%); transition: border-color .35s, background-color .35s, transform .35s; }
+.dot.on { background: #fff; border-color: #E4002B; transform: translate(-50%, -50%) scale(1.12); }
+.dot.end { width: 30px; height: 30px; border-width: 7px; }
+@media (max-width: 720px) { .dot { width: 15px; height: 15px; border-width: 3.5px; } .dot.end { width: 22px; height: 22px; border-width: 5px; } }
+
+.sec-head { margin: 72px 0 12px; max-width: 46em; }
+.kicker { font: 500 13px/1.4 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+h2 { position: relative; font: 700 clamp(34px, 4.4vw, 54px)/1.08 var(--f-display); margin-bottom: 14px; }
+.sec-head > p:last-child { color: var(--muted); }
+
+/* stations of the tour */
+.st { display: grid; gap: 16px; padding: 48px 0; align-items: center; }
+@media (min-width: 900px) {
+  .st { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 32px; padding: 72px 0; }
+  .st.wide { grid-template-columns: minmax(0, 1fr); }
+}
+.st-text { position: relative; isolation: isolate; }
+.num { position: absolute; z-index: -1; top: 10px; right: 18px; font: 700 clamp(56px, 7vw, 96px)/1 var(--f-display); color: var(--rule); pointer-events: none; user-select: none; }
+h3 { position: relative; font: 700 clamp(28px, 3vw, 38px)/1.15 var(--f-display); margin-bottom: 14px; text-wrap: balance; }
+.st p + p { margin-top: 12px; }
+.st-text p { max-width: 34em; }
+.st-media.phone .frame { max-width: 280px; margin: 0 auto; border-radius: 22px; }
+.st-media.phone figcaption { max-width: 420px; margin-inline: auto; text-align: center; }
+.big { font-size: clamp(19px, 2vw, 23px); line-height: 1.5; max-width: 30em !important; }
+
+.facts { display: grid; gap: 14px; margin-top: 24px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); }
+.fact { background: var(--surface-2); border: 1px solid var(--rule-soft); border-radius: 12px; padding: 18px 20px; }
+.fact b { display: block; font: 700 40px/1 var(--f-display); margin-bottom: 10px; }
+.fact p { font-size: 15.5px; color: var(--muted); }
+
+/* demos and tutorials */
+.grid { display: grid; gap: 22px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); padding: 12px 0 24px; }
+.card { padding: 14px 14px 18px; }
+.card h4 { font: 700 23px/1.2 var(--f-display); margin: 14px 4px 4px; }
+.card figcaption { margin: 0 4px; }
+.tut { display: block; color: inherit; text-decoration: none; padding: 14px; transition: transform .25s, border-color .25s; }
+.tut:hover { transform: translateY(-3px); border-color: var(--faint); }
+.tut .frame { aspect-ratio: 16 / 9; }
+.tut img { height: 100% !important; object-fit: cover; object-position: top; }
+.tut .meta { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 14px 4px 2px; }
+.tut h4 { margin: 0; font: 700 23px/1.2 var(--f-display); }
+.tut .where { font: 500 13px/1 var(--f-mono); color: var(--muted); white-space: nowrap; }
+
+/* install */
+.install { margin: 72px 0 40px; max-width: 800px; }
+.install > p { margin: 22px 0 10px; }
+.paste { display: flex; gap: 14px; align-items: flex-start; background: var(--surface-2); border: 1px solid var(--rule); border-left: 5px solid #E4002B; border-radius: 10px; padding: 16px 18px; }
+.paste p { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 720px) { .paste { flex-direction: column; } .paste .copy { align-self: flex-end; } }
+pre { background: var(--code-bg); color: var(--code-ink); border: 1px solid var(--rule); border-radius: 10px; padding: 16px 18px; overflow-x: auto; font: 14px/1.7 var(--f-mono); }
+pre code { background: none; border: 0; padding: 0; font-size: inherit; overflow-wrap: normal; }
+.install .cta { margin-top: 30px; }
+
+footer { max-width: 1200px; margin: 0 auto; padding: 8px 16px 48px var(--gut); color: var(--muted); font-size: 15px; }
+footer .veil { display: inline-block; max-width: 100%; padding: 10px 16px; overflow-wrap: anywhere; }
+footer a { color: inherit; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mark path, .mark circle { animation: none; stroke-dashoffset: 0; opacity: 1; }
+  .dot, .tut, .bg circle, .rail circle { transition: none; }
+}
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"><div class="layer far"><div class="clip"><div class="inner"><svg></svg></div></div></div><div class="layer mid"><div class="clip"><div class="inner"><svg></svg></div></div></div></div>
+
+<header class="top">
+  <a class="brand" href="#top" aria-label="Trace Canvas">
+    <svg viewBox="0 0 1000 240" aria-hidden="true"><g fill="none" stroke-width="34" stroke-linecap="round"><path d="M60 120 H940" stroke="#E4002B"/><path d="M220 120 C300 120 300 40 380 40 H640 C720 40 720 120 800 120" stroke="#0072CE"/><path d="M380 120 C440 120 430 200 470 200 H940" stroke="#00A651"/></g><g fill="#fff" stroke-width="16"><circle cx="110" cy="120" r="30" stroke="#E4002B"/><circle cx="300" cy="120" r="30" stroke="#E4002B"/><circle cx="520" cy="120" r="30" stroke="#E4002B"/><circle cx="740" cy="120" r="30" stroke="#E4002B"/><circle cx="890" cy="120" r="30" stroke="#E4002B"/><circle cx="380" cy="40" r="30" stroke="#0072CE"/><circle cx="640" cy="40" r="30" stroke="#0072CE"/><circle cx="470" cy="200" r="30" stroke="#00A651"/><circle cx="720" cy="200" r="30" stroke="#00A651"/></g></svg>
+    <b>Trace Canvas</b>
+  </a>
+  <nav>
+    <a href="#tour"><span data-l="en">Tour</span><span data-l="zh">导览</span></a>
+    <a href="#demos"><span data-l="en">Demos</span><span data-l="zh">功能演示</span></a>
+    <a href="#tutorials"><span data-l="en">Tutorials</span><span data-l="zh">教程</span></a>
+    <a href="#install"><span data-l="en">Install</span><span data-l="zh">安装</span></a>
+  </nav>
+  <button class="pill" id="lang" type="button" aria-label="Switch language / 切换语言"><span data-l="en">中文</span><span data-l="zh">EN</span></button>
+  <a class="pill" href="https://github.com/CallSymmetryEcho/trace-canvas" target="_blank" rel="noopener">GitHub ↗</a>
+</header>
+
+<main id="top">
+<section class="hero">
+  <div class="hero-in">
+    <div class="veil">
+      <div class="lockup">
+        <svg class="mark" viewBox="0 0 1000 240" role="img" aria-label="Trace Canvas mark"><g fill="none" stroke-width="22" stroke-linecap="round"><path pathLength="1" d="M60 120 H940" stroke="#E4002B"/><path pathLength="1" d="M220 120 C300 120 300 40 380 40 H640 C720 40 720 120 800 120" stroke="#0072CE"/><path pathLength="1" d="M380 120 C440 120 430 200 470 200 H940" stroke="#00A651"/></g><g fill="#fff" stroke-width="11"><circle style="--x:.11" cx="110" cy="120" r="21" stroke="#E4002B"/><circle style="--x:.3" cx="300" cy="120" r="21" stroke="#E4002B"/><circle style="--x:.52" cx="520" cy="120" r="21" stroke="#E4002B"/><circle style="--x:.74" cx="740" cy="120" r="21" stroke="#E4002B"/><circle style="--x:.89" cx="890" cy="120" r="21" stroke="#E4002B"/><circle style="--x:.38" cx="380" cy="40" r="21" stroke="#0072CE"/><circle style="--x:.64" cx="640" cy="40" r="21" stroke="#0072CE"/><circle style="--x:.47" cx="470" cy="200" r="21" stroke="#00A651"/><circle style="--x:.72" cx="720" cy="200" r="21" stroke="#00A651"/></g></svg>
+        <p class="wordmark">Trace Canvas</p>
+      </div>
+      <h1><span data-l="en">A map both people and agents can read</span><span data-l="zh">人和 agent 都看得懂的地图</span></h1>
+      <p class="lead" data-l="en">Every AI coding session becomes a line on one transit map: your instructions, edits, commits and decisions are its stations, forks and merges are drawn like git, and your agents read the same map to pick up where another left off.</p>
+      <p class="lead" data-l="zh">每个 AI 编程会话都是同一张地铁图上的一条线：你的指令、改动、提交和决定是线上的站点，分叉与合并像 git 一样画出来，你的 agent 也读同一张图，接着别人停下的地方继续做。</p>
+      <div class="cta">
+        <a class="btn primary" href="#install"><span data-l="en">Install</span><span data-l="zh">安装</span> ↓</a>
+        <a class="btn" href="#tour"><span data-l="en">Take the tour</span><span data-l="zh">跟着线路看一遍</span></a>
+      </div>
+    </div>
+    <figure class="panel">
+      <div class="frame"><video data-clip="demo" width="760" height="428" muted loop playsinline preload="none"></video></div>
+      <figcaption><span data-l="en">Records from agents arrive on the canvas, a new session appears as its own line, and two lines are merged back. Made-up data.</span><span data-l="zh">agent 的记录陆续出现在画布上，新会话成为一条新线路，再把两条线合并回来。虚构数据。</span></figcaption>
+    </figure>
+  </div>
+</section>
+
+<div class="line" id="line">
+  <div class="rail" aria-hidden="true"><div class="rail-clip"><div class="rail-inner"><svg></svg></div></div></div>
+
+  <section id="tour">
+    <header class="sec-head veil">
+      <p class="kicker"><span data-l="en">The tour</span><span data-l="zh">导览</span></p>
+      <h2><span data-l="en">Follow the line</span><span data-l="zh">沿着这条线走一遍</span></h2>
+      <p><span data-l="en">Each station is one idea. Side lines fork off and merge back, the way your sessions do.</span><span data-l="zh">每一站讲一件事。支线分出去又合回来，就像你的会话一样。</span></p>
+    </header>
+
+    <article class="st wide">
+      <div class="st-text panel">
+        <span class="num" aria-hidden="true">01</span>
+        <p class="kicker"><span data-l="en">The problem</span><span data-l="zh">问题</span></p>
+        <h3><i class="dot"></i><span data-l="en">Many sessions at once, and no one remembers who did what</span><span data-l="zh">同时开着好几个会话，谁做了什么已经说不清</span></h3>
+        <p class="big" data-l="en">Claude Code in one window, Codex in another, a third session on the laptop. Ideas and tasks run in parallel and scatter across chats. A day later you no longer know which session did what, or how far each one got.</p>
+        <p class="big" data-l="zh">一个窗口里是 Claude Code，另一个是 Codex，笔记本上还开着一个会话。想法和任务并行推进，散落在各个对话里。过一天，就说不清哪个会话做了什么、各自做到了哪一步。</p>
+      </div>
+    </article>
+
+    <article class="st">
+      <div class="st-text panel">
+        <span class="num" aria-hidden="true">02</span>
+        <p class="kicker"><span data-l="en">Lines and stations</span><span data-l="zh">线路和站点</span></p>
+        <h3><i class="dot"></i><span data-l="en">Every session becomes a line</span><span data-l="zh">每个会话都是一条线</span></h3>
+        <p data-l="en">Your instructions and decisions are dark stations; the agents' edits, commits and results are stations in the line's colour. Fork a line from any station and merge it back when it is done, drawn like git.</p>
+        <p data-l="zh">你的指令和决定是深色站点，agent 的改动、提交和产出用线路的颜色。可以从任意站点分叉出新线，做完再合并回来，像 git 一样画出来。</p>
+        <p data-l="en">Hooks draw it while you work. You do nothing.</p>
+        <p data-l="zh">这些由 hooks 在你工作时自动画上，你什么都不用做。</p>
+      </div>
+      <figure class="st-media panel">
+        <div class="frame"><video data-clip="branches" width="1000" height="562" muted loop playsinline preload="none"></video></div>
+        <figcaption><span data-l="en">Branches: running sessions sit as live tips on top of their lines. The orange one waits for you; once approved it turns green, your decision appears dark and the agent's result in the line's colour.</span><span data-l="zh">分支视图：正在运行的会话以线头显示在各自线路的顶端。橙色的在等你；批准后变绿，你的决定显示为深色，agent 的产出用线路的颜色。</span></figcaption>
+      </figure>
+    </article>
+
+    <article class="st">
+      <div class="st-text panel">
+        <span class="num" aria-hidden="true">03</span>
+        <p class="kicker"><span data-l="en">For agents</span><span data-l="zh">给 agent 看</span></p>
+        <h3><i class="dot"></i><span data-l="en">Agents read the same map</span><span data-l="zh">agent 读同一张图</span></h3>
+        <p data-l="en">Through the MCP tools <code>trace_list_threads</code> and <code>trace_read_thread</code>, a new session catches up in seconds instead of rereading old chats, and picks up where another left off.</p>
+        <p data-l="zh">通过 MCP 工具 <code>trace_list_threads</code> 和 <code>trace_read_thread</code>，新会话几秒钟就能跟上进度，不用重读旧对话，接着别的会话停下的地方继续做。</p>
+      </div>
+      <figure class="st-media panel">
+        <div class="frame"><video data-clip="sessions" width="1000" height="562" muted loop playsinline preload="none"></video></div>
+        <figcaption><span data-l="en">A resumed session logs on its line again; the line panel lists its sessions, each with a resume command.</span><span data-l="zh">恢复的会话接着记在原来的线上；线面板列出这条线上的会话，每个都能复制恢复命令。</span></figcaption>
+      </figure>
+    </article>
+
+    <article class="st">
+      <div class="st-text panel">
+        <span class="num" aria-hidden="true">04</span>
+        <p class="kicker"><span data-l="en">Goals and to-dos</span><span data-l="zh">目标和待办</span></p>
+        <h3><i class="dot"></i><span data-l="en">One list for you and your agents</span><span data-l="zh">人和 agent 共用一份清单</span></h3>
+        <p data-l="en">Write down what a line should achieve and its next steps. Agents read them with <code>trace_tasks</code> when they start and tick each one off with <code>trace_task_done</code>; the list shows who ticked it. Let them work while you are away, and come back to see where things stand.</p>
+        <p data-l="zh">写下一条线要达到的目标和下一步。agent 开工时用 <code>trace_tasks</code> 读，做完一项就用 <code>trace_task_done</code> 勾掉，清单上标着是谁勾的。你离开时 agent 照样推进，回来一看就知道做到哪了。</p>
+      </div>
+      <figure class="st-media panel">
+        <div class="frame"><video data-clip="goals" width="1000" height="562" muted loop playsinline preload="none"></video></div>
+        <figcaption><span data-l="en">Agents tick to-dos off on the shared list, one by Claude Code and one by Codex, and the line's progress bar moves forward.</span><span data-l="zh">agent 在共用的清单上勾掉待办：一项由 Claude Code 勾选，一项由 Codex 勾选，这条线的进度条随之前进。</span></figcaption>
+      </figure>
+    </article>
+
+    <article class="st">
+      <div class="st-text panel">
+        <span class="num" aria-hidden="true">05</span>
+        <p class="kicker"><span data-l="en">Dispatch</span><span data-l="zh">分派</span></p>
+        <h3><i class="dot"></i><span data-l="en">One sentence, every line at work</span><span data-l="zh">一句话，每条线都开工</span></h3>
+        <p data-l="en">Say dispatch (<code>/trace-canvas dispatch</code>, also from the Claude app on your phone) and each line's new to-dos go to the agent working on that line. A running session gets a message, a stopped one is resumed with its to-dos, and a line nobody works on gets a new session.</p>
+        <p data-l="zh">说一句「分派」（<code>/trace-canvas dispatch</code>，在手机上的 Claude app 里也行），每条线上新记的待办就交给正在做这条线的 agent。正在运行的会话收到消息，停了的会话带着待办恢复，没人做的线新开一个会话。</p>
+      </div>
+      <figure class="st-media panel">
+        <div class="frame"><video data-clip="dispatch" width="1000" height="562" muted loop playsinline preload="none"></video></div>
+        <figcaption><span data-l="en"><code>/trace-canvas dispatch</code> hands each line's new to-do to the agent working on it, and three lines wake up: a message to the running session, a resume for the stopped one, a new session for the line nobody works on.</span><span data-l="zh"><code>/trace-canvas dispatch</code> 把每条线的新待办交给在做这条线的 agent，三条线随之开工：正在运行的会话收到消息，停了的会话被恢复，没人做的线新开一个会话。</span></figcaption>
+      </figure>
+    </article>
+
+    <article class="st">
+      <div class="st-text panel">
+        <span class="num" aria-hidden="true">06</span>
+        <p class="kicker"><span data-l="en">On your phone</span><span data-l="zh">在手机上</span></p>
+        <h3><i class="dot"></i><span data-l="en">Jot ideas away from the desk</span><span data-l="zh">离开桌子，也能随手记下</span></h3>
+        <p data-l="en">Open the canvas on your phone through Tailscale, with nothing opened to the internet. Read your lines, drop ideas and to-dos into them, and edit a line's goal right there. The agents keep running on the computer.</p>
+        <p data-l="zh">通过 Tailscale 在手机上打开画布，不对公网开放。看各条线、往线上记想法和待办、就地改线的目标。agent 继续在电脑上跑。</p>
+      </div>
+      <figure class="st-media phone panel">
+        <div class="frame"><video data-clip="goaledit" width="420" height="708" muted loop playsinline preload="none"></video></div>
+        <figcaption><span data-l="en">On a phone, Goals is a page of its own: tap a line's goal to change it, tap a to-do to edit it, and a half-typed to-do stays, with an Add button.</span><span data-l="zh">在手机上，「目标」是单独的一页：点线的目标就地修改，点待办就能编辑，写到一半的待办还在，旁边多了「添加」按钮。</span></figcaption>
+      </figure>
+    </article>
+
+    <article class="st">
+      <div class="st-text panel">
+        <span class="num" aria-hidden="true">07</span>
+        <p class="kicker"><span data-l="en">Several machines</span><span data-l="zh">多台电脑</span></p>
+        <h3><i class="dot"></i><span data-l="en">Several machines, one canvas</span><span data-l="zh">多台电脑，同一张画布</span></h3>
+        <p data-l="en">Laptop, workstation and lab PC share one canvas through a private git repository. Each machine writes only its own file, and <code>trace-canvas sync</code> brings in the others. Records from another machine carry its name, and their resume command runs over ssh.</p>
+        <p data-l="zh">笔记本、工作站和实验室电脑通过一个私有 git 仓库共用一张画布。每台机器只写自己的文件，<code>trace-canvas sync</code> 把其他机器的拉进来。来自别的机器的记录标着机器名，恢复命令通过 ssh 执行。</p>
+      </div>
+      <figure class="st-media panel">
+        <div class="frame"><video data-clip="machines" width="1000" height="562" muted loop playsinline preload="none"></video></div>
+        <figcaption><span data-l="en">On the laptop a to-do goes to Codex; after a sync it comes back ticked by Codex, with its result marked On workstation.</span><span data-l="zh">笔记本上把待办交给 Codex，同步之后它回来时已由 Codex 勾选，产出标着「在 workstation 上」。</span></figcaption>
+      </figure>
+    </article>
+
+    <article class="st wide">
+      <div class="st-text panel">
+        <span class="num" aria-hidden="true">08</span>
+        <p class="kicker"><span data-l="en">Local and light</span><span data-l="zh">本地、轻量</span></p>
+        <h3><i class="dot"></i><span data-l="en">On your computer, at about 1% of the tokens</span><span data-l="zh">跑在你的电脑上，只占约 1% 的 token</span></h3>
+        <div class="facts">
+          <div class="fact"><b>Node.js</b><p data-l="en">Runs on your computer and needs only Node.js 18.17+. No <code>npm install</code>; your data stays in <code>~/.trace-canvas</code>.</p><p data-l="zh">在你的电脑上运行，只需要 Node.js 18.17+，不用 <code>npm install</code>；数据留在 <code>~/.trace-canvas</code>。</p></div>
+          <div class="fact"><b>MIT</b><p data-l="en">Open source under the MIT licence.</p><p data-l="zh">MIT 许可，开源。</p></div>
+          <div class="fact"><b>~1%</b><p data-l="en">Trace Canvas text is about 1% of a session's tokens, and that share does not grow as the canvas grows. The hooks run outside the model.</p><p data-l="zh">Trace Canvas 的文字约占一个会话 token 的 1%，而且不随画布变大而增长。hooks 在模型之外运行。</p></div>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <section id="demos">
+    <header class="sec-head veil">
+      <p class="kicker"><span data-l="en">Short clips</span><span data-l="zh">短片</span></p>
+      <h2><i class="dot"></i><span data-l="en">Feature demos</span><span data-l="zh">功能演示</span></h2>
+      <p><span data-l="en">A few seconds each, recorded from the real page. All data in the clips is made up.</span><span data-l="zh">每段几秒钟，录自真实页面。片中数据都是虚构的。</span></p>
+    </header>
+    <div class="grid">
+      <figure class="card panel">
+        <div class="frame"><video data-clip="replay" width="1000" height="562" muted loop playsinline preload="none"></video></div>
+        <h4><span data-l="en">All your past sessions, one map</span><span data-l="zh">过去的会话，一张地图</span></h4>
+        <figcaption><span data-l="en">Past sessions arrive on the canvas one after another, each as its own line.</span><span data-l="zh">过去的会话一个接一个落到画布上，每个会话一条线。</span></figcaption>
+      </figure>
+      <figure class="card panel">
+        <div class="frame"><video data-clip="timeline" width="1000" height="562" muted loop playsinline preload="none"></video></div>
+        <h4><span data-l="en">Timeline</span><span data-l="zh">时间线</span></h4>
+        <figcaption><span data-l="en">Day, week and month. Each band shows when a line was active; dashed curves are forks and merges.</span><span data-l="zh">按日、周、月查看。色带是每条线活跃的时段，虚线曲线是分叉与合并。</span></figcaption>
+      </figure>
+      <figure class="card panel">
+        <div class="frame"><video data-clip="agents" width="1000" height="562" muted loop playsinline preload="none"></video></div>
+        <h4><span data-l="en">Agent view: who started whom</span><span data-l="zh">Agent 视图：谁启动了谁</span></h4>
+        <figcaption><span data-l="en">A session waiting for approval turns green once approved, a subagent finishes and fades, and the panel shows who started the session.</span><span data-l="zh">等待批准的会话批准后变成绿色，子 agent 完成后变淡，面板显示这个会话由谁启动。</span></figcaption>
+      </figure>
+      <figure class="card panel">
+        <div class="frame"><video data-clip="jump" width="1000" height="562" muted loop playsinline preload="none"></video></div>
+        <h4><span data-l="en">One click back to its window</span><span data-l="zh">一键跳回它的对话或终端</span></h4>
+        <figcaption><span data-l="en">In the Agents view, ↗ opens a session's chat in the Claude app or the Codex app, and Go to its terminal brings a Terminal session's tab to the front.</span><span data-l="zh">在 Agent 视图里，↗ 在 Claude app 或 Codex app 里打开那次对话，「跳到终端」把终端里那个会话的标签页调到最前。</span></figcaption>
+      </figure>
+      <figure class="card panel">
+        <div class="frame"><video data-clip="changes" width="1000" height="562" muted loop playsinline preload="none"></video></div>
+        <h4><span data-l="en">What did the agent change?</span><span data-l="zh">agent 到底改了什么？</span></h4>
+        <figcaption><span data-l="en">A commit station lists the files it changed; a click opens a diff; Compare with shows what changed since an earlier station.</span><span data-l="zh">提交站点列出改过的文件，点文件看 diff，「对比」看与更早站点之间的改动。</span></figcaption>
+      </figure>
+      <figure class="card panel">
+        <div class="frame"><video data-clip="merge" width="1000" height="562" muted loop playsinline preload="none"></video></div>
+        <h4><span data-l="en">Merge two lines</span><span data-l="zh">合并两条线</span></h4>
+        <figcaption><span data-l="en">A close look at one card (dark stations are yours, coloured ones the agents'), then Shift-click two lines, pick the target and Merge.</span><span data-l="zh">先近看一张卡片（深色站点是你的，彩色的是 agent 的），再 Shift 点选两条线，选择目标后点「合并」。</span></figcaption>
+      </figure>
+      <figure class="card panel">
+        <div class="frame"><video data-clip="groups" width="1000" height="562" muted loop playsinline preload="none"></video></div>
+        <h4><span data-l="en">Groups and Arrange</span><span data-l="zh">分组与整理</span></h4>
+        <figcaption><span data-l="en">Scattered lines go into groups, each with a frame; Arrange lays them out by group, and a group moves by its label.</span><span data-l="zh">散乱的线放进分组，每组一个框；「整理」按分组排好，拖标签整组移动。</span></figcaption>
+      </figure>
+      <figure class="card panel">
+        <div class="frame"><video data-clip="theme" width="1000" height="562" muted loop playsinline preload="none"></video></div>
+        <h4><span data-l="en">Mist theme</span><span data-l="zh">雾蓝主题</span></h4>
+        <figcaption><span data-l="en">More → Theme goes from light through dark to Mist, a soft blue-grey that also tones down the lines' colours; then the branches and the timeline in Mist.</span><span data-l="zh">「更多 → 主题」从浅色、深色切到雾蓝，雾蓝把线的颜色也调柔和；再看分支和时间线在雾蓝下的样子。</span></figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section id="tutorials">
+    <header class="sec-head veil">
+      <p class="kicker"><span data-l="en">Videos</span><span data-l="zh">视频</span></p>
+      <h2><i class="dot"></i><span data-l="en">Tutorials</span><span data-l="zh">教程</span></h2>
+      <p><span data-l="en">Published videos, with narration. Each opens in a new tab.</span><span data-l="zh">已发布的视频，带讲解。点开在新标签页播放。</span></p>
+    </header>
+    <div class="grid">
+      <a class="tut panel" data-l="en" href="https://youtu.be/gDkbh4GVjno" target="_blank" rel="noopener"><div class="frame"><img src="media/cover-tutorial.en.jpg" alt="" width="960" height="540" loading="lazy"></div><div class="meta"><h4>Trace Canvas in 3 minutes</h4><span class="where">YouTube ↗</span></div></a>
+      <a class="tut panel" data-l="zh" href="https://www.bilibili.com/video/BV1y5xG6rEX9" target="_blank" rel="noopener"><div class="frame"><img src="media/cover-tutorial.zh.jpg" alt="" width="960" height="540" loading="lazy"></div><div class="meta"><h4>3 分钟上手 Trace Canvas</h4><span class="where">Bilibili ↗</span></div></a>
+      <a class="tut panel" data-l="en" href="https://x.com/BinLiano9m5/status/2115209429498917273" target="_blank" rel="noopener"><div class="frame"><img src="media/cover-saga.zh.jpg" alt="" width="960" height="540" loading="lazy"></div><div class="meta"><h4>Origin story: 413 stations in 4 days</h4><span class="where">X ↗</span></div></a>
+      <a class="tut panel" data-l="zh" href="https://www.bilibili.com/video/BV11VxG6GEjy" target="_blank" rel="noopener"><div class="frame"><img src="media/cover-saga.zh.jpg" alt="" width="960" height="540" loading="lazy"></div><div class="meta"><h4>诞生记：4 天 413 个站点</h4><span class="where">Bilibili ↗</span></div></a>
+      <a class="tut panel" data-l="en" href="https://youtube.com/shorts/XZEhi_UO9bA" target="_blank" rel="noopener"><div class="frame"><img src="media/cover-focus.en.jpg" alt="" width="960" height="540" loading="lazy"></div><div class="meta"><h4>Focus mode</h4><span class="where">YouTube Shorts ↗</span></div></a>
+      <a class="tut panel" data-l="zh" href="https://www.bilibili.com/video/BV1kJxG6MEQe" target="_blank" rel="noopener"><div class="frame"><img src="media/cover-focus.zh.jpg" alt="" width="960" height="540" loading="lazy"></div><div class="meta"><h4>专注模式</h4><span class="where">Bilibili ↗</span></div></a>
+      <a class="tut panel" data-l="en" href="https://youtube.com/shorts/tM9mwW9Yjws" target="_blank" rel="noopener"><div class="frame"><img src="media/cover-hook.en.jpg" alt="" width="960" height="1706" loading="lazy"></div><div class="meta"><h4>Too many agents? One map</h4><span class="where">YouTube Shorts ↗</span></div></a>
+      <a class="tut panel" data-l="zh" href="https://www.bilibili.com/video/BV115xG6rEPw" target="_blank" rel="noopener"><div class="frame"><img src="media/cover-hook.zh.jpg" alt="" width="960" height="540" loading="lazy"></div><div class="meta"><h4>agent 一多就乱？一张地图</h4><span class="where">Bilibili ↗</span></div></a>
+    </div>
+  </section>
+
+  <section id="install" class="install panel">
+    <p class="kicker"><span data-l="en">End of the line</span><span data-l="zh">终点站</span></p>
+    <h2><i class="dot end"></i><span data-l="en">Install</span><span data-l="zh">安装</span></h2>
+    <p><span data-l="en">Paste this into Claude Code (or Codex):</span><span data-l="zh">把这句话贴给 Claude Code（或 Codex）：</span></p>
+    <div class="paste" data-l="en"><p>Install Trace Canvas: clone https://github.com/CallSymmetryEcho/trace-canvas.git into ~/trace-canvas, then run <code>node ~/trace-canvas/bin/trace-canvas.mjs setup --user</code> (add <code>--agents codex</code> if Codex is installed).</p><button class="pill copy" type="button" data-done="Copied">Copy</button></div>
+    <div class="paste" data-l="zh"><p>安装 Trace Canvas：把 https://github.com/CallSymmetryEcho/trace-canvas.git 克隆到 ~/trace-canvas，然后运行 <code>node ~/trace-canvas/bin/trace-canvas.mjs setup --user</code>（装了 Codex 的话加上 <code>--agents codex</code>）。</p><button class="pill copy" type="button" data-done="已复制">复制</button></div>
+    <p><span data-l="en">Or by hand:</span><span data-l="zh">或者手动：</span></p>
+    <pre><code>git clone https://github.com/CallSymmetryEcho/trace-canvas.git ~/trace-canvas
+node ~/trace-canvas/bin/trace-canvas.mjs setup --user</code></pre>
+    <p data-l="en">Then start a new Claude Code session and type <code>/trace-canvas put all my sessions on the canvas</code>. It puts this project's past sessions on the map and opens it at <code>http://localhost:4777/</code>; from then on every new session lands on it by itself.</p>
+    <p data-l="zh">然后新开一个 Claude Code 会话，输入 <code>/trace-canvas 把现在所有的会话展示在画布上</code>。它会把这个项目过去的会话放上地图，并在 <code>http://localhost:4777/</code> 打开；之后每个新会话都会自动出现在上面。</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/CallSymmetryEcho/trace-canvas" target="_blank" rel="noopener"><span data-l="en">Trace Canvas on GitHub</span><span data-l="zh">GitHub 上的 Trace Canvas</span> ↗</a>
+    </div>
+  </section>
+</div>
+</main>
+
+<footer><span class="veil">
+  Trace Canvas · <span data-l="en">MIT licence</span><span data-l="zh">MIT 许可</span> · <a href="https://github.com/CallSymmetryEcho/trace-canvas" target="_blank" rel="noopener">github.com/CallSymmetryEcho/trace-canvas</a>
+</span></footer>
+
+<script>
+(() => {
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const root = document.documentElement;
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const TITLE = { en: 'Trace Canvas — A map both people and agents can read', zh: 'Trace Canvas — 人和 agent 都看得懂的地图' };
+  let lang = root.lang === 'zh-CN' ? 'zh' : 'en';
+  document.title = TITLE[lang];
+
+  /* ---------- clips: sources set near the viewport, played only while visible ---------- */
+  const clips = $$('video[data-clip]');
+  const load = v => { const n = v.dataset.clip; v.poster = `media/${n}.${lang}.jpg`; v.src = `media/${n}.${lang}.mp4`; v.dataset.lang = lang; };
+  const play = v => { if (!still && v.dataset.vis) v.play().catch(() => {}); };
+  if (still) clips.forEach(v => { v.controls = true; });
+  const near = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting && !e.target.dataset.lang) load(e.target); }), { rootMargin: '600px 0px' });
+  const seen = new IntersectionObserver(es => es.forEach(({ target: v, isIntersecting }) => {
+    if (isIntersecting) { v.dataset.vis = 1; if (!v.dataset.lang) load(v); play(v); } else { delete v.dataset.vis; v.pause(); }
+  }), { threshold: .25 });
+  clips.forEach(v => { near.observe(v); seen.observe(v); });
+
+  /* ---------- language: switched in place, remembered ---------- */
+  document.getElementById('lang').onclick = () => {
+    lang = lang === 'en' ? 'zh' : 'en';
+    root.lang = lang === 'zh' ? 'zh-CN' : 'en';
+    document.title = TITLE[lang];
+    try { localStorage.setItem('tc-site-lang', lang); } catch (e) {}
+    clips.forEach(v => { if (v.dataset.lang && v.dataset.lang !== lang) { load(v); play(v); } });
+    measure();
+  };
+
+  $$('.copy').forEach(b => {
+    const label = b.textContent;
+    b.onclick = async () => {
+      try { await navigator.clipboard.writeText(b.previousElementSibling.textContent.trim()); b.textContent = b.dataset.done; setTimeout(() => { b.textContent = label; }, 1800); } catch (e) {}
+    };
+  });
+
+  /* ---------- the graph: git branches that grow as you scroll ---------- */
+  const COLORS = ['#E4002B', '#0072CE', '#00A651', '#F29F05', '#8E3A96', '#00A0B0', '#A0522D', '#E5007E', '#5B6B7F', '#6CA425'];
+  const rng = seed => () => (seed = seed * 16807 % 2147483647) / 2147483647;
+  // A git graph down a W×G sheet over n lanes: lines fork into a free neighbouring lane and merge into the nearest
+  // line, so no two lines cross. Same seed, same graph: a resize only stretches it. Lanes keep out of the tour line's gutter [a, b].
+  function graph(W, G, n, seed, sw, a, b) {
+    const xs = [...Array(n)].map((_, i) => Math.round(W * (.04 + .92 * i / (n - 1)))).filter(x => x < a || x > b), R = rng(seed);
+    n = xs.length;
+    const c = Math.min(90, (xs[1] - xs[0]) * .9 + 30), live = new Map(), stops = [];
+    let paths = '', ci = Math.floor(R() * COLORS.length);
+    const open = (lane, d) => live.set(lane, { col: COLORS[ci++ % COLORS.length], d });
+    const close = (br, tail) => { paths += `<path d="${br.d}${tail}" stroke="${br.col}"/>`; };
+    for (let l = Math.floor(R() * 2); l < n; l += 2) open(l, `M${xs[l]} -20`);
+    for (let y = 90; y < G - 60; y += 110 + R() * 170) {
+      const lanes = [...live.keys()].sort((p, q) => p - q), r = R(), p = lanes[Math.floor(R() * lanes.length)];
+      const dir = R() < .5 ? -1 : 1, q = [p + dir, p - dir].find(l => l >= 0 && l < n && !live.has(l));
+      if (r < .45 && q !== undefined && live.size < Math.ceil(n * .75)) {
+        open(q, `M${xs[p]} ${y}C${xs[p]} ${y + c / 2} ${xs[q]} ${y + c / 2} ${xs[q]} ${y + c}`);
+        stops.push([xs[p], y, live.get(p).col]);
+      } else if (r < .8 && live.size > 2) {
+        const i = lanes.indexOf(p), t = lanes[i === 0 ? 1 : i === lanes.length - 1 ? i - 1 : i + dir], br = live.get(p);
+        close(br, `V${y}C${xs[p]} ${y + c / 2} ${xs[t]} ${y + c / 2} ${xs[t]} ${y + c}`);
+        live.delete(p);
+        stops.push([xs[t], y + c, live.get(t).col]);
+      } else stops.push([xs[p], y, live.get(p).col]);
+    }
+    for (const br of live.values()) close(br, `V${G + 20}`);
+    stops.sort((u, v) => u[1] - v[1]);
+    return `<g fill="none" stroke-width="${sw}" stroke-linecap="round">${paths}</g><g stroke-width="${sw * .6}">` +
+      stops.map(([x, y, col]) => `<circle cx="${x}" cy="${y}" r="${sw * 1.5}" stroke="${col}" data-y="${y}"/>`).join('') + '</g>';
+  }
+  // Stations pop in when the tip passes them: els sorted by y, n of them on.
+  const stations = els => ({ els, ys: els.map(e => +e.dataset.y), n: 0 });
+  const pop = (L, tip) => {
+    while (L.n < L.ys.length && L.ys[L.n] <= tip) L.els[L.n++].classList.add('on');
+    while (L.n && L.ys[L.n - 1] > tip) L.els[--L.n].classList.remove('on');
+  };
+
+  // far and mid: fixed layers moving at k of the scroll; their tips sit at `front` of the viewport and reach the end with the page
+  const bg = document.querySelector('.bg');
+  const layers = [['.far', .3, .5, 3, 95, 6, 16, 11], ['.mid', .6, .58, 6, 170, 4, 9, 29]].map(([sel, k, front, sw, per, lo, hi, seed]) => {
+    const el = bg.querySelector(sel);
+    return { k: still ? 1 : k, front, sw, per, lo, hi, seed, clip: el.querySelector('.clip'), inner: el.querySelector('.inner'), svg: el.querySelector('svg'), G: 0, st: stations([]) };
+  });
+  if (still) bg.classList.add('still');
+
+  // near: the tour's own line, with the sections as its stations
+  const wrap = document.getElementById('line'), rail = wrap.querySelector('.rail');
+  const rclip = rail.querySelector('.rail-clip'), rinner = rail.querySelector('.rail-inner'), rsvg = rinner.querySelector('svg');
+  const dots = $$('.dot', wrap), foot = document.querySelector('footer');
+  // [fork after station, merge before station, lane, colour]; the inner lane closes first, so lines never cross.
+  const SIDE = [[0, 4, 2, '#0072CE'], [1, 2, 1, '#00A651'], [5, 7, 1, '#F29F05']];
+  let H = 0, top = 0, docH = 0, vh = 0, main = stations([]), side = stations([]), boot = still ? 1 : 0, queued = false;
+
+  function measure() {
+    vh = innerHeight;
+    docH = foot.getBoundingClientRect().bottom + scrollY;
+    const W = document.documentElement.clientWidth, gl = wrap.getBoundingClientRect().left, gr = gl + rail.offsetWidth + 10;
+    for (const L of layers) {
+      L.G = Math.ceil((docH - vh) * L.k + vh);
+      const n = Math.max(L.lo, Math.min(L.hi, Math.round(W / L.per)));
+      L.svg.setAttribute('width', W); L.svg.setAttribute('height', L.G);
+      L.svg.innerHTML = graph(W, L.G, n, L.seed, L.sw, gl, gr);
+      L.clip.style.height = L.inner.style.height = L.G + 'px';
+      L.st = stations($$('circle', L.svg));
+    }
+    if (still) bg.style.height = docH + 'px';
+
+    top = wrap.getBoundingClientRect().top + scrollY;
+    H = wrap.offsetHeight;
+    dots.forEach(d => { const r = d.getBoundingClientRect(); d.dataset.y = r.top + r.height / 2 + scrollY - top; d.classList.remove('on'); });
+    main = stations(dots);
+    const cs = getComputedStyle(root), num = k => parseFloat(cs.getPropertyValue(k)), ys = main.ys;
+    const sw = num('--sw'), X = i => num('--l0') + i * num('--lg'), c = num('--lg') * 1.8, x0 = X(0);
+    let lines = `<path d="M${x0} 0V${ys[ys.length - 1]}" stroke="#E4002B" stroke-width="${sw}"/>`, stops = [];
+    for (const [a, b, lane, col] of SIDE) {
+      const y0 = ys[a] + sw * 3, y1 = ys[b] - sw * 3, x1 = X(lane), len = y1 - y0 - 2 * c;
+      lines += `<path d="M${x0} ${y0}C${x0} ${y0 + c / 2} ${x1} ${y0 + c / 2} ${x1} ${y0 + c}V${y1 - c}C${x1} ${y1 - c / 2} ${x0} ${y1 - c / 2} ${x0} ${y1}" stroke="${col}" stroke-width="${sw * .8}"/>`;
+      const k = Math.max(1, Math.round(len / 280));
+      for (let i = 1; i <= k; i++) stops.push([x1, y0 + c + len * i / (k + 1), col]);
+    }
+    stops.sort((u, v) => u[1] - v[1]);
+    rsvg.setAttribute('width', rail.offsetWidth);
+    rsvg.setAttribute('height', H);
+    rsvg.innerHTML = `<g fill="none" stroke-linecap="round">${lines}</g><g>` +
+      stops.map(([x, y, col]) => `<circle cx="${x}" cy="${y}" r="${sw * .9}" stroke="${col}" stroke-width="${sw * .5}" data-y="${y}"/>`).join('') + '</g>';
+    side = stations($$('circle', rsvg));
+    frame();
+  }
+
+  function frame() {
+    queued = false;
+    const y = scrollY, p = Math.min(1, y / Math.max(1, docH - vh));
+    for (const L of layers) {
+      // graph y shows at viewport y + off; the clip box ends at the tip, its content moves back so the graph stays put
+      const off = still ? 0 : y * L.k, tip = still ? L.G : off + vh * (L.front + (1 - L.front) * p) * boot;
+      L.clip.style.transform = `translate3d(0,${tip - off - L.G}px,0)`;
+      L.inner.style.transform = `translate3d(0,${L.G - tip}px,0)`;
+      pop(L.st, tip - 4);
+    }
+    const d = still ? H : Math.min(H, Math.max(0, y + vh * (.65 + .35 * p) * boot - top));
+    rclip.style.transform = `translate3d(0,${d - H}px,0)`;
+    rinner.style.transform = `translate3d(0,${H - d}px,0)`;
+    pop(main, d + 2);
+    pop(side, d - 4);
+  }
+
+  addEventListener('scroll', () => { if (!queued) { queued = true; requestAnimationFrame(frame); } }, { passive: true });
+  addEventListener('resize', measure);
+  new ResizeObserver(measure).observe(document.body);
+  if (document.fonts) document.fonts.ready.then(measure);
+  // on load the graph grows from the top to where the scroll position puts its tip
+  if (!still) {
+    const t0 = performance.now();
+    const grow = t => { boot = 1 - (1 - Math.min(1, (t - t0) / 1600)) ** 3; frame(); if (boot < 1) requestAnimationFrame(grow); };
+    requestAnimationFrame(grow);
+  }
+})();
+</script>
+</body>
+</html>

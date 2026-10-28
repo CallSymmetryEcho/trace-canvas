@@ -492,7 +492,7 @@ node ~/trace-canvas/bin/trace-canvas.mjs setup --user</code></pre>
     <p class="fname" id="finale-name">Trace Canvas</p>
     <p class="fpunch"><span data-l="en">Every session leaves a line.</span><span data-l="zh">每次对话，都留下一条线。</span></p>
     <p class="fsub"><span data-l="en">You and your agents read the same map, so no one loses the way.</span><span data-l="zh">你和 agent 看同一张图，谁也不迷路。</span></p>
-    <p class="fhint" aria-hidden="true"><span class="mouse"><span data-l="en">Move across to draw the map →</span><span data-l="zh">鼠标往右移，把这张图画出来 →</span></span><span class="touch"><span data-l="en">Drawing the map…</span><span data-l="zh">正在画这张图…</span></span></p>
+    <p class="fhint" aria-hidden="true"><span class="mouse"><span data-l="en">Scroll on, or move the mouse across, to draw the map →</span><span data-l="zh">继续往下滚，或者鼠标往右移，把这张图画出来 →</span></span><span class="touch"><span data-l="en">Keep scrolling to draw the map ↓</span><span data-l="zh">继续往下滑，把这张图画出来 ↓</span></span></p>
   </div>
 </section>
 
@@ -642,51 +642,47 @@ node ~/trace-canvas/bin/trace-canvas.mjs setup --user</code></pre>
     rinner.style.transform = `translate3d(0,${H - d}px,0)`;
     pop(main, d + 2);
     pop(side, d - 4);
+    if (still) drawTo(1000); else finFrame();
   }
 
-  /* ---------- finale: the pointer draws the mark once, and the layers lean after it ---------- */
+  /* ---------- finale: scrolling to the end draws the mark, the pointer can draw ahead, the layers lean after it ---------- */
   const fin = document.getElementById('finale'), fsvg = fin.querySelector('.fmark');
   const fpaths = $$('path[pathLength]', fsvg), ftips = $$('.tips circle', fsvg), fstops = $$('.stops circle', fsvg);
-  // Each line's x at every hundredth of its length (the lines run left to right), to turn the pointer's x into progress.
+  // Each line's x at every hundredth of its length (the lines run left to right), to turn an x into progress.
   const along = fpaths.map(p => { const L = p.getTotalLength(), xs = []; for (let i = 0; i <= 100; i++) xs.push(p.getPointAtLength(L * i / 100).x); return { p, L, xs }; });
-  let drawn = 0, inView = false, wait = 0;
-  // drawn: the furthest x (in mark units, 0–1000) the pen has reached; it never goes back, so the mark is drawn once.
-  function draw(x) {
-    if (x <= drawn) return;
-    drawn = Math.min(1000, x);
+  let pen = 0, shown = -1, inView = false;
+  // Draw the mark up to x (mark units, 0–1000); it follows the scroll both ways, like the graph behind it.
+  function drawTo(x) {
+    x = Math.max(0, Math.min(1000, x));
+    if (Math.abs(x - shown) < .5) return;
+    shown = x;
     along.forEach(({ p, L, xs }, i) => {
       let k = 0;
-      while (k < 100 && xs[k + 1] <= drawn) k++;
-      const t = drawn < xs[0] ? 0 : k / 100, pt = p.getPointAtLength(L * t);
+      while (k < 100 && xs[k + 1] <= x) k++;
+      const t = x < xs[0] ? 0 : k / 100, pt = p.getPointAtLength(L * t);
       p.style.strokeDashoffset = 1 - t;
       ftips[i].setAttribute('cx', pt.x); ftips[i].setAttribute('cy', pt.y);
       ftips[i].style.opacity = t > 0 && t < 1 ? 1 : 0;
     });
-    fstops.forEach(c => c.classList.toggle('on', +c.getAttribute('cx') <= drawn));
-    if (drawn >= 950) { fin.classList.add('done'); draw(1000); }
+    fstops.forEach(c => c.classList.toggle('on', +c.getAttribute('cx') <= x));
+    fin.classList.toggle('done', x >= 945);
   }
-  // Without a pointer that hovers (a phone), or if it stays still, the pen draws by itself.
-  const autodraw = () => {
-    if (drawn >= 1000) return;
-    const from = drawn, t0 = performance.now();
-    const step = t => { const k = Math.min(1, (t - t0) / 1800); draw(from + (1000 - from) * (1 - (1 - k) ** 3)); if (k < 1 && inView) requestAnimationFrame(step); };
-    requestAnimationFrame(step);
-  };
+  // Scroll progress: from the finale's top at three quarters down the viewport to the end of the page.
+  function finFrame() {
+    const a = fin.getBoundingClientRect().top + scrollY - vh * .75, b = document.documentElement.scrollHeight - vh;
+    const s = b - a < 40 ? +(scrollY >= a) : Math.max(0, Math.min(1, (scrollY - a) / (b - a)));
+    drawTo(Math.max(s * 1000, pen));
+  }
   const lean = (x, y) => { root.style.setProperty('--px', x.toFixed(3)); root.style.setProperty('--py', y.toFixed(3)); };
-  if (still) draw(1000);
-  else {
-    new IntersectionObserver(([e]) => {
-      inView = e.isIntersecting;
-      clearTimeout(wait);
-      if (inView) wait = setTimeout(autodraw, matchMedia('(hover: hover)').matches ? 6000 : 500);
-      else lean(0, 0);
-    }, { threshold: .45 }).observe(fin);
+  if (!still) {
+    new IntersectionObserver(([e]) => { inView = e.isIntersecting; if (!inView) { pen = 0; lean(0, 0); } }, { threshold: .2 }).observe(fin);
+    // The pen: the pointer draws ahead of the scroll while the finale is in view.
     addEventListener('pointermove', e => {
       if (!inView || e.pointerType === 'touch') return;
       const r = fsvg.getBoundingClientRect();
-      draw((e.clientX - r.left) / r.width * 1000);
+      pen = Math.max(pen, (e.clientX - r.left) / r.width * 1000);
+      finFrame();
       lean(e.clientX / innerWidth * 2 - 1, e.clientY / innerHeight * 2 - 1);
-      if (drawn < 1000) { clearTimeout(wait); wait = setTimeout(autodraw, 6000); }
     }, { passive: true });
   }
 

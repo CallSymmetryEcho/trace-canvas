@@ -100,6 +100,46 @@ export function handTo(d, { ref, to, thread, remote = false }, env = process.env
   const run = remote && ag.remote ? ag.remote(oneLine(th.name), prompt) : ag.launch(prompt);
   return { thread: th, todo, live, command: `${dir ? `cd ${q(dir)} && ` : ''}TRACE_CANVAS_THREAD=${tid} ${run}` };
 }
+/**
+ * Dispatch: hands each line's new to-dos to the agent that works on that line and says how to wake it.
+ * The line's agent is the session on this machine that last left a record there (its own turns, or what
+ * it logged there from elsewhere); a line without one gets a new session, as with Hand to it. New means
+ * open, nobody has it, and that session does not know it: the person logged it (on the page, the phone,
+ * the command line) or another session did. all: every open to-do nobody has. Assigns them. One row
+ * per line, with action:
+ *   message  a running Claude Code session: send it `prompt` (desktopId is its address in the Claude app)
+ *   busy     another agent, working right now: it can take the prompt only when it stops
+ *   resume   run `command`, which resumes the session with the prompt    start  run `command`: a new session
+ *   self     the caller's own line: the to-dos are the caller's
+ */
+export function dispatch(d, { threads = [], all = false, self = null } = {}, env = process.env) {
+  const me = readConfig(env).machine;
+  const tids = threads.length
+    ? threads.map(ref => { const id = findThreadLoose(d, ref); if (!id || id === INBOX) throw new Error(`No line named "${ref}"`); return id; })
+    : Object.values(d.threads).filter(t => !['done', 'merged'].includes(t.status)).map(t => t.id);
+  const known = new Map(threadSessions(d, null, env).map(s => [s.id, s]));
+  const live = new Map(liveSessions(d, env).sessions.map(s => [s.id, s]));
+  const rows = [];
+  for (const tid of tids) {
+    const th = d.threads[tid], cs = Object.values(d.commits).filter(c => threadIdOf(d, c) === tid);
+    const at = new Map(), worked = (id, ts) => { if (id && ts > (at.get(id) || 0)) at.set(id, ts); };
+    for (const c of cs) worked(c.session || c.fromSession, c.ts);
+    for (const [id, e] of Object.entries(d.sessions || {})) if (e.thread === tid) worked(id, e.last || 0);
+    const sid = [...at].sort((a, b) => b[1] - a[1]).map(([id]) => id).find(id => known.has(id) && (!known.get(id).machine || known.get(id).machine === me));
+    const s = sid && known.get(sid), run = sid && live.get(sid);
+    const todos = cs.filter(c => isTodo(c) && !c.done && !c.assignee && (all || !s || !c.agent || (c.fromSession && c.fromSession !== sid))).sort((a, b) => a.ts - b.ts);
+    if (!todos.length) continue;
+    const key = s ? Object.keys(AGENTS).find(k => AGENTS[k].name === s.agent) || 'claude' : 'claude';
+    for (const c of todos) c.assignee = key;
+    const row = { thread: { id: tid, name: th.name }, agent: key, todos: todos.map(c => ({ id: c.id, title: c.title })) };
+    if (!s) { rows.push({ ...row, action: 'start', command: handTo(d, { ref: todos[0].id, to: key, remote: key === 'claude' }, env).command }); continue; }
+    const prompt = oneLine(`New to-dos on the Trace Canvas line "${th.name}" (thread ${tid}) are yours: ${todos.map((c, i) => `${i + 1}) ${c.title} [${c.id}]`).join('; ')}. Do them in order; read the line with trace_read_thread for context, tick each with trace_task_done when it is done, and log results with trace_log.`);
+    const session = { id: sid, title: s.title || (run && (run.title || run.prompt)) || '', status: run ? run.status : 'off', ...(run && run.desktopId ? { desktopId: run.desktopId } : {}) };
+    const action = sid === self ? 'self' : run && key === 'claude' ? 'message' : run && run.status === 'working' ? 'busy' : 'resume';
+    rows.push({ ...row, action, session, prompt, ...(action === 'resume' ? { command: `${s.cwd ? `cd ${q(s.cwd)} && ` : ''}${AGENTS[key].wake(sid, prompt)}` } : {}) });
+  }
+  return rows;
+}
 // The command is typed into a terminal, so a name or to-do with a line break must not end it early.
 const oneLine = s => String(s).replace(/[\x00-\x1f\x7f]+/g, ' ');
 const sessionThreadOf = (d, s, env) => sessionThread(d, s, env).threadId;
@@ -420,10 +460,12 @@ export function readThread(d, ref, { limit = 50 } = {}, env = process.env) {
   const id = findThreadLoose(d, ref);
   if (!id) throw new Error(`No thread named "${ref}"`);
   const t = id === INBOX ? { id: INBOX, name: 'Inbox', status: 'active' } : d.threads[id];
-  const cs = Object.values(d.commits).filter(c => threadIdOf(d, c) === id).sort((a, b) => a.ts - b.ts);
+  const cs = Object.values(d.commits).filter(c => threadIdOf(d, c) === id).sort((a, b) => a.ts - b.ts), recs = cs.slice(-limit);
+  // The session a record was logged in, with the command that resumes it (it may work on another line).
+  const resume = recs.some(c => c.fromSession) ? new Map(threadSessions(d, null, env).map(s => [s.id, s.command])) : null;
   return {
     id: t.id, name: t.name, ...(t.group ? { group: t.group } : {}), status: t.status, goal: goalOf(t), note: t.note || '', total: cs.length,
     sessions: threadSessions(d, id, env).slice(0, 10).map(s => ({ id: s.id, agent: s.agent, title: s.title, status: s.status, last: new Date(s.last).toISOString(), resume: s.command })),
-    records: cs.slice(-limit).map(c => ({ id: c.id, at: new Date(c.ts).toISOString(), kind: c.kind, title: c.title, ...(c.body ? { body: c.body.slice(0, 600) } : {}), ...(c.agent ? { agent: c.agent } : {}), ...(c.session ? { session: c.session } : {}), ...(c.gitCommit ? { commit: c.gitCommit, ...(c.repo ? { repo: c.repo } : {}) } : {}), ...(c.links && c.links.length ? { links: c.links } : {}) })),
+    records: recs.map(c => ({ id: c.id, at: new Date(c.ts).toISOString(), kind: c.kind, title: c.title, ...(c.body ? { body: c.body.slice(0, 600) } : {}), ...(c.agent ? { agent: c.agent } : {}), ...(c.session ? { session: c.session } : {}), ...(c.fromSession ? { from: { session: c.fromSession, ...(resume.get(c.fromSession) ? { resume: resume.get(c.fromSession) } : {}) } } : {}), ...(c.gitCommit ? { commit: c.gitCommit, ...(c.repo ? { repo: c.repo } : {}) } : {}), ...(c.links && c.links.length ? { links: c.links } : {}) })),
   };
 }

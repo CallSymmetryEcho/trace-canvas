@@ -212,12 +212,15 @@ async function callTool(name, a = {}) {
       if (!String(a.title || '').trim()) throw new Error('title is required');
       // Agents are reminded of new to-dos on every message, so the same open to-do twice stays one.
       const norm = s => String(s).trim().toLowerCase().replace(/\s+/g, ' ');
-      let dup = false;
+      let dup = false, from = null;
+      // The session that logs it, so anyone can find the conversation behind a to-do (not `session`:
+      // a task record with a session is a prompt the hooks logged).
+      try { from = currentSessionId({ projectDir: projectDir() }); } catch {}
       const c = mutate(d => {
         const thread = a.thread ? ensureThread(d, a.thread) : INBOX, kind = a.kind || (a.assignee ? 'task' : 'agent');
         const same = kind === 'task' && Object.values(d.commits).find(x => x.kind === 'task' && !x.done && threadIdOf(d, x) === thread && norm(x.title) === norm(a.title));
         if (same) { dup = true; return same; }
-        return addCommit(d, { thread, kind, title: a.title, body: a.body || '', links: Array.isArray(a.links) ? a.links : [], agent: a.agent || agentOf(agentKey()).name, extra: a.assignee ? { assignee: a.assignee } : {} });
+        return addCommit(d, { thread, kind, title: a.title, body: a.body || '', links: Array.isArray(a.links) ? a.links : [], agent: a.agent || agentOf(agentKey()).name, extra: { ...(a.assignee ? { assignee: a.assignee } : {}), ...(from ? { fromSession: from } : {}) } });
       });
       const where = c.thread === INBOX ? 'the inbox' : `"${readData().threads[c.thread].name}"`;
       return { text: dup ? `Already an open to-do on ${where}.` : `Logged to ${where}.`, data: { id: c.id, thread: c.thread, ...(dup ? { existing: true } : {}) } };

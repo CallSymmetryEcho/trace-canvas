@@ -198,6 +198,8 @@ For Codex, setup also links the skill into `~/.agents/skills/trace-canvas`. Invo
 
 - **Who does what:** each to-do in **Goals** has a "who does it" choice (Claude Code, Codex, Gemini CLI or anyone). Agents read their own with `trace_tasks` (`mine: true`) and tick them with `trace_task_done`, and the list shows who ticked each one.
 - **Hand it over:** **Hand to it** next to an assigned to-do copies a command, and so does `trace-canvas hand "<to-do>" --to codex`. The command starts that agent in the line's folder with `TRACE_CANVAS_THREAD` set, so the new session lands on the line. On macOS, **Open in Terminal** next to it runs the command in a new Terminal window. An agent can also take its next to-do by itself: `/trace-canvas pick` (`$trace-canvas pick` in Codex).
+- **Dispatch:** tell one agent to dispatch (`/trace-canvas dispatch`, also from the Claude app on your phone) and each line's new to-dos go to the agent working on that line: the session that last left a record there. A running Claude Code session gets a message from that agent, a stopped session is resumed with its to-dos, and a line nobody works on gets a new session (Claude Code with Remote Control, so it shows in the Claude app); on macOS each opens in a new Terminal window. New means nobody has it and that agent does not know it yet: you logged it (on the page, the phone or the command line) or another session did. Once handed out, a to-do has its agent and is not handed out again (`--all` also takes the ones the line's agent logged itself). From the command line: `trace-canvas dispatch [line…]`, with `--print` to only print the commands.
+- **Back to the conversation:** a record an agent logs keeps the session it was logged in. Its panel shows it under **Logged in** (open the chat or copy the resume command), and `trace_read_thread` gives it as `from`.
 - **A head start:** when any of the three starts a session, the hook tells it which line it works on, the line's goal, the to-dos assigned to it, who else is working there, and (with the location map) where things are on this machine.
 - Records, live tips and the Agent view show which agent did what. Each session gets its own resume command: `claude --resume`, `codex resume` or `gemini --resume`.
 
@@ -309,6 +311,7 @@ Records
   trace-canvas merge <thread>... --into <thread> [--combine]
   trace-canvas fork <record|thread> [--name N] [--bind]   Branch a new thread off another
   trace-canvas hand <to-do|thread> --to claude|codex|gemini Assign it and print the command that starts the agent
+  trace-canvas dispatch [line...] [--all] [--print] Hand each line's new to-dos to the agent working on it and wake it
   trace-canvas import <file|->                     Merge an export, another data.json, or JSON lines
 
 Goals and to-dos

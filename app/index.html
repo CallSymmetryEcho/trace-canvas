@@ -979,7 +979,7 @@ const I18N = {
     stWorking: 'Working', stWaiting: 'Needs you', stIdle: 'Idle',
     liveHead: 'Running session', liveUntitled: 'Untitled session', liveStarted: x => `Started ${x}`, liveSeen: x => ` · last activity ${x}`,
     livePrompt: 'Latest instruction', liveThread: 'Thread', liveAuto: 'Automatic (repository and branch)', liveNow: 'Now on',
-    liveResume: 'Resume in a terminal', openChat: 'Open the chat', goTerm: 'Go to its terminal', tNoTerm: 'Its terminal tab is no longer open', liveRunning: 'Running now', lineSessions: 'Sessions on this line',
+    liveResume: 'Resume in a terminal', openChat: 'Open the chat', goTerm: 'Go to its terminal', tNoTerm: 'Its terminal tab is no longer open', liveRunning: 'Running now', lineSessions: 'Sessions on this line', loggedIn: 'Logged in',
     gxChanges: 'Changes', gxLoading: 'Reading from git…', gxNoRepo: 'This repository is not on this computer.', gxNoCommit: 'This commit is no longer in its repository (rewritten or cleaned up).',
     gxFiles: n => `${n} file${n === 1 ? '' : 's'}`, gxMore: n => `${n} more`, gxQuiet: n => `${n} binary or generated`, gxBinary: 'binary',
     gxCompare: 'Compare with', gxThisOnly: 'this commit only', gxOtherRepo: 'That station is in another repository.', gxTruncated: 'Cut at 200 KB.',
@@ -1152,7 +1152,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     stWorking: '工作中', stWaiting: '等你', stIdle: '空闲',
     liveHead: '运行中的会话', liveUntitled: '未命名会话', liveStarted: x => `开始于 ${x}`, liveSeen: x => ` · 最近活动 ${x}`,
     livePrompt: '最近的指令', liveThread: '所属线', liveAuto: '自动（按仓库和分支）', liveNow: '当前在',
-    liveResume: '在终端里恢复', openChat: '打开对话', goTerm: '跳到终端', tNoTerm: '它的终端标签页已经关了', liveRunning: '正在运行', lineSessions: '这条线上的会话',
+    liveResume: '在终端里恢复', openChat: '打开对话', goTerm: '跳到终端', tNoTerm: '它的终端标签页已经关了', liveRunning: '正在运行', lineSessions: '这条线上的会话', loggedIn: '记在这个会话里',
     gxChanges: '改动', gxLoading: '正在从 git 读取…', gxNoRepo: '这台电脑上没有这个仓库。', gxNoCommit: '仓库里已经没有这个提交，可能被改写或清理了。',
     gxFiles: n => `${n} 个文件`, gxMore: n => `还有 ${n} 个`, gxQuiet: n => `${n} 个二进制或生成文件`, gxBinary: '二进制',
     gxCompare: '对比', gxThisOnly: '只看这次提交', gxOtherRepo: '那个站点不在同一个仓库。', gxTruncated: '超过 200 KB，已截断。',
@@ -2660,6 +2660,7 @@ function commitDetail(c) {
         ${c.mergeOf && S.threads.has(c.mergeOf) ? `<span>${esc(t('mergedFromThread'))} <button class="linkish" data-act="goto-thread" data-tid="${esc(c.mergeOf)}">${esc(getThread(c.mergeOf).name)}</button></span>` : ''}
         ${children.map(x => `<span>${esc(t('forkedHere'))} <button class="linkish" data-act="goto-thread" data-tid="${esc(x.id)}">${esc(x.name)}</button></span>`).join('')}
       </div>` : ''}
+      ${fromView(c)}
       ${changesHTML(c)}
       <div class="d-actions">
         ${S.ui.fork
@@ -2670,8 +2671,6 @@ function commitDetail(c) {
       </div>
     </div>`;
 }
-// The line's sessions, running ones first, then the most recent. A running one opens its live panel;
-// each copies the command that resumes it, so work on a line goes on in its session.
 /* ---- retro ---- */
 const RETRO_LAYERS = ['project', 'line', 'memory'];
 const fmtTok = n => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(n || 0));
@@ -2703,22 +2702,30 @@ async function applyRetro(cid, n) {
   const r = await postJSON('/api/retro/apply', { record: cid, n: Number(n), layer: sel ? sel.value : '' });
   toast(r.error ? t('retroFail', r.error) : t('tRetroApplied', r.where));
 }
+// One session: open its chat or terminal, or copy the command that resumes it. l is its live entry, if running.
+function sessionItem(s, l) {
+  const st = l ? l.status : 'off', cwd = s.cwd || (l && l.cwd);
+  const here = `${cwd ? `cd ${shq(cwd)} && ` : ''}${s.resume || (l && l.resume) || `claude --resume ${s.id}`}`;
+  // A session from another machine resumes there, over ssh (the machine names are the ssh aliases).
+  const away = s.machine && S.machine && s.machine !== S.machine, cmd = away ? `ssh -t ${s.machine} ${shq(here)}` : here;
+  const jump = away ? '' : jumpTo({ ...l, ...s, desktopId: s.desktopId || (l && l.desktopId), tty: l && l.tty }, 'btn btn-primary');
+  const sub = [l && stLabel(st), s.agent || (l && l.agent) || 'Claude Code', away && s.machine, s.id.slice(0, 8), s.last && fmtRel(s.last)].filter(Boolean).join(' · ');
+  return `<li class="st-${esc(st)}${l ? ' is-live' : ''}"${l ? ` data-act="goto-live" data-sid="${esc(s.id)}"` : ''}><span class="ldot"></span><span class="s-name">${esc(s.title || (l ? liveTitle(l) : s.id))}</span><span class="act">${esc(sub)}</span><span class="s-acts">${jump}<button class="btn" data-act="copy-cmd" data-cmd="${esc(cmd)}" title="${esc(cmd)}">${esc(t('copyResume'))}</button></span></li>`;
+}
+// The session an agent logged this record in: its chat, or the command that resumes it.
+function fromView(c) {
+  const s = c.fromSession && (S.sessions.find(x => x.id === c.fromSession) || { id: c.fromSession });
+  return s ? `<div class="sec-label">${esc(t('loggedIn'))}</div><ul class="l-list s-list">${sessionItem(s, S.live.find(l => l.id === s.id))}</ul>` : '';
+}
+// The line's sessions, running ones first, then the most recent. A running one opens its live panel;
+// each copies the command that resumes it, so work on a line goes on in its session.
 function lineSessions(tid) {
   const live = liveOn(tid), byId = new Map(live.map(s => [s.id, s]));
   const known = new Set(S.sessions.map(s => s.id));
   const rows = [...S.sessions.filter(s => s.thread === tid || byId.has(s.id)), ...live.filter(l => !known.has(l.id)).map(l => ({ id: l.id, agent: l.agent, last: l.lastSeen }))]
     .sort((a, b) => byId.has(b.id) - byId.has(a.id) || (b.last || 0) - (a.last || 0));
   if (!rows.length) return '';
-  const li = s => {
-    const l = byId.get(s.id), st = l ? l.status : 'off', cwd = s.cwd || (l && l.cwd);
-    const here = `${cwd ? `cd ${shq(cwd)} && ` : ''}${s.resume || (l && l.resume) || `claude --resume ${s.id}`}`;
-    // A session from another machine resumes there, over ssh (the machine names are the ssh aliases).
-    const away = s.machine && S.machine && s.machine !== S.machine, cmd = away ? `ssh -t ${s.machine} ${shq(here)}` : here;
-    const jump = away ? '' : jumpTo({ ...l, ...s, desktopId: s.desktopId || (l && l.desktopId), tty: l && l.tty }, 'btn btn-primary');
-    const sub = [l && stLabel(st), s.agent || (l && l.agent) || 'Claude Code', away && s.machine, s.id.slice(0, 8), s.last && fmtRel(s.last)].filter(Boolean).join(' · ');
-    return `<li class="st-${esc(st)}${l ? ' is-live' : ''}"${l ? ` data-act="goto-live" data-sid="${esc(s.id)}"` : ''}><span class="ldot"></span><span class="s-name">${esc(s.title || (l ? liveTitle(l) : s.id))}</span><span class="act">${esc(sub)}</span><span class="s-acts">${jump}<button class="btn" data-act="copy-cmd" data-cmd="${esc(cmd)}" title="${esc(cmd)}">${esc(t('copyResume'))}</button></span></li>`;
-  };
-  return `<div class="sec-label">${esc(t('lineSessions'))}</div><ul class="l-list s-list">${rows.slice(0, 8).map(li).join('')}</ul>
+  return `<div class="sec-label">${esc(t('lineSessions'))}</div><ul class="l-list s-list">${rows.slice(0, 8).map(s => sessionItem(s, byId.get(s.id))).join('')}</ul>
       <p style="margin:0;color:var(--faint);font-size:12px">${rows.length > 8 ? `+${rows.length - 8} · ` : ''}${esc(t('lineSessionsHint'))}</p>`;
 }
 function threadDetail(th) {

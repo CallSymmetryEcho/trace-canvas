@@ -1,6 +1,6 @@
 ---
 name: trace-canvas
-description: Put an agent session on the Trace Canvas, a transit map of parallel work (threads like git branches, records like commits), log a key moment, list past Claude Code sessions, or merge sessions and threads into one line. Use when the user asks to trace, capture, save or log this session or conversation, to see how parallel work fits together, or to merge sessions or threads, including "留痕", "把这次会话放进画布", "合并会话" and "合并线程".
+description: Put an agent session on the Trace Canvas, a transit map of parallel work (threads like git branches, records like commits), log a key moment, list past Claude Code sessions, merge sessions and threads into one line, or hand new to-dos to the agents working on each line. Use when the user asks to trace, capture, save or log this session or conversation, to see how parallel work fits together, or to merge sessions or threads, including "留痕", "把这次会话放进画布", "合并会话", "合并线程" and "分派".
 allowed-tools: mcp__trace-canvas__trace_capture_session mcp__trace-canvas__trace_list_sessions mcp__trace-canvas__trace_list_threads mcp__trace-canvas__trace_read_thread mcp__trace-canvas__trace_log mcp__trace-canvas__trace_open mcp__trace-canvas__trace_live mcp__trace-canvas__trace_bind mcp__trace-canvas__trace_tasks mcp__trace-canvas__trace_task_done mcp__trace-canvas__trace_fork
 ---
 
@@ -10,7 +10,7 @@ Trace Canvas shows work as a transit map. A **thread** is one piece of work in p
 
 In Claude Code, invoke `/trace-canvas` (arguments: `$ARGUMENTS`). In Codex, invoke `$trace-canvas` and read the action from the user's request.
 
-Actions: `capture`, `all`, `sessions`, `tasks`, `pick`, `retro <thread>`, `live`, `bind <thread>`, `fork <thread>`, `merge <threads…>`, `open`, `log <text>`.
+Actions: `capture`, `all`, `sessions`, `tasks`, `pick`, `dispatch [lines…]`, `retro <thread>`, `live`, `bind <thread>`, `fork <thread>`, `merge <threads…>`, `open`, `log <text>`.
 
 Pick the matching action below. With no arguments, capture the current session.
 
@@ -67,6 +67,13 @@ Call `trace_tasks` (it answers for the line this session works on; pass `thread`
 1. Call `trace_tasks` with `mine: true`. If nothing is assigned to you, call `trace_tasks` for the line you work on and take its oldest open to-do that nobody has.
 2. Say in one line which to-do you take, then do it.
 3. When it is done, call `trace_task_done` with its id and `trace_log` the result on the same line.
+
+## dispatch [lines…]: hand new to-dos to each line's agent and wake it
+
+1. Run `node <this skill's folder>/../bin/trace-canvas.mjs dispatch` (`trace-canvas dispatch` if it is on the PATH) with the lines the user named, or none for every line; add `--all` if they also want the to-dos a line's agent logged itself. It gives each line's new to-dos (the user's own, or logged by another session) to the agent that last worked on that line, and on macOS it resumes stopped sessions and starts new ones in new Terminal windows by itself.
+2. Where it says **send it this message**, send that message to the running session with your messaging tool if you have one (in Claude Code: SendMessage to the `local_…` id it prints, or to the session's name from ListAgents). Otherwise give the user the session and the message.
+3. **Your own line** means those to-dos are yours: do them after the others are handed out. An agent that is **working** and not Claude Code takes its message only when it stops: tell the user.
+4. Report one row per line: which agent got which to-dos and how it was woken. Only to-dos are handed out; if the user's new items are ideas, say so and offer to make them to-dos.
 
 ## retro <thread>: which work took the most back-and-forth, and what to keep
 

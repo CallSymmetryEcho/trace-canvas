@@ -6,10 +6,11 @@ export const q = s => `'${String(s).replace(/'/g, `'\\''`)}'`; // POSIX shell qu
 
 export const AGENTS = {
   // remote: Remote Control on, named after the line, so the session shows in the Claude app (▶ Start).
-  claude: { name: 'Claude Code', resume: id => `claude --resume ${id}`, launch: p => `claude ${q(p)}`, remote: (name, p) => `claude --remote-control=${q(name)} ${q(p)}` },
-  codex: { name: 'Codex', resume: id => `codex resume ${id}`, launch: p => `codex ${q(p)}` },
+  // wake: resume the session with a first message (Dispatch).
+  claude: { name: 'Claude Code', resume: id => `claude --resume ${id}`, wake: (id, p) => `claude --resume ${id} ${q(p)}`, launch: p => `claude ${q(p)}`, remote: (name, p) => `claude --remote-control=${q(name)} ${q(p)}` },
+  codex: { name: 'Codex', resume: id => `codex resume ${id}`, wake: (id, p) => `codex resume ${id} ${q(p)}`, launch: p => `codex ${q(p)}` },
   // ponytail: Gemini's resume flag is unverified until a current gemini-cli is installed.
-  gemini: { name: 'Gemini CLI', resume: id => `gemini --resume ${id}`, launch: p => `gemini -i ${q(p)}` },
+  gemini: { name: 'Gemini CLI', resume: id => `gemini --resume ${id}`, wake: (id, p) => `gemini --resume ${id} -i ${q(p)}`, launch: p => `gemini -i ${q(p)}` },
 };
 export const agentOf = key => AGENTS[key] || AGENTS.claude;
 // AppleScript that runs cmd in a new Terminal window and brings it forward (macOS, "Open in Terminal").

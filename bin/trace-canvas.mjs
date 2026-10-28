@@ -97,6 +97,9 @@ Goals and to-dos
                                                    Tick a to-do by id or title (--undo reopens it)
   trace-canvas hand <to-do|thread> --to claude|codex|gemini
                                                    Assign it and print the command that starts the agent on it
+  trace-canvas dispatch [line...] [--all] [--print] [--json]
+                                                   Hand each line's new to-dos to the agent working on it and wake it
+                                                   (resume or start in a new Terminal window; --print only prints)
 
 Live sessions
   trace-canvas live                                Running sessions: status, activity, thread
@@ -268,6 +271,28 @@ async function main() {
       const r = mutate(d => handTo(d, { ref, to, thread: thread || undefined }));
       console.error(r.todo ? `"${r.todo.title}" is assigned to ${to}. Run this to start it:` : `Run this to start ${to} on "${r.thread.name}":`);
       console.log(r.command);
+      break;
+    }
+    case 'dispatch': {
+      // Dispatch: each line's new to-dos go to its agent. A stopped session is resumed and a line without one gets a
+      // new session, each in a new Terminal window (macOS); a running Claude Code session is messaged by the agent
+      // that called this (the skill), since only an agent can reach it.
+      const { dispatch } = await import('../src/ops.mjs');
+      const { AGENTS, terminalScript } = await import('../src/agents.mjs');
+      const all = !!flag('all', false), json = !!flag('json', false), run = !flag('print', false) && process.platform === 'darwin';
+      const rows = mutate(d => dispatch(d, { threads: argv.filter(Boolean), all, self: process.env.CLAUDE_CODE_SESSION_ID || null }));
+      for (const r of rows) if (r.command && run) spawn('osascript', ['-e', terminalScript(r.command)], { stdio: 'ignore', detached: true }).unref();
+      if (json) { console.log(JSON.stringify(rows, null, 2)); break; }
+      if (!rows.length) { console.log('Nothing new to dispatch: every open to-do has an agent, or was logged by the agent working on its line (--all takes those too).'); break; }
+      for (const r of rows) {
+        const who = AGENTS[r.agent].name, s = r.session, name = s && `"${s.title.slice(0, 50) || s.id.slice(0, 8)}"`;
+        console.log(`\n${r.thread.name}: ${r.todos.length} to-do${r.todos.length === 1 ? '' : 's'} for ${who}`);
+        for (const c of r.todos) console.log(`  □ ${c.title}  [${c.id}]`);
+        if (r.action === 'self') console.log('  → Your own line: they are yours.');
+        else if (r.action === 'message') console.log(`  → Running session ${name} (${s.status}${s.desktopId ? `, ${s.desktopId}` : ''}): send it this message:\n    ${r.prompt}`);
+        else if (r.action === 'busy') console.log(`  → ${who} session ${name} is working: send it this when it stops:\n    ${r.prompt}`);
+        else console.log(`  → ${r.action === 'start' ? `A new ${who} session` : `Session ${name} resumed`}${run ? ' in a new Terminal window' : '; run'}:\n    ${r.command}`);
+      }
       break;
     }
     case 'done': {

@@ -150,6 +150,10 @@ test('the MCP server speaks JSON-RPC over stdio and captures the current session
     assert.deepEqual(mine.result.structuredContent.threads[0].tasks.map(t => Object.keys(t)), [['id', 'title']]); // an open to-do: no empty fields
     const every = await call('tools/call', { name: 'trace_tasks', arguments: { all: true } });
     assert.deepEqual(every.result.structuredContent.threads.map(r => r.name), ['Methods chapter draft', 'Advisor meeting']);
+    // A to-do keeps the session that logged it (and stays a to-do), so its conversation can be found again.
+    const { from } = (await call('tools/call', { name: 'trace_read_thread', arguments: { thread: 'Advisor meeting' } })).result.structuredContent.records.at(-1);
+    assert.equal(from.session, 'sess-a');
+    assert.match(from.resume, /claude --resume sess-a$/);
     const merged = await call('tools/call', { name: 'trace_merge', arguments: { sources: ['Advisor meeting'], target: 'Methods chapter draft', mode: 'merge' } });
     assert.match(merged.result.content[0].text, /^Merged "Advisor meeting" into "Methods chapter draft"/);
     const bad = await call('tools/call', { name: 'trace_merge', arguments: { sources: ['Nope'] } });

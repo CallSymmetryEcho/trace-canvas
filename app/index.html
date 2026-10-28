@@ -923,7 +923,7 @@ const I18N = {
     tSaveFail: 'Couldn’t save. Check the connection and try again.', tConnLost: 'Lost the data connection. Reload the page to reconnect.',
     tForked: ti => `Forked a new thread from “${ti}”`, tMerged: (a, b) => `Merged “${a}” into “${b}”`, tCleared: n => `Cleared ${n} example item${n === 1 ? '' : 's'}`,
     tMoved: n => `Moved to “${n}”`, tLogged: n => `Logged to “${n}”`, tImported: n => `Imported ${n} record${n === 1 ? '' : 's'}`,
-    tDeleted: 'Deleted', tCopied: 'Copied', tCopyFail: 'Couldn’t write to the clipboard. Select the text and copy it by hand.',
+    tDeleted: 'Deleted', tCopied: 'Copied', tCopyFail: 'This page can’t write to the clipboard. The text below is selected: copy it from here.',
     tSaved: 'Saved', tCopiedAll: 'Copied all data', tSaveFallback: 'Saving didn’t work here, so the JSON is on your clipboard instead',
     tApplied: n => `Applied ${n} suggestion${n === 1 ? '' : 's'}`, tNoneChecked: 'No suggestions were selected',
     tImportFail: 'Nothing to import. Use an exported JSON file, or one {"title": …} record per line.', tDemoLoaded: 'Example data loaded',
@@ -1096,7 +1096,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     tSaveFail: '保存失败，请检查网络后重试', tConnLost: '数据连接中断，刷新页面可恢复',
     tForked: ti => `已从「${ti}」分出新线程`, tMerged: (a, b) => `「${a}」已合并到「${b}」`, tCleared: n => `已清除 ${n} 条示例数据`,
     tMoved: n => `已移到「${n}」`, tLogged: n => `已记到「${n}」`, tImported: n => `已导入 ${n} 条记录`,
-    tDeleted: '已删除', tCopied: '已复制', tCopyFail: '无法写入剪贴板，请手动选中复制',
+    tDeleted: '已删除', tCopied: '已复制', tCopyFail: '这个页面没法直接写入剪贴板。下面的文字已经选中，在这里复制即可。',
     tSaved: '已保存', tCopiedAll: '已复制全部数据', tSaveFallback: '这里不能直接保存文件，已把 JSON 复制到剪贴板',
     tApplied: n => `已应用 ${n} 条建议`, tNoneChecked: '没有勾选任何建议',
     tImportFail: '没有识别到可导入的内容：需要导出的 JSON，或每行一个 {"title": …} 的记录', tDemoLoaded: '已载入示例数据',
@@ -3014,9 +3014,27 @@ function setSheet(title, body, foot) {
   scrim.hidden = false;
 }
 function codebox(text, id) { return `<div class="codebox"><pre id="${id}">${esc(text)}</pre><button class="btn" data-copy-from="${id}">${esc(t('copy'))}</button></div>`; }
+// The clipboard API needs a secure page (https or localhost). A phone opens this one over plain http on the
+// tailnet, so copying falls back to execCommand, and failing that shows the text selected, to copy by hand.
 async function copyText(text, okMsg) {
-  try { await navigator.clipboard.writeText(text); toast(okMsg || t('tCopied')); }
-  catch { toast(t('tCopyFail')); }
+  let ok = false;
+  if (window.isSecureContext && navigator.clipboard) { try { await navigator.clipboard.writeText(text); ok = true; } catch {} }
+  if (!ok) ok = copyLegacy(text);
+  if (ok) { toast(okMsg || t('tCopied')); return; }
+  S.sheet = 'copy'; document.body.classList.add('sheet-open');
+  setSheet(t('copy'), `<p>${esc(t('tCopyFail'))}</p><textarea class="import" readonly>${esc(text)}</textarea>`);
+  const box = $('#sheet-body textarea'); box.focus(); box.setSelectionRange(0, text.length);
+}
+function copyLegacy(text) {
+  const box = document.createElement('textarea');
+  box.value = text; box.readOnly = true;
+  box.style.cssText = 'position:fixed;top:0;left:0;opacity:0;font-size:16px'; // 16px: iOS does not zoom in
+  document.body.appendChild(box);
+  box.focus(); box.setSelectionRange(0, text.length);
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch {}
+  box.remove();
+  return ok;
 }
 scrim.addEventListener('click', e => {
   const b = e.target.closest('[data-copy-from]');

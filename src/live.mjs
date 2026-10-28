@@ -36,6 +36,24 @@ export function dropLive(sid, env) {
   for (const n of names) if (n === `${safe(sid)}.json` || n.startsWith(pre)) { try { fs.unlinkSync(path.join(liveDir(env), n)); } catch {} }
 }
 
+// Codex sometimes ends a turn without running the Stop hook, which left sessions "working" for hours. Its rollout
+// records each turn's start and end, so a working Codex session whose last turn event is an end has stopped.
+// ponytail: reads the rollout's last 16 KB; a turn event further back than that leaves the status as it is.
+function codexTurnOver(file) {
+  let tail = '';
+  try {
+    const fd = fs.openSync(file, 'r'), size = fs.fstatSync(fd).size, n = Math.min(size, 16384), buf = Buffer.alloc(n);
+    fs.readSync(fd, buf, 0, n, size - n); fs.closeSync(fd);
+    tail = buf.toString('utf8');
+  } catch { return false; }
+  for (const line of tail.split('\n').reverse()) {
+    let o; try { o = JSON.parse(line); } catch { continue; }
+    const t = o && o.type === 'event_msg' && o.payload && o.payload.type;
+    if (t === 'task_started') return false;
+    if (t === 'task_complete' || t === 'turn_aborted') return true;
+  }
+  return false;
+}
 // Running sessions, the ones that need you first, then the busiest. Each carries its subagents.
 export function listLive(env, now = Date.now()) {
   let names = [];
@@ -47,6 +65,7 @@ export function listLive(env, now = Date.now()) {
   }
   return names.filter(n => !n.includes('.agent-')).map(n => readJson(path.join(liveDir(env), n)))
     .filter(s => s && s.id && now - (s.lastSeen || 0) < STALE_MS)
+    .map(s => (s.status === 'working' && s.agentKey === 'codex' && codexTurnOver(s.transcript) ? { ...s, status: 'idle' } : s))
     .map(s => ({ ...s, agents: (agents.get(s.id) || []).sort((a, b) => a.startedAt - b.startedAt).slice(-MAX_AGENTS)
       // Claude Code writes the .meta.json just after SubagentStart, so a running subagent picks up its description here.
       .map(a => (a.description ? a : { ...a, description: metaOf(s.transcript, a.id).description || '' })) }))

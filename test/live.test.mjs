@@ -175,3 +175,16 @@ test('server lists running sessions with their thread and binds only with its he
     fs.unwatchFile(path.join(process.env.TRACE_CANVAS_HOME, 'data.json'));
   }
 });
+
+test('a Codex session whose rollout ended the turn is idle, even when its Stop hook never came', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-live-codex-'));
+  const env = { ...process.env, TRACE_CANVAS_HOME: path.join(root, 'home') };
+  const dir = path.join(root, 'home', 'live'), rollout = path.join(root, 'rollout.jsonl');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'c1.json'), JSON.stringify({ id: 'c1', agent: 'Codex', agentKey: 'codex', status: 'working', lastSeen: Date.now(), transcript: rollout }));
+  const turn = type => JSON.stringify({ timestamp: new Date().toISOString(), type: 'event_msg', payload: { type } });
+  fs.writeFileSync(rollout, [turn('task_started'), JSON.stringify({ type: 'response_item', payload: { type: 'message' } })].join('\n') + '\n');
+  assert.equal(listLive(env)[0].status, 'working'); // still in the turn
+  fs.appendFileSync(rollout, turn('task_complete') + '\n' + JSON.stringify({ type: 'event_msg', payload: { type: 'token_count' } }) + '\n');
+  assert.equal(listLive(env)[0].status, 'idle');
+});

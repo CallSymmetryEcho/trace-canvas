@@ -14,6 +14,7 @@
 - **Goals:** click a line's goal to edit it in place, and on a phone a to-do's row has Edit. A half-typed to-do stays when you tap elsewhere, with an Add button next to it. On a phone, ← on a line or record page no longer misses a tap while sessions are updating.
 - **Open in Terminal (macOS):** next to Hand to it, starts the agent on the line in a new Terminal window. **`/trace-canvas pick`** has an agent take its next to-do.
 - A goal or note you just saved no longer disappears for a while when an older refresh of the page answers late (many sessions ending at once). On a phone, tapping a kind in the box at the bottom no longer misses on Safari. Copy buttons work on the phone too: the page is plain http there, where browsers withhold the clipboard API, so copying falls back to the older copy command, and if that fails as well the text opens selected, to copy by hand.
+- A Codex session whose turn has ended shows as idle, read from its rollout, even when Codex did not run the Stop hook (some sessions stayed "working" for hours).
 - A part of a line's name finds the line when only one line has it (resume, bind, tasks, trace_read_thread). Commit records keep the repository's real path, and More works while a sheet is open.
 
 - **Groups and arranging.** Lines can be put in a group (Select → Group, the line's panel, or `trace-canvas group`); a group is a frame on the canvas whose label moves, renames, arranges or ungroups it, and forks join their line's group. **Arrange** lays the canvas out by group, forks after their lines, and can be undone.

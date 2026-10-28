@@ -198,7 +198,7 @@ node bin/trace-canvas.mjs setup --user --agents codex,gemini
 
 - **谁做什么**：**目标**清单里每项待办都能选"由谁做"（Claude Code、Codex、Gemini CLI 或任何人）。agent 用 `trace_tasks`（`mine: true`）读分给自己的待办，做完用 `trace_task_done` 勾上，清单会标出是谁勾的。
 - **交出去**：已指定的待办旁边有**交给它**按钮，会复制一条命令；`trace-canvas hand "<待办>" --to codex` 也能打印同样的命令。这条命令在这条线的目录里启动那个 agent，并设置 `TRACE_CANVAS_THREAD`，新会话一开始就落在这条线上。在 macOS 上，旁边的**在终端打开**会直接在新的终端窗口里运行这条命令。agent 也可以自己领下一条待办：`/trace-canvas pick`（Codex 里是 `$trace-canvas pick`）。
-- **分派**：对一个 agent 说「分派」（`/trace-canvas dispatch`，在手机上的 Claude app 里也行），每条线上新记的待办就交给正在做这条线的 agent，也就是最后在这条线上留下记录的那个会话。正在运行的 Claude Code 会话由这个 agent 发消息过去；已经停了的会话带着待办恢复；没人做的线新开一个会话（Claude Code 会打开 Remote Control，在 Claude app 里看得到）。在 macOS 上，每个都在新的终端窗口里打开。「新」是指还没人认领、那个 agent 也还不知道的待办：你自己记的（在页面、手机或命令行上），或者别的会话替这条线记的。分出去的待办就有了主人，不会再分一次（`--all` 连这条线的 agent 自己记的也分）。命令行：`trace-canvas dispatch [线…]`，加 `--print` 只打印命令。
+- **分派**：对一个 agent 说「分派」（`/trace-canvas dispatch`，在手机上的 Claude app 里也行），每条线上新记的待办就交给正在做这条线的 agent，也就是最后在这条线上留下记录的那个会话。正在运行的 Claude Code 会话由这个 agent 发消息过去；已经停了的会话带着待办恢复；没人做的线新开一个会话（Claude Code 会打开 Remote Control，在 Claude app 里看得到）。在 macOS 上，每个都在新的终端窗口里打开。「新」是指还没人认领、那个 agent 也还不知道的待办：你自己记的（在页面、手机或命令行上），或者别的会话替这条线记的。分出去的待办就有了主人，不会再分一次（`--all` 连这条线的 agent 自己记的也分）。点名一条待办（而不是一条线），就只分这一条，不管是谁记的。命令行：`trace-canvas dispatch [线|待办…]`，加 `--print` 只打印命令。
 - **回到那次对话**：agent 记下的每条记录都保存了是在哪个会话里记的。记录面板里**记在这个会话里**一栏可以打开那次对话或复制恢复命令，`trace_read_thread` 里是 `from`。
 - **开局就知道情况**：三个 agent 无论哪个开新会话，hook 都会告诉它：在哪条线上、线的目标、分给它的待办、还有谁在这条线上，以及（配好位置地图时）本机上的东西在哪里。
 - 记录、实时线头和 Agent 视图都会标出是哪个 agent 做的。每个会话都有自己的恢复命令：`claude --resume`、`codex resume` 或 `gemini --resume`。
@@ -311,7 +311,7 @@ node bin/trace-canvas.mjs log "文献对比表完成" \
   trace-canvas merge <线程>... --into <线程> [--combine]
   trace-canvas fork <记录|线程> [--name 名字] [--bind]   从另一条线分出新线
   trace-canvas hand <待办|线程> --to claude|codex|gemini 指定由谁做，并打印启动那个 agent 的命令
-  trace-canvas dispatch [线...] [--all] [--print]  把每条线新记的待办交给做这条线的 agent，并叫醒它
+  trace-canvas dispatch [线|待办...] [--all] [--print]  把每条线新记的待办（或点名的待办）交给做这条线的 agent，并叫醒它
   trace-canvas import <文件|->                     合并导出文件、另一份 data.json 或 JSON 行
 
 目标和待办

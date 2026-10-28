@@ -58,7 +58,9 @@ test('dispatch hands each line\'s new to-dos to the agent working on it, and say
   assert.deepEqual(dispatch(d, {}, env), []); // handed out once
   running('c1', 'Codex', 'codex', 'working');
   todo(scripts, 'Add a lint step');
-  assert.deepEqual(dispatch(d, { threads: ['Scripts'] }, env).map(r => r.action), ['busy']);
-  assert.deepEqual(dispatch(d, { threads: ['Thesis'], all: true }, env)[0].todos.map(c => c.title), ['Its own to-do', 'An older agent to-do']);
-  assert.throws(() => dispatch(d, { threads: ['Nope'] }, env), /No line named "Nope"/);
+  assert.deepEqual(dispatch(d, { refs: ['Scripts'] }, env).map(r => r.action), ['busy']);
+  assert.deepEqual(dispatch(d, { refs: ['Thesis'], all: true }, env)[0].todos.map(c => c.title), ['Its own to-do', 'An older agent to-do']);
+  // A to-do named goes to its line's agent, even one that agent logged itself.
+  assert.deepEqual(dispatch(d, { refs: ['Its own to-do'] }, env).map(r => [r.thread.name, r.session.id, r.todos.map(c => c.title)]), [['Thesis', 's1', ['Its own to-do']]]);
+  assert.throws(() => dispatch(d, { refs: ['Nope'] }, env), /No line or open to-do "Nope"/);
 });

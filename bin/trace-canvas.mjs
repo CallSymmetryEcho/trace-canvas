@@ -97,8 +97,8 @@ Goals and to-dos
                                                    Tick a to-do by id or title (--undo reopens it)
   trace-canvas hand <to-do|thread> --to claude|codex|gemini
                                                    Assign it and print the command that starts the agent on it
-  trace-canvas dispatch [line...] [--all] [--print] [--json]
-                                                   Hand each line's new to-dos to the agent working on it and wake it
+  trace-canvas dispatch [line|to-do...] [--all] [--print] [--json]
+                                                   Hand each line's new to-dos (or the to-dos named) to the agent working on it and wake it
                                                    (resume or start in a new Terminal window; --print only prints)
 
 Live sessions
@@ -280,7 +280,7 @@ async function main() {
       const { dispatch } = await import('../src/ops.mjs');
       const { AGENTS, terminalScript } = await import('../src/agents.mjs');
       const all = !!flag('all', false), json = !!flag('json', false), run = !flag('print', false) && process.platform === 'darwin';
-      const rows = mutate(d => dispatch(d, { threads: argv.filter(Boolean), all, self: process.env.CLAUDE_CODE_SESSION_ID || null }));
+      const rows = mutate(d => dispatch(d, { refs: argv.filter(Boolean), all, self: process.env.CLAUDE_CODE_SESSION_ID || null }));
       for (const r of rows) if (r.command && run) spawn('osascript', ['-e', terminalScript(r.command)], { stdio: 'ignore', detached: true }).unref();
       if (json) { console.log(JSON.stringify(rows, null, 2)); break; }
       if (!rows.length) { console.log('Nothing new to dispatch: every open to-do has an agent, or was logged by the agent working on its line (--all takes those too).'); break; }

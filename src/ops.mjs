@@ -105,18 +105,25 @@ export function handTo(d, { ref, to, thread, remote = false }, env = process.env
  * The line's agent is the session on this machine that last left a record there (its own turns, or what
  * it logged there from elsewhere); a line without one gets a new session, as with Hand to it. New means
  * open, nobody has it, and that session does not know it: the person logged it (on the page, the phone,
- * the command line) or another session did. all: every open to-do nobody has. Assigns them. One row
- * per line, with action:
+ * the command line) or another session did. all: every open to-do nobody has. refs are lines or to-dos
+ * (id or title): a to-do named goes to its line's agent whoever logged it. Assigns them. One row per line:
  *   message  a running Claude Code session: send it `prompt` (desktopId is its address in the Claude app)
  *   busy     another agent, working right now: it can take the prompt only when it stops
  *   resume   run `command`, which resumes the session with the prompt    start  run `command`: a new session
  *   self     the caller's own line: the to-dos are the caller's
  */
-export function dispatch(d, { threads = [], all = false, self = null } = {}, env = process.env) {
-  const me = readConfig(env).machine;
-  const tids = threads.length
-    ? threads.map(ref => { const id = findThreadLoose(d, ref); if (!id || id === INBOX) throw new Error(`No line named "${ref}"`); return id; })
-    : Object.values(d.threads).filter(t => !['done', 'merged'].includes(t.status)).map(t => t.id);
+export function dispatch(d, { refs = [], all = false, self = null } = {}, env = process.env) {
+  const me = readConfig(env).machine, lines = new Set(), named = new Set();
+  for (const ref of refs) {
+    const id = d.commits[ref] ? null : findThreadLoose(d, ref);
+    if (id && id !== INBOX) { lines.add(id); continue; }
+    let c;
+    try { c = findTodo(d, { task: ref }); } catch (e) { throw /^No /.test(e.message) ? new Error(`No line or open to-do "${ref}"`) : e; }
+    if (threadIdOf(d, c) === INBOX) throw new Error(`"${c.title}" is in the inbox: put it on a line first`);
+    named.add(c.id);
+  }
+  if (!refs.length) for (const t of Object.values(d.threads)) if (!['done', 'merged'].includes(t.status)) lines.add(t.id);
+  const tids = [...lines, ...[...named].map(id => threadIdOf(d, d.commits[id]))].filter((t, i, a) => a.indexOf(t) === i);
   const known = new Map(threadSessions(d, null, env).map(s => [s.id, s]));
   const live = new Map(liveSessions(d, env).sessions.map(s => [s.id, s]));
   const rows = [];
@@ -127,7 +134,7 @@ export function dispatch(d, { threads = [], all = false, self = null } = {}, env
     for (const [id, e] of Object.entries(d.sessions || {})) if (e.thread === tid) worked(id, e.last || 0);
     const sid = [...at].sort((a, b) => b[1] - a[1]).map(([id]) => id).find(id => known.has(id) && (!known.get(id).machine || known.get(id).machine === me));
     const s = sid && known.get(sid), run = sid && live.get(sid);
-    const todos = cs.filter(c => isTodo(c) && !c.done && !c.assignee && (all || !s || !c.agent || (c.fromSession && c.fromSession !== sid))).sort((a, b) => a.ts - b.ts);
+    const todos = cs.filter(c => isTodo(c) && !c.done && (named.has(c.id) || (lines.has(tid) && !c.assignee && (all || !s || !c.agent || (c.fromSession && c.fromSession !== sid))))).sort((a, b) => a.ts - b.ts);
     if (!todos.length) continue;
     const key = s ? Object.keys(AGENTS).find(k => AGENTS[k].name === s.agent) || 'claude' : 'claude';
     for (const c of todos) c.assignee = key;

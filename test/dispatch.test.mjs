@@ -37,6 +37,8 @@ test('dispatch hands each line\'s new to-dos to the agent working on it, and say
   session('v', tools, 'Claude Code', 0);
   addCommit(d, { thread: videos, kind: 'agent', title: 'Video 21 is scheduled', agent: 'Claude Code', ts: now - 3e5, extra: { fromSession: 'v' } });
   todo(videos, 'Post the vertical cut');
+  // Ending is not working there: the note the hooks write when an idle session ends does not make it the line's agent.
+  addCommit(d, { thread: videos, kind: 'note', title: 'Session ended · 600 min · 1 prompt', agent: 'Claude Code', ts: now - 1e5, extra: { session: 'old' } });
 
   const rows = dispatch(d, { self: 'me' }, env);
   const by = Object.fromEntries(rows.map(r => [r.thread.name, r]));

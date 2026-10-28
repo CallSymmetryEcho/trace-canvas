@@ -102,8 +102,9 @@ export function handTo(d, { ref, to, thread, remote = false }, env = process.env
 }
 /**
  * Dispatch: hands each line's new to-dos to the agent that works on that line and says how to wake it.
- * The line's agent is the session on this machine that last left a record there (its own turns, or what
- * it logged there from elsewhere); a line without one gets a new session, as with Hand to it. New means
+ * The line's agent is the session on this machine that last did work there: its turns' records, or what it
+ * logged there from elsewhere (not the note the hooks write when a session ends, which any idle session leaves),
+ * else the session the line has; a line without one gets a new session, as with Hand to it. New means
  * open, nobody has it, and that session does not know it: the person logged it (on the page, the phone,
  * the command line) or another session did. all: every open to-do nobody has. refs are lines or to-dos
  * (id or title): a to-do named goes to its line's agent whoever logged it. Assigns them. One row per line:
@@ -130,8 +131,9 @@ export function dispatch(d, { refs = [], all = false, self = null } = {}, env = 
   for (const tid of tids) {
     const th = d.threads[tid], cs = Object.values(d.commits).filter(c => threadIdOf(d, c) === tid);
     const at = new Map(), worked = (id, ts) => { if (id && ts > (at.get(id) || 0)) at.set(id, ts); };
-    for (const c of cs) worked(c.session || c.fromSession, c.ts);
-    for (const [id, e] of Object.entries(d.sessions || {})) if (e.thread === tid) worked(id, e.last || 0);
+    for (const c of cs) worked(c.fromSession || (c.kind !== 'note' && c.session), c.ts);
+    // No session has worked here yet: the sessions the line has (bound to it, or there by their folder).
+    if (!at.size) for (const [id, e] of Object.entries(d.sessions || {})) if (e.thread === tid) worked(id, e.last || 1);
     const sid = [...at].sort((a, b) => b[1] - a[1]).map(([id]) => id).find(id => known.has(id) && (!known.get(id).machine || known.get(id).machine === me));
     const s = sid && known.get(sid), run = sid && live.get(sid);
     const todos = cs.filter(c => isTodo(c) && !c.done && (named.has(c.id) || (lines.has(tid) && !c.assignee && (all || !s || !c.agent || (c.fromSession && c.fromSession !== sid))))).sort((a, b) => a.ts - b.ts);

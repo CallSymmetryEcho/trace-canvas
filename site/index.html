@@ -199,9 +199,38 @@ footer { max-width: 1200px; margin: 0 auto; padding: 8px 16px 48px var(--gut); c
 footer .veil { display: inline-block; max-width: 100%; padding: 10px 16px; overflow-wrap: anywhere; }
 footer a { color: inherit; }
 
+/* ---------- finale: the pointer draws the mark, the layers lean after it ---------- */
+.bg .layer { translate: calc(var(--px, 0) * var(--d)) calc(var(--py, 0) * var(--d)); transition: translate .7s cubic-bezier(.2, .7, .2, 1); }
+.bg .far { --d: 14px; }
+.bg .mid { --d: 36px; }
+.finale { position: relative; z-index: 1; min-height: 92vh; display: grid; place-items: center; padding: 48px 16px 24px; text-align: center; }
+.finale-in { width: min(940px, 100%); padding: clamp(24px, 5vw, 56px) clamp(8px, 3vw, 40px); border-radius: 32px;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--bg) 92%, transparent) 62%, transparent);
+  translate: calc(var(--px, 0) * -12px) calc(var(--py, 0) * -9px); transition: translate .7s cubic-bezier(.2, .7, .2, 1); }
+.fmark { width: 100%; height: auto; display: block; overflow: visible; }
+.fmark path { stroke-dasharray: 1; stroke-dashoffset: 1; }
+.fmark .ghost path { stroke: var(--rule); stroke-dasharray: none; stroke-dashoffset: 0; }
+.fmark .stops circle { fill: var(--surface); transform-box: fill-box; transform-origin: center; transform: scale(0); transition: transform .45s cubic-bezier(.3, 1.7, .5, 1); }
+.fmark .stops circle.on { transform: none; }
+.fmark .tips circle { opacity: 0; transition: opacity .25s; }
+.fname { font: 700 clamp(46px, 8.4vw, 108px)/1 var(--f-display); letter-spacing: .005em; margin-top: clamp(18px, 4vh, 40px); }
+.fpunch { font: 700 clamp(26px, 3.4vw, 42px)/1.15 var(--f-display); margin-top: 16px; text-wrap: balance; }
+.fsub { color: var(--muted); font-size: clamp(16px, 1.6vw, 19px); margin-top: 10px; text-wrap: balance; }
+.fname, .fpunch, .fsub { opacity: 0; translate: 0 14px; transition: opacity .7s ease, translate .7s cubic-bezier(.2, .7, .2, 1); }
+.finale.done .fname, .finale.done .fpunch, .finale.done .fsub { opacity: 1; translate: none; }
+.finale.done .fpunch { transition-delay: .15s; }
+.finale.done .fsub { transition-delay: .3s; }
+.fhint { font: 500 13px/1.4 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--faint); margin-top: 22px; transition: opacity .4s; }
+.finale.done .fhint { opacity: 0; }
+@media (hover: hover) { .fhint .touch { display: none; } }
+@media (hover: none) { .fhint .mouse { display: none; } }
+
 @media (prefers-reduced-motion: reduce) {
   .mark path, .mark circle { animation: none; stroke-dashoffset: 0; opacity: 1; }
   .dot, .tut, .bg circle, .rail circle { transition: none; }
+  .fmark path { stroke-dashoffset: 0; }
+  .fmark .stops circle, .fname, .fpunch, .fsub { transition: none; transform: none; translate: none; opacity: 1; }
+  .fhint { display: none; }
 }
 </style>
 </head>
@@ -452,6 +481,21 @@ node ~/trace-canvas/bin/trace-canvas.mjs setup --user</code></pre>
 </div>
 </main>
 
+<section class="finale" id="finale" aria-labelledby="finale-name">
+  <div class="finale-in">
+    <svg class="fmark" viewBox="0 0 1000 240" role="img" aria-label="Trace Canvas mark">
+      <g class="ghost" fill="none" stroke-width="22" stroke-linecap="round"><path d="M60 120 H940" stroke="#E4002B"/><path d="M220 120 C300 120 300 40 380 40 H640 C720 40 720 120 800 120" stroke="#0072CE"/><path d="M380 120 C440 120 430 200 470 200 H940" stroke="#00A651"/></g>
+      <g fill="none" stroke-width="22" stroke-linecap="round"><path pathLength="1" d="M60 120 H940" stroke="#E4002B"/><path pathLength="1" d="M220 120 C300 120 300 40 380 40 H640 C720 40 720 120 800 120" stroke="#0072CE"/><path pathLength="1" d="M380 120 C440 120 430 200 470 200 H940" stroke="#00A651"/></g>
+      <g class="tips"><circle r="13" fill="#E4002B"/><circle r="13" fill="#0072CE"/><circle r="13" fill="#00A651"/></g>
+      <g class="stops" stroke-width="11"><circle cx="110" cy="120" r="20" stroke="#E4002B"/><circle cx="300" cy="120" r="20" stroke="#E4002B"/><circle cx="520" cy="120" r="20" stroke="#E4002B"/><circle cx="740" cy="120" r="20" stroke="#E4002B"/><circle cx="890" cy="120" r="20" stroke="#E4002B"/><circle cx="380" cy="40" r="20" stroke="#0072CE"/><circle cx="640" cy="40" r="20" stroke="#0072CE"/><circle cx="470" cy="200" r="20" stroke="#00A651"/><circle cx="720" cy="200" r="20" stroke="#00A651"/></g>
+    </svg>
+    <p class="fname" id="finale-name">Trace Canvas</p>
+    <p class="fpunch"><span data-l="en">Every session leaves a line.</span><span data-l="zh">每次对话，都留下一条线。</span></p>
+    <p class="fsub"><span data-l="en">You and your agents read the same map, so no one loses the way.</span><span data-l="zh">你和 agent 看同一张图，谁也不迷路。</span></p>
+    <p class="fhint" aria-hidden="true"><span class="mouse"><span data-l="en">Move across to draw the map →</span><span data-l="zh">鼠标往右移，把这张图画出来 →</span></span><span class="touch"><span data-l="en">Drawing the map…</span><span data-l="zh">正在画这张图…</span></span></p>
+  </div>
+</section>
+
 <footer><span class="veil">
   Trace Canvas · <span data-l="en">MIT licence</span><span data-l="zh">MIT 许可</span> · <a href="https://github.com/CallSymmetryEcho/trace-canvas" target="_blank" rel="noopener">github.com/CallSymmetryEcho/trace-canvas</a>
 </span></footer>
@@ -598,6 +642,52 @@ node ~/trace-canvas/bin/trace-canvas.mjs setup --user</code></pre>
     rinner.style.transform = `translate3d(0,${H - d}px,0)`;
     pop(main, d + 2);
     pop(side, d - 4);
+  }
+
+  /* ---------- finale: the pointer draws the mark once, and the layers lean after it ---------- */
+  const fin = document.getElementById('finale'), fsvg = fin.querySelector('.fmark');
+  const fpaths = $$('path[pathLength]', fsvg), ftips = $$('.tips circle', fsvg), fstops = $$('.stops circle', fsvg);
+  // Each line's x at every hundredth of its length (the lines run left to right), to turn the pointer's x into progress.
+  const along = fpaths.map(p => { const L = p.getTotalLength(), xs = []; for (let i = 0; i <= 100; i++) xs.push(p.getPointAtLength(L * i / 100).x); return { p, L, xs }; });
+  let drawn = 0, inView = false, wait = 0;
+  // drawn: the furthest x (in mark units, 0–1000) the pen has reached; it never goes back, so the mark is drawn once.
+  function draw(x) {
+    if (x <= drawn) return;
+    drawn = Math.min(1000, x);
+    along.forEach(({ p, L, xs }, i) => {
+      let k = 0;
+      while (k < 100 && xs[k + 1] <= drawn) k++;
+      const t = drawn < xs[0] ? 0 : k / 100, pt = p.getPointAtLength(L * t);
+      p.style.strokeDashoffset = 1 - t;
+      ftips[i].setAttribute('cx', pt.x); ftips[i].setAttribute('cy', pt.y);
+      ftips[i].style.opacity = t > 0 && t < 1 ? 1 : 0;
+    });
+    fstops.forEach(c => c.classList.toggle('on', +c.getAttribute('cx') <= drawn));
+    if (drawn >= 950) { fin.classList.add('done'); draw(1000); }
+  }
+  // Without a pointer that hovers (a phone), or if it stays still, the pen draws by itself.
+  const autodraw = () => {
+    if (drawn >= 1000) return;
+    const from = drawn, t0 = performance.now();
+    const step = t => { const k = Math.min(1, (t - t0) / 1800); draw(from + (1000 - from) * (1 - (1 - k) ** 3)); if (k < 1 && inView) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  };
+  const lean = (x, y) => { root.style.setProperty('--px', x.toFixed(3)); root.style.setProperty('--py', y.toFixed(3)); };
+  if (still) draw(1000);
+  else {
+    new IntersectionObserver(([e]) => {
+      inView = e.isIntersecting;
+      clearTimeout(wait);
+      if (inView) wait = setTimeout(autodraw, matchMedia('(hover: hover)').matches ? 6000 : 500);
+      else lean(0, 0);
+    }, { threshold: .45 }).observe(fin);
+    addEventListener('pointermove', e => {
+      if (!inView || e.pointerType === 'touch') return;
+      const r = fsvg.getBoundingClientRect();
+      draw((e.clientX - r.left) / r.width * 1000);
+      lean(e.clientX / innerWidth * 2 - 1, e.clientY / innerHeight * 2 - 1);
+      if (drawn < 1000) { clearTimeout(wait); wait = setTimeout(autodraw, 6000); }
+    }, { passive: true });
   }
 
   addEventListener('scroll', () => { if (!queued) { queued = true; requestAnimationFrame(frame); } }, { passive: true });

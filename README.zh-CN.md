@@ -49,6 +49,8 @@ node ~/trace-canvas/bin/trace-canvas.mjs setup --user   # hooks、MCP 工具和 
 
 它会把这个项目过去的会话放上地图，并在 <http://localhost:4777/> 打开。之后每个新会话都会自动出现在上面。
 
+**更新：** `trace-canvas update` 把仓库更新到最新版（只做快进；你自己的改动挡着时会停下）并重启画布服务。页面在启动时和每天两次检查有没有新版，有的话在**更多**里提示（按钮上会有个小点）；`trace-canvas update --check` 只看有没有新版。
+
 ![过去的会话一个接一个落到画布上，每个会话一条线（虚构数据）](docs/gif-replay.zh.gif)
 
 ## 你会看到什么
@@ -374,6 +376,7 @@ node bin/trace-canvas.mjs log "文献对比表完成" \
   trace-canvas phone            在手机上打开画布（Tailscale 扫码，见 docs/phone.zh-CN.md）
   trace-canvas where <关键词> [--machine 机器]   在位置地图（~/agent-map）里查东西
   trace-canvas sync             通过位置地图仓库和其他机器同步画布
+  trace-canvas update [--check] 更新到最新版（在仓库里 git pull）并重启画布服务；--check 只看有没有新版
 ```
 
 ## 实现

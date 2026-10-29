@@ -49,6 +49,8 @@ node ~/trace-canvas/bin/trace-canvas.mjs setup --user   # hooks, MCP tools and t
 
 It puts this project's past sessions on the map and opens it at <http://localhost:4777/>. From then on every new session lands on it by itself.
 
+**Updating:** `trace-canvas update` pulls the newest version into the clone (a fast-forward; it stops if your own changes are in the way) and restarts the page server. The page checks for a newer version at start and twice a day and offers it under **More** (the button gets a dot); `trace-canvas update --check` only says whether there is one.
+
 ![Past sessions arrive on the canvas one after another, each as its own line (made-up data)](docs/gif-replay.en.gif)
 
 ## What you see
@@ -374,6 +376,7 @@ Setup (--user for every project, --project DIR for one)
   trace-canvas phone            Open the canvas on your phone (Tailscale and a QR code; see docs/phone.md)
   trace-canvas where <words> [--machine M]   Look things up in the location map (~/agent-map)
   trace-canvas sync             Sync the canvas with your other machines through the location map
+  trace-canvas update [--check] Get the newest version (git pull in the clone) and restart the page server; --check only looks
 ```
 
 ## How it works

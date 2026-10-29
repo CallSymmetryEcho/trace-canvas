@@ -67,6 +67,14 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
   // ponytail: fs.watch on the folder; poll its files if a platform ever drops these events.
   try { fs.watch(liveDir(), () => broadcast('live')).unref(); } catch {}
   setInterval(() => { for (const res of clients) res.write(': ping\n\n'); }, 25000).unref();
+  // A newer version on this clone's remote, looked up at start and twice a day; the page offers it under More.
+  const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..'), CLI = path.join(ROOT, 'bin', 'trace-canvas.mjs');
+  let update = null;
+  const checkUpdate = () => execFile('git', ['-C', ROOT, 'fetch', '-q'], { timeout: 30000 }, err => {
+    if (!err) execFile('git', ['-C', ROOT, 'rev-list', '--count', 'HEAD..@{u}'], (e, out) => { const n = Number(out) || 0; if (n !== ((update && update.behind) || 0)) { update = n ? { behind: n } : null; broadcast(); } });
+  });
+  checkUpdate();
+  setInterval(checkUpdate, 12 * 3600e3).unref();
   // The other machines' changes come in (and this one's go out) every 2 minutes; the page refreshes when data.json changes.
   setInterval(() => syncSoon(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'trace-canvas.mjs')), 120000).unref();
   // Other machines' running sessions, over ssh every 15 s while a page is open (src/remote.mjs); a change is a live event.
@@ -95,7 +103,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         if (!phone || !phone.token || !(same(cookie, phone.token) || same(k, phone.token))) return send(res, 403, { error: 'Open the address trace-canvas phone printed' });
         if (same(k, phone.token) && !same(cookie, phone.token)) res.setHeader('Set-Cookie', `tc_k=${phone.token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000`);
         // These act on the computer itself (a terminal, git pushes, the claude CLI, the whole data set).
-        if (['/api/hand', '/api/focus', '/api/sync', '/api/ai', '/api/demo', '/api/retro', '/api/retro/apply'].includes(p)) return send(res, 403, { error: 'Only on the computer itself' });
+        if (['/api/hand', '/api/focus', '/api/sync', '/api/ai', '/api/demo', '/api/retro', '/api/retro/apply', '/api/update'].includes(p)) return send(res, 403, { error: 'Only on the computer itself' });
       }
       const write = req.method !== 'GET' && req.method !== 'HEAD';
       if (write && req.headers['x-trace-canvas'] !== '1') return send(res, 403, { error: 'missing header' });
@@ -105,7 +113,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
       if (req.method === 'GET' && p === '/api/data') {
         // desktopId: the Claude desktop app's id of a session, so the page can open its chat (claude://…).
         const d = readData(), desk = desktopSessions();
-        return send(res, 200, { ...toArrays(d), sessions: sessionList(d).map(s => ({ ...s, desktopId: (desk.get(s.id) || {}).desktopId || null })), machine: readConfig().machine, platform: process.platform, remote, start: canStart(remote), awayLive: readConfig().awayLive, machines: otherMachines(d) });
+        return send(res, 200, { ...toArrays(d), sessions: sessionList(d).map(s => ({ ...s, desktopId: (desk.get(s.id) || {}).desktopId || null })), machine: readConfig().machine, platform: process.platform, remote, update, start: canStart(remote), awayLive: readConfig().awayLive, machines: otherMachines(d) });
       }
       if (req.method === 'GET' && p === '/api/live') return send(res, 200, { ...liveSessions(readData()), away });
       // What a commit record changed, read from git on demand (src/git-view.mjs).
@@ -160,6 +168,8 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         broadcast('change');
         return send(res, 200, { ok: true, name: r.thread.name });
       }
+      // Update: trace-canvas update pulls the newest version and restarts this server; the page reloads after it.
+      if (req.method === 'POST' && p === '/api/update') { spawn(process.execPath, [CLI, 'update'], { detached: true, stdio: 'ignore' }).unref(); return send(res, 200, { ok: true }); }
       if (req.method === 'POST' && p === '/api/sync') { const r = runSync(); broadcast('change'); return send(res, 200, r); }
       if (req.method === 'POST' && p === '/api/bind') {
         const body = JSON.parse(await readBody(req));
@@ -211,6 +221,8 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
     server.once('error', reject);
     server.listen(port, host, () => {
       port = server.address().port;
+      // Where it runs, so trace-canvas update can restart it on the same port.
+      try { fs.writeFileSync(path.join(home(), 'server.json'), JSON.stringify({ pid: process.pid, port })); } catch {}
       // With phone access on, a second listener on the Tailscale address (never 0.0.0.0 unless set).
       const phone = readConfig().phone;
       if (!phone || !phone.bind) return resolve({ server, url: `http://localhost:${port}/`, ai });

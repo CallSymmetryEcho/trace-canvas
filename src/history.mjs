@@ -9,29 +9,46 @@ import { addCommit, hashId, readConfig } from './store.mjs';
 import { firstLine } from './git-events.mjs';
 import { gitRoot, repoInfo } from './hook.mjs';
 import { tr } from './i18n.mjs';
-import { findTranscripts, parseTranscript } from './transcript.mjs';
+import { encodeProjectDir, findTranscripts, parseTranscript, projectsRoot } from './transcript.mjs';
 import { codexPrompts } from './retro.mjs';
 
 export const LIMIT = 500; // commits per line; older ones become one record. ponytail: lift it once the page loads on demand
 const git = (root, args) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', maxBuffer: 64 << 20, stdio: ['ignore', 'pipe', 'ignore'] });
 const tryGit = (root, args) => { try { return git(root, args).trim(); } catch { return ''; } };
 
-/** The repository a line stands for here: its key or an alias names it as the hooks do (repo, or repo@branch). */
+/**
+ * The repository a line stands for here: its key or an alias names it as the hooks do (repo, or repo@branch). A folder
+ * without git counts by its name too (the hooks key such a line by the folder's name); it has sessions, no commits.
+ */
 export function lineRepo(d, th) {
   const keys = [th.key, ...(th.aliases || [])].filter(Boolean);
-  const dirs = [firstLine(th.note || ''),
+  const dirs = [th.repoDir, firstLine(th.note || ''),
     ...Object.values(d.commits).filter(c => c.thread === th.id && c.repo).map(c => c.repo),
     ...Object.values(d.sessions || {}).filter(s => s.thread === th.id).map(s => s.cwd)];
   for (const dir of new Set(dirs)) {
     if (!dir || !path.isAbsolute(dir) || !fs.existsSync(dir)) continue;
     const root = gitRoot(dir);
-    if (!root) continue;
+    if (!root) { if (keys.includes(path.basename(dir))) return { root: dir, name: path.basename(dir), branch: null, git: false }; continue; }
     const name = repoInfo(root).repo;
-    if (keys.includes(name)) return { root, name, branch: null };
+    if (keys.includes(name)) return { root, name, branch: null, git: true };
     const k = keys.find(k => k.startsWith(`${name}@`));
-    if (k) return { root, name, branch: k.slice(name.length + 1) };
+    if (k) return { root, name, branch: k.slice(name.length + 1), git: true };
   }
   return null;
+}
+
+/**
+ * Puts a line made by hand on a repository (`history <line> --repo <dir>`): it takes the repository's name as its key,
+ * so its history comes in and the hooks put new sessions there; a key it had stays as an alias. Call inside mutate().
+ */
+export function linkRepo(d, th, dir) {
+  const root = gitRoot(path.resolve(dir));
+  if (!root) throw new Error(`${dir} is not a git repository`);
+  const name = repoInfo(root).repo, other = Object.values(d.threads).find(t => t.id !== th.id && t.status !== 'merged' && (t.key === name || (t.aliases || []).includes(name)));
+  if (other) throw new Error(`"${other.name}" already stands for ${name}: merge the two lines instead`);
+  if (th.key && th.key !== name) th.aliases = [...new Set([...(th.aliases || []), th.key])];
+  Object.assign(th, { key: name, repoDir: root, history: true });
+  return { root, name };
 }
 
 // The local branch if there is one, else the remote's.
@@ -71,12 +88,23 @@ function commits(root, range, limit) {
   }).reverse();
 }
 
-function claudeSessions(root, known, env) {
+// A folder's transcripts, and with sub its subfolders' too (the agents' worktrees in .claude/worktrees among them). Claude
+// Code names a folder of transcripts after the path, so a subfolder's starts with the folder's; so does a sibling's
+// (repo-phone for repo), which the cwd inside tells apart.
+function transcriptFiles(root, sub, env) {
+  const base = projectsRoot(env), enc = encodeProjectDir(root), ls = dir => { try { return fs.readdirSync(dir); } catch { return []; } };
+  const out = ls(base).filter(n => n === enc || (sub && n.startsWith(`${enc}-`)))
+    .flatMap(n => ls(path.join(base, n)).filter(f => f.endsWith('.jsonl')).map(f => ({ path: path.join(base, n, f), sessionId: f.slice(0, -6), exact: n === enc })));
+  return out.length ? out : findTranscripts(root, env).map(f => ({ ...f, exact: true }));
+}
+const inside = (cwd, root, sub) => cwd === root || (sub && String(cwd || '').startsWith(`${root}/`));
+
+function claudeSessions(root, sub, known, env) {
   const out = [];
-  for (const f of findTranscripts(root, env)) {
+  for (const f of transcriptFiles(root, sub, env)) {
     if (known.has(f.sessionId)) continue; // before parsing: a long transcript takes a while
     const s = parseTranscript(f.path);
-    if (!s.turns.length || known.has(s.sessionId)) continue;
+    if (!s.turns.length || known.has(s.sessionId) || (!f.exact && !inside(s.cwd, root, sub))) continue;
     const files = new Set(s.turns.flatMap(t => t.files)).size, commits = s.turns.flatMap(t => t.git.flatMap(g => g.commits.map(c => c.sha.slice(0, 7))));
     if (s.turns.length === 1 && !files && !commits.length) continue; // one prompt that changed nothing: a probe or a quick question
     out.push({ id: s.sessionId, agentKey: 'claude', agent: 'Claude Code', start: s.startedAt, end: s.endedAt, title: s.title || s.turns[0].prompt,
@@ -84,7 +112,7 @@ function claudeSessions(root, known, env) {
   }
   return out;
 }
-function codexSessions(root, known, env) {
+function codexSessions(root, sub, known, env) {
   const base = env.CODEX_HOME || path.join(os.homedir(), '.codex'), out = [];
   const walk = dir => { let es = []; try { es = fs.readdirSync(dir, { withFileTypes: true }); } catch {} return es.flatMap(e => e.isDirectory() ? walk(path.join(dir, e.name)) : /^rollout-.*\.jsonl$/.test(e.name) ? [path.join(dir, e.name)] : []); };
   for (const file of [...walk(path.join(base, 'sessions')), ...walk(path.join(base, 'archived_sessions'))]) {
@@ -93,7 +121,7 @@ function codexSessions(root, known, env) {
     let head = '';
     try { const fd = fs.openSync(file, 'r'), buf = Buffer.alloc(16384); head = buf.subarray(0, fs.readSync(fd, buf, 0, buf.length, 0)).toString('utf8'); fs.closeSync(fd); } catch { continue; }
     const m = head.match(/"cwd":"((?:[^"\\]|\\.)*)"/), cwd = m && JSON.parse(`"${m[1]}"`);
-    if (!cwd || (cwd !== root && !cwd.startsWith(`${root}/`))) continue;
+    if (!cwd || !inside(cwd, root, sub)) continue;
     if (/"thread_source":"(?!user")/.test(head)) continue; // Codex's own reviewers (guardian_review) and helpers, not the person's sessions
     const ps = codexPrompts(file); // what the person typed; a session with none (an app's own request) is left out
     if (ps.length) out.push({ id, agentKey: 'codex', agent: 'Codex', start: ps[0].ts, end: fs.statSync(file).mtimeMs, title: ps[0].text, prompts: ps.length, files: 0, commits: [] });
@@ -105,6 +133,8 @@ function codexSessions(root, known, env) {
 export function collect(d, th, env = process.env, limit = LIMIT) {
   const r = lineRepo(d, th);
   if (!r) return null;
+  // A folder without git: only the sessions that ran in it, not in its subfolders (a home folder holds everything).
+  if (!r.git) return { root: r.root, name: r.name, branch: null, commits: [], older: null, sessions: [...claudeSessions(r.root, false, knownSessions(d), env), ...codexSessions(r.root, false, knownSessions(d), env)].sort((a, b) => a.start - b.start) };
   const main = defaultBranch(r.root), branch = r.branch && ref(r.root, r.branch);
   if (r.branch && !branch) return null;
   const range = branch ? [branch, `^${main}`] : [main];
@@ -112,7 +142,7 @@ export function collect(d, th, env = process.env, limit = LIMIT) {
   let older = null;
   if (total > all.length) older = { n: total - all.length, ts: Number(tryGit(r.root, ['log', '--first-parent', '--max-parents=0', '--format=%at', ...range]).split('\n')[0]) * 1000 || all[0].ts - 1 };
   const known = knownSessions(d);
-  const sessions = r.branch ? [] : [...claudeSessions(r.root, known, env), ...codexSessions(r.root, known, env)].sort((a, b) => a.start - b.start);
+  const sessions = r.branch ? [] : [...claudeSessions(r.root, true, known, env), ...codexSessions(r.root, true, known, env)].sort((a, b) => a.start - b.start);
   return { root: r.root, name: r.name, branch: branch || main, commits: all.filter(c => !seen(c)), older, sessions };
 }
 

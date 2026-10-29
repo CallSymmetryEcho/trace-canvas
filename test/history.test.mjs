@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { apply, collect, historyLines } from '../src/history.mjs';
+import { apply, collect, historyLines, linkRepo } from '../src/history.mjs';
 import { handleHook, historyDue } from '../src/hook.mjs';
 import { addCommit, createThread, emptyData, readData } from '../src/store.mjs';
 import { encodeProjectDir } from '../src/transcript.mjs';
@@ -105,4 +105,36 @@ test('a commit the hooks logged before it was rebased is not taken in again unde
   const th = createThread(d, { name: 'tripsplit', key: 'tripsplit', note: s.repo });
   addCommit(d, { thread: th.id, kind: 'agent', title: 'Commit 0000000: Tidy', ts: Date.parse('2026-01-05T14:00:03Z'), extra: { session: 'live', gitCommit: '0000000' } });
   assert.deepEqual(collect(d, th, s.env).commits.map(c => c.subject), ['Start', 'Add the receipt parser', 'Fix totals']);
+});
+
+// A Claude Code transcript with two instructions, in the folder Claude Code would keep it in for cwd.
+function transcript(projects, cwd, id) {
+  const dir = path.join(projects, encodeProjectDir(cwd)); fs.mkdirSync(dir, { recursive: true });
+  const line = (n, text) => ({ sessionId: id, cwd, type: 'user', uuid: `u${n}`, timestamp: `2026-01-07T10:0${n}:00.000Z`, promptSource: 'user', message: { role: 'user', content: text } });
+  fs.writeFileSync(path.join(dir, `${id}.jsonl`), [line(1, `Work in ${path.basename(cwd)}`), line(2, 'And the tests')].map(j => JSON.stringify(j)).join('\n') + '\n');
+}
+
+test('a line made by hand is put on a repository and takes in its history; another line with that repository says so', () => {
+  const s = sandbox(), d = emptyData();
+  const th = createThread(d, { name: 'Receipts app', key: 'area:receipts' });
+  assert.equal(collect(d, th, s.env), null);
+  assert.deepEqual(linkRepo(d, th, s.repo), { root: s.repo, name: 'tripsplit' });
+  assert.deepEqual([th.key, th.aliases, th.repoDir, th.history], ['tripsplit', ['area:receipts'], s.repo, true]);
+  assert.deepEqual(collect(d, th, s.env).commits.map(c => c.subject), ['Start', 'Add the receipt parser', 'Fix totals', 'Tidy']);
+  const other = createThread(d, { name: 'Another card' });
+  assert.throws(() => linkRepo(d, other, s.repo), /"Receipts app" already stands for tripsplit/);
+});
+
+test('sessions in the repository\'s worktrees count, a sibling folder\'s do not; a folder without git brings only its own sessions', () => {
+  const s = sandbox(), d = emptyData(), projects = s.env.CLAUDE_PROJECTS_DIR;
+  const th = createThread(d, { name: 'tripsplit', key: 'tripsplit', note: s.repo });
+  transcript(projects, path.join(s.repo, '.claude', 'worktrees', 'ocr'), 'wt-1');
+  const sibling = `${s.repo}-phone`; fs.mkdirSync(sibling); transcript(projects, sibling, 'sib-1');
+  assert.deepEqual(collect(d, th, s.env).sessions.map(x => x.id).sort(), ['11111111-2222-3333-4444-555555555555', 'sess-a', 'wt-1']);
+  // A folder without git, keyed by its name as the hooks key it: its own sessions, not its subfolders'.
+  const notes = path.join(s.root, 'notes'); fs.mkdirSync(path.join(notes, 'deep'), { recursive: true });
+  transcript(projects, notes, 'n-1'); transcript(projects, path.join(notes, 'deep'), 'n-2');
+  const folder = createThread(d, { name: 'notes', key: 'notes', note: notes });
+  const plan = collect(d, folder, s.env);
+  assert.deepEqual([plan.commits, plan.older, plan.sessions.map(x => x.id)], [[], null, ['n-1']]);
 });

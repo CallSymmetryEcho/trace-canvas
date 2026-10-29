@@ -14,7 +14,7 @@ import { demoData } from './demo.mjs';
 import { liveDir, readLive } from './live.mjs';
 import { bindLiveSession, findThreadLoose, handTo, liveSessions, sessionList } from './ops.mjs';
 import { applyRetro, askAgent, retroRecord, runRetro } from './retro.mjs';
-import { focusScript, terminalScript } from './agents.mjs';
+import { focusScript, openTerminal, terminalCommand } from './agents.mjs';
 import { otherMachines, remoteLive } from './remote.mjs';
 import { commitDiff, commitInfo } from './git-view.mjs';
 import { runSync } from './sync.mjs';
@@ -37,7 +37,8 @@ function page(cfg, ai) {
 
 const same = (a, b) => typeof a === 'string' && typeof b === 'string' && a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
 // ▶ Start opens a Terminal window on this Mac: from the phone only after trace-canvas phone --allow-start.
-const canStart = remote => process.platform === 'darwin' && (!remote || !!(readConfig().phone || {}).start);
+// A terminal to open here: Terminal on macOS, a Linux desktop's terminal (agents.mjs terminalCommand).
+const canStart = remote => !!terminalCommand('') && (!remote || !!(readConfig().phone || {}).start);
 export const phoneUrl = (phone, port) => `http://${phone.host}:${phone.port || port}/?k=${phone.token}`;
 function send(res, status, body, type = 'application/json; charset=utf-8') {
   res.writeHead(status, { 'Content-Type': type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
@@ -129,10 +130,10 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
       }
       // Open in Terminal: the command is built here from the to-do, never taken from the request.
       if (req.method === 'POST' && p === '/api/hand') {
-        if (process.platform !== 'darwin') return send(res, 200, { error: 'Opening a terminal works on macOS only; copy the command instead' });
+        if (!terminalCommand('')) return send(res, 200, { error: 'No terminal to open on this machine (macOS, or a Linux desktop); copy the command instead' });
         const body = JSON.parse(await readBody(req));
         const r = mutate(d => handTo(d, { ref: String(body.todo || ''), to: String(body.to || '') }));
-        spawn('osascript', ['-e', terminalScript(r.command)], { stdio: 'ignore', detached: true }).unref();
+        openTerminal(r.command);
         broadcast('change');
         return send(res, 200, { ok: true, command: r.command });
       }
@@ -148,12 +149,12 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
       // shows in the Claude app on the phone. Built from the line or to-do id like Open in Terminal; a line
       // that already has a session running gets none, the person is pointed at that one instead.
       if (req.method === 'POST' && p === '/api/start') {
-        if (!canStart(remote)) return send(res, 403, { error: remote ? 'Turn it on with trace-canvas phone --allow-start' : 'Starting works on macOS only' });
+        if (!canStart(remote)) return send(res, 403, { error: remote ? 'Turn it on with trace-canvas phone --allow-start' : 'No terminal to open on this machine (macOS, or a Linux desktop)' });
         const body = JSON.parse(await readBody(req)), args = { ref: String(body.todo || body.thread || ''), to: 'claude', remote: true };
         const busy = handTo(readData(), args).live[0];
         if (busy) return send(res, 200, { busy: { id: busy.id, title: busy.title || '', status: busy.status || '' } });
         const r = mutate(d => handTo(d, args));
-        spawn('osascript', ['-e', terminalScript(r.command)], { stdio: 'ignore', detached: true }).unref();
+        openTerminal(r.command);
         broadcast('change');
         return send(res, 200, { ok: true, name: r.thread.name });
       }

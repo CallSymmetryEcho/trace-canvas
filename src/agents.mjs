@@ -2,6 +2,10 @@
 // Code shape the rest of the code reads. Codex hooks are nearly Claude's (no Notification event:
 // a PermissionRequest is what "needs you" looks like); Gemini CLI names its events differently.
 // Tools are recognised by the shape of their input, since each CLI names them its own way.
+import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+
 export const q = s => `'${String(s).replace(/'/g, `'\\''`)}'`; // POSIX shell quoting
 
 export const AGENTS = {
@@ -15,6 +19,45 @@ export const AGENTS = {
 export const agentOf = key => AGENTS[key] || AGENTS.claude;
 // AppleScript that runs cmd in a new Terminal window and brings it forward (macOS, "Open in Terminal").
 export const terminalScript = cmd => `tell application "Terminal"\n  do script "${String(cmd).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"\n  activate\nend tell`;
+
+// The desktop session's display, for a server started over ssh, which has none: borrowed from the desktop shell's own
+// environment (this user's processes only). env itself when it has a display; null when there is no desktop.
+function desktopEnv(env) {
+  if (env.DISPLAY || env.WAYLAND_DISPLAY) return env;
+  const KEEP = ['DISPLAY', 'WAYLAND_DISPLAY', 'XAUTHORITY', 'DBUS_SESSION_BUS_ADDRESS', 'XDG_RUNTIME_DIR'];
+  for (const pid of fs.existsSync('/proc') ? fs.readdirSync('/proc').filter(p => /^\d+$/.test(p)) : []) {
+    try {
+      if (fs.statSync(`/proc/${pid}`).uid !== process.getuid() || !/^(plasmashell|gnome-shell|kwin_x11|kwin_wayland|xfce4-session|cinnamon|mate-session|sway|Hyprland)$/.test(fs.readFileSync(`/proc/${pid}/comm`, 'utf8').trim())) continue;
+      const vars = Object.fromEntries(fs.readFileSync(`/proc/${pid}/environ`, 'utf8').split('\0').filter(Boolean).map(l => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]));
+      if (vars.DISPLAY || vars.WAYLAND_DISPLAY) return { ...env, ...Object.fromEntries(KEEP.filter(k => vars[k]).map(k => [k, vars[k]])) };
+    } catch {}
+  }
+  return null;
+}
+const which = (name, env) => (env.PATH || '').split(path.delimiter).map(d => path.join(d, name)).find(p => { try { fs.accessSync(p, fs.constants.X_OK); return true; } catch { return false; } });
+
+/**
+ * How to run cmd in a new terminal window ("Open in Terminal", ▶ Start, dispatch): [program, args, env], or null when
+ * this machine has no terminal to open. macOS: Terminal. Linux: $TERMINAL, then the usual ones, on the desktop's
+ * display; the window stays open in a login shell once cmd is done. Going to an existing tab is macOS only.
+ */
+export function terminalCommand(cmd, env = process.env, platform = process.platform) {
+  if (platform === 'darwin') return ['osascript', ['-e', terminalScript(cmd)], env];
+  if (platform !== 'linux') return null;
+  const shown = desktopEnv(env);
+  const term = shown && [env.TERMINAL, 'x-terminal-emulator', 'konsole', 'gnome-terminal', 'xfce4-terminal', 'kitty', 'alacritty', 'wezterm', 'xterm'].filter(Boolean).map(t => [path.basename(t), which(t, env) || (path.isAbsolute(t) && t)]).find(([, p]) => p);
+  if (!term) return null;
+  const sh = env.SHELL || '/bin/sh', run = [sh, '-lc', `${cmd}; exec ${q(sh)} -l`];
+  const lead = { 'gnome-terminal': ['--'], 'xfce4-terminal': ['-x'], wezterm: ['start', '--'] }[term[0]] || ['-e'];
+  return [term[1], [...lead, ...run], shown];
+}
+/** Runs cmd in a new terminal window; false when there is none to open. */
+export function openTerminal(cmd, env = process.env) {
+  const t = terminalCommand(cmd, env);
+  if (!t) return false;
+  spawn(t[0], t[1], { stdio: 'ignore', detached: true, env: t[2] }).unref();
+  return true;
+}
 // AppleScript that brings the Terminal or iTerm2 tab with this tty to the front and prints "ok",
 // or nothing when no tab has it (Go to the terminal). null for other terminals.
 export function focusScript({ tty = '', term = '' } = {}) {

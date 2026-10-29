@@ -94,6 +94,7 @@ Records
   trace-canvas history [line...] [--all] [--off]   A repository's line takes in its history: the default branch's commits
                                                    (first parent, the newest 500) and past Claude Code and Codex sessions.
                                                    Alone it lists what each line would get; --all imports it; --off leaves a line out
+  trace-canvas history <line> --repo <folder>      Put a line made by hand on a repository, then take in its history
 
 Goals and to-dos
   trace-canvas tasks [--thread T] [--all]          Each thread's goal and open to-dos (--all: finished too)
@@ -103,7 +104,7 @@ Goals and to-dos
                                                    Assign it and print the command that starts the agent on it
   trace-canvas dispatch [line|to-do...] [--all] [--print] [--json]
                                                    Hand each line's new to-dos (or the to-dos named) to the agent working on it and wake it
-                                                   (resume or start in a new Terminal window; --print only prints)
+                                                   (resume or start in a new terminal window; --print only prints)
 
 Live sessions
   trace-canvas live [--json]                                Running sessions: status, activity, thread
@@ -281,13 +282,13 @@ async function main() {
     }
     case 'dispatch': {
       // Dispatch: each line's new to-dos go to its agent. A stopped session is resumed and a line without one gets a
-      // new session, each in a new Terminal window (macOS); a running Claude Code session is messaged by the agent
+      // new session, each in a new terminal window (macOS, or a Linux desktop); a running Claude Code session is messaged by the agent
       // that called this (the skill), since only an agent can reach it.
       const { dispatch } = await import('../src/ops.mjs');
-      const { AGENTS, terminalScript } = await import('../src/agents.mjs');
-      const all = !!flag('all', false), json = !!flag('json', false), run = !flag('print', false) && process.platform === 'darwin';
+      const { AGENTS, openTerminal, terminalCommand } = await import('../src/agents.mjs');
+      const all = !!flag('all', false), json = !!flag('json', false), run = !flag('print', false) && !!terminalCommand('');
       const rows = mutate(d => dispatch(d, { refs: argv.filter(Boolean), all, self: process.env.CLAUDE_CODE_SESSION_ID || null }));
-      for (const r of rows) if (r.command && run) spawn('osascript', ['-e', terminalScript(r.command)], { stdio: 'ignore', detached: true }).unref();
+      for (const r of rows) if (r.command && run) openTerminal(r.command);
       if (json) { console.log(JSON.stringify(rows, null, 2)); break; }
       if (!rows.length) { console.log('Nothing new to dispatch: every open to-do has an agent, or was logged by the agent working on its line (--all takes those too).'); break; }
       for (const r of rows) {
@@ -297,7 +298,7 @@ async function main() {
         if (r.action === 'self') console.log('  → Your own line: they are yours.');
         else if (r.action === 'message') console.log(`  → Running session ${name} (${s.status}${s.desktopId ? `, ${s.desktopId}` : ''}): send it this message:\n    ${r.prompt}`);
         else if (r.action === 'busy') console.log(`  → ${who} session ${name} is working: send it this when it stops:\n    ${r.prompt}`);
-        else console.log(`  → ${r.action === 'start' ? `A new ${who} session` : `Session ${name} resumed`}${run ? ' in a new Terminal window' : '; run'}:\n    ${r.command}`);
+        else console.log(`  → ${r.action === 'start' ? `A new ${who} session` : `Session ${name} resumed`}${run ? ' in a new terminal window' : '; run'}:\n    ${r.command}`);
       }
       break;
     }
@@ -305,13 +306,20 @@ async function main() {
       // A repository's line takes in its history from before it was on the canvas (src/history.mjs): git and the
       // transcripts are read outside the lock, then what is still new goes on in one write. A new repository line does
       // this by itself; the lines from before need --all (or their names) once.
-      const { apply, collect, historyLines } = await import('../src/history.mjs');
+      const { apply, collect, historyLines, linkRepo } = await import('../src/history.mjs');
       const { historyDue } = await import('../src/hook.mjs');
       const { findThreadLoose } = await import('../src/ops.mjs');
       const { readData } = await import('../src/store.mjs');
       const bool = n => { const v = flag(n, false); if (typeof v === 'string') argv.push(v); return !!v; }; // a flag before a name
-      const quiet = bool('quiet'), off = bool('off'), all = bool('all'), d = readData();
-      const named = argv.filter(Boolean).map(ref => { const id = findThreadLoose(d, ref); if (!d.threads[id]) { console.error(`No line "${ref}"`); process.exit(1); } return d.threads[id]; });
+      const repo = str(flag('repo', '')), quiet = bool('quiet'), off = bool('off'), all = bool('all');
+      let d = readData();
+      let named = argv.filter(Boolean).map(ref => { const id = findThreadLoose(d, ref); if (!d.threads[id]) { console.error(`No line "${ref}"`); process.exit(1); } return d.threads[id]; });
+      // --repo: a line made by hand stands for that repository from now on, then takes in its history like the others.
+      if (repo) {
+        if (named.length !== 1) { console.error('Usage: trace-canvas history <line> --repo <folder of the repository>'); process.exit(1); }
+        try { const r = mutate(x => linkRepo(x, x.threads[named[0].id], repo)); console.log(`"${named[0].name}" stands for ${r.name} (${r.root})`); } catch (e) { console.error(e.message); process.exit(1); }
+        d = readData(); named = [d.threads[named[0].id]];
+      }
       if (off) {
         if (!named.length) { console.error('Usage: trace-canvas history <line>... --off   (name a line again to turn it back on)'); process.exit(1); }
         mutate(x => { for (const th of named) x.threads[th.id].history = false; });

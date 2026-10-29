@@ -131,3 +131,15 @@ test('setup makes trace-canvas a command in the user\'s own bin folder on the PA
   fs.mkdirSync(nodeDir, { recursive: true }); fs.writeFileSync(path.join(nodeDir, 'node'), '');
   assert.deepEqual(linkCommand(cli, { PATH: `/usr/bin${path.delimiter}${nodeDir}` }, path.join(home, 'nohome'), node), { ok: true, where: path.join(nodeDir, 'trace-canvas') });
 });
+
+test('a new terminal window: Terminal on macOS; on Linux the terminal found on the PATH, on the display, the window kept open', async () => {
+  const { terminalCommand } = await import('../src/agents.mjs');
+  assert.equal(terminalCommand('ls', {}, 'darwin')[0], 'osascript');
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-term-'));
+  for (const t of ['konsole', 'gnome-terminal']) { fs.writeFileSync(path.join(bin, t), '#!/bin/sh\n'); fs.chmodSync(path.join(bin, t), 0o755); }
+  const env = { PATH: bin, DISPLAY: ':0', SHELL: '/bin/bash' };
+  assert.deepEqual(terminalCommand('claude --resume s1', env, 'linux'), [path.join(bin, 'konsole'), ['-e', '/bin/bash', '-lc', "claude --resume s1; exec '/bin/bash' -l"], env]);
+  assert.deepEqual(terminalCommand('ls', { ...env, TERMINAL: 'gnome-terminal' }, 'linux')[1].slice(0, 2), ['--', '/bin/bash']);
+  assert.equal(terminalCommand('ls', { PATH: '/nowhere', DISPLAY: ':0' }, 'linux'), null); // no terminal
+  assert.equal(terminalCommand('ls', env, 'win32'), null);
+});

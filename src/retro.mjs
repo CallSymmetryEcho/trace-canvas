@@ -125,7 +125,8 @@ export function rankRetro(prompts, items) {
 
 // The person's own claude command line, or codex when claude is not installed.
 export function askAgent(prompt, { timeout = 600000, env = process.env } = {}) {
-  const codex = !onPath('claude') && onPath('codex');
+  if (!onPath('claude', env) && !onPath('codex', env)) return Promise.reject(new Error(`Neither claude nor codex is on the PATH of the canvas server here (${env.PATH || 'empty'})`));
+  const codex = !onPath('claude', env) && onPath('codex', env);
   const outFile = codex ? path.join(os.tmpdir(), `trace-canvas-ask-${process.pid}-${Date.now()}.txt`) : null;
   const [cmd, args] = codex ? ['codex', ['exec', '--skip-git-repo-check', '-s', 'read-only', '-o', outFile]] : ['claude', ['-p', '--output-format', 'text']];
   return new Promise((resolve, reject) => {

@@ -143,3 +143,13 @@ test('a new terminal window: Terminal on macOS; on Linux the terminal found on t
   assert.equal(terminalCommand('ls', { PATH: '/nowhere', DISPLAY: ':0' }, 'linux'), null); // no terminal
   assert.equal(terminalCommand('ls', env, 'win32'), null);
 });
+
+test('the user\'s own bin folders join a bare PATH (a server started over ssh), at the end and once', async () => {
+  const { withUserBins } = await import('../src/install.mjs');
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-bins-'));
+  fs.mkdirSync(path.join(home, '.local', 'bin'), { recursive: true });
+  const bare = '/usr/bin:/bin';
+  assert.equal(withUserBins(bare, home).split(':').slice(0, 3).join(':'), `/usr/bin:/bin:${path.join(home, '.local', 'bin')}`);
+  assert.equal(withUserBins(withUserBins(bare, home), home), withUserBins(bare, home)); // once
+  assert.ok(!withUserBins(bare, home).includes(path.join(home, '.bun', 'bin'))); // only folders that exist
+});

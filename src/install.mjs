@@ -142,6 +142,16 @@ export function codexWritable(file, dir) {
   fs.writeFileSync(file, t);
   return true;
 }
+/**
+ * The PATH with the user's own bin folders added at the end where they exist: started over ssh or as a service, the
+ * canvas gets a PATH without them, and claude and codex usually live there (~/.local/bin and the like).
+ */
+export function withUserBins(PATH = '', home = os.homedir()) {
+  const have = PATH.split(path.delimiter).filter(Boolean);
+  const more = [path.join(home, '.local', 'bin'), path.join(home, '.claude', 'local'), path.join(home, '.npm-global', 'bin'), path.join(home, '.bun', 'bin'), '/opt/homebrew/bin', '/usr/local/bin']
+    .filter(d => !have.includes(d) && fs.existsSync(d));
+  return [...have, ...more].join(path.delimiter);
+}
 export const onPath = (cmd, env = process.env) => { try { execFileSync('which', [cmd], { stdio: 'ignore', env }); return true; } catch { return false; } };
 
 // The trace-canvas command: a small script in the user's own bin folder on the PATH (~/.local/bin, ~/bin, else the

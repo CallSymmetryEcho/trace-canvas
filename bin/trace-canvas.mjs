@@ -13,6 +13,8 @@ import os from 'node:os';
 import crypto from 'node:crypto';
 
 const SELF = fileURLToPath(import.meta.url);
+// Every command and what it starts (claude and codex for Retro and AI tidy-up) see the user's own bin folders.
+process.env.PATH = (await import('../src/install.mjs')).withUserBins(process.env.PATH);
 
 // This computer's name in the location map (tools/where.py --whoami), or '' without one.
 function whoami(map) {

@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { handleHook, repoInfo } from '../src/hook.mjs';
-import { machineOwner, runSync, syncDocs } from '../src/sync.mjs';
+import { machineOwner, runSync, syncDocs, syncSoon } from '../src/sync.mjs';
 import { addCommit, canonicalize, createThread, emptyData, hashId, mutate, readData, threadById } from '../src/store.mjs';
 
 const git = (dir, ...a) => execFileSync('git', ['-C', dir, ...a], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -126,4 +126,20 @@ test('a repository is named after its remote, and its folder-named line from bef
   assert.equal(Object.keys(d.threads).length, 1);
   assert.deepEqual([d.threads[old].key, d.threads[old].aliases], ['alchemarm', ['roboticarm']]);
   assert.equal(Object.values(d.commits)[0].thread, old);
+});
+
+test('a background sync starts only on a machine that has synced before, and not again within 2 minutes', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-soon-')), map = path.join(root, 'map'), home = path.join(root, 'home');
+  fs.mkdirSync(path.join(map, 'canvas'), { recursive: true }); fs.mkdirSync(home);
+  fs.writeFileSync(path.join(home, 'config.json'), JSON.stringify({ map, machine: 'laptop' }));
+  const env = { ...process.env, TRACE_CANVAS_HOME: home, TRACE_CANVAS_MACHINE: 'laptop' };
+  const cli = path.join(root, 'cli.mjs'), mark = path.join(root, 'ran');
+  fs.writeFileSync(cli, `import fs from 'node:fs'; fs.writeFileSync(${JSON.stringify(mark)}, process.argv.slice(2).join(' '));`);
+  assert.equal(syncSoon(cli, env), false); // never synced by hand: its file is not there
+  fs.writeFileSync(path.join(map, 'canvas', 'laptop.jsonl'), '');
+  assert.equal(syncSoon(cli, env), true);
+  for (let i = 0; i < 50 && !fs.existsSync(mark); i++) await new Promise(r => setTimeout(r, 50));
+  assert.equal(fs.readFileSync(mark, 'utf8'), 'sync --quiet');
+  fs.writeFileSync(path.join(home, '.sync-last'), String(Date.now()));
+  assert.equal(syncSoon(cli, env), false); // synced a moment ago
 });

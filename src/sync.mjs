@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { COLS, canonicalize, dataFile, home, mutate, readConfig } from './store.mjs';
 
 const KINDS = [...COLS, 'sessions'];
@@ -120,6 +120,21 @@ export function machineOwner(mapDir, machine) {
  * push). Offline is a result, not an error: the merge still happens and the commit waits for the
  * next sync. Never throws; one sync at a time per data folder.
  */
+/**
+ * Syncs in the background (cli sync --quiet), at most every 2 minutes: after a session ends, and from the page server
+ * every 2 minutes, so what one machine logs shows on the other without anyone pressing Sync. Only once this machine has
+ * synced by hand (its file exists), so the first sync stays a choice.
+ */
+export function syncSoon(cli, env = process.env) {
+  const cfg = readConfig(env);
+  if (!cfg.map || !fs.existsSync(path.join(cfg.map, 'canvas', `${cfg.machine}.jsonl`))) return false;
+  let last = 0;
+  try { last = Number(fs.readFileSync(path.join(home(env), '.sync-last'), 'utf8')) || 0; } catch {}
+  if (Date.now() - last < 120000) return false;
+  spawn(process.execPath, [cli, 'sync', '--quiet'], { detached: true, stdio: 'ignore', env }).unref();
+  return true;
+}
+
 export function runSync(env = process.env) {
   const cfg = readConfig(env), mapDir = cfg.map, machine = cfg.machine;
   if (!mapDir || !fs.existsSync(path.join(mapDir, '.git'))) return { error: 'No location map repository (setup --map, or clone it to ~/agent-map)' };

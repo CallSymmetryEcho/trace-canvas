@@ -17,7 +17,7 @@ import { applyRetro, askAgent, retroRecord, runRetro } from './retro.mjs';
 import { focusScript, openTerminal, terminalCommand } from './agents.mjs';
 import { otherMachines, remoteLive } from './remote.mjs';
 import { commitDiff, commitInfo } from './git-view.mjs';
-import { runSync } from './sync.mjs';
+import { runSync, syncSoon } from './sync.mjs';
 import { desktopSessions } from './desktop.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -67,6 +67,8 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
   // ponytail: fs.watch on the folder; poll its files if a platform ever drops these events.
   try { fs.watch(liveDir(), () => broadcast('live')).unref(); } catch {}
   setInterval(() => { for (const res of clients) res.write(': ping\n\n'); }, 25000).unref();
+  // The other machines' changes come in (and this one's go out) every 2 minutes; the page refreshes when data.json changes.
+  setInterval(() => syncSoon(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'trace-canvas.mjs')), 120000).unref();
   // Other machines' running sessions, over ssh every 15 s while a page is open (src/remote.mjs); a change is a live event.
   let away = [], awaySig = '';
   const pollAway = async () => {

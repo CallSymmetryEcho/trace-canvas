@@ -14,15 +14,6 @@ import crypto from 'node:crypto';
 
 const SELF = fileURLToPath(import.meta.url);
 
-// After a session ends, sync with the other machines in the background, at most every 2 minutes.
-// Only once this machine has synced by hand (its file exists), so the first sync is a choice.
-function syncSoon() {
-  const cfg = readConfig();
-  if (!cfg.map || !fs.existsSync(path.join(cfg.map, 'canvas', `${cfg.machine}.jsonl`))) return;
-  let last = 0;
-  try { last = Number(fs.readFileSync(path.join(home(), '.sync-last'), 'utf8')) || 0; } catch {}
-  if (Date.now() - last > 120000) spawn(process.execPath, [SELF, 'sync', '--quiet'], { detached: true, stdio: 'ignore' }).unref();
-}
 // This computer's name in the location map (tools/where.py --whoami), or '' without one.
 function whoami(map) {
   const py = map && path.join(map, 'tools', 'where.py');
@@ -174,7 +165,7 @@ async function main() {
           const payload = JSON.parse(raw), input = normalize(agent, payload);
           event = payload.hook_event_name; // the CLI's own name for it, which its output must repeat
           outcome = handleHook(input);
-          if (input.hook_event_name === 'SessionEnd' && process.env.TRACE_CANVAS_DISABLE !== '1') syncSoon();
+          if (input.hook_event_name === 'SessionEnd' && process.env.TRACE_CANVAS_DISABLE !== '1') (await import('../src/sync.mjs')).syncSoon(SELF);
           // The line's history from before catches up in the background (src/history.mjs).
           if (outcome && outcome.history) spawn(process.execPath, [SELF, 'history', outcome.history, '--quiet'], { detached: true, stdio: 'ignore' }).unref();
           if (process.env.TRACE_CANVAS_DISABLE !== '1') {

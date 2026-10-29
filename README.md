@@ -105,6 +105,8 @@ This adds the hooks to `~/.claude/settings.json`, registers the MCP server with 
 
 Records go to one thread per repository and branch. Working on `main` logs to `graduation-affair`. Switching to a branch `lit-review` forks a new thread `graduation-affair · lit-review` from where you were, so parallel sessions on different branches land on different lines. Turns that only answer a question are not logged. Files written from the shell (`>`, `tee`, `sed -i`, …) count as changes.
 
+**History from before.** A repository's new line starts where the repository started, not at the first session the hooks saw. In the background it takes in the default branch's commits (first parent, so the line stays one line; the newest 500, with the older ones as one record where the line begins) and, as one record each, the Claude Code and Codex sessions that ran in the repository on this machine; they also join the line's sessions, so they can be resumed. A branch line takes the commits only that branch has. A commit already on the canvas is not taken in twice: by its sha, or by its subject and author time once a rebase has given it a new sha. Records get the same ids on every machine, so syncing does not double them. Afterwards the line catches up on its own (at most every 10 minutes, when a session there gets an instruction). For lines from before this, `trace-canvas history` lists what each line would take in, `trace-canvas history --all` takes it in, and `trace-canvas history <line> --off` leaves a line out.
+
 ### `/trace-canvas`: put this session on the canvas
 
 | You type | What happens |
@@ -316,6 +318,7 @@ Records
   trace-canvas hand <to-do|thread> --to claude|codex|gemini Assign it and print the command that starts the agent
   trace-canvas dispatch [line|to-do...] [--all] [--print] Hand each line's new to-dos (or the to-dos named) to the agent working on it and wake it
   trace-canvas import <file|->                     Merge an export, another data.json, or JSON lines
+  trace-canvas history [line...] [--all] [--off]   A repository's line takes in its earlier commits and past sessions (alone: list only)
 
 Goals and to-dos
   trace-canvas tasks [--thread T] [--all]          Each thread's goal and open to-dos

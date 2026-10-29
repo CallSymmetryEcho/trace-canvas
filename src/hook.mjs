@@ -97,12 +97,13 @@ export function resolveThread(d, info, { cfg, sid, prevThreadId = null, promptFo
     const date = new Date().toISOString().slice(5, 10);
     return createThread(d, { id: hashId('t', key), name: firstLine(promptForName, 60) || tr(cfg.lang, 'sessionThread', info.repo, date), key });
   }
-  if (!key.includes('@')) return createThread(d, { id: hashId('t', key), name: info.repo, key, note: info.root });
+  // A repository's line takes in its history from before (src/history.mjs); `history: false` leaves it out.
+  if (!key.includes('@')) return createThread(d, { id: hashId('t', key), name: info.repo, key, note: info.root, extra: { history: true } });
   // A new branch forks from the thread this session was on, else from the repository's main line.
   const prev = prevThreadId && d.threads[prevThreadId];
-  const parent = prev && prev.key !== key ? prev : threadByKey(d, info.repo) || createThread(d, { id: hashId('t', info.repo), name: info.repo, key: info.repo, note: info.root });
+  const parent = prev && prev.key !== key ? prev : threadByKey(d, info.repo) || createThread(d, { id: hashId('t', info.repo), name: info.repo, key: info.repo, note: info.root, extra: { history: true } });
   const forkPoint = lastCommit(d, parent.id);
-  t = createThread(d, { id: hashId('t', key), name: `${info.repo} · ${info.branch}`, key, parent: parent.id, forkOf: forkPoint ? forkPoint.id : null, note: info.root, extra: parent.group ? { group: parent.group } : {} });
+  t = createThread(d, { id: hashId('t', key), name: `${info.repo} · ${info.branch}`, key, parent: parent.id, forkOf: forkPoint ? forkPoint.id : null, note: info.root, extra: { history: true, ...(parent.group ? { group: parent.group } : {}) } });
   addCommit(d, { thread: t.id, kind: 'fork', title: tr(cfg.lang, 'branchedFrom', info.branch, parent.name), parents: forkPoint ? [forkPoint.id] : [], agent });
   return t;
 }
@@ -140,7 +141,8 @@ export function handleHook(input, env = process.env) {
   try { updateLive(input, { info, key: info ? threadKey(info, cfg, sid) : null, env, agent: ag.name, agentKey: input._agent || 'claude', resume: ag.resume(sid), machine: cfg.machine, terminal }); } catch {}
   if (!LOG_EVENTS.includes(ev)) return { live: ev };
 
-  return mutate(d => {
+  let due = null;
+  const r = mutate(d => {
     const state = loadState(sid, env);
     const key = eventKey(input);
     if (key && state.seen.includes(key)) return false;
@@ -167,6 +169,9 @@ export function handleHook(input, env = process.env) {
         s.prompted = true;
         if (!s.title) s.title = firstLine(prompt, 120);
       }
+      // The line's history from before catches up in the background (the CLI starts it), at most every 10 minutes.
+      const th = s.thread && threadById(d, s.thread);
+      if (th && th.history && historyDue(th.id, env)) due = th.id;
     } else if (ev === 'PostToolUse') {
       const tool = input.tool_name, ti = input.tool_input || {}, out = input.tool_response || {};
       if (EDIT_TOOLS.has(tool)) {
@@ -214,6 +219,21 @@ export function handleHook(input, env = process.env) {
     saveState(sid, state, env);
     return changed ? undefined : false;
   }, env);
+  return due ? { history: due } : r;
+}
+
+/**
+ * Whether a line's history should catch up now, and if so notes the time. Kept on this machine, not on the line:
+ * each machine reads its own repositories and sessions, and a synced stamp would rewrite the line every few minutes.
+ */
+export function historyDue(tid, env = process.env, every = 10 * 60e3) {
+  const f = path.join(home(env), 'history-at.json');
+  let at = {};
+  try { at = JSON.parse(fs.readFileSync(f, 'utf8')); } catch {}
+  if (Date.now() - (at[tid] || 0) < every) return false;
+  at[tid] = Date.now();
+  try { fs.writeFileSync(f, JSON.stringify(at)); } catch {}
+  return true;
 }
 
 // Sessions from before the session table: the old state file's binding, else the line of the

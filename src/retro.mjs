@@ -33,7 +33,7 @@ function codexFile(id, env) {
   return walk(path.join(root, 'sessions')) || walk(path.join(root, 'archived_sessions'));
 }
 
-function codexPrompts(file) {
+export function codexPrompts(file) {
   const out = [];
   for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
     let j; try { j = JSON.parse(line); } catch { continue; }

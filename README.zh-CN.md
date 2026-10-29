@@ -105,6 +105,8 @@ node bin/trace-canvas.mjs setup --user
 
 记录按「仓库 + 分支」归到线程。在 `main` 上工作记到 `graduation-affair`；切到分支 `lit-review` 时，会从当前位置分叉出新线程 `graduation-affair · lit-review`。这样不同分支上并行的会话会落在不同的线路上。只是回答问题的回合不记录；用 shell 写文件（`>`、`tee`、`sed -i` 等）也算改动。
 
+**之前的历史。** 一个仓库新建的线，从仓库真正的起点开始，而不是从 hooks 看到的第一个会话开始。它会在后台导入默认分支的提交（按第一父提交，线保持一条；最多最近 500 个，更早的合成一条记录放在线的起点），以及这台电脑上在这个仓库里跑过的 Claude Code 和 Codex 会话，每个会话一条记录，并进入这条线的会话列表，可以直接恢复。分支线只导入这个分支独有的提交。已经在画布上的提交不会导入第二次：按 sha 认，rebase 后 sha 变了的，按提交说明和作者时间认。导入的记录在每台电脑上 id 相同，同步后不会出现两份。之后这条线会自己补上新的（这条线上的会话收到指令时，最多每 10 分钟一次）。此前就有的线：`trace-canvas history` 列出每条线会导入什么，`trace-canvas history --all` 执行导入，`trace-canvas history <线> --off` 让某条线不导入。
+
 ### `/trace-canvas`：把当前会话放进画布
 
 | 你输入 | 发生什么 |
@@ -316,6 +318,7 @@ node bin/trace-canvas.mjs log "文献对比表完成" \
   trace-canvas hand <待办|线程> --to claude|codex|gemini 指定由谁做，并打印启动那个 agent 的命令
   trace-canvas dispatch [线|待办...] [--all] [--print]  把每条线新记的待办（或点名的待办）交给做这条线的 agent，并叫醒它
   trace-canvas import <文件|->                     合并导出文件、另一份 data.json 或 JSON 行
+  trace-canvas history [线...] [--all] [--off]     仓库的线导入之前的提交和以前的会话（不带参数时只列出）
 
 目标和待办
   trace-canvas tasks [--thread 线程] [--all]       每条线的目标和未完成的待办

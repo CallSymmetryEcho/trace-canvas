@@ -91,6 +91,9 @@ Records
   trace-canvas fork <record|thread> [--name N] [--bind] [--session id]
                                                    Branch a new thread off a record or a thread's tip
   trace-canvas import <file|->                     Merge an export, another data.json, or JSON lines
+  trace-canvas history [line...] [--all] [--off]   A repository's line takes in its history: the default branch's commits
+                                                   (first parent, the newest 500) and past Claude Code and Codex sessions.
+                                                   Alone it lists what each line would get; --all imports it; --off leaves a line out
 
 Goals and to-dos
   trace-canvas tasks [--thread T] [--all]          Each thread's goal and open to-dos (--all: finished too)
@@ -168,6 +171,8 @@ async function main() {
           event = payload.hook_event_name; // the CLI's own name for it, which its output must repeat
           outcome = handleHook(input);
           if (input.hook_event_name === 'SessionEnd' && process.env.TRACE_CANVAS_DISABLE !== '1') syncSoon();
+          // The line's history from before catches up in the background (src/history.mjs).
+          if (outcome && outcome.history) spawn(process.execPath, [SELF, 'history', outcome.history, '--quiet'], { detached: true, stdio: 'ignore' }).unref();
           if (process.env.TRACE_CANVAS_DISABLE !== '1') {
             const { sessionStartContext, promptContext } = await import('../src/hook.mjs');
             if (input.hook_event_name === 'SessionStart') context = sessionStartContext(input);
@@ -293,6 +298,39 @@ async function main() {
         else if (r.action === 'message') console.log(`  → Running session ${name} (${s.status}${s.desktopId ? `, ${s.desktopId}` : ''}): send it this message:\n    ${r.prompt}`);
         else if (r.action === 'busy') console.log(`  → ${who} session ${name} is working: send it this when it stops:\n    ${r.prompt}`);
         else console.log(`  → ${r.action === 'start' ? `A new ${who} session` : `Session ${name} resumed`}${run ? ' in a new Terminal window' : '; run'}:\n    ${r.command}`);
+      }
+      break;
+    }
+    case 'history': {
+      // A repository's line takes in its history from before it was on the canvas (src/history.mjs): git and the
+      // transcripts are read outside the lock, then what is still new goes on in one write. A new repository line does
+      // this by itself; the lines from before need --all (or their names) once.
+      const { apply, collect, historyLines } = await import('../src/history.mjs');
+      const { historyDue } = await import('../src/hook.mjs');
+      const { findThreadLoose } = await import('../src/ops.mjs');
+      const { readData } = await import('../src/store.mjs');
+      const bool = n => { const v = flag(n, false); if (typeof v === 'string') argv.push(v); return !!v; }; // a flag before a name
+      const quiet = bool('quiet'), off = bool('off'), all = bool('all'), d = readData();
+      const named = argv.filter(Boolean).map(ref => { const id = findThreadLoose(d, ref); if (!d.threads[id]) { console.error(`No line "${ref}"`); process.exit(1); } return d.threads[id]; });
+      if (off) {
+        if (!named.length) { console.error('Usage: trace-canvas history <line>... --off   (name a line again to turn it back on)'); process.exit(1); }
+        mutate(x => { for (const th of named) x.threads[th.id].history = false; });
+        console.log(`Left out: ${named.map(th => th.name).join(', ')}`);
+        break;
+      }
+      const rows = named.length ? named.map(th => ({ th, plan: collect(d, th) })) : historyLines(d);
+      const what = p => `${p.commits.length} commit${p.commits.length === 1 ? '' : 's'}${p.older ? ` (+ ${p.older.n} older as one record)` : ''}, ${p.sessions.length} past session${p.sessions.length === 1 ? '' : 's'}`;
+      if (!named.length && !all) {
+        if (!rows.length) { console.log('No line stands for a git repository on this machine.'); break; }
+        console.log('Lines that stand for a repository here, and what each would take in:');
+        for (const { th, plan } of rows) console.log(`  ${th.name}  <-  ${plan.root} (${plan.branch}): ${what(plan)}${th.history ? '' : '  [not yet]'}`);
+        console.log('\nImport with: trace-canvas history --all   (or name the lines). Leave a line out with: trace-canvas history <line> --off');
+        break;
+      }
+      const done = mutate(x => rows.map(({ th, plan }) => ({ th, plan, r: plan && apply(x, x.threads[th.id], plan) })));
+      for (const { th, plan, r } of done) {
+        if (r) historyDue(th.id, undefined, 0); // caught up now: the hooks wait their 10 minutes from here
+        if (!quiet) console.log(r ? `${th.name}: added ${r.commits} commit${r.commits === 1 ? '' : 's'}${r.older ? ' and one record for the older ones' : ''}, ${r.sessions} past session${r.sessions === 1 ? '' : 's'} (${plan.root})` : `${th.name}: not a git repository on this machine`);
       }
       break;
     }

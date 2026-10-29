@@ -84,8 +84,34 @@ function threadKey(info, cfg, sid) {
   return `${info.repo}@${info.branch}`;
 }
 
+/**
+ * The line that claims the folder cwd is in (trace-canvas folder): one repository, several lines, by subfolder. The
+ * folders are kept as the repository's name and a path inside it, so they hold on every machine; the deepest wins.
+ */
+export function folderLine(d, info, cwd) {
+  const sub = info && info.root && cwd ? path.relative(info.root, real(cwd)) : '';
+  if (!sub || sub.startsWith('..') || path.isAbsolute(sub)) return null;
+  let best = null, depth = -1;
+  for (const t of Object.values(d.threads)) {
+    if (t.status === 'merged') continue;
+    for (const f of t.folders || []) if (f.repo === info.repo && (sub === f.path || sub.startsWith(`${f.path}/`)) && f.path.length > depth) { best = t; depth = f.path.length; }
+  }
+  return best;
+}
+/** A line claims a folder of a repository (remove: gives it back). Returns { repo, path }. Call inside mutate(). */
+export function claimFolder(d, th, dir, remove = false) {
+  const info = repoInfo(path.resolve(dir)), sub = info.branch !== undefined && gitRoot(dir) ? path.relative(info.root, real(path.resolve(dir))) : '';
+  if (!sub || sub.startsWith('..')) throw new Error(`${dir} is not a folder inside a git repository (the repository's own folder is its line already)`);
+  const f = { repo: info.repo, path: sub.split(path.sep).join('/') }, same = x => x.repo === f.repo && x.path === f.path;
+  th.folders = [...(th.folders || []).filter(x => !same(x)), ...(remove ? [] : [f])];
+  if (!th.folders.length) delete th.folders;
+  return f;
+}
+
 // Finds or creates the thread for a repository/branch. Exported for transcript capture.
-export function resolveThread(d, info, { cfg, sid, prevThreadId = null, promptForName = '', agent = AGENT }) {
+export function resolveThread(d, info, { cfg, sid, prevThreadId = null, promptForName = '', agent = AGENT, cwd = '' }) {
+  const claimed = folderLine(d, info, cwd);
+  if (claimed) return claimed;
   const key = threadKey(info, cfg, sid);
   let t = threadByKey(d, key);
   if (t) return t;
@@ -153,7 +179,7 @@ export function handleHook(input, env = process.env) {
     const s = d.sessions[sid] || adoptSession(d, sid, state);
     const touch = () => { d.sessions[sid] = Object.assign(s, { id: sid, agent: ag.name, agentKey: input._agent || 'claude', resume: ag.resume(sid), cwd, machine: cfg.machine, last: Date.now() }); changed = true; };
     const thread = prompt => {
-      const t = (s.bound && threadById(d, s.thread)) || resolveThread(d, info, { cfg, sid, prevThreadId: s.thread, promptForName: prompt || state.lastPrompt, agent: ag.name });
+      const t = (s.bound && threadById(d, s.thread)) || resolveThread(d, info, { cfg, sid, prevThreadId: s.thread, promptForName: prompt || state.lastPrompt, agent: ag.name, cwd });
       s.thread = t.id; touch(); return t;
     };
 
@@ -300,6 +326,7 @@ export function sessionStartContext(input, env = process.env) {
   const handed = env.TRACE_CANVAS_THREAD && threadById(d, env.TRACE_CANVAS_THREAD);
   let tid = handed ? handed.id : null;
   if (tid && sid) mutate(dd => bindSession(dd, sid, tid, env), env);
+  if (!tid && sid && !(d.sessions[sid] && d.sessions[sid].bound)) { const t = folderLine(d, repoInfo(cwd), cwd); if (t) tid = t.id; }
   if (!tid && sid) tid = sessionThread(d, { id: sid, key: threadKey(repoInfo(cwd), cfg, sid) }, env).threadId;
   const out = [];
   if (tid) {

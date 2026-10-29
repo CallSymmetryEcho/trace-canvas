@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { bindSession, handleHook } from '../src/hook.mjs';
+import { bindSession, claimFolder, handleHook } from '../src/hook.mjs';
 import { bindLiveSession, findThreadLoose, mergeThreads, readThread, threadSessions } from '../src/ops.mjs';
 import { addCommit, createThread, emptyData, mutate, readData } from '../src/store.mjs';
 
@@ -100,4 +100,18 @@ test('a part of a line name finds the line when only one line has it', () => {
   // Binding finds it too; a name nothing matches still makes a new line.
   assert.equal(bindLiveSession(d, { sessionId: 's1', thread: 'receipt' }).id, ocr);
   assert.equal(bindLiveSession(d, { sessionId: 's2', thread: 'Dark mode' }).name, 'Dark mode');
+});
+
+test('a line that claims a folder of the repository gets the sessions working in it; the rest stay on the repository line', () => {
+  const s = sandbox();
+  fs.mkdirSync(path.join(s.repo, 'docs', 'paper'), { recursive: true });
+  const thesis = mutate(d => { const t = createThread(d, { name: 'Thesis writing' }); claimFolder(d, t, path.join(s.repo, 'docs')); return t.id; }, s.env);
+  assert.deepEqual(readData(s.env).threads[thesis].folders, [{ repo: 'tripsplit', path: 'docs' }]);
+  s.fire('w1', 'UserPromptSubmit', { prompt: 'Tighten the abstract', cwd: path.join(s.repo, 'docs', 'paper') }); // deeper still counts
+  s.fire('c1', 'UserPromptSubmit', { prompt: 'Fix the build' });
+  assert.deepEqual(s.on('Thesis writing'), ['task']);
+  assert.deepEqual(s.on('tripsplit'), ['task']);
+  assert.throws(() => claimFolder(readData(s.env), { id: 'x' }, s.repo), /not a folder inside a git repository/);
+  mutate(d => { claimFolder(d, d.threads[thesis], path.join(s.repo, 'docs'), true); }, s.env); // given back
+  assert.equal(readData(s.env).threads[thesis].folders, undefined);
 });

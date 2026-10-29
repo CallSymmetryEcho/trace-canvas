@@ -282,6 +282,7 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .pill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .kind-tag { flex: none; font-size: 11px; color: var(--faint); border: 1px solid var(--rule); border-radius: 4px; padding: 0 5px; }
 .agent-tag { flex: none; font-size: 11px; color: var(--muted); background: var(--surface-2); border-radius: 4px; padding: 1px 6px; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.s-latest { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 4px; background: color-mix(in srgb, var(--accent) 14%, var(--surface)); color: var(--accent); font-size: 11px; font-weight: 600; vertical-align: 1px; }
 .g-time { flex: none; font-family: var(--f-mono); font-size: 11.5px; color: var(--faint); min-width: 78px; text-align: right; }
 .g-ago { display: none; } /* phone only */
 /* who wrote it: you (solid, dark) or an agent (outlined, in the line's colour) */
@@ -870,7 +871,7 @@ const I18N = {
     retroLayers: { project: 'Project rules (CLAUDE.md, AGENTS.md)', line: 'This line', memory: 'Long-term memory' }, tRetroApplied: w => `Written to ${w}`,
     agentAsk: 'Prompt for an agent', agentPromptTitle: 'Copy a prompt that sends an agent to read this line and carry on', tAgentPrompt: 'Prompt copied: paste it to an agent, for example in the Claude app on your phone',
     agentPromptText: (name, id) => `Read the Trace Canvas line "${name}" (thread ${id}): use trace_read_thread and trace_tasks for its goal and open to-dos, carry on with them, and tick each one with trace_task_done when it is done.`, tSyncing: 'Syncing…', tSyncBusy: 'A sync is already running', tSyncFailed: e => `Sync failed: ${e}`,
-    tSynced: (n, off) => `Synced: ${n} change${n === 1 ? '' : 's'} from other machines${off ? ' (offline; pushes next time)' : ''}`, onMachine: m => `On ${m}`,
+    tSynced: (n, off) => `Synced: ${n} change${n === 1 ? '' : 's'} from other machines${off ? ' (offline; pushes next time)' : ''}`, onMachine: m => `On ${m}`, latestOn: m => `${m} · latest`,
     menuAgent: 'Connect an AI agent', menuIO: 'Import / export', menuClearEx: 'Clear example data', menuHelp: 'Shortcuts and help',
     zoomOut: 'Zoom out', zoomIn: 'Zoom in', zoomReset: 'Reset to 100%', fit: 'Fit', connect: 'Connect', connectTitle: 'Draw a link between two threads', newThread: 'New thread',
     selectMode: 'Select', selectTitle: 'Pick several threads (or Shift-click cards), then merge them',
@@ -1044,7 +1045,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     retroLayers: { project: '项目规矩（CLAUDE.md、AGENTS.md）', line: '这条线', memory: '长期记忆' }, tRetroApplied: w => `已写入 ${w}`,
     agentAsk: '给 agent 的提示', agentPromptTitle: '复制一段提示，让 agent 去读这条线并接着做', tAgentPrompt: '提示已复制：粘贴给 agent，比如手机 Claude app 里的会话',
     agentPromptText: (name, id) => `读 Trace Canvas 上的线「${name}」（thread ${id}）：用 trace_read_thread 和 trace_tasks 看它的目标和未完成的待办，接着做，每做完一项就用 trace_task_done 勾掉。`, tSyncing: '正在同步…', tSyncBusy: '已经有一个同步在进行', tSyncFailed: e => `同步失败：${e}`,
-    tSynced: (n, off) => `已同步：从其他电脑收到 ${n} 处改动${off ? '（离线，下次再推送）' : ''}`, onMachine: m => `在 ${m} 上`,
+    tSynced: (n, off) => `已同步：从其他电脑收到 ${n} 处改动${off ? '（离线，下次再推送）' : ''}`, onMachine: m => `在 ${m} 上`, latestOn: m => `${m} 最新`,
     menuAgent: '接入 AI agent', menuIO: '导入 / 导出', menuClearEx: '清除示例数据', menuHelp: '快捷键与用法',
     zoomOut: '缩小', zoomIn: '放大', zoomReset: '重置为 100%', fit: '适配', connect: '连线', connectTitle: '在两个线程之间画一条关联', newThread: '新线程',
     selectMode: '多选', selectTitle: '点选多条线程（或 Shift+点击卡片），然后合并',
@@ -2401,6 +2402,8 @@ function createThreadAndEdit() {
 }
 
 /* ================= git graph ================= */
+// Another machine's name, next to what it wrote or runs (this machine is never named).
+const machineTag = m => (m && S.machine && m !== S.machine ? `<span class="agent-tag m-tag" title="${esc(t('onMachine', m))}">${esc(m)}</span>` : '');
 function renderGit() {
   const by = byThread();
   const visible = new Set(viewLines().map(th => th.id));
@@ -2472,6 +2475,7 @@ function renderGit() {
       <span class="actor a-agent" style="--c:${th.color}">${ACTOR_ICON.agent}</span>
       <span class="g-title"><b>${esc(liveTitle(s))}</b></span>
       ${s.activity ? `<span class="act">${esc(s.activity)}</span>` : ''}
+${machineTag(s.away && s.machine)}
       <span class="kind-tag">${esc(stLabel(s.status))}</span>
       <span class="pill" style="--c:${th.color}"><i></i><span>${esc(th.name)}</span></span>
       <span class="g-time">${esc(t('liveTipTime'))}</span><span class="g-ago">${esc(t('liveTipTime'))}</span>
@@ -2482,7 +2486,7 @@ function renderGit() {
     return `<div class="g-row k-${c.kind} ${c.done ? 'done' : ''} ${c.id === selC ? 'is-sel' : ''} ${S.q && !matches(c) ? 'is-dim' : ''}" data-cid="${esc(c.id)}" style="padding-left:${gw + 6}px">
       ${c.kind === 'fork' || c.kind === 'merge' ? '<span class="actor"></span>' : actorMark(c, th.color)}
       <span class="g-title">${esc(c.title)}</span>
-      ${c.agent ? `<span class="agent-tag">${esc(c.agent)}</span>` : ''}
+      ${c.agent ? `<span class="agent-tag">${esc(c.agent)}</span>` : ''}${machineTag(c.machine)}
       <span class="kind-tag">${esc(kindLabel(c.kind))}</span>
       <span class="pill" style="--c:${th.color}"><i></i><span>${esc(th.name)}</span></span>
       <span class="g-time">${fmtAbs(c.ts)}</span><span class="g-ago">${fmtShort(c.ts)}</span>
@@ -2752,7 +2756,7 @@ async function applyRetro(cid, n) {
   toast(r.error ? t('retroFail', r.error) : t('tRetroApplied', r.where));
 }
 // One session: open its chat or terminal, or copy the command that resumes it. l is its live entry, if running.
-function sessionItem(s, l) {
+function sessionItem(s, l, latest = '') {
   const st = l ? l.status : 'off', cwd = s.cwd || (l && l.cwd);
   const here = `${cwd ? `cd ${shq(cwd)} && ` : ''}${s.resume || (l && l.resume) || `claude --resume ${s.id}`}`;
   // A session from another machine resumes there, over ssh (the machine names are the ssh aliases).
@@ -2760,7 +2764,7 @@ function sessionItem(s, l) {
   const away = s.machine && S.machine && s.machine !== S.machine, cmd = away ? `ssh -t ${s.machine} ${shq(`exec "$SHELL" -lc ${shq(here)}`)}` : here;
   const jump = away ? '' : jumpTo({ ...l, ...s, desktopId: s.desktopId || (l && l.desktopId), tty: l && l.tty }, 'btn btn-primary');
   const sub = [l && stLabel(st), s.agent || (l && l.agent) || 'Claude Code', away && s.machine, s.id.slice(0, 8), s.last && fmtRel(s.last)].filter(Boolean).join(' · ');
-  return `<li class="st-${esc(st)}${l ? ' is-live' : ''}"${l ? ` data-act="goto-live" data-sid="${esc(s.id)}"` : ''}><span class="ldot"></span><span class="s-name">${esc(s.title || (l ? liveTitle(l) : s.id))}</span><span class="act">${esc(sub)}</span><span class="s-acts">${jump}<button class="btn" data-act="copy-cmd" data-cmd="${esc(cmd)}" title="${esc(cmd)}">${esc(t('copyResume'))}</button></span></li>`;
+  return `<li class="st-${esc(st)}${l ? ' is-live' : ''}"${l ? ` data-act="goto-live" data-sid="${esc(s.id)}"` : ''}><span class="ldot"></span><span class="s-name">${latest ? `<span class="s-latest">${esc(t('latestOn', latest))}</span>` : ''}${esc(s.title || (l ? liveTitle(l) : s.id))}</span><span class="act">${esc(sub)}</span><span class="s-acts">${jump}<button class="btn" data-act="copy-cmd" data-cmd="${esc(cmd)}" title="${esc(cmd)}">${esc(t('copyResume'))}</button></span></li>`;
 }
 // The session an agent logged this record in: its chat, or the command that resumes it.
 function fromView(c) {
@@ -2775,7 +2779,12 @@ function lineSessions(tid) {
   const rows = [...S.sessions.filter(s => s.thread === tid || byId.has(s.id)), ...live.filter(l => !known.has(l.id)).map(l => ({ id: l.id, agent: l.agent, last: l.lastSeen }))]
     .sort((a, b) => byId.has(b.id) - byId.has(a.id) || (b.last || 0) - (a.last || 0));
   if (!rows.length) return '';
-  return `<div class="sec-label">${esc(t('lineSessions'))}</div><ul class="l-list s-list">${rows.slice(0, 8).map(s => sessionItem(s, byId.get(s.id))).join('')}</ul>
+  // Each machine's latest session (where dispatch looks for that machine), marked and shown even past the first eight.
+  const latest = new Map();
+  for (const s of rows) { const m = s.machine || S.machine; if (!latest.has(m) || (s.last || 0) > (latest.get(m).last || 0)) latest.set(m, s); }
+  const mark = latest.size > 1 ? new Map([...latest].map(([m, s]) => [s.id, m])) : new Map();
+  const shown = [...rows.slice(0, 8), ...rows.slice(8).filter(s => mark.has(s.id))];
+  return `<div class="sec-label">${esc(t('lineSessions'))}</div><ul class="l-list s-list">${shown.map(s => sessionItem(s, byId.get(s.id), mark.get(s.id))).join('')}</ul>
       <p style="margin:0;color:var(--faint);font-size:12px">${rows.length > 8 ? `+${rows.length - 8} · ` : ''}${esc(t('lineSessionsHint'))}</p>`;
 }
 function threadDetail(th) {

@@ -84,7 +84,7 @@ const TOOLS = [
     name: 'trace_log',
     title: 'Log one record',
     description: 'Adds one record to a thread (created if the name is new) or to the inbox.',
-    inputSchema: { type: 'object', properties: { title: { type: 'string' }, kind: KIND, thread: { type: 'string' }, body: { type: 'string' }, links: { type: 'array', items: { type: 'string' } }, agent: { type: 'string' }, assignee: { type: 'string', enum: ['claude', 'codex', 'gemini'], description: 'Hand this to-do to an agent (kind defaults to task).' } }, required: ['title'] },
+    inputSchema: { type: 'object', properties: { title: { type: 'string' }, kind: KIND, thread: { type: 'string' }, body: { type: 'string' }, links: { type: 'array', items: { type: 'string' } }, agent: { type: 'string' }, assignee: { type: 'string', enum: ['claude', 'codex', 'gemini'], description: 'Hand this to-do to an agent (kind defaults to task).' }, on: { type: 'string', description: 'The machine to do this to-do on (as the canvas names machines): dispatch gives it to the latest session on that machine for its line, or starts one there.' } }, required: ['title'] },
     annotations: { readOnlyHint: false, destructiveHint: false },
   },
   {
@@ -220,7 +220,7 @@ async function callTool(name, a = {}) {
         const thread = a.thread ? ensureThread(d, a.thread) : INBOX, kind = a.kind || (a.assignee ? 'task' : 'agent');
         const same = kind === 'task' && Object.values(d.commits).find(x => x.kind === 'task' && !x.done && threadIdOf(d, x) === thread && norm(x.title) === norm(a.title));
         if (same) { dup = true; return same; }
-        return addCommit(d, { thread, kind, title: a.title, body: a.body || '', links: Array.isArray(a.links) ? a.links : [], agent: a.agent || agentOf(agentKey()).name, extra: { ...(a.assignee ? { assignee: a.assignee } : {}), ...(from ? { fromSession: from } : {}) } });
+        return addCommit(d, { thread, kind, title: a.title, body: a.body || '', links: Array.isArray(a.links) ? a.links : [], agent: a.agent || agentOf(agentKey()).name, extra: { ...(a.assignee ? { assignee: a.assignee } : {}), ...(a.on ? { on: String(a.on) } : {}), ...(from ? { fromSession: from } : {}) } });
       });
       const where = c.thread === INBOX ? 'the inbox' : `"${readData().threads[c.thread].name}"`;
       return { text: dup ? `Already an open to-do on ${where}.` : `Logged to ${where}.`, data: { id: c.id, thread: c.thread, ...(dup ? { existing: true } : {}) } };

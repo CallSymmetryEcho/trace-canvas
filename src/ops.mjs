@@ -53,7 +53,7 @@ export function listTasks(d, { thread, includeDone = false, assignee } = {}) {
     const open = tasks.filter(c => !c.done);
     return {
       id, name: th.name, ...(th.group ? { group: th.group } : {}), goal: goalOf(th), status: th.status || 'active', done: tasks.length - open.length, total: tasks.length,
-      tasks: (includeDone ? tasks : open).map(c => ({ id: c.id, title: c.title, ...(c.assignee ? { assignee: c.assignee } : {}), ...(c.done ? { done: true, doneBy: c.doneBy || null, doneAt: c.doneAt ? new Date(c.doneAt).toISOString() : null } : {}) })),
+      tasks: (includeDone ? tasks : open).map(c => ({ id: c.id, title: c.title, ...(c.assignee ? { assignee: c.assignee } : {}), ...(c.on ? { on: c.on } : {}), ...(c.done ? { done: true, doneBy: c.doneBy || null, doneAt: c.doneAt ? new Date(c.doneAt).toISOString() : null } : {}) })),
     };
   }).filter(r => r.total || r.goal).filter(r => only || !['done', 'merged'].includes(r.status) || r.total > r.done);
 }
@@ -88,7 +88,7 @@ export function setTaskDone(d, { task, thread, done = true, by = 'human' }) {
  * that starts that agent on the thread. TRACE_CANVAS_THREAD binds the new session through the
  * SessionStart hook; the prompt also asks for trace_bind in case the hook cannot see it.
  */
-export function handTo(d, { ref, to, thread, remote = false }, env = process.env) {
+export function handTo(d, { ref, to, thread, remote = false, here = true }, env = process.env) {
   const ag = AGENTS[to];
   if (!ag) throw new Error(`Hand to whom? One of ${Object.keys(AGENTS).join(', ')}`);
   let todo = null, tid = d.commits[ref] && d.commits[ref].kind !== 'task' ? null : resolveThreadRef(d, ref);
@@ -96,7 +96,7 @@ export function handTo(d, { ref, to, thread, remote = false }, env = process.env
   const th = tid === INBOX ? null : d.threads[tid];
   if (!th) throw new Error('Put the to-do on a line first; the inbox has no folder or goal to hand over');
   const live = listLive(env).filter(s => sessionThreadOf(d, s, env) === tid).sort((a, b) => b.lastSeen - a.lastSeen);
-  const dir = lineDir(th) || (live[0] ? live[0].cwd : '');
+  const dir = here ? lineDir(th) || (live[0] ? live[0].cwd : '') : ''; // here: false for a command run on another machine
   const prompt = oneLine(`You are taking over the Trace Canvas line "${th.name}" (thread ${tid}). First call the MCP tool trace_bind with thread "${tid}". Then read the line with trace_read_thread (ideas logged on it are there) and call trace_tasks with mine: true for the goal and your to-dos, work through them, and tick each one with trace_task_done when it is done. Log decisions and results with trace_log.${todo ? ` Start with: ${todo.title}` : ''}`);
   const run = remote && ag.remote ? ag.remote(oneLine(th.name), prompt) : ag.launch(prompt);
   return { thread: th, todo, live, command: `${dir ? `cd ${q(dir)} && ` : ''}TRACE_CANVAS_THREAD=${tid} ${run}` };
@@ -112,9 +112,11 @@ export function handTo(d, { ref, to, thread, remote = false }, env = process.env
  *   busy     another agent working right now, or a session running on another machine: it takes the prompt only there
  *   resume   run `command`, which resumes the session with the prompt (over ssh for another machine's session)
  *   start    run `command`: a new session        self  the caller's own line: the to-dos are the caller's
- * awayLive(machine) gives another machine's running sessions (over ssh by default).
+ * on: the machine to do them on (a to-do can carry its own, `on`); they go to that machine's session, or a new one there.
+ * Each row has the machine its to-dos are for (`on`) when there is one. awayLive(machine) gives another machine's running
+ * sessions (over ssh by default).
  */
-export function dispatch(d, { refs = [], all = false, self = null, awayLive = remoteLiveSync } = {}, env = process.env) {
+export function dispatch(d, { refs = [], all = false, self = null, on = '', awayLive = remoteLiveSync } = {}, env = process.env) {
   const me = readConfig(env).machine, lines = new Set(), named = new Set();
   for (const ref of refs) {
     const id = d.commits[ref] ? null : findThreadLoose(d, ref);
@@ -128,6 +130,14 @@ export function dispatch(d, { refs = [], all = false, self = null, awayLive = re
   const tids = [...lines, ...[...named].map(id => threadIdOf(d, d.commits[id]))].filter((t, i, a) => a.indexOf(t) === i);
   const known = new Map(threadSessions(d, null, env).map(s => [s.id, s]));
   const live = new Map(liveSessions(d, env).sessions.map(s => [s.id, s])), awayCache = new Map();
+  const machineOf = id => known.get(id).machine || me;
+  // Running now: here from the live files, on another machine from its own (read once per machine, over ssh by default).
+  const runOf = id => {
+    const m = machineOf(id);
+    if (m === me) return live.get(id);
+    if (!awayCache.has(m)) awayCache.set(m, new Map(awayLive(m).sessions.map(x => [x.id, x])));
+    return awayCache.get(m).get(id);
+  };
   const rows = [];
   for (const tid of tids) {
     const th = d.threads[tid], cs = Object.values(d.commits).filter(c => threadIdOf(d, c) === tid);
@@ -141,23 +151,38 @@ export function dispatch(d, { refs = [], all = false, self = null, awayLive = re
     }
     // No session has worked here yet: the sessions the line has (bound to it, or there by their folder).
     if (!at.size) for (const [id, e] of Object.entries(d.sessions || {})) if (e.thread === tid) worked(id, e.last || 1);
-    // A session on this line comes first; one that only logged a result here from its own line, when none has worked here.
     const ranked = [...at].sort((a, b) => b[1] - a[1]).map(([id]) => id).filter(id => known.has(id));
-    const sid = ranked.find(onLine) || ranked[0];
-    const s = sid && known.get(sid), away = s && s.machine && s.machine !== me ? s.machine : '';
-    if (away && !awayCache.has(away)) awayCache.set(away, new Map(awayLive(away).sessions.map(x => [x.id, x])));
-    const run = sid && (away ? awayCache.get(away).get(sid) : live.get(sid));
-    const todos = cs.filter(c => isTodo(c) && !c.done && (named.has(c.id) || (lines.has(tid) && !c.assignee && (all || !s || !c.agent || (c.fromSession && c.fromSession !== sid))))).sort((a, b) => a.ts - b.ts);
-    if (!todos.length) continue;
-    const key = s ? Object.keys(AGENTS).find(k => AGENTS[k].name === s.agent) || 'claude' : 'claude';
-    for (const c of todos) c.assignee = key;
-    const row = { thread: { id: tid, name: th.name }, agent: key, todos: todos.map(c => ({ id: c.id, title: c.title })) };
-    if (!s) { rows.push({ ...row, action: 'start', command: handTo(d, { ref: todos[0].id, to: key, remote: key === 'claude' }, env).command }); continue; }
-    const prompt = oneLine(`New to-dos on the Trace Canvas line "${th.name}" (thread ${tid}) are yours: ${todos.map((c, i) => `${i + 1}) ${c.title} [${c.id}]`).join('; ')}. Do them in order; read the line with trace_read_thread for context, tick each with trace_task_done when it is done, and log results with trace_log.`);
-    const session = { id: sid, title: s.title || (run && (run.title || run.prompt)) || '', status: run ? run.status : 'off', ...(away ? { machine: away } : {}), ...(run && run.desktopId ? { desktopId: run.desktopId } : {}) };
-    const action = sid === self ? 'self' : away ? (run ? 'busy' : 'resume') : run && key === 'claude' ? 'message' : run && run.status === 'working' ? 'busy' : 'resume';
-    const wake = `${s.cwd ? `cd ${q(s.cwd)} && ` : ''}${AGENTS[key].wake(sid, prompt)}`;
-    rows.push({ ...row, action, session, prompt, ...(action === 'resume' ? { command: away ? remote(away, wake) : wake } : {}) });
+    // Which session, among those on one machine when the to-dos are for it: the line's own sessions first (one that only
+    // logged a result here from its own line, when none has worked here); of those a running one, this machine's before
+    // another's (whose messages do not reach it yet); then this machine's latest; then the latest anywhere.
+    const pick = machine => {
+      const pool = ranked.filter(id => !machine || machineOf(id) === machine), own = pool.filter(onLine), c = own.length ? own : pool;
+      return c.find(id => machineOf(id) === me && runOf(id)) || c.find(id => runOf(id)) || c.find(id => machineOf(id) === me) || c[0];
+    };
+    // The line's open to-dos nobody has, in one group per machine they are for (dispatch's `on`, else the to-do's own).
+    const groups = new Map();
+    for (const c of cs) if (isTodo(c) && !c.done && (named.has(c.id) || (lines.has(tid) && !c.assignee))) { const m = on || c.on || ''; groups.set(m, [...(groups.get(m) || []), c]); }
+    for (const [machine, group] of groups) {
+      const sid = pick(machine), s = sid && known.get(sid);
+      const todos = group.filter(c => named.has(c.id) || all || !s || !c.agent || (c.fromSession && c.fromSession !== sid)).sort((a, b) => a.ts - b.ts);
+      if (!todos.length) continue;
+      const away = s ? (s.machine && s.machine !== me ? s.machine : '') : (machine && machine !== me ? machine : '');
+      const run = sid && runOf(sid);
+      const key = s ? Object.keys(AGENTS).find(k => AGENTS[k].name === s.agent) || 'claude' : 'claude';
+      for (const c of todos) c.assignee = key;
+      const row = { thread: { id: tid, name: th.name }, agent: key, todos: todos.map(c => ({ id: c.id, title: c.title })), ...(machine ? { on: machine } : {}) };
+      if (!s) {
+        // A new session; on another machine over ssh, from its home folder (the line's folder is this machine's).
+        const cmd = handTo(d, { ref: todos[0].id, to: key, remote: key === 'claude', here: !away }, env).command;
+        rows.push({ ...row, action: 'start', ...(away ? { machine: away } : {}), command: away ? remote(away, cmd) : cmd });
+        continue;
+      }
+      const prompt = oneLine(`New to-dos on the Trace Canvas line "${th.name}" (thread ${tid}) are yours: ${todos.map((c, i) => `${i + 1}) ${c.title} [${c.id}]`).join('; ')}. Do them in order; read the line with trace_read_thread for context, tick each with trace_task_done when it is done, and log results with trace_log.`);
+      const session = { id: sid, title: s.title || (run && (run.title || run.prompt)) || '', status: run ? run.status : 'off', ...(away ? { machine: away } : {}), ...(run && run.desktopId ? { desktopId: run.desktopId } : {}) };
+      const action = sid === self ? 'self' : away ? (run ? 'busy' : 'resume') : run && key === 'claude' ? 'message' : run && run.status === 'working' ? 'busy' : 'resume';
+      const wake = `${s.cwd ? `cd ${q(s.cwd)} && ` : ''}${AGENTS[key].wake(sid, prompt)}`;
+      rows.push({ ...row, action, session, prompt, ...(action === 'resume' ? { command: away ? remote(away, wake) : wake } : {}) });
+    }
   }
   return rows;
 }

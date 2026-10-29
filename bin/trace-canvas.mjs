@@ -117,6 +117,7 @@ Live sessions
   trace-canvas tokens [--days 7]                   How much of recent Claude Code sessions' tokens went to Trace Canvas
   trace-canvas retro <thread>                      Rank the line's work by back-and-forth (rounds, time, tokens)
                                                    and suggest rules, using your local claude or codex
+  trace-canvas prompts <session>...                What you typed in these sessions on this machine, as JSON (another machine's Retro reads it)
   trace-canvas retro --apply <record> <n> [--layer project|line|memory]
                                                    Write suggestion n: CLAUDE.md/AGENTS.md, the line, or long-term memory
 
@@ -428,6 +429,14 @@ async function main() {
       for (const r of rows.sort((a, b) => b.total - a.total)) console.log(`${r.name.padEnd(38)}${String(r.calls).padStart(6)}${String(r.notes).padStart(6)}${k(r.noteTokens / (r.notes || 1)).padStart(9)}${k(r.toolTokens).padStart(7)}${k(r.total).padStart(8)}${pct(r.reread, r.total).padStart(13)}`);
       const T = rows.reduce((n, r) => n + r.total, 0), R = rows.reduce((n, r) => n + r.reread, 0);
       console.log(`\n${rows.length} session${rows.length === 1 ? '' : 's'} in the last ${days} days: ${k(T)} tokens processed, ${k(R)} of them (${pct(R, T)}) re-reading what Trace Canvas added (hook notes, trace_* calls and results; estimated from their characters).`);
+      break;
+    }
+    case 'prompts': {
+      // What the person typed in these sessions, from this machine's transcripts, as JSON: another machine's Retro reads it over ssh.
+      const { sessionPrompts } = await import('../src/retro.mjs');
+      const { readData } = await import('../src/store.mjs');
+      const known = readData().sessions || {};
+      console.log(JSON.stringify(sessionPrompts(argv.filter(Boolean).map(id => ({ id, agent: (known[id] || {}).agent || '' })))));
       break;
     }
     case 'retro': {

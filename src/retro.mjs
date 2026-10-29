@@ -10,6 +10,7 @@ import { addCommit, readConfig, threadIdOf } from './store.mjs';
 import { lineDir, sessionList } from './ops.mjs';
 import { findTranscript, parseTranscript } from './transcript.mjs';
 import { onPath } from './install.mjs';
+import { remotePrompts } from './remote.mjs';
 import { tr } from './i18n.mjs';
 
 const MAX_PROMPTS = 400;
@@ -47,18 +48,44 @@ export function codexPrompts(file) {
   return out;
 }
 
-// What the person typed in the line's sessions, oldest first, numbered.
-export function linePrompts(d, tid, env = process.env) {
+// What the person typed in these sessions, read from this machine's transcripts (an agent not known: either kind).
+export function sessionPrompts(sessions, env = process.env) {
   const out = [];
-  for (const s of sessionList(d, tid)) {
-    const codex = /codex/i.test(s.agent);
-    const file = codex ? codexFile(s.id, env) : findTranscript({ sessionId: s.id }, env);
-    if (!file) continue;
-    const ps = codex ? codexPrompts(file) : parseTranscript(file).turns.map(t => ({ ts: t.ts, text: t.prompt, tokens: t.tokens }));
+  for (const s of sessions) {
+    const kind = /codex/i.test(s.agent || '') ? 'codex' : s.agent ? 'claude' : '';
+    const claude = kind !== 'codex' && findTranscript({ sessionId: s.id }, env), codex = !claude && kind !== 'claude' && codexFile(s.id, env);
+    const ps = claude ? parseTranscript(claude).turns.map(t => ({ ts: t.ts, text: t.prompt, tokens: t.tokens })) : codex ? codexPrompts(codex) : [];
     for (const p of ps) if (p.text && !NOISE.test(p.text)) out.push({ ...p, session: s.id });
   }
-  return out.sort((a, b) => a.ts - b.ts).slice(-MAX_PROMPTS).map((p, i) => ({ ...p, i: i + 1 }));
+  return out;
 }
+
+// The line's conversations: its own sessions; when it has none, the sessions that logged on it from their own line.
+export function retroSessions(d, tid) {
+  const all = sessionList(d), own = all.filter(s => s.thread === tid);
+  if (own.length) return own;
+  const from = new Set(Object.values(d.commits).filter(c => c.fromSession && threadIdOf(d, c) === tid).map(c => c.fromSession));
+  return all.filter(s => from.has(s.id));
+}
+
+/**
+ * What the person typed in the line's conversations, oldest first, numbered. A session that ran on another machine is
+ * read there (fetchAway, over ssh by default) and analysed here with the rest. unread: the machines that could not be.
+ */
+export function lineConversations(d, tid, env = process.env, { fetchAway = remotePrompts } = {}) {
+  const me = readConfig(env).machine, sessions = retroSessions(d, tid), by = new Map(), unread = [];
+  for (const s of sessions) { const m = s.machine && s.machine !== me ? s.machine : ''; by.set(m, [...(by.get(m) || []), s]); }
+  const out = [];
+  for (const [m, ss] of by) {
+    const r = m ? fetchAway(m, ss.map(s => s.id)) : { prompts: sessionPrompts(ss, env) };
+    if (r.error) unread.push({ machine: m, sessions: ss.length, error: r.error });
+    else if (!r.prompts.length) unread.push({ machine: m, sessions: ss.length, error: 'their transcripts are not there any more' });
+    else out.push(...r.prompts);
+  }
+  const prompts = out.sort((a, b) => a.ts - b.ts).slice(-MAX_PROMPTS).map((p, i) => ({ ...p, i: i + 1 }));
+  return { prompts, sessions: sessions.length, unread };
+}
+export const linePrompts = (d, tid, env, opts) => lineConversations(d, tid, env, opts).prompts;
 
 export function retroPrompt(prompts, todos, lang = 'en') {
   const day = ts => new Date(ts).toISOString().slice(5, 16).replace('T', ' ');
@@ -118,15 +145,16 @@ export function askAgent(prompt, { timeout = 600000, env = process.env } = {}) {
   });
 }
 
-export async function runRetro(d, tid, { ask = askAgent, lang = readConfig().lang, env = process.env } = {}) {
-  const prompts = linePrompts(d, tid, env);
-  if (!prompts.length) throw new Error('No conversations of this line were found on this machine');
+export async function runRetro(d, tid, { ask = askAgent, lang = readConfig().lang, env = process.env, fetchAway } = {}) {
+  const { prompts, sessions, unread } = lineConversations(d, tid, env, fetchAway ? { fetchAway } : {});
+  if (!sessions) throw new Error('This line has no conversations to read: no session ran on it, and none logged anything on it from another line');
+  if (!prompts.length) throw new Error(`None of this line's ${sessions} session${sessions === 1 ? '' : 's'} could be read: ${unread.map(u => `${u.sessions} on ${u.machine || 'this machine'}: ${u.error}`).join('; ')}`);
   const todos = Object.values(d.commits).filter(c => c.kind === 'task' && threadIdOf(d, c) === tid);
   const reply = String(await ask(retroPrompt(prompts, todos, lang)));
   let items;
   try { items = JSON.parse(reply.slice(reply.indexOf('{'), reply.lastIndexOf('}') + 1)).items; }
   catch { throw new Error(`The analysis did not come back as JSON: ${reply.slice(0, 200)}`); }
-  return { items: rankRetro(prompts, items), prompts: prompts.length, sessions: new Set(prompts.map(p => p.session)).size };
+  return { items: rankRetro(prompts, items), prompts: prompts.length, sessions: new Set(prompts.map(p => p.session)).size, unread };
 }
 
 // The result goes on the line as a note that keeps the ranking; nothing else is written yet.

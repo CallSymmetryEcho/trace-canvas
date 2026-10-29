@@ -319,6 +319,8 @@ node bin/trace-canvas.mjs log "文献对比表完成" \
 
 每件来回多的事，会写出卡在哪（缺了什么信息）、最后说清楚的那句话，并建议一条规矩。你在某条规矩上点**写入**并选好位置之前，什么都不写：**项目规矩**（项目的 CLAUDE.md 和 AGENTS.md，放在「Rules from retros」下面）、**这条线**（线上的一条决定）、**长期记忆**（装了 [Theatrum](https://github.com/CallSymmetryEcho/Theatrum) 就写进 Theatrum，否则写进 `~/.claude/CLAUDE.md`）。排行作为一条笔记留在线上。命令行：`trace-canvas retro --apply <记录> <序号> [--layer project|line|memory]`。
 
+读哪些对话：这条线自己的会话；如果一个都没有（记录全是从别的线记过来的），就用在这条线上记过东西的会话。在别的机器上跑的会话，通过 ssh 让那台机器自己的 `trace-canvas prompts` 读出来，拿回来和其余的一起分析。一条都读不到时，会说明原因：根本没有会话，或者哪台机器连不上、那边的 trace-canvas 太旧。
+
 ## Trace Canvas 花多少 token
 
 **大约 1%，而且不随画布变大而增长。** 记录是 hook 在模型之外写的，留痕本身不花 token。进到会话里的文字都很短、有上限：开头几行（所在的线、目标、你的待办、东西在哪），每条消息一行（所在的线和最多八条已有待办），再加上 agent 主动调用 `trace_*` 工具时的返回，默认只回答会话所在的这条线。这些文字留在上下文里，之后的调用会再读一遍，所以开销跟着一个会话的消息条数走，不跟着画布大小走。`trace-canvas tokens` 读最近的 Claude Code 对话记录，列出每个会话里这部分的占比。

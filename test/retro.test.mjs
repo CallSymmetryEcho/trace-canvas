@@ -119,3 +119,22 @@ test('Trace Canvas\'s share of a session: its text is re-read by every later cal
   ]));
   assert.deepEqual(canvasTokens(file), { calls: 4, total: 490, reread: 10 + 12 + 16, notes: 1, noteTokens: 10, toolTokens: 6 });
 });
+
+test('retro reads the sessions that logged on a line from their own line when it has none, and another machine\'s over ssh', async () => {
+  const { d, env: base } = setup(), env = { ...base, TRACE_CANVAS_MACHINE: 'here' };
+  const ops = createThread(d, { name: 'Ops' }), other = createThread(d, { name: 'Elsewhere' });
+  d.sessions.s1.thread = other.id; // s1 works on another line and logged a result on Ops
+  addCommit(d, { thread: ops.id, kind: 'agent', title: 'Disk cleaned', ts: 5, extra: { fromSession: 's1' } });
+  assert.deepEqual(linePrompts(d, ops.id, env).map(p => p.session), ['s1', 's1', 's1', 's1']);
+  // A session that ran on another machine is read there; what comes back is analysed with the rest.
+  const far = createThread(d, { name: 'Far' });
+  d.sessions.r9 = { id: 'r9', thread: far.id, agent: 'Claude Code', machine: 'lab', last: 3 };
+  const asked = [];
+  const fetchAway = (m, ids) => { asked.push([m, ids]); return { prompts: [{ ts: 1, text: 'Tune the PID gains', tokens: 10, session: 'r9' }] }; };
+  assert.deepEqual(linePrompts(d, far.id, env, { fetchAway }).map(p => [p.i, p.text]), [[1, 'Tune the PID gains']]);
+  assert.deepEqual(asked, [['lab', ['r9']]]);
+  // Nothing to read says why: no session at all, or which machine could not be read.
+  const empty = createThread(d, { name: 'Commits only' });
+  await assert.rejects(runRetro(d, empty.id, { env, ask: async () => '' }), /no session ran on it, and none logged anything on it/);
+  await assert.rejects(runRetro(d, far.id, { env, ask: async () => '', fetchAway: () => ({ error: 'ssh: connect to host lab: timed out' }) }), /None of this line's 1 session could be read: 1 on lab: ssh: connect to host lab: timed out/);
+});

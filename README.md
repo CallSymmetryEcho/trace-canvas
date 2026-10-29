@@ -167,7 +167,7 @@ The **Agents** tab draws the running agents as a tree, left to right. Each sessi
 
 *A session waiting for approval turns green once approved, a subagent finishes and fades, and the panel shows who started the session. Made-up data.*
 
-Subagents come from the SubagentStart/Stop hooks and the `.meta.json` file Claude Code keeps next to each subagent transcript. Which session started which comes from the Claude desktop app's own session records (`~/Library/Application Support/Claude/claude-code-sessions/`), read-only and best-effort: that format belongs to the app and may change, and without the desktop app every session simply starts its own tree. `TRACE_CANVAS_DESKTOP_DIR` points it somewhere else. The made-up sessions in the screenshot come from `node docs/scenarios/agents.mjs <data dir> <desktop dir>`.
+Subagents come from the SubagentStart/Stop hooks and the `.meta.json` file Claude Code keeps next to each subagent transcript. Which session started which comes from the Claude desktop app's own session records (`~/Library/Application Support/Claude/claude-code-sessions/` on macOS, `~/.config/Claude/claude-code-sessions/` on Linux, `%APPDATA%\Claude\claude-code-sessions\` on Windows), read-only and best-effort: that format belongs to the app and may change, and without the desktop app every session simply starts its own tree. `TRACE_CANVAS_DESKTOP_DIR` points it somewhere else. The made-up sessions in the screenshot come from `node docs/scenarios/agents.mjs <data dir> <desktop dir>`.
 
 ## Goals and to-dos: working with agents asynchronously
 

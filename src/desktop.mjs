@@ -1,12 +1,16 @@
 // Which session started which, from the Claude desktop app's own session records
-// (~/Library/Application Support/Claude/claude-code-sessions/<…>/<…>/local_<id>.json).
+// (<app data>/Claude/claude-code-sessions/<…>/<…>/local_<id>.json: ~/Library/Application Support
+// on macOS, %APPDATA% on Windows, ~/.config on Linux).
 // Read-only and best-effort: the format is the app's, not a public API, so anything
 // unexpected means "no links", never an error. Without the desktop app this returns nothing.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-export const desktopDir = env => env.TRACE_CANVAS_DESKTOP_DIR || path.join(os.homedir(), 'Library', 'Application Support', 'Claude', 'claude-code-sessions');
+const appData = env => process.platform === 'darwin' ? path.join(os.homedir(), 'Library', 'Application Support')
+  : process.platform === 'win32' ? env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming')
+  : env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config');
+export const desktopDir = env => env.TRACE_CANVAS_DESKTOP_DIR || path.join(appData(env), 'Claude', 'claude-code-sessions');
 const cache = new Map(); // file -> { mtime, rec }
 
 function records(dir) {

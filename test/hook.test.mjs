@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { handleHook, headline, redirectTargets } from '../src/hook.mjs';
+import { handleHook, headline, redirectTargets, whereFind } from '../src/hook.mjs';
 import { readData } from '../src/store.mjs';
 
 function sandbox(lang = 'en') {
@@ -173,4 +173,16 @@ test('headline keeps the first real sentence and drops headings and markdown', (
   assert.equal(headline('I created `notes.txt` in the project directory. It holds one word.'), 'I created notes.txt in the project directory.');
   assert.equal(headline('```js\ncode\n```\nAll 12 tests pass. Nothing else changed.'), 'All 12 tests pass.');
   assert.equal(headline('已完成方法部分的初稿。下一步补表格。'), '已完成方法部分的初稿。');
+});
+
+test('the location map still answers when the python3 first on PATH is broken', { skip: !fs.existsSync('/usr/bin/python3') }, () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-py-'));
+  fs.mkdirSync(path.join(dir, 'map', 'tools'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'map', 'tools', 'where.py'), 'import json; print(json.dumps([{"id": "nas", "title": "NAS", "where": [{"host": "lab", "local": "/mnt/nas"}]}]))\n');
+  fs.mkdirSync(path.join(dir, 'bin'));
+  fs.writeFileSync(path.join(dir, 'bin', 'python3'), '#!/bin/sh\necho "version GLIBC_2.38 not found" >&2; exit 1\n', { mode: 0o755 });
+  const PATH = process.env.PATH;
+  process.env.PATH = `${path.join(dir, 'bin')}${path.delimiter}${PATH}`;
+  try { assert.deepEqual(whereFind({ map: path.join(dir, 'map') }, 'nas').map(r => r.id), ['nas']); }
+  finally { process.env.PATH = PATH; }
 });

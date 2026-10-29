@@ -300,10 +300,17 @@ export function sessionThread(d, s, env = process.env) {
 
 // Where things are on this machine, from the location map: the entries whose local path holds cwd
 // (or sits inside it). Empty when no map is set up or where.py is too old to answer in JSON.
+// The first python3 that runs: one on PATH can be broken (linuxbrew's, built for a newer glibc)
+// while the system's works.
+export function python3(args, opts) {
+  let err;
+  for (const exe of ['python3', '/usr/bin/python3']) { try { return execFileSync(exe, args, opts); } catch (e) { err = e; } }
+  throw err;
+}
 function whereRows(cfg) {
   const py = cfg.map && path.join(cfg.map, 'tools', 'where.py');
   if (!py || !fs.existsSync(py)) return [];
-  try { return JSON.parse(execFileSync('python3', [py, '--json'], { encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'] })); } catch { return []; }
+  try { return JSON.parse(python3([py, '--json'], { encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'] })); } catch { return []; }
 }
 // Location-map entries matching every word of query (in their id, title, notes, tags or paths),
 // with only the places on `machine` when one is given.

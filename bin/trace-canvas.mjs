@@ -6,7 +6,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { addCommit, dataFile, ensureThread, home, importText, INBOX, mutate, readConfig, writeConfig } from '../src/store.mjs';
 import { execFileSync } from 'node:child_process';
-import { handleHook, readStdin } from '../src/hook.mjs';
+import { handleHook, python3, readStdin } from '../src/hook.mjs';
 import { agentFiles, allowSafeTools, codexHooks, codexWritable, geminiHooks, hookCommand, install, installAgentMcp, installMcp, installSkill, linkCommand, onPath, settingsPath, uninstall } from '../src/install.mjs';
 import { normalize } from '../src/agents.mjs';
 import os from 'node:os';
@@ -17,7 +17,7 @@ const SELF = fileURLToPath(import.meta.url);
 // This computer's name in the location map (tools/where.py --whoami), or '' without one.
 function whoami(map) {
   const py = map && path.join(map, 'tools', 'where.py');
-  try { return py && fs.existsSync(py) ? execFileSync('python3', [py, '--whoami'], { encoding: 'utf8', timeout: 5000 }).trim() : ''; } catch { return ''; }
+  try { return py && fs.existsSync(py) ? python3([py, '--whoami'], { encoding: 'utf8', timeout: 5000 }).trim() : ''; } catch { return ''; }
 }
 const SKILL_DIR = path.join(path.dirname(SELF), '..', 'skill');
 // This computer on Tailscale, or null when Tailscale is not running: { dns, ip }.

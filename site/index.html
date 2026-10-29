@@ -76,7 +76,15 @@ section { scroll-margin-top: 64px; }
 .top nav a:hover { color: var(--ink); }
 .pill { font: 600 14px/1 var(--f-body); color: var(--ink); background: var(--surface); border: 1px solid var(--rule); border-radius: 999px; padding: 8px 14px; cursor: pointer; text-decoration: none; white-space: nowrap; }
 .pill:hover { border-color: var(--faint); }
+/* Language: both choices always visible, the current one filled (set from html[lang], so it is right before any script runs) */
+.lang-switch { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--rule); border-radius: 999px; background: var(--surface); }
+.lang-switch svg { width: 16px; height: 16px; margin: 0 3px 0 7px; color: var(--muted); flex: none; }
+.lang-switch button { font: 600 13px/1 var(--f-body); color: var(--muted); background: none; border: 0; border-radius: 999px; padding: 7px 11px; cursor: pointer; white-space: nowrap; }
+.lang-switch button:hover { color: var(--ink); }
+html[lang="en"] .lang-switch [data-set="en"], html[lang="zh-CN"] .lang-switch [data-set="zh"] { background: var(--ink); color: var(--surface); }
 @media (max-width: 720px) {
+  .lang-switch button { padding: 7px 9px; }
+  .lang-switch svg { margin: 0 2px 0 5px; }
   .top { gap: 10px; }
   .top nav { display: none; }
   #lang { margin-left: auto; }
@@ -84,6 +92,10 @@ section { scroll-margin-top: 64px; }
   .brand svg { width: 46px; }
   .brand b { font-size: 20px; }
   .pill { padding: 8px 11px; font-size: 13px; }
+}
+@media (max-width: 480px) {
+  .lang-switch svg { display: none; }
+  .lang-switch button { padding: 7px 6px; }
 }
 
 /* ---------- background: git branches that grow as you scroll, in three depths ---------- */
@@ -248,7 +260,11 @@ footer a { color: inherit; }
     <a href="#tutorials"><span data-l="en">Tutorials</span><span data-l="zh">教程</span></a>
     <a href="#install"><span data-l="en">Install</span><span data-l="zh">安装</span></a>
   </nav>
-  <button class="pill" id="lang" type="button" aria-label="Switch language / 切换语言"><span data-l="en">中文</span><span data-l="zh">EN</span></button>
+  <div class="lang-switch" id="lang" role="group" aria-label="Language / 语言">
+    <svg viewBox="0 0 16 16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6.3"/><path d="M1.7 8h12.6M8 1.7c1.8 1.7 2.8 3.9 2.8 6.3S9.8 12.6 8 14.3C6.2 12.6 5.2 10.4 5.2 8S6.2 3.4 8 1.7z"/></g></svg>
+    <button type="button" data-set="en" lang="en">EN</button>
+    <button type="button" data-set="zh" lang="zh-CN">中文</button>
+  </div>
   <a class="pill" href="https://github.com/CallSymmetryEcho/trace-canvas" target="_blank" rel="noopener">GitHub ↗</a>
 </header>
 
@@ -521,14 +537,19 @@ node ~/trace-canvas/bin/trace-canvas.mjs setup --user</code></pre>
   clips.forEach(v => { near.observe(v); seen.observe(v); });
 
   /* ---------- language: switched in place, remembered ---------- */
-  document.getElementById('lang').onclick = () => {
-    lang = lang === 'en' ? 'zh' : 'en';
+  const langButtons = $$('#lang [data-set]');
+  const markLang = () => langButtons.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.set === lang)));
+  langButtons.forEach(b => b.onclick = () => {
+    if (b.dataset.set === lang) return;
+    lang = b.dataset.set;
     root.lang = lang === 'zh' ? 'zh-CN' : 'en';
     document.title = TITLE[lang];
     try { localStorage.setItem('tc-site-lang', lang); } catch (e) {}
     clips.forEach(v => { if (v.dataset.lang && v.dataset.lang !== lang) { load(v); play(v); } });
+    markLang();
     measure();
-  };
+  });
+  markLang();
 
   $$('.copy').forEach(b => {
     const label = b.textContent;

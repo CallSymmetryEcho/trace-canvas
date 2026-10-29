@@ -1890,7 +1890,7 @@ function renderAll() {
   if (S.sheet === 'goals' && !(adding && f.value) && !editing) {
     renderGoals();
     const again = adding && $(`.gl-add[data-thread="${CSS.escape(adding)}"]`);
-    if (again) again.focus();
+    if (again) again.focus({ preventScroll: true }); // a redraw must not pull the list back to the box
   }
   renderCaptureThreads();
   $('#ex-banner').hidden = !(loaded() && hasExamples());

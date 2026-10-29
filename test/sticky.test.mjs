@@ -115,3 +115,17 @@ test('a line that claims a folder of the repository gets the sessions working in
   mutate(d => { claimFolder(d, d.threads[thesis], path.join(s.repo, 'docs'), true); }, s.env); // given back
   assert.equal(readData(s.env).threads[thesis].folders, undefined);
 });
+
+test('a hidden session the app runs for itself (Codex suggestions) leaves nothing on the canvas', () => {
+  const s = sandbox();
+  const wt = path.join(s.repo, '.claude', 'worktrees', 'w1'); fs.mkdirSync(wt, { recursive: true });
+  const before = JSON.stringify(readData(s.env));
+  s.fire('h1', 'SessionStart', { source: 'startup', cwd: wt });
+  s.fire('h1', 'UserPromptSubmit', { prompt: 'This is an app-generated request for a suggested next user message. The user did not write this message.', cwd: wt });
+  s.fire('h1', 'Stop', { last_assistant_message: 'Try: run the tests', cwd: wt });
+  s.fire('h1', 'SessionEnd', { reason: 'other', cwd: wt });
+  assert.equal(JSON.stringify(readData(s.env)), before); // no record, no line, no session entry
+  assert.equal(fs.existsSync(path.join(s.env.TRACE_CANVAS_HOME, 'live', 'h1.json')), false);
+  s.fire('p1', 'UserPromptSubmit', { prompt: 'A real instruction' }); // the person's own sessions are logged as before
+  assert.deepEqual(s.on('tripsplit'), ['task']);
+});

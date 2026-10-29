@@ -18,7 +18,7 @@ import { home, mutate, readConfig, readData, createThread, addCommit, lastCommit
 import { gitEvents, redirectTargets, BASH_WRITES, EDIT_TOOLS, GIT_COMMIT, commandDir, headline, firstLine, cleanPrompt } from './git-events.mjs';
 import { tr } from './i18n.mjs';
 const threadIdOfLocal = (d, c) => (c && c.thread && d.threads[c.thread] ? c.thread : 'inbox');
-import { readLive, terminalOf, updateLive, listLive as listLiveLocal } from './live.mjs';
+import { dropLive, readLive, terminalOf, updateLive, listLive as listLiveLocal } from './live.mjs';
 import { agentOf } from './agents.mjs';
 
 export { headline, redirectTargets };
@@ -142,6 +142,9 @@ function eventKey(input) {
 }
 
 const LOG_EVENTS = ['UserPromptSubmit', 'PostToolUse', 'Stop', 'SessionEnd'];
+// Codex Desktop asks itself for a suggested next message in a hidden session of its own, in whatever folder is open
+// (a worktree on a branch made a line of its own). None of it is the person's work, so it stays off the canvas.
+const APP_PROMPT = /^\s*This is an app-generated request/;
 const LIVE_EVENTS = [...LOG_EVENTS, 'SessionStart', 'PreToolUse', 'Notification', 'SubagentStart', 'SubagentStop'];
 
 export function handleHook(input, env = process.env) {
@@ -150,6 +153,12 @@ export function handleHook(input, env = process.env) {
   const ev = input.hook_event_name;
   if (!LIVE_EVENTS.includes(ev)) return { skipped: ev };
   const sid = input.session_id || 'unknown';
+  if (ev === 'UserPromptSubmit' && APP_PROMPT.test(String(input.prompt || ''))) {
+    saveState(sid, { ...loadState(sid, env), ignored: true }, env);
+    try { dropLive(sid, env); } catch {}
+    return { skipped: 'app-generated' };
+  }
+  if (loadState(sid, env).ignored) { if (ev === 'SessionEnd') dropState(sid, env); else try { dropLive(sid, env); } catch {} return { skipped: 'app-generated' }; }
   const cfg = readConfig(env);
   const cwd = input.cwd || process.cwd();
   const ag = agentOf(input._agent); // normalize() sets it for Codex and Gemini; plain input is Claude Code
@@ -362,7 +371,7 @@ export function promptContext(input, env = process.env) {
   const th = threadId && d.threads[threadId];
   if (!th) return '';
   const open = Object.values(d.commits).filter(c => threadIdOfLocal(d, c) === th.id && c.kind === 'task' && !c.done && !(c.session && !c.highlight)).sort((a, b) => a.ts - b.ts);
-  return `Trace Canvas: you work on the line "${th.name}" (thread ${th.id}). If this message gives a new goal, idea or next step worth tracking, add each one now as a to-do with trace_log (kind "task", thread "${th.id}"), one short title per item; leave out what you will finish in this same turn${open.length ? `, and what is already open: ${open.slice(-8).map(c => firstLine(c.title, 60)).join('; ')}` : ''}.`;
+  return `Trace Canvas: you work on the line "${th.name}" (thread ${th.id}). If this message gives a new goal, idea or next step worth tracking, add each one now as a to-do with trace_log (kind "task", thread "${th.id}"), one short title per item; not the request in this message, which you are doing now, nor anything you will finish in this same turn${open.length ? `, and what is already open: ${open.slice(-8).map(c => firstLine(c.title, 60)).join('; ')}` : ''}.`;
 }
 
 export function turnBody(lang, msg, files, todos = []) {

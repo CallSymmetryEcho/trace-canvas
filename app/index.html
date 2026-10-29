@@ -82,7 +82,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .sync[data-mode="db"]::before, .sync[data-mode="server"]::before { background: var(--ok); }
 .sync[data-mode="offline"]::before { background: var(--danger); }
 .brand-sub:empty { display: none; }
-.lang-btn { min-width: 44px; justify-content: center; }
+/* Language: both choices always visible, the current one filled, like the view tabs */
+.lang-switch { display: inline-flex; align-items: center; gap: 2px; padding: 2px; background: var(--surface-2); border: 1px solid var(--rule); border-radius: var(--r); flex: none; }
+.lang-switch svg { width: 15px; height: 15px; margin: 0 2px 0 6px; color: var(--muted); flex: none; }
+.lang-switch button { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; line-height: 1; padding: 6px 9px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+.lang-switch button:hover { color: var(--ink); }
+.lang-switch button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
 .sync[data-mode="local"]::before { background: #E0A100; }
 .sync[data-mode="ro"]::before { background: var(--inbox); }
 .tabs { display: flex; gap: 2px; padding: 2px; background: var(--surface-2); border: 1px solid var(--rule); border-radius: var(--r); }
@@ -505,6 +510,11 @@ body.sheet-open .top { z-index: 80; }
 @media (max-width: 480px) {
   .brand-name { display: none; }
   .top { gap: 8px 10px; }
+  .lang-switch svg { display: none; }
+  .lang-switch button { padding: 6px 7px; }
+  /* The second header row is full on a phone: no spacer, and the search box gives way first */
+  .top > .spacer { display: none; }
+  .search { flex: 1 1 80px; min-width: 80px; }
 }
 
 /* ---------- live sessions ---------- */
@@ -700,7 +710,11 @@ body.sheet-open .top { z-index: 80; }
     </label>
     <button class="btn" id="goals-btn" data-i18n="goalsBtn" data-i18n-title="goalsBtnTitle">Goals</button>
     <button class="btn btn-accent" id="ai-btn" hidden data-i18n="aiBtn" data-i18n-title="aiBtnTitle">AI tidy-up</button>
-    <button class="btn lang-btn" id="lang-btn" data-i18n="langBtn" data-i18n-title="langTitle">中文</button>
+    <div class="lang-switch" id="lang-switch" role="group" data-i18n-aria="langGroup">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6.3"/><path d="M1.7 8h12.6M8 1.7c1.8 1.7 2.8 3.9 2.8 6.3S9.8 12.6 8 14.3C6.2 12.6 5.2 10.4 5.2 8S6.2 3.4 8 1.7z"/></g></svg>
+      <button type="button" data-set-lang="en" lang="en" aria-pressed="true">EN</button>
+      <button type="button" data-set-lang="zh" lang="zh-CN" aria-pressed="false">中文</button>
+    </div>
     <div class="menu-wrap">
       <button class="btn" id="more-btn" aria-haspopup="true" aria-expanded="false" data-i18n="more">More</button>
       <div class="menu" id="menu" hidden>
@@ -857,7 +871,7 @@ const I18N = {
     syncRoTitle: 'You can view but not change this page', syncOfflineTitle: 'Lost the local server. Start it again with trace-canvas serve.',
     exChip: 'Example data', exClear: 'Clear', exChipTitle: 'Records added to show how the views work',
     searchPh: 'Search records…', aiBtn: 'AI tidy-up', aiBtnTitle: 'Ask Claude to sort the inbox and find links between threads',
-    langBtn: '中文', langTitle: '切换到中文', more: 'More',
+    langGroup: 'Language', more: 'More',
     menuNewThread: 'New thread', menuHideDone: 'Hide finished threads', menuShowDone: 'Show finished threads',
     arrange: 'Arrange', arrangeTitle: 'Lay the lines out by group, forks next to the lines they came from', tArranged: 'Arranged', tUndo: 'Undo',
     groupLabel: 'Group', groupName: 'Name', groupLines: 'Lines in this group', groupCount: n => `${n} line${n === 1 ? '' : 's'}`, groupArrange: 'Arrange this group', groupFocus: 'Focus on this group', menuFocus: 'Focus on a group…', menuTheme: n => `Theme: ${n}`, theme_auto: 'match the system', theme_light: 'light', theme_dark: 'dark', theme_mist: 'mist', focusTitle: 'Focus on a group', focusLabel: 'Focus', focusPick: 'Change', focusExit: 'Leave focus', groupFold: 'Fold this group', foldedLabel: 'Folded', foldOpenAll: 'Unfold all', foldOpen: 'Unfold', foldedChip: n => `${n} line${n === 1 ? '' : 's'} · folded`, fromMachines: ms => `from ${ms.join(', ')}`, fromTitle: (m, n) => `${n} record${n === 1 ? '' : 's'} written on ${m}`, foldTitle: 'Fold groups', foldIntro: 'Folded groups stay out of every view (the canvas keeps a small chip for each) until you unfold them. Focus still works on any group.', foldShown: 'Shown', tFolded: g => `Folded "${g}"`,
@@ -1031,7 +1045,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     syncRoTitle: '你可以查看，但不能修改', syncOfflineTitle: '和本地服务断开了。用 trace-canvas serve 重新启动。',
     exChip: '示例数据', exClear: '清除', exChipTitle: '这些是演示各个视图用的示例数据',
     searchPh: '搜索记录…', aiBtn: 'AI 梳理', aiBtnTitle: '让 Claude 归类收件箱并找出线程间的关联',
-    langBtn: 'EN', langTitle: 'Switch to English', more: '更多',
+    langGroup: '语言', more: '更多',
     menuNewThread: '新建线程', menuHideDone: '隐藏已完成的线程', menuShowDone: '显示已完成的线程',
     arrange: '整理', arrangeTitle: '按分组排好线程，分叉排在原线旁边', tArranged: '已整理', tUndo: '撤销',
     groupLabel: '分组', groupName: '名称', groupLines: '组里的线', groupCount: n => `${n} 条线`, groupArrange: '整理这一组', groupFocus: '专注这一组', menuFocus: '专注某个分组…', menuTheme: n => `主题：${n}`, theme_auto: '跟随系统', theme_light: '浅色', theme_dark: '深色', theme_mist: '雾蓝', focusTitle: '专注模式', focusLabel: '专注', focusPick: '换一个', focusExit: '退出专注', groupFold: '折叠这一组', foldedLabel: '已折叠', foldOpenAll: '全部展开', foldOpen: '展开', foldedChip: n => `${n} 条线 · 已折叠`, fromMachines: ms => `来自 ${ms.join('、')}`, fromTitle: (m, n) => `${n} 条记录写在 ${m} 上`, foldTitle: '折叠分组', foldIntro: '折叠的分组不会出现在任何视图里（画布上只留一个小条），直到你展开。专注仍然可以选任何分组。', foldShown: '显示中', tFolded: g => `已折叠「${g}」`,
@@ -1215,6 +1229,7 @@ function applyStatic() {
   $$('[data-i18n-ph]').forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
   $$('[data-i18n-title]').forEach(el => { el.title = t(el.dataset.i18nTitle); });
   $$('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', t(el.dataset.i18nAria)); });
+  $$('#lang-switch [data-set-lang]').forEach(b => { b.setAttribute('aria-pressed', String(b.dataset.setLang === LANG)); });
 }
 function setLang(l) {
   LANG = l === 'zh' ? 'zh' : 'en';
@@ -3045,7 +3060,7 @@ function markTabs() {
 }
 let qTimer = 0;
 $('#q').addEventListener('input', e => { clearTimeout(qTimer); qTimer = setTimeout(() => { S.q = e.target.value.trim(); render(); }, 120); });
-$('#lang-btn').onclick = () => setLang(LANG === 'en' ? 'zh' : 'en');
+$$('#lang-switch [data-set-lang]').forEach(b => { b.onclick = () => { if (b.dataset.setLang !== LANG) setLang(b.dataset.setLang); }; });
 
 const menu = $('#menu'), moreBtn = $('#more-btn');
 function closeMenu() { menu.hidden = true; moreBtn.setAttribute('aria-expanded', 'false'); }

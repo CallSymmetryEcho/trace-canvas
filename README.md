@@ -1,4 +1,9 @@
 <p align="center">
+  <a href="README.md"><img alt="English (this page)" src="https://img.shields.io/badge/English-15181C?style=for-the-badge"></a>
+  <a href="README.zh-CN.md"><img alt="简体中文" src="https://img.shields.io/badge/%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-0072CE?style=for-the-badge"></a>
+</p>
+
+<p align="center">
   <img src="site/favicon.svg" width="96" alt="Trace Canvas logo: a red line with a blue and a green line forking from it, stations drawn as white circles">
 </p>
 
@@ -20,8 +25,7 @@
   <a href="https://trace-canvas.bin-lian.com"><b>Promo site</b></a> ·
   <a href="https://github.com/CallSymmetryEcho/trace-canvas/releases/tag/v0.1.0">Videos</a> ·
   <a href="docs/why.md">Why it exists</a> ·
-  <a href="CHANGELOG.md">Changelog</a> ·
-  <a href="README.zh-CN.md">中文</a>
+  <a href="CHANGELOG.md">Changelog</a>
 </p>
 
 Every AI coding session becomes a line on one transit map: your instructions, edits, commits and decisions are its stations, forks and merges are drawn like git, and your agents read the same map to pick up where another left off. Runs locally, needs only Node.js 18.17+, MIT.

@@ -1,4 +1,9 @@
 <p align="center">
+  <a href="README.md"><img alt="English" src="https://img.shields.io/badge/English-0072CE?style=for-the-badge"></a>
+  <a href="README.zh-CN.md"><img alt="简体中文（当前页）" src="https://img.shields.io/badge/%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-15181C?style=for-the-badge"></a>
+</p>
+
+<p align="center">
   <img src="site/favicon.svg" width="96" alt="Trace Canvas 标志：一条红线上分出蓝线和绿线，站点是白色圆圈">
 </p>
 
@@ -20,8 +25,7 @@
   <a href="https://trace-canvas.bin-lian.com"><b>宣传站</b></a> ·
   <a href="https://github.com/CallSymmetryEcho/trace-canvas/releases/tag/v0.1.0">教程视频</a> ·
   <a href="docs/why.zh-CN.md">为什么做它</a> ·
-  <a href="CHANGELOG.md">更新日志</a> ·
-  <a href="README.md">English</a>
+  <a href="CHANGELOG.md">更新日志</a>
 </p>
 
 每个 AI 编程会话都是同一张地铁图上的一条线：你的指令、改动、提交和决定是线上的站点，分叉与合并像 git 一样画出来，你的 agent 也读同一张图，接着别人停下的地方继续做。本地运行，只需要 Node.js 18.17+，MIT 开源。

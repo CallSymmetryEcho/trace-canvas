@@ -375,6 +375,7 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .swatch[aria-pressed="true"] { outline: 2px solid var(--ink); outline-offset: 2px; }
 .d-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; border-top: 1px solid var(--rule-soft); padding-top: 12px; }
 .inline-form { display: flex; gap: 6px; flex-wrap: wrap; width: 100%; }
+.rt-range { align-items: center; } .rt-range-head { width: 100%; color: var(--muted); font-size: 12px; } .rt-range label { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); }
 .inline-form input, .inline-form select { flex: 1 1 140px; min-width: 0; padding: 6px 9px; border: 1px solid var(--rule); border-radius: 7px; background: var(--surface-2); }
 .confirm { font-size: 13px; color: var(--danger); }
 .meta { display: grid; gap: 4px; font-size: 12.5px; color: var(--muted); }
@@ -891,7 +892,7 @@ const I18N = {
     retroRunning: 'Reading the conversations… (a minute or two)', retroFail: e => `Retro failed: ${e}`,
     retroHead: (p, n) => `${p} messages in ${n} session${n === 1 ? '' : 's'}, most back-and-forth first (rounds ÷ difficulty)`,
     retroStats: (r, tok) => `${r.rounds} rounds · ${r.minutes} min · ${tok} tokens · ${r.corrections} correction${r.corrections === 1 ? '' : 's'} · ${r.sessions} session${r.sessions === 1 ? '' : 's'} · difficulty ${r.difficulty}`,
-    retroStuck: 'Stuck on', retroClear: 'Made clear by', retroRule: 'Rule', retroApply: 'Write', retroApplied: l => `Written: ${l}`,
+    retroStuck: 'Stuck on', retroSinceLast: d => `By default: since the last retro (${d}) up to now`, retroNoLast: 'No retro on this line yet: from the start up to now', retroFrom: 'From', retroTo: 'To (empty: now)', retroAll: 'Everything', retroStart: 'Start the retro', retroRange: (a, b) => `${a} → ${b}`, retroStartOfLine: 'the start', retroClear: 'Made clear by', retroRule: 'Rule', retroApply: 'Write', retroApplied: l => `Written: ${l}`,
     retroLayers: { project: 'Project rules (CLAUDE.md, AGENTS.md)', line: 'This line', memory: 'Long-term memory' }, tRetroApplied: w => `Written to ${w}`,
     agentAsk: 'Prompt for an agent', agentPromptTitle: 'Copy a prompt that sends an agent to read this line and carry on', tAgentPrompt: 'Prompt copied: paste it to an agent, for example in the Claude app on your phone',
     agentPromptText: (name, id) => `Read the Trace Canvas line "${name}" (thread ${id}): use trace_read_thread and trace_tasks for its goal and open to-dos, carry on with them, and tick each one with trace_task_done when it is done.`, tSyncing: 'Syncing…', tSyncBusy: 'A sync is already running', tSyncFailed: e => `Sync failed: ${e}`,
@@ -1065,7 +1066,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     retroRunning: '正在读对话…（一两分钟）', retroFail: e => `复盘没做成：${e}`,
     retroHead: (p, n) => `${n} 个会话里的 ${p} 条消息，来回最多的在前（轮次 ÷ 难度）`,
     retroStats: (r, tok) => `${r.rounds} 轮 · ${r.minutes} 分钟 · ${tok} token · 纠正 ${r.corrections} 次 · ${r.sessions} 个会话 · 难度 ${r.difficulty}`,
-    retroStuck: '卡在', retroClear: '说清楚的那句', retroRule: '规矩', retroApply: '写入', retroApplied: l => `已写入：${l}`,
+    retroStuck: '卡在', retroSinceLast: d => `默认：从上次复盘（${d}）到现在`, retroNoLast: '这条线还没复盘过：从头到现在', retroFrom: '从', retroTo: '到（空着就是现在）', retroAll: '全部', retroStart: '开始复盘', retroRange: (a, b) => `${a} → ${b}`, retroStartOfLine: '开头', retroClear: '说清楚的那句', retroRule: '规矩', retroApply: '写入', retroApplied: l => `已写入：${l}`,
     retroLayers: { project: '项目规矩（CLAUDE.md、AGENTS.md）', line: '这条线', memory: '长期记忆' }, tRetroApplied: w => `已写入 ${w}`,
     agentAsk: '给 agent 的提示', agentPromptTitle: '复制一段提示，让 agent 去读这条线并接着做', tAgentPrompt: '提示已复制：粘贴给 agent，比如手机 Claude app 里的会话',
     agentPromptText: (name, id) => `读 Trace Canvas 上的线「${name}」（thread ${id}）：用 trace_read_thread 和 trace_tasks 看它的目标和未完成的待办，接着做，每做完一项就用 trace_task_done 勾掉。`, tSyncing: '正在同步…', tSyncBusy: '已经有一个同步在进行', tSyncFailed: e => `同步失败：${e}`,
@@ -2756,7 +2757,7 @@ const RETRO_LAYERS = ['project', 'line', 'memory'];
 const fmtTok = n => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(n || 0));
 function retroView(c, th) {
   const R = c.retro, max = Math.max(1, ...R.items.map(r => r.rounds)), pick = S.ui.rt || {};
-  return `<div class="sec-label">${esc(t('retroHead', R.prompts, R.sessions))}</div>
+  return `<div class="sec-label">${esc(t('retroHead', R.prompts, R.sessions))}${R.until ? ` · ${esc(t('retroRange', R.since ? fmtAbs(R.since) : t('retroStartOfLine'), fmtAbs(R.until)))}` : ''}</div>
     <ol class="rt-list" style="--c:${th.color}">${R.items.map((r, k) => `<li>
       <b>${k + 1}. ${esc(r.title)}</b>
       <div class="rt-bar"><i style="width:${(r.rounds / max * 100).toFixed(1)}%"></i></div>
@@ -2766,10 +2767,21 @@ function retroView(c, th) {
     </li>`).join('')}</ol>`;
 }
 const postJSON = (url, body) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Trace-Canvas': '1' }, body: JSON.stringify(body) }).then(x => x.json()).catch(e => ({ error: String(e.message || e) }));
-async function runRetro(tid) {
+// The range a retro reads, as the date-time fields show it (local time); empty "from" is the start, empty "to" is now.
+const localInput = ms => (ms ? new Date(ms - new Date(ms).getTimezoneOffset() * 60e3).toISOString().slice(0, 16) : '');
+const lastRetroEnd = tid => Math.max(0, ...[...S.commits.values()].filter(c => c.retro && tidOf(c) === tid).map(c => c.retro.until || c.retro.at || c.ts));
+function retroRangeForm(tid) {
+  const last = lastRetroEnd(tid);
+  return `<div class="inline-form rt-range"><span class="rt-range-head">${esc(last ? t('retroSinceLast', fmtAbs(last)) : t('retroNoLast'))}</span>
+    <label>${esc(t('retroFrom'))} <input type="datetime-local" id="rt-since" value="${localInput(last)}"></label>
+    <label>${esc(t('retroTo'))} <input type="datetime-local" id="rt-until"></label>
+    <button class="btn" data-act="retro-all">${esc(t('retroAll'))}</button>
+    <button class="btn btn-primary" data-act="retro-go">${esc(t('retroStart'))}</button><button class="btn" data-act="retro-cancel">${esc(t('cancel'))}</button></div>`;
+}
+async function runRetro(tid, range = {}) {
   if (S.retroBusy) return;
   S.retroBusy = tid; render();
-  const r = await postJSON('/api/retro', { thread: tid });
+  const r = await postJSON('/api/retro', { thread: tid, ...range });
   S.retroBusy = null;
   if (r.error) { toast(t('retroFail', r.error)); render(); return; }
   // The note arrives with the next data change; open it once it is here.
@@ -2843,7 +2855,7 @@ function threadDetail(th) {
         <button class="btn btn-primary" data-act="capture-here">${esc(t('captureHere'))}</button>
         ${!isInbox && S.start && th.status !== 'merged' ? `<button class="btn" data-act="start" title="${esc(t('startTitle'))}">${esc(t('start'))}</button>` : ''}
         ${!isInbox ? `<button class="btn" data-act="agent-prompt" title="${esc(t('agentPromptTitle'))}">${esc(t('agentAsk'))}</button>` : ''}
-        ${!isInbox && SERVER && !S.remote ? `<button class="btn" data-act="retro" title="${esc(t('retroTitle'))}" ${S.retroBusy ? 'disabled' : ''}>${esc(S.retroBusy === th.id ? t('retroRunning') : t('retro'))}</button>` : ''}
+        ${!isInbox && SERVER && !S.remote ? (S.ui.retro ? retroRangeForm(th.id) : `<button class="btn" data-act="retro" title="${esc(t('retroTitle'))}" ${S.retroBusy ? 'disabled' : ''}>${esc(S.retroBusy === th.id ? t('retroRunning') : t('retro'))}</button>`) : ''}
         ${!isInbox && th.status !== 'merged' ? (S.ui.merge
           ? `<div class="inline-form"><select id="t-merge">${threadOptions(th.parent && th.parent !== th.id ? th.parent : INBOX, { excludeId: th.id, onlyOpen: true })}</select><button class="btn btn-primary" data-act="merge">${esc(t('merge'))}</button><button class="btn" data-act="merge-cancel">${esc(t('cancel'))}</button></div>`
           : `<button class="btn" data-act="merge-open">${esc(t('mergeTo'))}</button>`) : ''}
@@ -2935,7 +2947,15 @@ detail.addEventListener('click', e => {
     case 'gx-more': GX.more.add(b.dataset.key); render(); break;
     case 'goto-thread': select({ type: 'thread', id: b.dataset.tid }); break;
     case 'start': startOn({ thread: s.id }); break;
-    case 'retro': runRetro(s.id); break;
+    case 'retro': S.ui = { retro: true }; render(); break;
+    case 'retro-all': $('#rt-since').value = ''; $('#rt-until').value = ''; break;
+    case 'retro-go': {
+      // The field holds minutes: left at the default, the exact end of the last retro, so its last message is not read twice.
+      const v = id => ($(id).value ? new Date($(id).value).getTime() : null), last = lastRetroEnd(s.id);
+      const since = $('#rt-since').value === localInput(last) ? last : v('#rt-since') || 0, until = v('#rt-until');
+      S.ui = {}; runRetro(s.id, { since, until }); break;
+    }
+    case 'retro-cancel': S.ui = {}; render(); break;
     case 'retro-apply': applyRetro(s.id, b.dataset.n); break;
     case 'agent-prompt': { const th = getThread(s.id); copyText(t('agentPromptText', th.name, th.id), t('tAgentPrompt')); break; }
     case 'g-arrange': doArrange(s.id); break;

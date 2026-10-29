@@ -327,6 +327,8 @@ For each piece with many rounds it names what was missing, quotes the sentence t
 
 Which conversations: the line's own sessions; a line that has none (its records were all logged from another line) uses the sessions that logged on it. A session that ran on another machine is read there over ssh, by that machine's own `trace-canvas prompts`, and analysed here with the rest. When nothing can be read, Retro says why: no session at all, or which machine it could not reach or whose trace-canvas is too old.
 
+Which messages: by default those since the line's last retro, up to now, so each retro picks up where the last one stopped. **Retro** opens a small form with that range filled in; change **From** and **To** to look at part of it, or press **Everything**. On the command line: `trace-canvas retro <line> [--since <time> | --all] [--until <time>]`. The note says which range it read.
+
 ## What Trace Canvas costs in tokens
 
 **About 1%, and it does not grow with your canvas.** The records are written by hooks that run outside the model, so tracing itself costs no tokens. What enters a session is short and capped: a few lines when it starts (its line, goal, your to-dos, where things are), one line with every message (its line and at most eight open to-dos), and the `trace_*` answers when an agent asks, which cover the session's own line unless it asks for more. That text stays in the context and is read again on later calls, so the cost follows the number of messages in a session, not the size of the canvas. `trace-canvas tokens` reads your recent Claude Code transcripts and shows each session's share.

@@ -204,7 +204,9 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         const body = JSON.parse(await readBody(req));
         const tid = findThreadLoose(readData(), String(body.thread || ''));
         if (!tid) return send(res, 404, { error: 'No such line' });
-        const r = await runRetro(readData(), tid);
+        // since: a time (0 for everything), or left out for "since the last retro"; until: a time, or now.
+        const num = v => (v == null || v === '' ? undefined : Number(v));
+        const r = await runRetro(readData(), tid, { since: num(body.since), until: num(body.until) });
         return send(res, 200, { id: mutate(d => retroRecord(d, tid, r)).id });
       }
       if (req.method === 'POST' && p === '/api/retro/apply') {

@@ -72,7 +72,14 @@ export function retroSessions(d, tid) {
  * What the person typed in the line's conversations, oldest first, numbered. A session that ran on another machine is
  * read there (fetchAway, over ssh by default) and analysed here with the rest. unread: the machines that could not be.
  */
-export function lineConversations(d, tid, env = process.env, { fetchAway = remotePrompts } = {}) {
+// Where the line's last retro ended: the time of the newest message it read (an older note: when it ran); 0 for none.
+export function lastRetroEnd(d, tid) {
+  let end = 0;
+  for (const c of Object.values(d.commits)) if (c.retro && threadIdOf(d, c) === tid) end = Math.max(end, c.retro.until || c.retro.at || c.ts);
+  return end;
+}
+
+export function lineConversations(d, tid, env = process.env, { fetchAway = remotePrompts, since = 0, until = Infinity } = {}) {
   const me = readConfig(env).machine, sessions = retroSessions(d, tid), by = new Map(), unread = [];
   for (const s of sessions) { const m = s.machine && s.machine !== me ? s.machine : ''; by.set(m, [...(by.get(m) || []), s]); }
   const out = [];
@@ -82,8 +89,9 @@ export function lineConversations(d, tid, env = process.env, { fetchAway = remot
     else if (!r.prompts.length) unread.push({ machine: m, sessions: ss.length, error: 'their transcripts are not there any more' });
     else out.push(...r.prompts);
   }
-  const prompts = out.sort((a, b) => a.ts - b.ts).slice(-MAX_PROMPTS).map((p, i) => ({ ...p, i: i + 1 }));
-  return { prompts, sessions: sessions.length, unread };
+  // The range: after since (the end of the last retro, not read twice), up to until.
+  const prompts = out.filter(p => p.ts > since && p.ts <= until).sort((a, b) => a.ts - b.ts).slice(-MAX_PROMPTS).map((p, i) => ({ ...p, i: i + 1 }));
+  return { prompts, sessions: sessions.length, unread, total: out.length };
 }
 export const linePrompts = (d, tid, env, opts) => lineConversations(d, tid, env, opts).prompts;
 
@@ -146,16 +154,22 @@ export function askAgent(prompt, { timeout = 600000, env = process.env } = {}) {
   });
 }
 
-export async function runRetro(d, tid, { ask = askAgent, lang = readConfig().lang, env = process.env, fetchAway } = {}) {
-  const { prompts, sessions, unread } = lineConversations(d, tid, env, fetchAway ? { fetchAway } : {});
+/**
+ * since/until (ms): the range of messages to read; since defaults to where the line's last retro ended (0: from the start),
+ * until to now. The note keeps the range, so the next retro starts where this one stopped.
+ */
+export async function runRetro(d, tid, { ask = askAgent, lang = readConfig().lang, env = process.env, fetchAway, since, until } = {}) {
+  const from = since ?? lastRetroEnd(d, tid), to = until || Infinity;
+  const { prompts, sessions, unread, total } = lineConversations(d, tid, env, { ...(fetchAway ? { fetchAway } : {}), since: from, until: to });
   if (!sessions) throw new Error('This line has no conversations to read: no session ran on it, and none logged anything on it from another line');
-  if (!prompts.length) throw new Error(`None of this line's ${sessions} session${sessions === 1 ? '' : 's'} could be read: ${unread.map(u => `${u.sessions} on ${u.machine || 'this machine'}: ${u.error}`).join('; ')}`);
+  if (!total) throw new Error(`None of this line's ${sessions} session${sessions === 1 ? '' : 's'} could be read: ${unread.map(u => `${u.sessions} on ${u.machine || 'this machine'}: ${u.error}`).join('; ')}`);
+  if (!prompts.length) throw new Error(`Nothing in this range: none of the line's ${total} messages is ${from ? `after ${new Date(from).toISOString().slice(0, 16).replace('T', ' ')} UTC${since == null ? ' (where the last retro ended)' : ''}` : 'from the start'}${to < Infinity ? ` up to ${new Date(to).toISOString().slice(0, 16).replace('T', ' ')} UTC` : ''}; pick a wider range`);
   const todos = Object.values(d.commits).filter(c => c.kind === 'task' && threadIdOf(d, c) === tid);
   const reply = String(await ask(retroPrompt(prompts, todos, lang)));
   let items;
   try { items = JSON.parse(reply.slice(reply.indexOf('{'), reply.lastIndexOf('}') + 1)).items; }
   catch { throw new Error(`The analysis did not come back as JSON: ${reply.slice(0, 200)}`); }
-  return { items: rankRetro(prompts, items), prompts: prompts.length, sessions: new Set(prompts.map(p => p.session)).size, unread };
+  return { items: rankRetro(prompts, items), prompts: prompts.length, sessions: new Set(prompts.map(p => p.session)).size, unread, since: from, until: prompts.at(-1).ts };
 }
 
 // The result goes on the line as a note that keeps the ranking; nothing else is written yet.
@@ -165,7 +179,7 @@ export function retroRecord(d, tid, res, lang = readConfig().lang) {
   return addCommit(d, {
     thread: tid, kind: 'note', agent: 'Trace Canvas',
     title: top ? tr(lang, 'retroTitle', res.items.length, top.title, top.rounds) : tr(lang, 'retroNone'),
-    body, extra: { retro: { at: Date.now(), prompts: res.prompts, sessions: res.sessions, items: res.items } },
+    body, extra: { retro: { at: Date.now(), prompts: res.prompts, sessions: res.sessions, items: res.items, ...(res.until ? { since: res.since || 0, until: res.until } : {}) } },
   });
 }
 

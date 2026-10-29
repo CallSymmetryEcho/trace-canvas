@@ -108,8 +108,10 @@ Live sessions
   trace-canvas folder <line> <folder> [--remove]   Sessions working in that folder of a repository go to this line
                                                    (one repository, several lines); --remove gives it back
   trace-canvas tokens [--days 7]                   How much of recent Claude Code sessions' tokens went to Trace Canvas
-  trace-canvas retro <thread>                      Rank the line's work by back-and-forth (rounds, time, tokens)
-                                                   and suggest rules, using your local claude or codex
+  trace-canvas retro <thread> [--since T | --all] [--until T]
+                                                   Rank the line's work by back-and-forth (rounds, time, tokens)
+                                                   and suggest rules, using your local claude or codex; by default
+                                                   the messages since the line's last retro
   trace-canvas prompts <session>...                What you typed in these sessions on this machine, as JSON (another machine's Retro reads it)
   trace-canvas retro --apply <record> <n> [--layer project|line|memory]
                                                    Write suggestion n: CLAUDE.md/AGENTS.md, the line, or long-term memory
@@ -472,6 +474,10 @@ async function main() {
       const { readData } = await import('../src/store.mjs');
       const { tr } = await import('../src/i18n.mjs');
       const apply = str(flag('apply', '')), layer = str(flag('layer', '')), asJson = !!flag('json', false);
+      // The range: --since <time> or --all (default: since the line's last retro), --until <time> (default: now).
+      const when = (v, name) => { if (!v) return undefined; const ms = Date.parse(v); if (Number.isNaN(ms)) { console.error(`--${name}: not a time: ${v}`); process.exit(1); } return ms; };
+      const sinceArg = str(flag('since', '')), untilArg = str(flag('until', '')), all = !!flag('all', false);
+      const range = { since: all ? 0 : when(sinceArg, 'since'), until: when(untilArg, 'until') };
       if (apply) {
         const r = mutate(d => applyRetro(d, { record: apply, n: Number(argv[0]), layer }));
         console.log(`Written to ${r.layer === 'project' ? r.where : r.layer === 'line' ? `the line "${r.where}"` : r.where}: ${r.rule}`);
@@ -480,7 +486,7 @@ async function main() {
       const ref = argv.join(' ').trim(), tid = ref && findThreadLoose(readData(), ref);
       if (!tid) { console.error(ref ? `No thread named "${ref}"` : 'Usage: trace-canvas retro <thread>   (then --apply <record> <n> [--layer project|line|memory])'); process.exit(1); }
       console.error('Reading the line\'s conversations and asking your local claude/codex to group them; this takes a minute or two…');
-      const res = await runRetro(readData(), tid), lang = readConfig().lang;
+      const res = await runRetro(readData(), tid, range), lang = readConfig().lang;
       const c = mutate(d => retroRecord(d, tid, res, lang));
       if (asJson) { console.log(JSON.stringify({ record: c.id, ...res }, null, 2)); break; }
       console.log(`${c.title}\n${res.prompts} messages in ${res.sessions} session${res.sessions === 1 ? '' : 's'}; worst first (rounds ÷ difficulty):\n`);

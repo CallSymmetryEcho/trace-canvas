@@ -138,3 +138,21 @@ test('retro reads the sessions that logged on a line from their own line when it
   await assert.rejects(runRetro(d, empty.id, { env, ask: async () => '' }), /no session ran on it, and none logged anything on it/);
   await assert.rejects(runRetro(d, far.id, { env, ask: async () => '', fetchAway: () => ({ error: 'ssh: connect to host lab: timed out' }) }), /None of this line's 1 session could be read: 1 on lab: ssh: connect to host lab: timed out/);
 });
+
+test('a retro reads from where the last one ended up to now by default, or the range asked for', async () => {
+  const { d, th, env } = setup();
+  const all = linePrompts(d, th.id, env);
+  const asked = [];
+  const ask = async p => { asked.push(p); return JSON.stringify({ items: [{ title: 'x', messages: [1], difficulty: 1 }] }); };
+  const first = await runRetro(d, th.id, { env, ask, lang: 'en' });
+  assert.deepEqual([first.since, first.until, first.prompts], [0, all.at(-1).ts, all.length]);
+  retroRecord(d, th.id, first, 'en');
+  // Nothing new since: says so, with the range it looked at.
+  await assert.rejects(runRetro(d, th.id, { env, ask, lang: 'en' }), /Nothing in this range: none of the line's 5 messages is after .* \(where the last retro ended\); pick a wider range/);
+  // A range asked for: only the messages inside it.
+  const part = await runRetro(d, th.id, { env, ask, lang: 'en', since: all[1].ts, until: all[3].ts });
+  assert.deepEqual([part.prompts, part.since, part.until], [2, all[1].ts, all[3].ts]);
+  assert.equal(retroRecord(d, th.id, part, 'en').retro.until, all[3].ts);
+  // Everything again: since 0.
+  assert.equal((await runRetro(d, th.id, { env, ask, lang: 'en', since: 0 })).prompts, all.length);
+});

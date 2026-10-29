@@ -1,6 +1,28 @@
-# Trace Canvas 留痕
+<p align="center">
+  <img src="site/favicon.svg" width="96" alt="Trace Canvas 标志：一条红线上分出蓝线和绿线，站点是白色圆圈">
+</p>
 
-[English](README.md) | 中文
+<h1 align="center">Trace Canvas 留痕</h1>
+
+<p align="center"><b>人和 agent 都看得懂的地图</b></p>
+
+<p align="center">
+  <a href="https://github.com/CallSymmetryEcho/trace-canvas/releases"><img alt="最新版本" src="https://img.shields.io/github/v/release/CallSymmetryEcho/trace-canvas?label=release&color=0072CE"></a>
+  <a href="LICENSE"><img alt="许可证：MIT" src="https://img.shields.io/badge/license-MIT-00A651"></a>
+  <a href="#只看页面"><img alt="需要 Node.js 18.17 或更新版本" src="https://img.shields.io/badge/node-%E2%89%A5%2018.17-339933?logo=nodedotjs&logoColor=white"></a>
+  <a href="package.json"><img alt="没有依赖" src="https://img.shields.io/badge/dependencies-0-00A0B0"></a>
+  <a href="#mcp-工具"><img alt="MCP 服务" src="https://img.shields.io/badge/MCP-server-8E3A96"></a>
+  <a href="#一台机器上多个-agent-分工claude-codecodexgemini-cli"><img alt="支持 Claude Code 和 Codex" src="https://img.shields.io/badge/works%20with-Claude%20Code%20%C2%B7%20Codex-E4002B"></a>
+  <a href="https://github.com/CallSymmetryEcho/trace-canvas/commits/main"><img alt="最近提交" src="https://img.shields.io/github/last-commit/CallSymmetryEcho/trace-canvas?color=5B6B7F"></a>
+</p>
+
+<p align="center">
+  <a href="https://trace-canvas.bin-lian.com"><b>宣传站</b></a> ·
+  <a href="https://github.com/CallSymmetryEcho/trace-canvas/releases/tag/v0.1.0">教程视频</a> ·
+  <a href="docs/why.zh-CN.md">为什么做它</a> ·
+  <a href="CHANGELOG.md">更新日志</a> ·
+  <a href="README.md">English</a>
+</p>
 
 每个 AI 编程会话都是同一张地铁图上的一条线：你的指令、改动、提交和决定是线上的站点，分叉与合并像 git 一样画出来，你的 agent 也读同一张图，接着别人停下的地方继续做。本地运行，只需要 Node.js 18.17+，MIT 开源。
 
@@ -295,7 +317,7 @@ node bin/trace-canvas.mjs log "文献对比表完成" \
 
 一个很简单的改动，只要缺了一个细节，也可能和 agent 来回十几轮；改完没总结，下次又从头讲。线面板里的**复盘**（或 `trace-canvas retro <线程>`、`/trace-canvas retro`）读这条线在本机的 Claude Code 和 Codex 对话，用你自己的 `claude`（或 `codex`）命令行把它们分成一件件事，能对上待办的就归到那条待办。每件事算出：轮次（你发了几条）、耗时（消息之间的间隔，每段最多算 30 分钟）、回复用掉的 token、纠正了 agent 几次、在几个会话里出现过；按「轮次 ÷ 难度」排行，简单却来回多的排在最前。
 
-每件来回多的事，会写出卡在哪（缺了什么信息）、最后说清楚的那句话，并建议一条规矩。你在某条规矩上点**写入**并选好位置之前，什么都不写：**项目规矩**（项目的 CLAUDE.md 和 AGENTS.md，放在「Rules from retros」下面）、**这条线**（线上的一条决定）、**长期记忆**（装了 Theatrum 就写进 Theatrum，否则写进 `~/.claude/CLAUDE.md`）。排行作为一条笔记留在线上。命令行：`trace-canvas retro --apply <记录> <序号> [--layer project|line|memory]`。
+每件来回多的事，会写出卡在哪（缺了什么信息）、最后说清楚的那句话，并建议一条规矩。你在某条规矩上点**写入**并选好位置之前，什么都不写：**项目规矩**（项目的 CLAUDE.md 和 AGENTS.md，放在「Rules from retros」下面）、**这条线**（线上的一条决定）、**长期记忆**（装了 [Theatrum](https://github.com/CallSymmetryEcho/Theatrum) 就写进 Theatrum，否则写进 `~/.claude/CLAUDE.md`）。排行作为一条笔记留在线上。命令行：`trace-canvas retro --apply <记录> <序号> [--layer project|line|memory]`。
 
 ## Trace Canvas 花多少 token
 

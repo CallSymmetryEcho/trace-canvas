@@ -1,6 +1,28 @@
-# Trace Canvas
+<p align="center">
+  <img src="site/favicon.svg" width="96" alt="Trace Canvas logo: a red line with a blue and a green line forking from it, stations drawn as white circles">
+</p>
 
-English | [中文](README.zh-CN.md)
+<h1 align="center">Trace Canvas</h1>
+
+<p align="center"><b>A map both people and agents can read.</b></p>
+
+<p align="center">
+  <a href="https://github.com/CallSymmetryEcho/trace-canvas/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/CallSymmetryEcho/trace-canvas?label=release&color=0072CE"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-00A651"></a>
+  <a href="#just-the-page"><img alt="Node.js 18.17 or newer" src="https://img.shields.io/badge/node-%E2%89%A5%2018.17-339933?logo=nodedotjs&logoColor=white"></a>
+  <a href="package.json"><img alt="No dependencies" src="https://img.shields.io/badge/dependencies-0-00A0B0"></a>
+  <a href="#mcp-tools"><img alt="MCP server" src="https://img.shields.io/badge/MCP-server-8E3A96"></a>
+  <a href="#several-agents-on-one-machine-claude-code-codex-gemini-cli"><img alt="Works with Claude Code and Codex" src="https://img.shields.io/badge/works%20with-Claude%20Code%20%C2%B7%20Codex-E4002B"></a>
+  <a href="https://github.com/CallSymmetryEcho/trace-canvas/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/CallSymmetryEcho/trace-canvas?color=5B6B7F"></a>
+</p>
+
+<p align="center">
+  <a href="https://trace-canvas.bin-lian.com"><b>Promo site</b></a> ·
+  <a href="https://github.com/CallSymmetryEcho/trace-canvas/releases/tag/v0.1.0">Videos</a> ·
+  <a href="docs/why.md">Why it exists</a> ·
+  <a href="CHANGELOG.md">Changelog</a> ·
+  <a href="README.zh-CN.md">中文</a>
+</p>
 
 Every AI coding session becomes a line on one transit map: your instructions, edits, commits and decisions are its stations, forks and merges are drawn like git, and your agents read the same map to pick up where another left off. Runs locally, needs only Node.js 18.17+, MIT.
 
@@ -295,7 +317,7 @@ Agents without shell access (ChatGPT, for example) can end their answer with JSO
 
 A simple change can still take a dozen rounds with an agent when one detail is missing, and the next time it starts from zero. **Retro** in a line's panel (or `trace-canvas retro <thread>`, or `/trace-canvas retro`) reads the line's Claude Code and Codex conversations on this machine and has your own `claude` (or `codex`) command line group them into pieces of work, matched to the line's to-dos where it can. Each piece gets its rounds (your messages), the time between them (a gap counts at most 30 minutes), the tokens its replies used, how often you corrected the agent and in how many sessions it came up, and they are ranked by rounds per unit of difficulty, so a simple thing that took many rounds comes first.
 
-For each piece with many rounds it names what was missing, quotes the sentence that finally made it clear and suggests a rule. Nothing is written until you press **Write** on a rule and pick where it goes: **project rules** (the project's CLAUDE.md and AGENTS.md, under "Rules from retros"), **this line** (a decision on the line), or **long-term memory** (Theatrum when it is installed, otherwise `~/.claude/CLAUDE.md`). The ranking stays on the line as a note. From the command line: `trace-canvas retro --apply <record> <n> [--layer project|line|memory]`.
+For each piece with many rounds it names what was missing, quotes the sentence that finally made it clear and suggests a rule. Nothing is written until you press **Write** on a rule and pick where it goes: **project rules** (the project's CLAUDE.md and AGENTS.md, under "Rules from retros"), **this line** (a decision on the line), or **long-term memory** ([Theatrum](https://github.com/CallSymmetryEcho/Theatrum) when it is installed, otherwise `~/.claude/CLAUDE.md`). The ranking stays on the line as a note. From the command line: `trace-canvas retro --apply <record> <n> [--layer project|line|memory]`.
 
 ## What Trace Canvas costs in tokens
 

@@ -90,4 +90,27 @@ test('dispatch hands each line\'s new to-dos to the agent working on it, and say
   addCommit(d, { thread: kit, kind: 'agent', title: 'Found the old exporter', agent: 'Claude Code', ts: now - 1e5, extra: { fromSession: 'b' } });
   todo(kit, 'Write the import docs');
   assert.deepEqual(dispatch(d, { refs: ['Kit'] }, env).map(r => [r.session.id, r.todos.map(c => c.title)]), [['k', ['Write the import docs']]]);
+
+  // Worked on from two machines: none running, this machine's session; the other machine's when it is running there.
+  const two = createThread(d, { name: 'Two' }).id, here = env.TRACE_CANVAS_MACHINE;
+  d.sessions.m1 = { id: 'm1', thread: two, agent: 'Claude Code', cwd: tmp, last: now - 9e5, machine: here };
+  d.sessions.b1 = { id: 'b1', thread: two, agent: 'Claude Code', cwd: '/home/u/two', last: now - 1e5, machine: 'bsuper' };
+  addCommit(d, { thread: two, kind: 'agent', title: 'Here', agent: 'Claude Code', ts: now - 9e5, extra: { session: 'm1' } });
+  addCommit(d, { thread: two, kind: 'agent', title: 'There, later', agent: 'Claude Code', ts: now - 1e5, extra: { session: 'b1' } });
+  const idle = () => ({ sessions: [] }), busyThere = () => ({ sessions: [{ id: 'b1', status: 'working' }] });
+  todo(two, 'First');
+  assert.deepEqual(dispatch(d, { refs: ['Two'], awayLive: idle }, env).map(r => [r.session.id, r.action]), [['m1', 'resume']]);
+  todo(two, 'Second');
+  assert.deepEqual(dispatch(d, { refs: ['Two'], awayLive: busyThere }, env).map(r => [r.session.id, r.action]), [['b1', 'busy']]);
+  // A to-do for a machine goes to that machine's latest session on the line; a machine without one gets a new session there.
+  const third = todo(two, 'Third, on bsuper'); third.on = 'bsuper';
+  todo(two, 'Fourth, anywhere');
+  const rowsTwo = dispatch(d, { refs: ['Two'], awayLive: idle }, env);
+  assert.deepEqual(rowsTwo.map(r => [r.on || '', r.session.id, r.todos.map(c => c.title)]).sort(), [['', 'm1', ['Fourth, anywhere']], ['bsuper', 'b1', ['Third, on bsuper']]]);
+  assert.match(rowsTwo.find(r => r.on).command, /^ssh -t bsuper .*cd .*\/home\/u\/two.* && claude --resume b1 /);
+  todo(two, 'Fifth');
+  const lab = dispatch(d, { refs: ['Two'], on: 'lab', awayLive: idle }, env)[0];
+  assert.deepEqual([lab.action, lab.machine, lab.on], ['start', 'lab', 'lab']);
+  assert.match(lab.command, /^ssh -t lab 'exec "\$SHELL" -lc .*TRACE_CANVAS_THREAD=/);
+  assert.doesNotMatch(lab.command, /cd /); // this machine's folder means nothing there
 });

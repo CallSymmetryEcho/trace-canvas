@@ -102,7 +102,7 @@ Goals and to-dos
                                                    Tick a to-do by id or title (--undo reopens it)
   trace-canvas hand <to-do|thread> --to claude|codex|gemini
                                                    Assign it and print the command that starts the agent on it
-  trace-canvas dispatch [line|to-do...] [--all] [--print] [--json]
+  trace-canvas dispatch [line|to-do...] [--on machine] [--all] [--print] [--json]
                                                    Hand each line's new to-dos (or the to-dos named) to the agent working on it and wake it
                                                    (resume or start in a new terminal window; --print only prints)
 
@@ -112,6 +112,8 @@ Live sessions
   trace-canvas bind --unbind [--session id]        Back to its repository/branch line
   trace-canvas resume <thread>                     The line's sessions, newest first, each with the command that resumes it
   trace-canvas group <thread>... --name G | --clear   Put lines in a group (on the canvas they sit in one frame)
+  trace-canvas folder <line> <folder> [--remove]   Sessions working in that folder of a repository go to this line
+                                                   (one repository, several lines); --remove gives it back
   trace-canvas tokens [--days 7]                   How much of recent Claude Code sessions' tokens went to Trace Canvas
   trace-canvas retro <thread>                      Rank the line's work by back-and-forth (rounds, time, tokens)
                                                    and suggest rules, using your local claude or codex
@@ -193,10 +195,10 @@ async function main() {
       break;
     }
     case 'log': {
-      const thread = flag('thread', null), assignee = str(flag('assignee', '')), kind = flag('kind', assignee ? 'task' : 'agent'), body = flag('body', ''), link = flag('link', null), agent = flag('agent', '');
+      const thread = flag('thread', null), assignee = str(flag('assignee', '')), on = str(flag('on', '')), kind = flag('kind', assignee || on ? 'task' : 'agent'), body = flag('body', ''), link = flag('link', null), agent = flag('agent', '');
       const title = argv.join(' ').trim();
-      if (!title) { console.error('Usage: trace-canvas log "title" [--thread name] [--kind agent] [--assignee codex]'); process.exit(1); }
-      const c = mutate(d => addCommit(d, { thread: thread && thread !== true ? ensureThread(d, thread) : INBOX, kind: str(kind) || 'agent', title, body: str(body), links: str(link) ? [str(link)] : [], agent: str(agent), extra: assignee ? { assignee } : {} }));
+      if (!title) { console.error('Usage: trace-canvas log "title" [--thread name] [--kind agent] [--assignee codex] [--on machine]'); process.exit(1); }
+      const c = mutate(d => addCommit(d, { thread: thread && thread !== true ? ensureThread(d, thread) : INBOX, kind: str(kind) || 'agent', title, body: str(body), links: str(link) ? [str(link)] : [], agent: str(agent), extra: { ...(assignee ? { assignee } : {}), ...(on ? { on } : {}) } }));
       console.log(`Logged ${c.id}`);
       break;
     }
@@ -286,14 +288,14 @@ async function main() {
       // that called this (the skill), since only an agent can reach it.
       const { dispatch } = await import('../src/ops.mjs');
       const { AGENTS, openTerminal, terminalCommand } = await import('../src/agents.mjs');
-      const all = !!flag('all', false), json = !!flag('json', false), run = !flag('print', false) && !!terminalCommand('');
-      const rows = mutate(d => dispatch(d, { refs: argv.filter(Boolean), all, self: process.env.CLAUDE_CODE_SESSION_ID || null }));
+      const on = str(flag('on', '')), all = !!flag('all', false), json = !!flag('json', false), run = !flag('print', false) && !!terminalCommand('');
+      const rows = mutate(d => dispatch(d, { refs: argv.filter(Boolean), all, on, self: process.env.CLAUDE_CODE_SESSION_ID || null }));
       for (const r of rows) if (r.command && run) openTerminal(r.command);
       if (json) { console.log(JSON.stringify(rows, null, 2)); break; }
       if (!rows.length) { console.log('Nothing new to dispatch: every open to-do has an agent, or was logged by the agent working on its line (--all takes those too).'); break; }
       for (const r of rows) {
         const who = AGENTS[r.agent].name, s = r.session, name = s && `"${s.title.slice(0, 50) || s.id.slice(0, 8)}"`;
-        console.log(`\n${r.thread.name}: ${r.todos.length} to-do${r.todos.length === 1 ? '' : 's'} for ${who}`);
+        console.log(`\n${r.thread.name}: ${r.todos.length} to-do${r.todos.length === 1 ? '' : 's'} for ${who}${r.on ? ` on ${r.on}` : ''}`);
         for (const c of r.todos) console.log(`  □ ${c.title}  [${c.id}]`);
         if (r.action === 'self') console.log('  → Your own line: they are yours.');
         else if (r.action === 'message') console.log(`  → Running session ${name} (${s.status}${s.desktopId ? `, ${s.desktopId}` : ''}): send it this message:\n    ${r.prompt}`);
@@ -340,6 +342,21 @@ async function main() {
         if (r) historyDue(th.id, undefined, 0); // caught up now: the hooks wait their 10 minutes from here
         if (!quiet) console.log(r ? `${th.name}: added ${r.commits} commit${r.commits === 1 ? '' : 's'}${r.older ? ' and one record for the older ones' : ''}, ${r.sessions} past session${r.sessions === 1 ? '' : 's'} (${plan.root})` : `${th.name}: not a git repository on this machine`);
       }
+      break;
+    }
+    case 'folder': {
+      // One repository, several lines: sessions whose folder is inside the claimed one go to this line (src/hook.mjs).
+      const { claimFolder } = await import('../src/hook.mjs');
+      const { findThreadLoose } = await import('../src/ops.mjs');
+      const { readData } = await import('../src/store.mjs');
+      const remove = !!flag('remove', false), [ref, folder] = argv.filter(Boolean);
+      if (!ref || !folder) { console.error('Usage: trace-canvas folder <line> <folder> [--remove]'); process.exit(1); }
+      const tid = findThreadLoose(readData(), ref);
+      if (!tid || !readData().threads[tid]) { console.error(`No line "${ref}"`); process.exit(1); }
+      try {
+        const f = mutate(d => claimFolder(d, d.threads[tid], folder, remove));
+        console.log(remove ? `"${readData().threads[tid].name}" no longer claims ${f.repo}/${f.path}` : `Sessions working in ${f.repo}/${f.path} now go to "${readData().threads[tid].name}"`);
+      } catch (e) { console.error(e.message); process.exit(1); }
       break;
     }
     case 'done': {

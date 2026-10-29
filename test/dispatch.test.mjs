@@ -76,4 +76,14 @@ test('dispatch hands each line\'s new to-dos to the agent working on it, and say
   assert.match(off.command, /^ssh -t bsuper 'exec "\$SHELL" -lc .*cd .*\/home\/u\/proj.* && claude --resume r1 /);
   todo(far, 'Plot the results');
   assert.equal(dispatch(d, { refs: ['Far'], awayLive: () => ({ sessions: [{ id: 'r1', status: 'idle' }] }) }, env)[0].action, 'busy');
+
+  // A session whose first prompt landed on a line and that was bound to another since has left it: a to-do it logs
+  // there goes to the line's own agent, not back to it.
+  const kit = createThread(d, { name: 'Kit' }).id, box = createThread(d, { name: 'Box' }).id;
+  session('k', kit, 'Claude Code', 5e6);
+  addCommit(d, { thread: kit, kind: 'agent', title: 'Kit is set up', agent: 'Claude Code', ts: now - 5e6, extra: { session: 'k' } });
+  session('b', box, 'Claude Code', 0); d.sessions.b.bound = true;
+  addCommit(d, { thread: kit, kind: 'task', title: 'Its first prompt, before it was bound', agent: 'Claude Code', ts: now - 2e5, extra: { session: 'b' } });
+  todo(kit, 'Import the history', 'Claude Code', 'b');
+  assert.deepEqual(dispatch(d, { refs: ['Kit'] }, env).map(r => [r.session && r.session.id, r.todos.map(c => c.title)]), [['k', ['Import the history']]]);
 });

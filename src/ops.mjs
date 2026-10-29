@@ -103,9 +103,9 @@ export function handTo(d, { ref, to, thread, remote = false }, env = process.env
 }
 /**
  * Dispatch: hands each line's new to-dos to the agent that works on that line and says how to wake it.
- * The line's agent is the session that last did work there, on this machine or another: its turns' records, or what
- * it logged there from elsewhere (not the note the hooks write when a session ends, which any idle session leaves),
- * else the session the line has. New means open, nobody has it, and that session does not know it: the person logged
+ * The line's agent is the session that last did work there, on this machine or another: its turns' records while it is
+ * still on the line, or a result it logged there from elsewhere (not the note the hooks write when a session ends, which
+ * any idle session leaves, nor a to-do it hands over), else the session the line has. New means open, nobody has it, and that session does not know it: the person logged
  * it (on the page, the phone, the command line) or another session did. all: every open to-do nobody has. refs are
  * lines or to-dos (id or title): a to-do named goes to its line's agent whoever logged it. Assigns them. One row per line:
  *   message  a running Claude Code session here: send it `prompt` (desktopId is its address in the Claude app)
@@ -132,7 +132,13 @@ export function dispatch(d, { refs = [], all = false, self = null, awayLive = re
   for (const tid of tids) {
     const th = d.threads[tid], cs = Object.values(d.commits).filter(c => threadIdOf(d, c) === tid);
     const at = new Map(), worked = (id, ts) => { if (id && ts > (at.get(id) || 0)) at.set(id, ts); };
-    for (const c of cs) worked(c.fromSession || (c.kind !== 'note' && c.session), c.ts);
+    // Work here: what a session did while on this line, or a result it logged here from another line. A to-do, idea or
+    // decision it logs for this line from elsewhere hands work over, and a session bound to another line since has left.
+    const onLine = id => known.has(id) && known.get(id).thread === tid;
+    for (const c of cs) {
+      const id = c.fromSession || (c.kind !== 'note' && c.session);
+      if (id && (onLine(id) || (c.fromSession && c.kind === 'agent'))) worked(id, c.ts);
+    }
     // No session has worked here yet: the sessions the line has (bound to it, or there by their folder).
     if (!at.size) for (const [id, e] of Object.entries(d.sessions || {})) if (e.thread === tid) worked(id, e.last || 1);
     const sid = [...at].sort((a, b) => b[1] - a[1]).map(([id]) => id).find(id => known.has(id));

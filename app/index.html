@@ -154,6 +154,7 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .grp { position: absolute; border: 1.5px dashed color-mix(in srgb, var(--c) 55%, transparent); border-radius: 14px; background: color-mix(in srgb, var(--c) 7%, transparent); }
 .grp-label { position: absolute; padding: 2px 10px; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--c) 18%, var(--surface)); color: var(--ink); font: 600 12.5px var(--f-display); letter-spacing: .03em; cursor: grab; white-space: nowrap; }
 .grp-label:hover { background: color-mix(in srgb, var(--c) 30%, var(--surface)); }
+.grp-from { font-weight: 500; color: var(--muted); letter-spacing: 0; }
 .grp-folded { cursor: pointer; border: 1.5px dashed color-mix(in srgb, var(--c) 55%, transparent); padding: 5px 12px; color: var(--muted); }
 .phone-qr { display: grid; place-items: center; padding: 8px 0; }
 .phone-qr svg { max-width: 100%; height: auto; border-radius: 8px; }
@@ -851,7 +852,7 @@ const I18N = {
     langBtn: '中文', langTitle: '切换到中文', more: 'More',
     menuNewThread: 'New thread', menuHideDone: 'Hide finished threads', menuShowDone: 'Show finished threads',
     arrange: 'Arrange', arrangeTitle: 'Lay the lines out by group, forks next to the lines they came from', tArranged: 'Arranged', tUndo: 'Undo',
-    groupLabel: 'Group', groupName: 'Name', groupLines: 'Lines in this group', groupCount: n => `${n} line${n === 1 ? '' : 's'}`, groupArrange: 'Arrange this group', groupFocus: 'Focus on this group', menuFocus: 'Focus on a group…', menuTheme: n => `Theme: ${n}`, theme_auto: 'match the system', theme_light: 'light', theme_dark: 'dark', theme_mist: 'mist', focusTitle: 'Focus on a group', focusLabel: 'Focus', focusPick: 'Change', focusExit: 'Leave focus', groupFold: 'Fold this group', foldedLabel: 'Folded', foldOpenAll: 'Unfold all', foldOpen: 'Unfold', foldedChip: n => `${n} line${n === 1 ? '' : 's'} · folded`, foldTitle: 'Fold groups', foldIntro: 'Folded groups stay out of every view (the canvas keeps a small chip for each) until you unfold them. Focus still works on any group.', foldShown: 'Shown', tFolded: g => `Folded "${g}"`,
+    groupLabel: 'Group', groupName: 'Name', groupLines: 'Lines in this group', groupCount: n => `${n} line${n === 1 ? '' : 's'}`, groupArrange: 'Arrange this group', groupFocus: 'Focus on this group', menuFocus: 'Focus on a group…', menuTheme: n => `Theme: ${n}`, theme_auto: 'match the system', theme_light: 'light', theme_dark: 'dark', theme_mist: 'mist', focusTitle: 'Focus on a group', focusLabel: 'Focus', focusPick: 'Change', focusExit: 'Leave focus', groupFold: 'Fold this group', foldedLabel: 'Folded', foldOpenAll: 'Unfold all', foldOpen: 'Unfold', foldedChip: n => `${n} line${n === 1 ? '' : 's'} · folded`, fromMachines: ms => `from ${ms.join(', ')}`, fromTitle: (m, n) => `${n} record${n === 1 ? '' : 's'} written on ${m}`, foldTitle: 'Fold groups', foldIntro: 'Folded groups stay out of every view (the canvas keeps a small chip for each) until you unfold them. Focus still works on any group.', foldShown: 'Shown', tFolded: g => `Folded "${g}"`,
     focusIntro: 'Every view then shows only the lines of the group you pick: the canvas, the branches, the timeline and the goals. It stays on, also after a reload, until you leave it.',
     focusNoGroups: 'No groups yet. Select lines on the canvas and press Group, or fill in a group in a line\'s panel.', groupUngroup: 'Ungroup',
     threadGroup: 'Group', threadGroupPh: 'None', multiGroup: 'Group', multiGroupPh: 'Group name', tGroupNeedName: 'Type a group name first',
@@ -1025,7 +1026,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     langBtn: 'EN', langTitle: 'Switch to English', more: '更多',
     menuNewThread: '新建线程', menuHideDone: '隐藏已完成的线程', menuShowDone: '显示已完成的线程',
     arrange: '整理', arrangeTitle: '按分组排好线程，分叉排在原线旁边', tArranged: '已整理', tUndo: '撤销',
-    groupLabel: '分组', groupName: '名称', groupLines: '组里的线', groupCount: n => `${n} 条线`, groupArrange: '整理这一组', groupFocus: '专注这一组', menuFocus: '专注某个分组…', menuTheme: n => `主题：${n}`, theme_auto: '跟随系统', theme_light: '浅色', theme_dark: '深色', theme_mist: '雾蓝', focusTitle: '专注模式', focusLabel: '专注', focusPick: '换一个', focusExit: '退出专注', groupFold: '折叠这一组', foldedLabel: '已折叠', foldOpenAll: '全部展开', foldOpen: '展开', foldedChip: n => `${n} 条线 · 已折叠`, foldTitle: '折叠分组', foldIntro: '折叠的分组不会出现在任何视图里（画布上只留一个小条），直到你展开。专注仍然可以选任何分组。', foldShown: '显示中', tFolded: g => `已折叠「${g}」`,
+    groupLabel: '分组', groupName: '名称', groupLines: '组里的线', groupCount: n => `${n} 条线`, groupArrange: '整理这一组', groupFocus: '专注这一组', menuFocus: '专注某个分组…', menuTheme: n => `主题：${n}`, theme_auto: '跟随系统', theme_light: '浅色', theme_dark: '深色', theme_mist: '雾蓝', focusTitle: '专注模式', focusLabel: '专注', focusPick: '换一个', focusExit: '退出专注', groupFold: '折叠这一组', foldedLabel: '已折叠', foldOpenAll: '全部展开', foldOpen: '展开', foldedChip: n => `${n} 条线 · 已折叠`, fromMachines: ms => `来自 ${ms.join('、')}`, fromTitle: (m, n) => `${n} 条记录写在 ${m} 上`, foldTitle: '折叠分组', foldIntro: '折叠的分组不会出现在任何视图里（画布上只留一个小条），直到你展开。专注仍然可以选任何分组。', foldShown: '显示中', tFolded: g => `已折叠「${g}」`,
     focusIntro: '选一个分组后，画布、分支、时间线和目标都只显示这个组里的线。刷新后也保持，直到你退出。',
     focusNoGroups: '还没有分组。在画布上选中几条线点「编组」，或者在线面板里填写分组。', groupUngroup: '解散分组',
     threadGroup: '分组', threadGroupPh: '无', multiGroup: '编组', multiGroupPh: '分组名称', tGroupNeedName: '先填分组名称',
@@ -2085,16 +2086,24 @@ function drawGroups() {
     if ((th.createdAt || 0) < b.first) { b.first = th.createdAt || 0; b.color = th.color; }
     box.set(th.group, b);
   }
+  // The other machines that wrote on a group's lines go on its label; this machine and single cards stay unmarked.
+  const away = new Map();
+  for (const c of S.commits.values()) {
+    const g = c.machine && S.machine && c.machine !== S.machine && S.threads.get(tidOf(c))?.group;
+    if (!g) continue;
+    const m = away.get(g) || new Map(); m.set(c.machine, (m.get(c.machine) || 0) + 1); away.set(g, m);
+  }
+  const from = g => { const m = away.get(g); return m ? ` <span class="grp-from" title="${esc([...m].map(([k, n]) => t('fromTitle', k, n)).join('\n'))}">· ${esc(t('fromMachines', [...m.keys()].sort()))}</span>` : ''; };
   const pad = 16, label = 28;
   // Labels go in their own layer above every frame: frames overlap while lines are scattered, and a
   // later frame would otherwise cover an earlier group's label (a click there would hit the frame).
   groupsEl.innerHTML = [...box].map(([, b]) => `<div class="grp" style="left:${b.x0 - pad}px;top:${b.y0 - pad - label}px;width:${b.x1 - b.x0 + 2 * pad}px;height:${b.y1 - b.y0 + 2 * pad + label}px;--c:${b.color}"></div>`).join('')
-    + [...box].map(([g, b]) => `<button class="grp-label" data-group="${esc(g)}" style="left:${b.x0 - pad + 10}px;top:${b.y0 - pad - label + 5}px;--c:${b.color}">${esc(g)} · ${b.n}</button>`).join('')
+    + [...box].map(([g, b]) => `<button class="grp-label" data-group="${esc(g)}" style="left:${b.x0 - pad + 10}px;top:${b.y0 - pad - label + 5}px;--c:${b.color}">${esc(g)} · ${b.n}${from(g)}</button>`).join('')
     + (S.focusGroup ? '' : S.folded.map(g => {
       const ths = orderedThreads().filter(th => th.group === g && !isHidden(th));
       if (!ths.length) return '';
       const x = Math.min(...ths.map(th => th.x || 0)), y = Math.min(...ths.map(th => th.y || 0));
-      return `<button class="grp-label grp-folded" data-group="${esc(g)}" data-unfold="1" title="${esc(t('foldOpen'))}" style="left:${x}px;top:${y}px;--c:${ths[0].color}">▸ ${esc(g)} · ${esc(t('foldedChip', ths.length))}</button>`;
+      return `<button class="grp-label grp-folded" data-group="${esc(g)}" data-unfold="1" title="${esc(t('foldOpen'))}" style="left:${x}px;top:${y}px;--c:${ths[0].color}">▸ ${esc(g)} · ${esc(t('foldedChip', ths.length))}${from(g)}</button>`;
     }).join(''));
 }
 // <arrange>

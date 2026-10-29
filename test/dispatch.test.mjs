@@ -86,4 +86,8 @@ test('dispatch hands each line\'s new to-dos to the agent working on it, and say
   addCommit(d, { thread: kit, kind: 'task', title: 'Its first prompt, before it was bound', agent: 'Claude Code', ts: now - 2e5, extra: { session: 'b' } });
   todo(kit, 'Import the history', 'Claude Code', 'b');
   assert.deepEqual(dispatch(d, { refs: ['Kit'] }, env).map(r => [r.session && r.session.id, r.todos.map(c => c.title)]), [['k', ['Import the history']]]);
+  // A result it logs there from its own line does not take Kit from Kit's own session, which has worked there.
+  addCommit(d, { thread: kit, kind: 'agent', title: 'Found the old exporter', agent: 'Claude Code', ts: now - 1e5, extra: { fromSession: 'b' } });
+  todo(kit, 'Write the import docs');
+  assert.deepEqual(dispatch(d, { refs: ['Kit'] }, env).map(r => [r.session.id, r.todos.map(c => c.title)]), [['k', ['Write the import docs']]]);
 });

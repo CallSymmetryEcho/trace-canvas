@@ -141,7 +141,9 @@ export function dispatch(d, { refs = [], all = false, self = null, awayLive = re
     }
     // No session has worked here yet: the sessions the line has (bound to it, or there by their folder).
     if (!at.size) for (const [id, e] of Object.entries(d.sessions || {})) if (e.thread === tid) worked(id, e.last || 1);
-    const sid = [...at].sort((a, b) => b[1] - a[1]).map(([id]) => id).find(id => known.has(id));
+    // A session on this line comes first; one that only logged a result here from its own line, when none has worked here.
+    const ranked = [...at].sort((a, b) => b[1] - a[1]).map(([id]) => id).filter(id => known.has(id));
+    const sid = ranked.find(onLine) || ranked[0];
     const s = sid && known.get(sid), away = s && s.machine && s.machine !== me ? s.machine : '';
     if (away && !awayCache.has(away)) awayCache.set(away, new Map(awayLive(away).sessions.map(x => [x.id, x])));
     const run = sid && (away ? awayCache.get(away).get(sid) : live.get(sid));

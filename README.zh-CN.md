@@ -40,7 +40,7 @@ node ~/trace-canvas/bin/trace-canvas.mjs setup --user   # hooks、MCP 工具和 
 
 视频：[中英文教程](https://github.com/CallSymmetryEcho/trace-canvas/releases/tag/v0.1.0)。
 
-宣传站：https://trace-canvas.bin-lian.com（源文件在 [`site/`](site/README.md)），一页导览，沿着一张随滚动生长的分支图介绍功能，还有功能演示和教程视频（本地预览：`python3 -m http.server -d site`）。
+宣传站：[trace-canvas.bin-lian.com](https://trace-canvas.bin-lian.com)（源文件在 [`site/`](site/README.md)），一页导览，沿着一张随滚动生长的分支图介绍功能，还有功能演示和教程视频（本地预览：`python3 -m http.server -d site`）。
 
 ![分支视图：实时线头、批准、你的决定和 agent 的产出](docs/gif-branches.zh.gif)
 
@@ -103,7 +103,7 @@ node bin/trace-canvas.mjs setup --user
 | `git merge <分支>` | 当前线程上一条**合并**，被合并的分支线程标为已合并 |
 | 会话结束 | **笔记**：时长、指令数、文件数、提交数，以及 `claude --resume <id>` |
 
-记录按「仓库 + 分支」归到线程。在 `main` 上工作记到 `graduation-affair`；切到分支 `lit-review` 时，会从当前位置分叉出新线程 `graduation-affair · lit-review`。这样不同分支上并行的会话会落在不同的线路上。只是回答问题的回合不记录；用 shell 写文件（`>`、`tee`、`sed -i` 等）也算改动。
+记录按「仓库 + 分支」归到线程。比如在仓库 `my-thesis` 的 `main` 上工作，记到 `my-thesis`；切到分支 `lit-review` 时，会从当前位置分叉出新线程 `my-thesis · lit-review`。这样不同分支上并行的会话会落在不同的线路上。只是回答问题的回合不记录；用 shell 写文件（`>`、`tee`、`sed -i` 等）也算改动。
 
 **之前的历史。** 一个仓库新建的线，从仓库真正的起点开始，而不是从 hooks 看到的第一个会话开始。它会在后台导入默认分支的提交（按第一父提交，线保持一条；最多最近 500 个，更早的合成一条记录放在线的起点），以及这台电脑上在这个仓库里跑过的 Claude Code 和 Codex 会话，每个会话一条记录，并进入这条线的会话列表，可以直接恢复。分支线只导入这个分支独有的提交。已经在画布上的提交不会导入第二次：按 sha 认，rebase 后 sha 变了的，按提交说明和作者时间认。导入的记录在每台电脑上 id 相同，同步后不会出现两份。之后这条线会自己补上新的（这条线上的会话收到指令时，最多每 10 分钟一次）。此前就有的线：`trace-canvas history` 列出每条线会导入什么，`trace-canvas history --all` 执行导入，`trace-canvas history <线> --off` 让某条线不导入。
 
@@ -137,6 +137,7 @@ node bin/trace-canvas.mjs setup --user
 | `trace_bind` | 把一个运行中的会话（默认是当前会话）放到某条线上 |
 | `trace_tasks` | 返回会话所在这条线的目标和待办，以及完成了几项（`thread` 指定别的线，`all: true` 返回所有线） |
 | `trace_task_done` | 勾选一项待办（或重新打开），并记下是谁勾的 |
+| `trace_where` | 在位置地图（`~/agent-map`）里查东西：仓库、数据目录、NAS 路径，以及它们在每台机器上的位置 |
 | `trace_open` | 必要时启动页面，返回地址 |
 
 ## 实时会话
@@ -334,6 +335,7 @@ node bin/trace-canvas.mjs log "文献对比表完成" \
   trace-canvas tokens [--days 7]                   最近的 Claude Code 会话里，有多少 token 花在 Trace Canvas 上
   trace-canvas retro --apply <记录> <序号> [--layer project|line|memory]   写入其中一条
   trace-canvas resume <线程>                       这条线上的会话（新的在前）和恢复每个会话的命令
+  trace-canvas group <线程>... --name 组名 | --clear   把几条线放进一个分组（画布上框在一起）
 
 安装（--user 对所有项目，--project 目录 只对一个项目）
   trace-canvas setup            hooks + MCP 服务 + skill
@@ -342,11 +344,9 @@ node bin/trace-canvas.mjs log "文献对比表完成" \
   trace-canvas lang <en|zh>     hooks 写入记录的语言
   trace-canvas where            显示数据存放位置
   trace-canvas phone            在手机上打开画布（Tailscale 扫码，见 docs/phone.zh-CN.md）
+  trace-canvas where <关键词> [--machine 机器]   在位置地图（~/agent-map）里查东西
+  trace-canvas sync             通过位置地图仓库和其他机器同步画布
 ```
-
-## 在线版
-
-同一个页面也作为 claude.ai artifact 运行，数据在 artifact 自己的数据库里：<https://claude.ai/artifact/Y7kykkrWyU4rH31MttYLMj>。本地版和在线版的数据互相独立，可以用「更多 → 导入 / 导出」搬运。
 
 ## 实现
 

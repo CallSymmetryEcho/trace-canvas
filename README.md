@@ -40,7 +40,7 @@ A transit map of your work. When you work with AI agents, ideas and tasks run in
 
 Videos: [2-minute tutorial](https://github.com/CallSymmetryEcho/trace-canvas/releases/tag/v0.1.0) in English and Chinese.
 
-Promo site: https://trace-canvas.bin-lian.com ([`site/`](site/README.md)), one page with a tour along a growing branch graph, the feature clips and the videos (preview with `python3 -m http.server -d site`).
+Promo site: [trace-canvas.bin-lian.com](https://trace-canvas.bin-lian.com) ([`site/`](site/README.md)), one page with a tour along a growing branch graph, the feature clips and the videos (preview with `python3 -m http.server -d site`).
 
 ![Branches view: live tips, an approval, your decision and the agent's result](docs/gif-branches.en.gif)
 
@@ -103,7 +103,7 @@ This adds the hooks to `~/.claude/settings.json`, registers the MCP server with 
 | `git merge <branch>` | a **merge** on the current thread; the branch thread is marked merged |
 | The session ends | a **note** summarizing duration, prompts, files and commits, with `claude --resume <id>` |
 
-Records go to one thread per repository and branch. Working on `main` logs to `graduation-affair`. Switching to a branch `lit-review` forks a new thread `graduation-affair · lit-review` from where you were, so parallel sessions on different branches land on different lines. Turns that only answer a question are not logged. Files written from the shell (`>`, `tee`, `sed -i`, …) count as changes.
+Records go to one thread per repository and branch. Working on `main` in a repository `my-thesis` logs to `my-thesis`. Switching to a branch `lit-review` forks a new thread `my-thesis · lit-review` from where you were, so parallel sessions on different branches land on different lines. Turns that only answer a question are not logged. Files written from the shell (`>`, `tee`, `sed -i`, …) count as changes.
 
 **History from before.** A repository's new line starts where the repository started, not at the first session the hooks saw. In the background it takes in the default branch's commits (first parent, so the line stays one line; the newest 500, with the older ones as one record where the line begins) and, as one record each, the Claude Code and Codex sessions that ran in the repository on this machine; they also join the line's sessions, so they can be resumed. A branch line takes the commits only that branch has. A commit already on the canvas is not taken in twice: by its sha, or by its subject and author time once a rebase has given it a new sha. Records get the same ids on every machine, so syncing does not double them. Afterwards the line catches up on its own (at most every 10 minutes, when a session there gets an instruction). For lines from before this, `trace-canvas history` lists what each line would take in, `trace-canvas history --all` takes it in, and `trace-canvas history <line> --off` leaves a line out.
 
@@ -137,6 +137,7 @@ Capturing is safe to repeat: records already on the canvas are skipped. If the h
 | `trace_bind` | Puts a running session (the current one by default) on a thread |
 | `trace_tasks` | Returns the goal and the to-dos of the line the session works on (`thread` for another, `all: true` for every line), with how many are done |
 | `trace_task_done` | Ticks a to-do (or reopens it) and records who ticked it |
+| `trace_where` | Looks things up in the location map (`~/agent-map`): repositories, data folders, NAS paths, and which machine has them where |
 | `trace_open` | Starts the page if needed and returns its address |
 
 ## Live sessions
@@ -331,6 +332,7 @@ Live sessions
   trace-canvas bind <thread> [--session ID]        Put a running session on a thread (default: this one)
   trace-canvas bind --unbind [--session ID]        Back to its repository/branch line
   trace-canvas resume <thread>                     The line's sessions, newest first, each with the command that resumes it
+  trace-canvas group <thread>... --name G | --clear   Put lines in a group (on the canvas they sit in one frame)
   trace-canvas retro <thread>                      Rank the line's work by back-and-forth and suggest rules
   trace-canvas tokens [--days 7]                   How much of recent Claude Code sessions' tokens went to Trace Canvas
   trace-canvas retro --apply <record> <n> [--layer project|line|memory]   Write one of them
@@ -342,11 +344,9 @@ Setup (--user for every project, --project DIR for one)
   trace-canvas lang <en|zh>     Language of records the hooks write
   trace-canvas where            Show where the data is stored
   trace-canvas phone            Open the canvas on your phone (Tailscale and a QR code; see docs/phone.md)
+  trace-canvas where <words> [--machine M]   Look things up in the location map (~/agent-map)
+  trace-canvas sync             Sync the canvas with your other machines through the location map
 ```
-
-## Online version
-
-The same page also runs as a claude.ai artifact, with its data in the artifact's own database: <https://claude.ai/artifact/Y7kykkrWyU4rH31MttYLMj>. The local version and the online version keep separate data; use **More → Import / export** to move data between them.
 
 ## How it works
 

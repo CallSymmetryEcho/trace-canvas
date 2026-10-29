@@ -407,6 +407,12 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 }
 .cap-input textarea:focus { outline: none; border-color: var(--accent); background: var(--surface); }
 .cap-input .btn { padding: 8px 14px; }
+.cap-input { position: relative; }
+/* "#" at the start of the box lists the lines to log on; picking one sets the line selector. */
+.cap-suggest { position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 40; min-width: min(320px, 100%); max-width: 100%; max-height: 240px; overflow: auto; margin: 0; padding: 4px; list-style: none; background: var(--surface); border: 1px solid var(--rule); border-radius: 9px; box-shadow: var(--shadow); }
+.cap-suggest li { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cap-suggest li[aria-selected="true"] { background: var(--surface-2); }
+.cap-suggest i { flex: none; width: 9px; height: 9px; border-radius: 50%; border: 2.5px solid var(--c); }
 
 /* ---------- sheets ---------- */
 /* While a sheet is open the header stays above its scrim, so More and the other header buttons still work. */
@@ -793,6 +799,7 @@ body.sheet-open .top { z-index: 80; }
       <div class="kinds" id="kinds" role="group" data-i18n-aria="kindsAria"></div>
     </div>
     <div class="cap-input">
+      <ul class="cap-suggest" id="cap-suggest" role="listbox" hidden></ul>
       <textarea id="cap-text" rows="1" data-i18n-ph="capPh"></textarea>
       <button class="btn btn-primary" type="submit" id="cap-submit" data-i18n="capSubmit">Log</button>
     </div>
@@ -1883,7 +1890,7 @@ function renderAll() {
   if (S.sheet === 'goals' && !(adding && f.value) && !editing) {
     renderGoals();
     const again = adding && $(`.gl-add[data-thread="${CSS.escape(adding)}"]`);
-    if (again) again.focus();
+    if (again) again.focus({ preventScroll: true }); // a redraw must not pull the list back to the box
   }
   renderCaptureThreads();
   $('#ex-banner').hidden = !(loaded() && hasExamples());
@@ -2953,7 +2960,36 @@ $('#kinds').addEventListener('mousedown', e => e.preventDefault());
 $('#kinds').addEventListener('click', e => { const b = e.target.closest('[data-kind]'); if (!b) return; S.captureKind = b.dataset.kind; renderKinds(); capText.focus(); });
 function autosize() { capText.style.height = 'auto'; capText.style.height = Math.min(150, capText.scrollHeight + 2) + 'px'; }
 capText.addEventListener('input', autosize);
+// <capsuggest>
+// "#tr" alone in the box: the lines whose name holds "tr", those starting with it first.
+function capMatches(text, threads) {
+  const m = /^#([^\n#]*)$/.exec(text); if (!m) return [];
+  const q = m[1].trim().toLowerCase();
+  return threads.filter(th => th.name.toLowerCase().includes(q))
+    .sort((a, b) => b.name.toLowerCase().startsWith(q) - a.name.toLowerCase().startsWith(q)).slice(0, 8);
+}
+// </capsuggest>
+const capSuggest = $('#cap-suggest');
+let sugg = [], suggAt = 0;
+function renderSuggest() {
+  sugg = document.activeElement === capText ? capMatches(capText.value, orderedThreads().filter(th => inFocus(th) && (th.status === 'active' || th.status === 'parked'))) : [];
+  suggAt = Math.min(suggAt, Math.max(0, sugg.length - 1));
+  capSuggest.hidden = !sugg.length;
+  capSuggest.innerHTML = sugg.map((th, i) => `<li role="option" data-tid="${esc(th.id)}" aria-selected="${i === suggAt}" style="--c:${esc(th.color)}"><i></i>${esc(th.name)}</li>`).join('');
+}
+// The picked line goes into the selector rather than the text, so names with spaces work too.
+function pickSuggest(id) { capText.value = ''; autosize(); setCaptureThread(id); capText.focus(); renderSuggest(); }
+capText.addEventListener('input', () => { suggAt = 0; renderSuggest(); });
+capText.addEventListener('focus', renderSuggest);
+capText.addEventListener('blur', renderSuggest);
+capSuggest.addEventListener('mousedown', e => e.preventDefault());
+capSuggest.addEventListener('click', e => { const li = e.target.closest('[data-tid]'); if (li) pickSuggest(li.dataset.tid); });
 capText.addEventListener('keydown', e => {
+  if (sugg.length && !e.isComposing && e.keyCode !== 229) {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); suggAt = (suggAt + (e.key === 'ArrowDown' ? 1 : sugg.length - 1)) % sugg.length; renderSuggest(); return; }
+    if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); pickSuggest(sugg[suggAt].id); return; }
+    if (e.key === 'Escape') { e.preventDefault(); sugg = []; capSuggest.hidden = true; return; }
+  }
   if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); doCapture(); }
   if (e.key === 'Escape') capText.blur();
 });

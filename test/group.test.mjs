@@ -76,3 +76,17 @@ test('Arrange stacks fewer cards a column in a wide window and more in a tall on
   assert.ok(wide < tall, `${wide} < ${tall}`);
   assert.ok(wide >= 2 && tall <= 12);
 });
+
+test('"#" in the capture box suggests lines by name, those starting with the text first', () => {
+  const { capMatches } = new Function(`${page.slice(page.indexOf('// <capsuggest>'), page.indexOf('// </capsuggest>'))}; return { capMatches };`)();
+  const th = [{ id: 'a', name: '宣传-视频运维' }, { id: 'b', name: 'Trace Canvas 工具' }, { id: 'c', name: 'RL-NW · RL 增强 PID' }];
+  assert.deepEqual(capMatches('#', th).map(t => t.id), ['a', 'b', 'c']);
+  assert.deepEqual(capMatches('#rl', th).map(t => t.id), ['c']);
+  assert.deepEqual(capMatches('#c', th).map(t => t.id), ['b']);
+  assert.deepEqual(capMatches('#an', th).map(t => t.id), ['b']);
+  assert.deepEqual(capMatches('#tra', th).map(t => t.id), ['b']);
+  assert.deepEqual(capMatches('#视频', th).map(t => t.id), ['a']);
+  assert.deepEqual(capMatches('#视频 hello', th), []);
+  assert.deepEqual(capMatches('note #rl', th), []);
+  assert.deepEqual(capMatches('#rl\nmore', th), []);
+});

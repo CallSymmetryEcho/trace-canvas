@@ -231,9 +231,9 @@ const SCENES = [
     text: [['The page works in English and Chinese.', '页面支持中文和英文。']],
     run: async h => {
       const p = h.speak(0);
-      await h.click('#lang-btn');
+      await h.click('#lang-switch [aria-pressed="false"]');
       await h.wait(1300);
-      await h.click('#lang-btn');
+      await h.click('#lang-switch [aria-pressed="false"]');
       await p;
     } },
   { page: { card: { big: 'Trace Canvas', small: ['Free and open source · MIT · Node.js 18+', '免费开源 · MIT 许可 · Node.js 18+'], foot: `${REPO} ⭐` } },

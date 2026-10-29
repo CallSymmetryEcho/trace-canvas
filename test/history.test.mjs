@@ -130,6 +130,7 @@ test('sessions in the repository\'s worktrees count, a sibling folder\'s do not;
   const th = createThread(d, { name: 'tripsplit', key: 'tripsplit', note: s.repo });
   transcript(projects, path.join(s.repo, '.claude', 'worktrees', 'ocr'), 'wt-1');
   const sibling = `${s.repo}-phone`; fs.mkdirSync(sibling); transcript(projects, sibling, 'sib-1');
+  const inner = path.join(s.repo, 'vendor', 'lib'); fs.mkdirSync(inner, { recursive: true }); execFileSync('git', ['-C', inner, 'init', '-q']); transcript(projects, inner, 'in-1'); // a repository of its own
   assert.deepEqual(collect(d, th, s.env).sessions.map(x => x.id).sort(), ['11111111-2222-3333-4444-555555555555', 'sess-a', 'wt-1']);
   // A folder without git, keyed by its name as the hooks key it: its own sessions, not its subfolders'.
   const notes = path.join(s.root, 'notes'); fs.mkdirSync(path.join(notes, 'deep'), { recursive: true });

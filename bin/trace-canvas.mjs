@@ -331,7 +331,7 @@ async function main() {
       if (!named.length && !all) {
         if (!rows.length) { console.log('No line stands for a git repository on this machine.'); break; }
         console.log('Lines that stand for a repository here, and what each would take in:');
-        for (const { th, plan } of rows) console.log(`  ${th.name}  <-  ${plan.root} (${plan.branch}): ${what(plan)}${th.history ? '' : '  [not yet]'}`);
+        for (const { th, plan } of rows) console.log(`  ${th.name}  <-  ${plan.root} (${plan.branch || 'no git'}): ${what(plan)}${th.history ? '' : '  [not yet]'}`);
         console.log('\nImport with: trace-canvas history --all   (or name the lines). Leave a line out with: trace-canvas history <line> --off');
         break;
       }

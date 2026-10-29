@@ -97,7 +97,8 @@ function transcriptFiles(root, sub, env) {
     .flatMap(n => ls(path.join(base, n)).filter(f => f.endsWith('.jsonl')).map(f => ({ path: path.join(base, n, f), sessionId: f.slice(0, -6), exact: n === enc })));
   return out.length ? out : findTranscripts(root, env).map(f => ({ ...f, exact: true }));
 }
-const inside = (cwd, root, sub) => cwd === root || (sub && String(cwd || '').startsWith(`${root}/`));
+// A subfolder counts when it is the same repository (a worktree is), not one nested inside; one gone since is let in.
+const inside = (cwd, root, sub) => cwd === root || (sub && String(cwd || '').startsWith(`${root}/`) && (!fs.existsSync(cwd) || gitRoot(cwd) === root));
 
 function claudeSessions(root, sub, known, env) {
   const out = [];

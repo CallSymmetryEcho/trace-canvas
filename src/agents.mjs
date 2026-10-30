@@ -15,7 +15,24 @@ export const AGENTS = {
   codex: { name: 'Codex', resume: id => `codex resume ${id}`, wake: (id, p) => `codex resume ${id} ${q(p)}`, launch: p => `codex ${q(p)}` },
   // ponytail: Gemini's resume flag is unverified until a current gemini-cli is installed.
   gemini: { name: 'Gemini CLI', resume: id => `gemini --resume ${id}`, wake: (id, p) => `gemini --resume ${id} -i ${q(p)}`, launch: p => `gemini -i ${q(p)}` },
+  // iFlow CLI (Alibaba): Claude Code's hook events and payload, Claude Code-format transcripts in ~/.iflow/projects.
+  iflow: { name: 'iFlow CLI', resume: id => `iflow -r ${id}`, wake: (id, p) => `iflow -r ${id} -i ${q(p)}`, launch: p => `iflow -i ${q(p)}` },
+  // Experimental, from their docs and not yet run here: hooks modelled on Claude Code's (Qwen Code, Qoder, TRAE, Kimi
+  // Code), or Claude Code's own hooks run by a bridge plugin (DeepSeek Harness). ponytail: resume flags from the docs;
+  // TRAE documents none, so its resume is a guess.
+  qwen: { name: 'Qwen Code', experimental: true, resume: id => `qwen --resume ${id}`, wake: (id, p) => `qwen --resume ${id} -i ${q(p)}`, launch: p => `qwen -i ${q(p)}` },
+  qoder: { name: 'Qoder CLI', experimental: true, resume: id => `qodercli -r ${id}`, wake: (id, p) => `qodercli -r ${id} ${q(p)}`, launch: p => `qodercli ${q(p)}` },
+  trae: { name: 'TRAE CLI', experimental: true, resume: id => `traecli resume ${id}`, wake: (id, p) => `traecli resume ${id} ${q(p)}`, launch: p => `traecli ${q(p)}` },
+  kimi: { name: 'Kimi Code', experimental: true, resume: id => `kimi -r ${id}`, wake: (id, p) => `kimi -r ${id} ${q(p)}`, launch: p => `kimi ${q(p)}` },
+  dsh: { name: 'DeepSeek Harness', experimental: true, resume: id => `dsh --session-id ${id}`, wake: (id, p) => `dsh --session-id ${id} ${q(p)}`, launch: p => `dsh ${q(p)}` },
 };
+// Claude Code pointed at another model's Anthropic-compatible API (ANTHROPIC_BASE_URL): whose model it runs.
+const PROVIDERS = [[/deepseek/i, 'DeepSeek'], [/moonshot|kimi/i, 'Kimi'], [/dashscope|aliyuncs|qwen/i, 'Qwen'], [/minimax/i, 'MiniMax'], [/bigmodel|zhipu|z\.ai/i, 'GLM'], [/volces|volcengine|ark\.cn/i, 'Doubao'], [/siliconflow/i, 'SiliconFlow'], [/openrouter/i, 'OpenRouter']];
+export function modelProvider(env = process.env) {
+  const url = String(env.ANTHROPIC_BASE_URL || '');
+  if (!url || /anthropic\.com/i.test(url)) return '';
+  return (PROVIDERS.find(([re]) => re.test(url)) || [])[1] || '';
+}
 export const agentOf = key => AGENTS[key] || AGENTS.claude;
 // AppleScript that runs cmd in a new Terminal window and brings it forward (macOS, "Open in Terminal").
 export const terminalScript = cmd => `tell application "Terminal"\n  do script "${String(cmd).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"\n  activate\nend tell`;
@@ -84,7 +101,8 @@ export function normalize(key, input) {
   if (!input || typeof input !== 'object') return input;
   const k = AGENTS[key] ? key : 'claude';
   const out = { ...input, _agent: k };
-  if (k === 'claude') return out;
+  // DeepSeek Harness runs the Claude Code hooks through its bridge plugin; its sessions are kept under ~/.dsh.
+  if (k === 'claude') return /[\\/]\.dsh[\\/]/.test(String(input.transcript_path || '')) ? { ...out, _agent: 'dsh' } : out;
   let ev = input.hook_event_name;
   if (k === 'gemini') {
     ev = GEMINI_EVENTS[ev] || ev;
@@ -112,5 +130,22 @@ export function normalize(key, input) {
     }
   }
   if (typeof input.tool_response === 'string') out.tool_response = { stdout: input.tool_response };
+  // A CLI that does not hand the reply to its Stop hook (iFlow): the last thing the agent said, from its transcript.
+  if (ev === 'Stop' && !out.last_assistant_message && input.transcript_path) out.last_assistant_message = lastReply(input.transcript_path);
   return out;
+}
+
+// The text of the newest assistant message in a Claude Code-format transcript (its last 256 KB), or ''.
+export function lastReply(file) {
+  try {
+    const fd = fs.openSync(file, 'r'), size = fs.fstatSync(fd).size, n = Math.min(size, 256 * 1024), buf = Buffer.alloc(n);
+    fs.readSync(fd, buf, 0, n, size - n); fs.closeSync(fd);
+    for (const line of buf.toString('utf8').split('\n').reverse()) {
+      let j; try { j = JSON.parse(line); } catch { continue; }
+      if (j.type !== 'assistant' || !j.message) continue;
+      const c = j.message.content, text = typeof c === 'string' ? c : (c || []).filter(b => b && b.type === 'text').map(b => b.text).join('\n');
+      if (text.trim()) return text.trim();
+    }
+  } catch {}
+  return '';
 }

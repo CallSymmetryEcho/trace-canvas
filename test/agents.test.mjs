@@ -170,3 +170,74 @@ test('Go to the terminal finds the Terminal or iTerm2 tab by its tty, and nothin
   assert.equal(focusScript({ tty: '/dev/ttys1" & do shell script "x', term: 'Apple_Terminal' }), null);
   assert.equal(focusScript(), null);
 });
+
+test('an iFlow CLI session, its payloads as iFlow 0.4 builds them, is recorded as iFlow with the reply read from its transcript', () => {
+  const s = sandbox(), transcript = path.join(s.root, 'session-if1.jsonl');
+  // iFlow's own tool names and inputs (run_shell_command, write_file), the alias it adds, and a string tool response.
+  const fire = (ev, extra = {}) => handleHook(normalize('iflow', { session_id: 'session-if1', transcript_path: transcript, cwd: s.repo, hook_event_name: ev, ...extra }), s.env);
+  fire('SessionStart', { source: 'startup' });
+  fire('UserPromptSubmit', { prompt: 'Add a notes file' });
+  fire('PostToolUse', { tool_name: 'write_file', tool_name_alias: 'WriteFile', tool_input: { file_path: path.join(s.repo, 'notes.txt'), content: 'hello' }, tool_response: 'ok', tool_desc: '', tool_schema: {} });
+  fire('PostToolUse', { tool_name: 'run_shell_command', tool_name_alias: 'Shell', tool_input: { command: 'git add notes.txt && git commit -m "Add notes"' }, tool_response: '[main 1a2b3c4] Add notes\n 1 file changed', tool_desc: '', tool_schema: {} });
+  // Its Stop carries no reply (and always stop_hook_active: true): the reply comes from the transcript.
+  fs.writeFileSync(transcript, [
+    { type: 'user', sessionId: 'session-if1', message: { role: 'user', content: 'Add a notes file' } },
+    { type: 'assistant', sessionId: 'session-if1', message: { role: 'assistant', content: [{ type: 'text', text: 'Added notes.txt and committed it.' }] } },
+  ].map(j => JSON.stringify(j)).join('\n') + '\n');
+  fire('Stop', { stop_hook_active: true });
+  const live = readLive('session-if1', s.env);
+  assert.deepEqual([live.agent, live.agentKey, live.resume], ['iFlow CLI', 'iflow', 'iflow -r session-if1']);
+  const cs = Object.values(readData(s.env).commits).sort((a, b) => a.ts - b.ts);
+  assert.deepEqual(cs.map(c => [c.title, c.agent]), [['Add a notes file', 'iFlow CLI'], ['Commit 1a2b3c4: Add notes', 'iFlow CLI'], ['Added notes.txt and committed it.', 'iFlow CLI']]);
+  assert.deepEqual(cs[2].files, ['notes.txt']);
+});
+
+test('iFlow hooks go in its settings.json in Claude\'s shape, seconds, no matcher on SubagentStop; its MCP server too', async () => {
+  const { iflowHooks, installAgentMcp, install, agentFiles } = await import('../src/install.mjs');
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-iflow-')), file = agentFiles(home).iflow;
+  fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify({ modelName: 'Qwen3-Coder', hooks: { Stop: [{ hooks: [{ type: 'command', command: 'other-tool' }] }] } }));
+  install(file, 'node cli.mjs hook --agent iflow', iflowHooks('node cli.mjs hook --agent iflow'));
+  installAgentMcp('iflow', '/x/cli.mjs', home);
+  const s = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.equal(s.modelName, 'Qwen3-Coder'); // the person's own settings stay
+  assert.deepEqual(Object.keys(s.hooks).sort(), ['Notification', 'PostToolUse', 'PreToolUse', 'SessionEnd', 'SessionStart', 'Stop', 'SubagentStop', 'UserPromptSubmit']);
+  assert.equal(s.hooks.Stop[0].hooks[0].command, 'other-tool'); // theirs first, ours after
+  assert.equal(s.hooks.Stop[1].hooks[0].timeout, 10);
+  assert.equal(s.hooks.SubagentStop[0].matcher, undefined);
+  assert.deepEqual(s.mcpServers['trace-canvas'].env, { TRACE_CANVAS_AGENT: 'iflow' });
+});
+
+test('Claude Code on another model\'s API is named after it; DeepSeek Harness, running the Claude Code hooks, is told apart by its sessions', async () => {
+  const { modelProvider } = await import('../src/agents.mjs');
+  assert.equal(modelProvider({ ANTHROPIC_BASE_URL: 'https://api.deepseek.com/anthropic' }), 'DeepSeek');
+  assert.equal(modelProvider({ ANTHROPIC_BASE_URL: 'https://api.moonshot.cn/anthropic' }), 'Kimi');
+  assert.equal(modelProvider({ ANTHROPIC_BASE_URL: 'https://dashscope.aliyuncs.com/apps/anthropic' }), 'Qwen');
+  assert.equal(modelProvider({ ANTHROPIC_BASE_URL: 'https://api.anthropic.com' }), '');
+  assert.equal(modelProvider({}), '');
+  const s = sandbox(), env = { ...s.env, ANTHROPIC_BASE_URL: 'https://api.deepseek.com/anthropic' };
+  handleHook({ session_id: 'ds1', cwd: s.repo, hook_event_name: 'UserPromptSubmit', prompt: 'Speed up the parser' }, env);
+  assert.deepEqual(Object.values(readData(env).commits).map(c => c.agent), ['Claude Code · DeepSeek']);
+  // DeepSeek Harness's bridge hands over Claude-shaped payloads; its transcript path gives it away.
+  assert.equal(normalize('claude', { hook_event_name: 'Stop', transcript_path: '/home/u/.dsh/sessions/s1.jsonl' })._agent, 'dsh');
+  assert.equal(normalize('claude', { hook_event_name: 'Stop', transcript_path: '/home/u/.claude/projects/p/s1.jsonl' })._agent, 'claude');
+});
+
+test('the experimental CLIs: Claude-shaped hooks for Qwen Code, Qoder and TRAE, a guide for Kimi Code and DeepSeek Harness', async () => {
+  const { AGENT_SETUP, agentFiles, installAgentMcp } = await import('../src/install.mjs');
+  const { AGENTS } = await import('../src/agents.mjs');
+  const trae = AGENT_SETUP.trae.hooks('cmd');
+  assert.deepEqual(Object.keys(trae), ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Notification', 'Stop']);
+  assert.deepEqual(trae.PreToolUse, [{ matcher: '*', hooks: [{ type: 'command', command: 'cmd' }] }]);
+  assert.deepEqual(trae.Stop, [{ hooks: [{ type: 'command', command: 'cmd' }] }]); // no timeout: units differ between CLIs
+  assert.equal(Object.keys(AGENT_SETUP.qwen.hooks('cmd')).length, 7);
+  assert.match(AGENT_SETUP.kimi.guide('CMD', '/x/cli.mjs'), /\[\[hooks\]\].*CMD.*kimi mcp add trace-canvas/);
+  assert.match(AGENT_SETUP.dsh.guide('CMD', '/x/cli.mjs'), /dsh-hooks-claude-code/);
+  for (const k of ['qwen', 'qoder', 'trae', 'kimi', 'dsh']) assert.equal(AGENTS[k].experimental, true);
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-cn-'));
+  assert.equal(agentFiles(home).trae, path.join(home, '.trae', 'hooks.json'));
+  fs.mkdirSync(path.join(home, '.trae-cn'));
+  assert.equal(agentFiles(home).trae, path.join(home, '.trae-cn', 'hooks.json')); // the Chinese edition's folder when it is there
+  assert.equal(installAgentMcp('qwen', '/x/cli.mjs', home).ok, true);
+  assert.deepEqual(JSON.parse(fs.readFileSync(agentFiles(home).qwen, 'utf8')).mcpServers['trace-canvas'].env, { TRACE_CANVAS_AGENT: 'qwen' });
+  assert.match(installAgentMcp('qoder', '/x/cli.mjs', home).hint, /^qodercli mcp add trace-canvas -- /);
+});

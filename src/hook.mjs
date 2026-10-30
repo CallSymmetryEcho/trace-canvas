@@ -19,7 +19,7 @@ import { gitEvents, redirectTargets, BASH_WRITES, EDIT_TOOLS, GIT_COMMIT, comman
 import { tr } from './i18n.mjs';
 const threadIdOfLocal = (d, c) => (c && c.thread && d.threads[c.thread] ? c.thread : 'inbox');
 import { dropLive, readLive, terminalOf, updateLive, listLive as listLiveLocal } from './live.mjs';
-import { agentOf } from './agents.mjs';
+import { agentOf, modelProvider } from './agents.mjs';
 
 export { headline, redirectTargets };
 
@@ -161,7 +161,9 @@ export function handleHook(input, env = process.env) {
   if (loadState(sid, env).ignored) { if (ev === 'SessionEnd') dropState(sid, env); else try { dropLive(sid, env); } catch {} return { skipped: 'app-generated' }; }
   const cfg = readConfig(env);
   const cwd = input.cwd || process.cwd();
-  const ag = agentOf(input._agent); // normalize() sets it for Codex and Gemini; plain input is Claude Code
+  // normalize() sets _agent for the other CLIs; plain input is Claude Code, named after the model when it runs another's.
+  const base = agentOf(input._agent), provider = !input._agent || input._agent === 'claude' ? modelProvider(env) : '';
+  const ag = provider ? { ...base, name: `${base.name} · ${provider}` } : base;
   // git calls happen outside the lock so parallel sessions don't wait on each other.
   // PreToolUse and Notification fire on every tool call, so they reuse what the live file already knows.
   const relevantTool = ev !== 'PostToolUse' || input.tool_name === 'Bash' || EDIT_TOOLS.has(input.tool_name) || input.tool_name === 'TodoWrite';

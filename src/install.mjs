@@ -42,7 +42,29 @@ export function geminiHooks(command) {
     AfterTool: [{ hooks: h() }], Notification: [{ hooks: h() }], SessionEnd: [{ hooks: h(10000) }],
   };
 }
-export const agentFiles = home => ({ codex: path.join(home, '.codex', 'hooks.json'), gemini: path.join(home, '.gemini', 'settings.json') });
+// iFlow CLI (~/.iflow/settings.json): Claude's events and shape, timeouts in seconds; no SubagentStart.
+export function iflowHooks(command) {
+  const h = (timeout = 5) => [{ type: 'command', command, timeout }];
+  return {
+    SessionStart: [{ hooks: h(10) }], UserPromptSubmit: [{ hooks: h() }], PreToolUse: [{ hooks: h() }], PostToolUse: [{ hooks: h() }],
+    Notification: [{ hooks: h() }], Stop: [{ hooks: h(10) }], SubagentStop: [{ hooks: h() }], SessionEnd: [{ hooks: h(10) }],
+  };
+}
+// Qwen Code, Qoder and TRAE (experimental): Claude's shape; no timeouts, since their units are not documented alike.
+const plainHooks = events => command => Object.fromEntries(events.map(e => [e, [{ ...(/ToolUse$/.test(e) ? { matcher: '*' } : {}), hooks: [{ type: 'command', command }] }]]));
+const CLAUDE_LIKE = ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Notification', 'Stop', 'SessionEnd'];
+export const agentFiles = home => ({
+  codex: path.join(home, '.codex', 'hooks.json'), gemini: path.join(home, '.gemini', 'settings.json'), iflow: path.join(home, '.iflow', 'settings.json'),
+  qwen: path.join(home, '.qwen', 'settings.json'), qoder: path.join(home, '.qoder', 'settings.json'), trae: path.join(home, fs.existsSync(path.join(home, '.trae-cn')) ? '.trae-cn' : '.trae', 'hooks.json'),
+});
+// Each other CLI: its hooks and the command that must be on the PATH for setup to wire it, or a guide to follow by hand
+// where its config format cannot be edited safely from here (Kimi Code's TOML, DeepSeek Harness's plugins).
+export const AGENT_SETUP = {
+  codex: { hooks: codexHooks, bin: 'codex' }, gemini: { hooks: geminiHooks, bin: 'gemini' }, iflow: { hooks: iflowHooks, bin: 'iflow' },
+  qwen: { hooks: plainHooks(CLAUDE_LIKE), bin: 'qwen' }, qoder: { hooks: plainHooks(CLAUDE_LIKE), bin: 'qodercli' }, trae: { hooks: plainHooks(['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Notification', 'Stop']), bin: 'traecli' },
+  kimi: { bin: 'kimi', guide: (cmd, cli) => `Kimi Code: add [[hooks]] entries running ${cmd} to ~/.kimi-code/config.toml (https://www.kimi.com/code/docs/en/kimi-code-cli/customization/hooks.html), and the tools with: kimi mcp add trace-canvas -- "${NODE}" "${cli}" mcp` },
+  dsh: { bin: 'dsh', guide: (cmd, cli) => `DeepSeek Harness: turn on its dsh-hooks-claude-code plugin, which runs the Claude Code hooks setup installed; for the tools, mount @deepseek-ai/dsh-mcp-client in ~/.dsh/profiles/web/cordis.patch.yml with the command "${NODE}" "${cli}" mcp and TRACE_CANVAS_AGENT=dsh` },
+};
 
 export function settingsPath({ user, project }) {
   if (user) return path.join(os.homedir(), '.claude', 'settings.json');
@@ -113,9 +135,11 @@ export function installAgentMcp(agent, cli, home = os.homedir()) {
     try { execFileSync('codex', ['mcp', 'add', 'trace-canvas', '--env', 'TRACE_CANVAS_AGENT=codex', '--', NODE, cli, 'mcp'], { stdio: 'pipe' }); return { ok: true }; }
     catch (e) { return { ok: false, hint: `codex mcp add trace-canvas --env TRACE_CANVAS_AGENT=codex -- "${NODE}" "${cli}" mcp` }; }
   }
-  const file = agentFiles(home).gemini;
+  // Gemini CLI, iFlow CLI and Qwen Code: mcpServers in their settings.json; the others are registered by hand.
+  if (!['gemini', 'iflow', 'qwen'].includes(agent)) return { ok: false, hint: agent === 'qoder' ? `qodercli mcp add trace-canvas -- "${NODE}" "${cli}" mcp` : `add an MCP server running "${NODE}" "${cli}" mcp with TRACE_CANVAS_AGENT=${agent}` };
+  const file = agentFiles(home)[agent];
   const s = fs.existsSync(file) && fs.readFileSync(file, 'utf8').trim() ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
-  s.mcpServers = { ...(s.mcpServers || {}), 'trace-canvas': { command: NODE, args: [cli, 'mcp'], env: { TRACE_CANVAS_AGENT: 'gemini' } } };
+  s.mcpServers = { ...(s.mcpServers || {}), 'trace-canvas': { command: NODE, args: [cli, 'mcp'], env: { TRACE_CANVAS_AGENT: agent } } };
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify(s, null, 2) + '\n');
   return { ok: true };

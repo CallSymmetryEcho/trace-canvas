@@ -3326,7 +3326,8 @@ function renderGoals() {
 }
 // The command `trace-canvas hand` prints, built here too: start the assigned agent on the to-do's
 // line, in the line's folder (its repository path, else where a session on it works now).
-const AGENT_NAMES = { claude: 'Claude Code', codex: 'Codex', gemini: 'Gemini CLI' };
+// The agents a to-do can go to (src/agents.mjs AGENTS); from Qwen Code on they are experimental.
+const AGENT_NAMES = { claude: 'Claude Code', codex: 'Codex', gemini: 'Gemini CLI', iflow: 'iFlow CLI', qwen: 'Qwen Code', qoder: 'Qoder CLI', trae: 'TRAE CLI', kimi: 'Kimi Code', dsh: 'DeepSeek Harness' };
 const AGENT_LAUNCH = { claude: p => `claude ${shq(p)}`, codex: p => `codex ${shq(p)}`, gemini: p => `gemini -i ${shq(p)}` };
 const shq = v => `'${String(v).replace(/'/g, `'\\''`)}'`;
 function handCommand(c) {

@@ -7,8 +7,8 @@ import { fileURLToPath } from 'node:url';
 import { addCommit, dataFile, ensureThread, home, importText, INBOX, mutate, readConfig, writeConfig } from '../src/store.mjs';
 import { execFileSync } from 'node:child_process';
 import { handleHook, python3, readStdin } from '../src/hook.mjs';
-import { agentFiles, allowSafeTools, codexHooks, codexWritable, geminiHooks, hookCommand, install, installAgentMcp, installMcp, installSkill, linkCommand, onPath, settingsPath, uninstall } from '../src/install.mjs';
-import { normalize } from '../src/agents.mjs';
+import { AGENT_SETUP, agentFiles, allowSafeTools, codexWritable, hookCommand, install, installAgentMcp, installMcp, installSkill, linkCommand, onPath, settingsPath, uninstall } from '../src/install.mjs';
+import { AGENTS, normalize } from '../src/agents.mjs';
 import os from 'node:os';
 import crypto from 'node:crypto';
 
@@ -93,7 +93,7 @@ Goals and to-dos
   trace-canvas tasks [--thread T] [--all]          Each thread's goal and open to-dos (--all: finished too)
   trace-canvas done <task> [--thread T] [--agent A] [--undo]
                                                    Tick a to-do by id or title (--undo reopens it)
-  trace-canvas hand <to-do|thread> --to claude|codex|gemini
+  trace-canvas hand <to-do|thread> --to claude|codex|gemini|iflow|qwen|qoder|trae|kimi|dsh
                                                    Assign it and print the command that starts the agent on it
   trace-canvas dispatch [line|to-do...] [--on machine] [--all] [--print] [--json]
                                                    Hand each line's new to-dos (or the to-dos named) to the agent working on it and wake it
@@ -274,7 +274,7 @@ async function main() {
       const { handTo } = await import('../src/ops.mjs');
       const to = str(flag('to', '')), thread = str(flag('thread', ''));
       const ref = argv.join(' ').trim();
-      if (!ref || !to) { console.error('Usage: trace-canvas hand <to-do or thread> --to claude|codex|gemini [--thread T]'); process.exit(1); }
+      if (!ref || !to) { console.error('Usage: trace-canvas hand <to-do or thread> --to claude|codex|gemini|iflow|qwen|qoder|trae|kimi|dsh [--thread T]'); process.exit(1); }
       const r = mutate(d => handTo(d, { ref, to, thread: thread || undefined }));
       console.error(r.todo ? `"${r.todo.title}" is assigned to ${to}. Run this to start it:` : `Run this to start ${to} on "${r.thread.name}":`);
       console.log(r.command);
@@ -556,14 +556,15 @@ async function main() {
         writeConfig({ machine });
         console.log(`4. This computer is "${machine}"${cfg.map ? `; the canvas syncs through ${cfg.map} with trace-canvas sync` : ''}`);
       }
-      // --agents claude,codex,gemini also wires the other CLIs (user scope only); missing ones are skipped.
-      const others = str(flag('agents', '')).split(',').map(x => x.trim()).filter(x => x === 'codex' || x === 'gemini');
+      // --agents claude,codex,gemini,iflow,qwen,qoder,trae,kimi,dsh also wires the other CLIs (user scope only); missing ones are skipped.
+      const others = str(flag('agents', '')).split(',').map(x => x.trim()).filter(x => AGENT_SETUP[x]);
       for (const a of s.user ? others : []) {
-        if (!onPath(a)) { console.log(`   ${a}: not found on PATH, skipped${a === 'gemini' ? ' (install a current @google/gemini-cli, then run setup again)' : ''}`); continue; }
+        if (!onPath(AGENT_SETUP[a].bin)) { console.log(`   ${a}: not found on PATH, skipped${a === 'gemini' ? ' (install a current @google/gemini-cli, then run setup again)' : ''}`); continue; }
+        if (AGENT_SETUP[a].guide) { console.log(`   ${AGENT_SETUP[a].guide(hookCommand(SELF, a), SELF)} (experimental)`); continue; }
         const f = agentFiles(os.homedir())[a], cmd = hookCommand(SELF, a);
-        install(f, cmd, a === 'codex' ? codexHooks(cmd) : geminiHooks(cmd));
+        install(f, cmd, AGENT_SETUP[a].hooks(cmd));
         const r = installAgentMcp(a, SELF);
-        console.log(`   ${a}: hooks in ${f}; MCP ${r.ok ? 'registered' : `not registered, run: ${r.hint}`}`);
+        console.log(`   ${a}: hooks in ${f}; MCP ${r.ok ? 'registered' : `not registered, run: ${r.hint}`}${AGENTS[a].experimental ? ' (experimental: built from its docs, not yet run here)' : ''}`);
         if (a === 'codex') {
           console.log(`   codex: skill installed at ${installSkill(s, SKILL_DIR, 'codex')}; invoke it with $trace-canvas.`);
           const toml = path.join(os.homedir(), '.codex', 'config.toml');

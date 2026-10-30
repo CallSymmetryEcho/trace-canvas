@@ -9,7 +9,8 @@ import { addCommit, hashId, readConfig } from './store.mjs';
 import { firstLine } from './git-events.mjs';
 import { gitRoot, repoInfo } from './hook.mjs';
 import { tr } from './i18n.mjs';
-import { encodeProjectDir, findTranscripts, parseTranscript, projectsRoot } from './transcript.mjs';
+import { encodeProjectDir, findTranscripts, iflowTranscripts, parseTranscript, projectsRoot } from './transcript.mjs';
+import { AGENTS } from './agents.mjs';
 import { codexPrompts } from './retro.mjs';
 
 export const LIMIT = 500; // commits per line; older ones become one record. ponytail: lift it once the page loads on demand
@@ -100,15 +101,18 @@ function transcriptFiles(root, sub, env) {
 // A subfolder counts when it is the same repository (a worktree is), not one nested inside; one gone since is let in.
 const inside = (cwd, root, sub) => cwd === root || (sub && String(cwd || '').startsWith(`${root}/`) && (!fs.existsSync(cwd) || gitRoot(cwd) === root));
 
-function claudeSessions(root, sub, known, env) {
+const claudeSessions = (root, sub, known, env) => transcriptSessions(transcriptFiles(root, sub, env), root, sub, known, 'claude');
+const iflowSessions = (root, sub, known, env) => transcriptSessions(iflowTranscripts(env), root, sub, known, 'iflow');
+// Sessions from Claude Code-format transcripts; a file not in the folder's own transcript folder is checked by its cwd.
+function transcriptSessions(list, root, sub, known, agentKey) {
   const out = [];
-  for (const f of transcriptFiles(root, sub, env)) {
+  for (const f of list) {
     if (known.has(f.sessionId)) continue; // before parsing: a long transcript takes a while
     const s = parseTranscript(f.path);
     if (!s.turns.length || known.has(s.sessionId) || (!f.exact && !inside(s.cwd, root, sub))) continue;
     const files = new Set(s.turns.flatMap(t => t.files)).size, commits = s.turns.flatMap(t => t.git.flatMap(g => g.commits.map(c => c.sha.slice(0, 7))));
     if (s.turns.length === 1 && !files && !commits.length) continue; // one prompt that changed nothing: a probe or a quick question
-    out.push({ id: s.sessionId, agentKey: 'claude', agent: 'Claude Code', start: s.startedAt, end: s.endedAt, title: s.title || s.turns[0].prompt,
+    out.push({ id: s.sessionId, agentKey, agent: AGENTS[agentKey].name, start: s.startedAt, end: s.endedAt, title: s.title || s.turns[0].prompt,
       prompts: s.turns.length, files, commits });
   }
   return out;
@@ -135,7 +139,7 @@ export function collect(d, th, env = process.env, limit = LIMIT) {
   const r = lineRepo(d, th);
   if (!r) return null;
   // A folder without git: only the sessions that ran in it, not in its subfolders (a home folder holds everything).
-  if (!r.git) return { root: r.root, name: r.name, branch: null, commits: [], older: null, sessions: [...claudeSessions(r.root, false, knownSessions(d), env), ...codexSessions(r.root, false, knownSessions(d), env)].sort((a, b) => a.start - b.start) };
+  if (!r.git) return { root: r.root, name: r.name, branch: null, commits: [], older: null, sessions: [...claudeSessions(r.root, false, knownSessions(d), env), ...iflowSessions(r.root, false, knownSessions(d), env), ...codexSessions(r.root, false, knownSessions(d), env)].sort((a, b) => a.start - b.start) };
   const main = defaultBranch(r.root), branch = r.branch && ref(r.root, r.branch);
   if (r.branch && !branch) return null;
   const range = branch ? [branch, `^${main}`] : [main];
@@ -143,7 +147,7 @@ export function collect(d, th, env = process.env, limit = LIMIT) {
   let older = null;
   if (total > all.length) older = { n: total - all.length, ts: Number(tryGit(r.root, ['log', '--first-parent', '--max-parents=0', '--format=%at', ...range]).split('\n')[0]) * 1000 || all[0].ts - 1 };
   const known = knownSessions(d);
-  const sessions = r.branch ? [] : [...claudeSessions(r.root, true, known, env), ...codexSessions(r.root, true, known, env)].sort((a, b) => a.start - b.start);
+  const sessions = r.branch ? [] : [...claudeSessions(r.root, true, known, env), ...iflowSessions(r.root, true, known, env), ...codexSessions(r.root, true, known, env)].sort((a, b) => a.start - b.start);
   return { root: r.root, name: r.name, branch: branch || main, commits: all.filter(c => !seen(c)), older, sessions };
 }
 
@@ -162,7 +166,7 @@ export function apply(d, th, plan, env = process.env) {
   }
   for (const s of plan.sessions) {
     if (known.has(s.id)) continue;
-    const resume = s.agentKey === 'codex' ? `codex resume ${s.id}` : `claude --resume ${s.id}`;
+    const resume = (AGENTS[s.agentKey] || AGENTS.claude).resume(s.id);
     addCommit(d, { thread: th.id, kind: 'note', title: firstLine(s.title, 100), body: tr(cfg.lang, 'pastSession', s), agent: s.agent, ts: s.start, links: [resume], parents: [], extra: { id: hashId('c', `session:${s.id}`), session: s.id, imported: 'session' } });
     // It joins the line's sessions, so it can be resumed from there.
     d.sessions[s.id] = { id: s.id, thread: th.id, agent: s.agent, agentKey: s.agentKey, resume, cwd: plan.root, machine: cfg.machine, title: firstLine(s.title, 120), last: s.end || s.start };

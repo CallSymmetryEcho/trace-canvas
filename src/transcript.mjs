@@ -18,6 +18,13 @@ function readHead(file, bytes = 65536) {
   finally { fs.closeSync(fd); }
 }
 
+// iFlow CLI keeps Claude Code-format transcripts in ~/.iflow/projects/<folder>/session-<id>.jsonl, its folder names
+// made differently (non-ASCII left out), so a session is found by its file and a project by the cwd inside.
+export function iflowTranscripts(env = process.env) {
+  const root = env.IFLOW_PROJECTS_DIR || path.join(os.homedir(), '.iflow', 'projects'), ls = d => { try { return fs.readdirSync(d); } catch { return []; } };
+  return ls(root).flatMap(d => ls(path.join(root, d)).filter(f => f.endsWith('.jsonl')).map(f => ({ path: path.join(root, d, f), sessionId: f.slice(0, -6) })));
+}
+
 // Transcript files for a project, newest first.
 export function findTranscripts(projectDir, env = process.env) {
   const root = projectsRoot(env);

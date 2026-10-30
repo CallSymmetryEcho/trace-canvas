@@ -6,7 +6,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { addCommit, dataFile, ensureThread, importText, INBOX, mutate, readConfig, readData, threadById, threadIdOf } from './store.mjs';
 import { sessionThread, whereFind } from './hook.mjs';
-import { agentKey, agentOf } from './agents.mjs';
+import { AGENTS, agentKey, agentOf } from './agents.mjs';
 import { bindLiveSession, captureSession, forkThread, listTasks, listThreads, liveSessions, mergeDataset, mergeThreads, readThread, setTaskDone } from './ops.mjs';
 import { currentSessionId, describeSession, findTranscript, findTranscripts, parseTranscript } from './transcript.mjs';
 
@@ -84,7 +84,7 @@ const TOOLS = [
     name: 'trace_log',
     title: 'Log one record',
     description: 'Adds one record to a thread (created if the name is new) or to the inbox.',
-    inputSchema: { type: 'object', properties: { title: { type: 'string' }, kind: KIND, thread: { type: 'string' }, body: { type: 'string' }, links: { type: 'array', items: { type: 'string' } }, agent: { type: 'string' }, assignee: { type: 'string', enum: ['claude', 'codex', 'gemini'], description: 'Hand this to-do to an agent (kind defaults to task).' }, on: { type: 'string', description: 'The machine to do this to-do on (as the canvas names machines): dispatch gives it to the latest session on that machine for its line, or starts one there.' } }, required: ['title'] },
+    inputSchema: { type: 'object', properties: { title: { type: 'string' }, kind: KIND, thread: { type: 'string' }, body: { type: 'string' }, links: { type: 'array', items: { type: 'string' } }, agent: { type: 'string' }, assignee: { type: 'string', enum: Object.keys(AGENTS), description: 'Hand this to-do to an agent (kind defaults to task).' }, on: { type: 'string', description: 'The machine to do this to-do on (as the canvas names machines): dispatch gives it to the latest session on that machine for its line, or starts one there.' } }, required: ['title'] },
     annotations: { readOnlyHint: false, destructiveHint: false },
   },
   {
@@ -105,7 +105,7 @@ const TOOLS = [
     name: 'trace_tasks',
     title: 'Goals and to-dos',
     description: 'Returns the goal and the to-dos of the thread this session works on (or of another thread, or of all), with how many are done. Read it before working on a thread; tick to-dos with trace_task_done when they are finished.',
-    inputSchema: { type: 'object', properties: { thread: { type: 'string', description: 'Thread id or name; omit for the thread this session works on.' }, all: { type: 'boolean', description: 'Every thread instead of this session\'s.' }, include_done: { type: 'boolean', description: 'Also list finished to-dos (default false).' }, mine: { type: 'boolean', description: 'Only the to-dos assigned to you.' }, assignee: { type: 'string', enum: ['claude', 'codex', 'gemini'] } } },
+    inputSchema: { type: 'object', properties: { thread: { type: 'string', description: 'Thread id or name; omit for the thread this session works on.' }, all: { type: 'boolean', description: 'Every thread instead of this session\'s.' }, include_done: { type: 'boolean', description: 'Also list finished to-dos (default false).' }, mine: { type: 'boolean', description: 'Only the to-dos assigned to you.' }, assignee: { type: 'string', enum: Object.keys(AGENTS) } } },
     annotations: { readOnlyHint: true },
   },
   {

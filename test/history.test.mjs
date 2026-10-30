@@ -15,7 +15,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 function sandbox() {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'tc-history-')));
   const repo = path.join(root, 'tripsplit'), projects = path.join(root, 'projects'), codex = path.join(root, 'codex');
-  const env = { ...process.env, TRACE_CANVAS_HOME: path.join(root, 'home'), TRACE_CANVAS_LANG: 'en', TRACE_CANVAS_MACHINE: 'laptop', TRACE_CANVAS_MAP: '', CLAUDE_PROJECTS_DIR: projects, CODEX_HOME: codex };
+  const env = { ...process.env, TRACE_CANVAS_HOME: path.join(root, 'home'), TRACE_CANVAS_LANG: 'en', TRACE_CANVAS_MACHINE: 'laptop', TRACE_CANVAS_MAP: '', CLAUDE_PROJECTS_DIR: projects, CODEX_HOME: codex, IFLOW_PROJECTS_DIR: path.join(root, 'iflow') };
   delete env.TRACE_CANVAS_DISABLE; delete env.TRACE_CANVAS_THREAD;
   fs.mkdirSync(repo);
   let t = Date.parse('2026-01-05T10:00:00Z') / 1000;
@@ -138,4 +138,16 @@ test('sessions in the repository\'s worktrees count, a sibling folder\'s do not;
   const folder = createThread(d, { name: 'notes', key: 'notes', note: notes });
   const plan = collect(d, folder, s.env);
   assert.deepEqual([plan.commits, plan.older, plan.sessions.map(x => x.id)], [[], null, ['n-1']]);
+});
+
+test('past iFlow CLI sessions in the repository come in too, found by the cwd inside their transcripts', () => {
+  const s = sandbox(), d = emptyData();
+  const th = createThread(d, { name: 'tripsplit', key: 'tripsplit', note: s.repo });
+  const dir = path.join(s.env.IFLOW_PROJECTS_DIR, '-tripsplit'); fs.mkdirSync(dir, { recursive: true }); // iFlow names its folders its own way
+  const line = (n, text) => ({ uuid: `u${n}`, sessionId: 'session-if9', cwd: s.repo, type: 'user', timestamp: `2026-01-08T10:0${n}:00.000Z`, message: { role: 'user', content: text } });
+  fs.writeFileSync(path.join(dir, 'session-if9.jsonl'), [line(1, 'Port the parser to iFlow'), line(2, 'Add tests')].map(j => JSON.stringify(j)).join('\n') + '\n');
+  const got = collect(d, th, s.env).sessions.find(x => x.id === 'session-if9');
+  assert.deepEqual([got.agent, got.agentKey, got.title, got.prompts], ['iFlow CLI', 'iflow', 'Port the parser to iFlow', 2]);
+  apply(d, th, collect(d, th, s.env), s.env);
+  assert.equal(d.sessions['session-if9'].resume, 'iflow -r session-if9');
 });

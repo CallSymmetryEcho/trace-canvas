@@ -8,7 +8,7 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { addCommit, readConfig, threadIdOf } from './store.mjs';
 import { lineDir, sessionList } from './ops.mjs';
-import { findTranscript, parseTranscript } from './transcript.mjs';
+import { findTranscript, iflowTranscripts, parseTranscript } from './transcript.mjs';
 import { onPath } from './install.mjs';
 import { remotePrompts } from './remote.mjs';
 import { tr } from './i18n.mjs';
@@ -52,8 +52,9 @@ export function codexPrompts(file) {
 export function sessionPrompts(sessions, env = process.env) {
   const out = [];
   for (const s of sessions) {
-    const kind = /codex/i.test(s.agent || '') ? 'codex' : s.agent ? 'claude' : '';
-    const claude = kind !== 'codex' && findTranscript({ sessionId: s.id }, env), codex = !claude && kind !== 'claude' && codexFile(s.id, env);
+    const kind = /codex/i.test(s.agent || '') ? 'codex' : /iflow/i.test(s.agent || '') ? 'iflow' : s.agent ? 'claude' : '';
+    const claude = kind === 'iflow' ? (iflowTranscripts(env).find(f => f.sessionId === s.id) || {}).path : kind !== 'codex' && findTranscript({ sessionId: s.id }, env);
+    const codex = !claude && (kind === 'codex' || !kind) && codexFile(s.id, env);
     const ps = claude ? parseTranscript(claude).turns.map(t => ({ ts: t.ts, text: t.prompt, tokens: t.tokens })) : codex ? codexPrompts(codex) : [];
     for (const p of ps) if (p.text && !NOISE.test(p.text)) out.push({ ...p, session: s.id });
   }

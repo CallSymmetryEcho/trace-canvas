@@ -17,14 +17,15 @@ export const AGENTS = {
   gemini: { name: 'Gemini CLI', resume: id => `gemini --resume ${id}`, wake: (id, p) => `gemini --resume ${id} -i ${q(p)}`, launch: p => `gemini -i ${q(p)}` },
   // iFlow CLI (Alibaba): Claude Code's hook events and payload, Claude Code-format transcripts in ~/.iflow/projects.
   iflow: { name: 'iFlow CLI', resume: id => `iflow -r ${id}`, wake: (id, p) => `iflow -r ${id} -i ${q(p)}`, launch: p => `iflow -i ${q(p)}` },
-  // Experimental, from their docs and not yet run here: hooks modelled on Claude Code's (Qwen Code, Qoder, TRAE, Kimi
-  // Code), or Claude Code's own hooks run by a bridge plugin (DeepSeek Harness). ponytail: resume flags from the docs;
-  // TRAE documents none, so its resume is a guess.
+  // Experimental, from their docs and source, not yet run here. ponytail: TRAE documents no resume flag, so its is a guess.
   qwen: { name: 'Qwen Code', experimental: true, resume: id => `qwen --resume ${id}`, wake: (id, p) => `qwen --resume ${id} -i ${q(p)}`, launch: p => `qwen -i ${q(p)}` },
   qoder: { name: 'Qoder CLI', experimental: true, resume: id => `qodercli -r ${id}`, wake: (id, p) => `qodercli -r ${id} ${q(p)}`, launch: p => `qodercli ${q(p)}` },
   trae: { name: 'TRAE CLI', experimental: true, resume: id => `traecli resume ${id}`, wake: (id, p) => `traecli resume ${id} ${q(p)}`, launch: p => `traecli ${q(p)}` },
-  kimi: { name: 'Kimi Code', experimental: true, resume: id => `kimi -r ${id}`, wake: (id, p) => `kimi -r ${id} ${q(p)}`, launch: p => `kimi ${q(p)}` },
-  dsh: { name: 'DeepSeek Harness', experimental: true, resume: id => `dsh --session-id ${id}`, wake: (id, p) => `dsh --session-id ${id} ${q(p)}`, launch: p => `dsh ${q(p)}` },
+  // Kimi Code takes no first message in its terminal UI: a message runs as one non-interactive turn (-p).
+  kimi: { name: 'Kimi Code', experimental: true, resume: id => `kimi --session ${id}`, wake: (id, p) => `kimi --session ${id} -p ${q(p)}`, launch: p => `kimi -p ${q(p)}` },
+  // DeepSeek Harness: sessions are opened in its web UI; a message runs as one headless task in the session.
+  dsh: { name: 'DeepSeek Harness', experimental: true, resume: () => 'dsh web', wake: (id, p) => `dsh headless --session-id ${id} ${q(p)}`, launch: p => `dsh headless ${q(p)}` },
+  minimax: { name: 'MiniMax Code', experimental: true, resume: id => `mcode --session ${id}`, wake: (id, p) => `mcode --session ${id} ${q(p)}`, launch: p => `mcode ${q(p)}` },
 };
 // Claude Code pointed at another model's Anthropic-compatible API (ANTHROPIC_BASE_URL): whose model it runs.
 const PROVIDERS = [[/deepseek/i, 'DeepSeek'], [/moonshot|kimi/i, 'Kimi'], [/dashscope|aliyuncs|qwen/i, 'Qwen'], [/minimax/i, 'MiniMax'], [/bigmodel|zhipu|z\.ai/i, 'GLM'], [/volces|volcengine|ark\.cn/i, 'Doubao'], [/siliconflow/i, 'SiliconFlow'], [/openrouter/i, 'OpenRouter']];
@@ -101,19 +102,22 @@ export function normalize(key, input) {
   if (!input || typeof input !== 'object') return input;
   const k = AGENTS[key] ? key : 'claude';
   const out = { ...input, _agent: k };
-  // DeepSeek Harness runs the Claude Code hooks through its bridge plugin; its sessions are kept under ~/.dsh.
-  if (k === 'claude') return /[\\/]\.dsh[\\/]/.test(String(input.transcript_path || '')) ? { ...out, _agent: 'dsh' } : out;
+  if (k === 'claude') return out;
   let ev = input.hook_event_name;
   if (k === 'gemini') {
     ev = GEMINI_EVENTS[ev] || ev;
     if (input.hook_event_name === 'AfterAgent') out.last_assistant_message = input.prompt_response || input.last_assistant_message || '';
     if (ev === 'Notification' && /permission/i.test(String(input.notification_type || ''))) out.notification_type = 'permission_prompt';
   }
-  if (k === 'codex') {
-    // Our hook prints nothing for it, so Codex asks the person as usual.
+  // Codex, Kimi Code and MiniMax Code have no Notification event: a PermissionRequest is what "needs you" looks like.
+  // Our hook prints nothing for it, so the CLI asks the person as usual. Interrupt ends a turn in place of Stop.
+  if (k === 'codex' || k === 'kimi' || k === 'minimax') {
     if (ev === 'PermissionRequest') { ev = 'Notification'; out.notification_type = 'permission_prompt'; out.message = input.message || `${input.tool_name || 'A tool'} needs your permission`; }
     if (ev === 'Interrupt') ev = 'Stop';
   }
+  // Kimi Code: the prompt as content parts, the tool's result as tool_output.
+  if (Array.isArray(input.prompt)) out.prompt = input.prompt.map(p => (p && typeof p.text === 'string' ? p.text : '')).join('');
+  if (typeof input.tool_output === 'string' && input.tool_response == null) out.tool_response = input.tool_output;
   out.hook_event_name = ev;
   const ti = input.tool_input;
   if (ti && typeof ti === 'object' && (ev === 'PreToolUse' || ev === 'PostToolUse')) {
@@ -129,7 +133,7 @@ export function normalize(key, input) {
       out.tool_name = 'Edit'; out.tool_input = { ...ti, file_path: file }; // Gemini write_file / replace
     }
   }
-  if (typeof input.tool_response === 'string') out.tool_response = { stdout: input.tool_response };
+  if (typeof out.tool_response === 'string') out.tool_response = { stdout: out.tool_response };
   // A CLI that does not hand the reply to its Stop hook (iFlow): the last thing the agent said, from its transcript.
   if (ev === 'Stop' && !out.last_assistant_message && input.transcript_path) out.last_assistant_message = lastReply(input.transcript_path);
   return out;

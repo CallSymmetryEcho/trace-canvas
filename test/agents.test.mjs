@@ -207,7 +207,7 @@ test('iFlow hooks go in its settings.json in Claude\'s shape, seconds, no matche
   assert.deepEqual(s.mcpServers['trace-canvas'].env, { TRACE_CANVAS_AGENT: 'iflow' });
 });
 
-test('Claude Code on another model\'s API is named after it; DeepSeek Harness, running the Claude Code hooks, is told apart by its sessions', async () => {
+test('Claude Code on another model\'s API is named after it', async () => {
   const { modelProvider } = await import('../src/agents.mjs');
   assert.equal(modelProvider({ ANTHROPIC_BASE_URL: 'https://api.deepseek.com/anthropic' }), 'DeepSeek');
   assert.equal(modelProvider({ ANTHROPIC_BASE_URL: 'https://api.moonshot.cn/anthropic' }), 'Kimi');
@@ -217,12 +217,9 @@ test('Claude Code on another model\'s API is named after it; DeepSeek Harness, r
   const s = sandbox(), env = { ...s.env, ANTHROPIC_BASE_URL: 'https://api.deepseek.com/anthropic' };
   handleHook({ session_id: 'ds1', cwd: s.repo, hook_event_name: 'UserPromptSubmit', prompt: 'Speed up the parser' }, env);
   assert.deepEqual(Object.values(readData(env).commits).map(c => c.agent), ['Claude Code · DeepSeek']);
-  // DeepSeek Harness's bridge hands over Claude-shaped payloads; its transcript path gives it away.
-  assert.equal(normalize('claude', { hook_event_name: 'Stop', transcript_path: '/home/u/.dsh/sessions/s1.jsonl' })._agent, 'dsh');
-  assert.equal(normalize('claude', { hook_event_name: 'Stop', transcript_path: '/home/u/.claude/projects/p/s1.jsonl' })._agent, 'claude');
 });
 
-test('the experimental CLIs: Claude-shaped hooks for Qwen Code, Qoder and TRAE, a guide for Kimi Code and DeepSeek Harness', async () => {
+test('the experimental CLIs: Claude-shaped hooks for Qwen Code, Qoder and TRAE', async () => {
   const { AGENT_SETUP, agentFiles, installAgentMcp } = await import('../src/install.mjs');
   const { AGENTS } = await import('../src/agents.mjs');
   const trae = AGENT_SETUP.trae.hooks('cmd');
@@ -230,9 +227,7 @@ test('the experimental CLIs: Claude-shaped hooks for Qwen Code, Qoder and TRAE, 
   assert.deepEqual(trae.PreToolUse, [{ matcher: '*', hooks: [{ type: 'command', command: 'cmd' }] }]);
   assert.deepEqual(trae.Stop, [{ hooks: [{ type: 'command', command: 'cmd' }] }]); // no timeout: units differ between CLIs
   assert.equal(Object.keys(AGENT_SETUP.qwen.hooks('cmd')).length, 7);
-  assert.match(AGENT_SETUP.kimi.guide('CMD', '/x/cli.mjs'), /\[\[hooks\]\].*CMD.*kimi mcp add trace-canvas/);
-  assert.match(AGENT_SETUP.dsh.guide('CMD', '/x/cli.mjs'), /dsh-hooks-claude-code/);
-  for (const k of ['qwen', 'qoder', 'trae', 'kimi', 'dsh']) assert.equal(AGENTS[k].experimental, true);
+  for (const k of ['qwen', 'qoder', 'trae', 'kimi', 'dsh', 'minimax']) assert.equal(AGENTS[k].experimental, true);
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-cn-'));
   assert.equal(agentFiles(home).trae, path.join(home, '.trae', 'hooks.json'));
   fs.mkdirSync(path.join(home, '.trae-cn'));
@@ -240,4 +235,75 @@ test('the experimental CLIs: Claude-shaped hooks for Qwen Code, Qoder and TRAE, 
   assert.equal(installAgentMcp('qwen', '/x/cli.mjs', home).ok, true);
   assert.deepEqual(JSON.parse(fs.readFileSync(agentFiles(home).qwen, 'utf8')).mcpServers['trace-canvas'].env, { TRACE_CANVAS_AGENT: 'qwen' });
   assert.match(installAgentMcp('qoder', '/x/cli.mjs', home).hint, /^qodercli mcp add trace-canvas -- /);
+});
+
+test('a Kimi Code session, its payloads as Kimi Code builds them, is recorded as Kimi Code', () => {
+  const s = sandbox();
+  // snake_case fields, the prompt as content parts, Edit's path, the result as tool_output; Interrupt ends a turn.
+  const fire = (ev, extra = {}) => handleHook(normalize('kimi', { hook_event_name: ev, session_id: 'kimi-s1', session_title: 'Notes', client_type: 'kimi_code_cli', cwd: s.repo, ...extra }), s.env);
+  fire('SessionStart', { source: 'startup', model: 'kimi-k2', profile: 'default' });
+  fire('UserPromptSubmit', { prompt: [{ type: 'text', text: 'Add a notes file' }] });
+  assert.equal(normalize('kimi', { hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: { path: '/p/a.js', old_string: 'a', new_string: 'b' } }).tool_input.file_path, '/p/a.js');
+  fire('PermissionRequest', { tool_name: 'Bash' });
+  assert.equal(readLive('kimi-s1', s.env).status, 'waiting');
+  fire('PostToolUse', { tool_name: 'Bash', tool_input: { command: 'git add notes.txt && git commit -m "Add notes"' }, tool_output: '[main 1a2b3c4] Add notes\n 1 file changed' });
+  assert.equal(normalize('kimi', { hook_event_name: 'Interrupt', reason: 'user' }).hook_event_name, 'Stop');
+  const live = readLive('kimi-s1', s.env);
+  assert.deepEqual([live.agent, live.agentKey, live.resume], ['Kimi Code', 'kimi', 'kimi --session kimi-s1']);
+  const cs = Object.values(readData(s.env).commits).sort((a, b) => a.ts - b.ts);
+  assert.deepEqual(cs.map(c => [c.title, c.agent]), [['Add a notes file', 'Kimi Code'], ['Commit 1a2b3c4: Add notes', 'Kimi Code']]);
+});
+
+test('Kimi Code\'s hooks are [[hooks]] tables in its config.toml, replaced on a second setup; its MCP server goes in mcp.json', async () => {
+  const { installKimi, installAgentMcp } = await import('../src/install.mjs');
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-kimi-')), file = path.join(home, '.kimi-code', 'config.toml');
+  const mine = 'default_model = "kimi-k2"\n\n[[hooks]]\nevent = "Notification"\nmatcher = "task\\\\.completed"\ncommand = "terminal-notifier -message done"\n\n[mcp]\nstartup_timeout_ms = 30000\n';
+  fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, mine);
+  const cmd = '"/usr/bin/node" "/x/bin/trace-canvas.mjs" hook --agent kimi';
+  installKimi(file, cmd); installKimi(file, cmd);
+  const toml = fs.readFileSync(file, 'utf8'), tables = toml.split(/^(?=\[)/m);
+  assert.ok(toml.startsWith(mine.trimEnd())); // the person's settings and hooks are kept, in place
+  const ours = tables.filter(t => t.includes('--agent kimi'));
+  assert.deepEqual(ours.map(t => t.match(/event = "(\w+)"/)[1]), ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PermissionRequest', 'Stop', 'Interrupt', 'SubagentStart', 'SubagentStop', 'SessionEnd']);
+  assert.equal(ours[0], `[[hooks]]\nevent = "SessionStart"\ncommand = '${cmd}'\ntimeout = 10\n\n`);
+  for (const t of ours) assert.deepEqual(t.trim().split('\n').slice(1).map(l => l.split(' = ')[0]), ['event', 'command', 'timeout']); // only keys it allows
+  installAgentMcp('kimi', '/x/bin/trace-canvas.mjs', home);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(home, '.kimi-code', 'mcp.json'), 'utf8')).mcpServers['trace-canvas'].env, { TRACE_CANVAS_AGENT: 'kimi' });
+});
+
+test('DeepSeek Harness gets a Claude Code hooks file for its bridge plugin and a patch that mounts it and the MCP client', async () => {
+  const { installDsh } = await import('../src/install.mjs');
+  const s = sandbox(), dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-dsh-'));
+  const patch = installDsh(dir, '/x/bin/trace-canvas.mjs'), yml = fs.readFileSync(patch, 'utf8');
+  const hooks = JSON.parse(fs.readFileSync(path.join(dir, 'dsh-hooks.json'), 'utf8')).hooks;
+  assert.deepEqual(Object.keys(hooks), ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop', 'SubagentStart', 'SubagentStop']);
+  assert.match(hooks.Stop[0].hooks[0].command, /trace-canvas\.mjs" hook --agent dsh$/);
+  assert.match(yml, /name: '@deepseek-ai\/dsh-hooks-claude-code'\n {6}config:\n {8}configPath: ".*dsh-hooks\.json"/);
+  assert.match(yml, /name: '@deepseek-ai\/dsh-mcp-client'[\s\S]*serverName: trace-canvas[\s\S]*args: \["\/x\/bin\/trace-canvas\.mjs", mcp\][\s\S]*TRACE_CANVAS_AGENT: dsh/);
+  // Its bridge's payloads: Claude's fields, the prompt as text, transcript_path always '', a string tool_response.
+  const fire = (ev, extra = {}) => handleHook(normalize('dsh', { session_id: 'dsh-s1', transcript_path: '', cwd: s.repo, hook_event_name: ev, ...extra }), s.env);
+  fire('SessionStart', { source: 'startup' });
+  fire('UserPromptSubmit', { prompt: 'Speed up the parser' });
+  fire('PostToolUse', { tool_name: 'bash', tool_input: { command: 'git commit -am "Faster parser"' }, tool_use_id: 'c1', tool_response: '[main 9f8e7d6] Faster parser' });
+  fire('Stop', { stop_hook_active: false });
+  const live = readLive('dsh-s1', s.env);
+  assert.deepEqual([live.agent, live.agentKey, live.resume], ['DeepSeek Harness', 'dsh', 'dsh web']);
+  assert.deepEqual(Object.values(readData(s.env).commits).sort((a, b) => a.ts - b.ts).map(c => c.title), ['Speed up the parser', 'Commit 9f8e7d6: Faster parser']);
+});
+
+test('MiniMax Code gets a local plugin in Claude Code\'s plugin format: hooks, and the MCP server in its manifest', async () => {
+  const { installMinimax } = await import('../src/install.mjs');
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-mm-'));
+  const root = installMinimax(home, '/x/bin/trace-canvas.mjs', {});
+  assert.equal(root, path.join(home, '.minimax', 'plugins', 'trace-canvas'));
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, '.claude-plugin', 'plugin.json'), 'utf8'));
+  assert.equal(manifest.name, 'trace-canvas'); // the folder's name
+  assert.deepEqual(manifest.mcpServers['trace-canvas'].args, ['/x/bin/trace-canvas.mjs', 'mcp']);
+  const hooks = JSON.parse(fs.readFileSync(path.join(root, 'hooks', 'hooks.json'), 'utf8')).hooks;
+  assert.deepEqual(Object.keys(hooks), ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PermissionRequest', 'PostToolUse', 'SubagentStart', 'SubagentStop', 'Stop', 'SessionEnd']);
+  assert.match(hooks.PreToolUse[0].hooks[0].command, /--agent minimax$/);
+  assert.equal(installMinimax(home, '/x/bin/trace-canvas.mjs', { MINIMAX_DATA_DIR: path.join(home, 'mm') }), path.join(home, 'mm', 'plugins', 'trace-canvas'));
+  fs.mkdirSync(path.join(home, 'old', '.mavis'), { recursive: true }); // only the legacy folder there
+  assert.equal(installMinimax(path.join(home, 'old'), '/x/bin/trace-canvas.mjs', {}), path.join(home, 'old', '.mavis', 'plugins', 'trace-canvas'));
+  assert.equal(normalize('minimax', { hook_event_name: 'PermissionRequest', tool_name: 'Bash' }).notification_type, 'permission_prompt');
 });

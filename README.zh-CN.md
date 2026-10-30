@@ -238,22 +238,22 @@ node bin/trace-canvas.mjs setup --user --agents codex,gemini
 
 Codex 没有通知事件，所以用权限请求来表示"等你"。这些已经用真实的 Codex 0.164 会话核对过（`test/fixtures/codex/`）：指令、shell 命令、`apply_patch` 改文件、提交、权限请求、会话开始时的上下文，以及通过 MCP 勾掉待办。Gemini CLI 的支持按它文档里的 hook 事件实现，还要用最新的 `@google/gemini-cli` 实际核对。
 
-### 国产编程 agent：iFlow、Qwen Code、Qoder、TRAE、Kimi Code、DeepSeek Harness
+### 国产编程 agent：Kimi Code、DeepSeek Harness、MiniMax Code 等
 
-它们大多照着 Claude Code 的 hooks 做，所以一套适配就能覆盖；`setup --user --agents iflow,qwen,qoder,trae` 会给 PATH 里有的那几个接上。
+`setup --user --agents kimi,dsh,minimax` 会给 PATH 里有的那几个接上（其他的加 `qwen,qoder,trae,iflow`）。
 
-| Agent | 能用什么 | 怎么接 | 核实情况 |
+| Agent | 能用什么 | 怎么接 | 验证情况 |
 | --- | --- | --- | --- |
-| **Claude Code 接 DeepSeek、Kimi、千问、MiniMax、GLM 或豆包** | 全部功能 | 它就是 Claude Code（把 `ANTHROPIC_BASE_URL` 指向它们兼容 Anthropic 的接口）；记录会写明用的是谁的模型，比如「Claude Code · DeepSeek」 | 已核实 |
-| **iFlow CLI**（阿里） | 自动留痕、实时栏、MCP 工具、恢复会话（`iflow -r`）、导入历史、复盘 | hooks 和 MCP 写在 `~/.iflow/settings.json`；它的对话记录和 Claude Code 同格式，在 `~/.iflow/projects` | 按 iFlow 0.4 实际发出的数据回放过；还没跑过真实会话 |
+| **Claude Code 接 DeepSeek、Kimi、千问、MiniMax、GLM 或豆包** | 全部功能 | 它就是 Claude Code（把 `ANTHROPIC_BASE_URL` 指向它们兼容 Anthropic 的接口）；记录会写明用的是谁的模型，比如「Claude Code · DeepSeek」 | 已验证 |
+| **Kimi Code**（月之暗面） | 自动留痕、实时栏、「等你处理」、MCP 工具、恢复会话（`kimi --session`） | `~/.kimi-code/config.toml` 里的 `[[hooks]]` 表，MCP 写在 `~/.kimi-code/mcp.json` | 实验性：按它源码里的数据格式回放过 |
+| **DeepSeek Harness**（`dsh`） | 自动留痕、实时栏、MCP 工具、给会话发消息（`dsh headless --session-id`） | 它的 `dsh-hooks-claude-code` 插件运行 setup 写好的 hooks 文件；setup 还会写一个 patch，挂上这个插件和 `dsh-mcp-client`：先装一次这两个插件，再用 `dsh web --patch ~/.trace-canvas/dsh.patch.yml` 启动（setup 会打印这两行） | 实验性：按它桥接插件的数据格式回放过 |
+| **MiniMax Code**（`mcode`） | 自动留痕、实时栏、「等你处理」、MCP 工具、恢复会话（`mcode --session`） | 一个 Claude Code 插件格式的本地插件，放在 `~/.minimax/plugins/trace-canvas`，用 `mcode plugin enable trace-canvas@local` 打开 | 实验性：照源码做 |
 | **Qwen Code**（千问） | 自动留痕、实时栏、MCP 工具 | `~/.qwen/settings.json` | 实验性：照文档做 |
-| **Qoder CLI** | 自动留痕、实时栏（MCP 用 `qodercli mcp add`，setup 会打印） | `~/.qoder/settings.json` | 实验性：照文档做 |
+| **Qoder CLI** | 自动留痕、实时栏（MCP：`qodercli mcp add`，setup 会打印） | `~/.qoder/settings.json` | 实验性：照文档做 |
 | **TRAE CLI**（字节） | 自动留痕、实时栏（MCP 手动加） | `~/.trae/hooks.json`（国内版是 `~/.trae-cn`） | 实验性：照文档做 |
-| **Kimi Code** | 手动加上 hooks（TOML）后自动留痕；MCP 工具 | setup 会打印要加进 `~/.kimi-code/config.toml` 的内容和 `kimi mcp add` 命令 | 实验性 |
-| **DeepSeek Harness** | 通过它的 `dsh-hooks-claude-code` 插件沿用 Claude Code 的 hooks，按 `~/.dsh` 下的会话认出它；MCP 手动加 | setup 会打印步骤 | 实验性 |
-| **MiniMax Code** | 只有 MCP 工具（没有公开的 hooks）：靠 agent 自己用 `trace_log` 记 | 加一个运行 `trace-canvas mcp` 的 MCP 服务 | 还没做 |
+| **iFlow CLI**（阿里，即将停用） | 自动留痕、实时栏、MCP 工具、恢复会话（`iflow -r`）、导入历史、复盘 | hooks 和 MCP 写在 `~/.iflow/settings.json`；它的对话记录和 Claude Code 同格式，在 `~/.iflow/projects` | 按 iFlow 0.4 的数据格式回放过 |
 
-各家的工具名不一样（`run_shell_command`、`RunCommand`、`write_file`……），所以命令和改动按工具输入的样子认，不按名字认。Stop hook 不带回复的，从它的对话记录里读最后一句。
+各家的工具名不一样（`run_shell_command`、`RunCommand`、`write_file`……），所以命令和改动按工具输入的样子认，不按名字认。Kimi Code 和 DeepSeek Harness 不把 agent 的回复交给 Stop hook，所以它们每一轮显示的是改了哪些文件，而不是 agent 说了什么。
 
 ## 多台电脑，同一张画布
 

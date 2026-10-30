@@ -57,13 +57,69 @@ export const agentFiles = home => ({
   codex: path.join(home, '.codex', 'hooks.json'), gemini: path.join(home, '.gemini', 'settings.json'), iflow: path.join(home, '.iflow', 'settings.json'),
   qwen: path.join(home, '.qwen', 'settings.json'), qoder: path.join(home, '.qoder', 'settings.json'), trae: path.join(home, fs.existsSync(path.join(home, '.trae-cn')) ? '.trae-cn' : '.trae', 'hooks.json'),
 });
-// Each other CLI: its hooks and the command that must be on the PATH for setup to wire it, or a guide to follow by hand
-// where its config format cannot be edited safely from here (Kimi Code's TOML, DeepSeek Harness's plugins).
+// Kimi Code (~/.kimi-code/config.toml): [[hooks]] tables of event, command and timeout (seconds). A text edit, since
+// Node has no TOML parser: our tables, from their header to the next one, are replaced. ponytail: the command goes in
+// a literal string, so a path with a ' in it breaks it; KIMI_CODE_HOME is not followed.
+const KIMI_EVENTS = { SessionStart: 10, UserPromptSubmit: 5, PreToolUse: 5, PostToolUse: 5, PermissionRequest: 5, Stop: 10, Interrupt: 5, SubagentStart: 5, SubagentStop: 5, SessionEnd: 10 };
+export function installKimi(file, command) {
+  const raw = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+  if (raw) fs.writeFileSync(file + '.bak', raw);
+  const kept = raw.split(/^(?=\[)/m).filter(t => !(t.startsWith('[[hooks]]') && t.includes(MARK))).join('').trimEnd();
+  const ours = Object.entries(KIMI_EVENTS).map(([event, t]) => `[[hooks]]\nevent = "${event}"\ncommand = '${command}'\ntimeout = ${t}\n`).join('\n');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, (kept ? kept + '\n\n' : '') + ours);
+}
+// DeepSeek Harness: its dsh-hooks-claude-code plugin runs a Claude Code hooks file, and dsh-mcp-client connects an MCP
+// server. Both files go in the data folder: the hooks, and a patch that mounts the two plugins on them, to boot with.
+export function installDsh(dir, cli) {
+  const hooks = path.join(dir, 'dsh-hooks.json'), patch = path.join(dir, 'dsh.patch.yml'), cmd = hookCommand(cli, 'dsh');
+  install(hooks, cmd, plainHooks(['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop', 'SubagentStart', 'SubagentStop'])(cmd));
+  fs.writeFileSync(patch, `# Trace Canvas for DeepSeek Harness: dsh web --patch ${patch}
+- insert:
+    - id: trace-canvas-hooks
+      name: '@deepseek-ai/dsh-hooks-claude-code'
+      config:
+        configPath: ${JSON.stringify(hooks)}
+    - id: trace-canvas-mcp
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: trace-canvas
+        transport: stdio
+        command: ${JSON.stringify(NODE)}
+        args: [${JSON.stringify(cli)}, mcp]
+        env:
+          TRACE_CANVAS_AGENT: dsh
+`);
+  return patch;
+}
+// MiniMax Code: a local plugin, in the Claude Code plugin format it also reads (hooks/hooks.json, MCP servers in the
+// manifest), in its data folder's plugins/ (the local marketplace). It has no Notification event.
+export function installMinimax(home, cli, env = process.env) {
+  const data = env.MINIMAX_DATA_DIR || env.MAVIS_DATA_DIR || [path.join(home, '.minimax'), path.join(home, '.mavis')].find(d => fs.existsSync(d)) || path.join(home, '.minimax');
+  const root = path.join(data, 'plugins', 'trace-canvas'), cmd = hookCommand(cli, 'minimax');
+  fs.mkdirSync(path.join(root, '.claude-plugin'), { recursive: true });
+  fs.writeFileSync(path.join(root, '.claude-plugin', 'plugin.json'), JSON.stringify({ name: 'trace-canvas', version: '1.0.0', description: 'Trace Canvas: records this session on the canvas and gives the agent its trace_* tools.', mcpServers: { 'trace-canvas': { command: NODE, args: [cli, 'mcp'], env: { TRACE_CANVAS_AGENT: 'minimax' } } } }, null, 2) + '\n');
+  install(path.join(root, 'hooks', 'hooks.json'), cmd, plainHooks(['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PermissionRequest', 'PostToolUse', 'SubagentStart', 'SubagentStop', 'Stop', 'SessionEnd'])(cmd));
+  return root;
+}
+// Each other CLI: its hooks and the command that must be on the PATH for setup to wire it, or its own setup, which
+// returns what to tell the person.
 export const AGENT_SETUP = {
   codex: { hooks: codexHooks, bin: 'codex' }, gemini: { hooks: geminiHooks, bin: 'gemini' }, iflow: { hooks: iflowHooks, bin: 'iflow' },
   qwen: { hooks: plainHooks(CLAUDE_LIKE), bin: 'qwen' }, qoder: { hooks: plainHooks(CLAUDE_LIKE), bin: 'qodercli' }, trae: { hooks: plainHooks(['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Notification', 'Stop']), bin: 'traecli' },
-  kimi: { bin: 'kimi', guide: (cmd, cli) => `Kimi Code: add [[hooks]] entries running ${cmd} to ~/.kimi-code/config.toml (https://www.kimi.com/code/docs/en/kimi-code-cli/customization/hooks.html), and the tools with: kimi mcp add trace-canvas -- "${NODE}" "${cli}" mcp` },
-  dsh: { bin: 'dsh', guide: (cmd, cli) => `DeepSeek Harness: turn on its dsh-hooks-claude-code plugin, which runs the Claude Code hooks setup installed; for the tools, mount @deepseek-ai/dsh-mcp-client in ~/.dsh/profiles/web/cordis.patch.yml with the command "${NODE}" "${cli}" mcp and TRACE_CANVAS_AGENT=dsh` },
+  kimi: { bin: 'kimi', setup: (cli, dir, home = os.homedir()) => {
+    const f = path.join(home, '.kimi-code', 'config.toml');
+    installKimi(f, hookCommand(cli, 'kimi'));
+    installAgentMcp('kimi', cli, home);
+    return `hooks in ${f}, MCP in ${path.join(home, '.kimi-code', 'mcp.json')}; start a new Kimi Code session`;
+  } },
+  dsh: { bin: 'dsh', setup: (cli, dir) => `add its plugins once with: dsh plugin --profile web add @deepseek-ai/dsh-hooks-claude-code @deepseek-ai/dsh-mcp-client
+      then start it with: dsh web --patch ${installDsh(dir, cli)}  (or copy that file's entries into ~/.dsh/profiles/web/cordis.patch.yml)` },
+  minimax: { bin: 'mcode', setup: (cli, dir, home = os.homedir()) => {
+    const root = installMinimax(home, cli);
+    try { execFileSync('mcode', ['plugin', 'enable', 'trace-canvas@local'], { stdio: 'ignore', timeout: 20000 }); return `plugin at ${root}, enabled`; }
+    catch { return `plugin at ${root}; turn it on with: mcode plugin enable trace-canvas@local`; }
+  } },
 };
 
 export function settingsPath({ user, project }) {
@@ -135,9 +191,9 @@ export function installAgentMcp(agent, cli, home = os.homedir()) {
     try { execFileSync('codex', ['mcp', 'add', 'trace-canvas', '--env', 'TRACE_CANVAS_AGENT=codex', '--', NODE, cli, 'mcp'], { stdio: 'pipe' }); return { ok: true }; }
     catch (e) { return { ok: false, hint: `codex mcp add trace-canvas --env TRACE_CANVAS_AGENT=codex -- "${NODE}" "${cli}" mcp` }; }
   }
-  // Gemini CLI, iFlow CLI and Qwen Code: mcpServers in their settings.json; the others are registered by hand.
-  if (!['gemini', 'iflow', 'qwen'].includes(agent)) return { ok: false, hint: agent === 'qoder' ? `qodercli mcp add trace-canvas -- "${NODE}" "${cli}" mcp` : `add an MCP server running "${NODE}" "${cli}" mcp with TRACE_CANVAS_AGENT=${agent}` };
-  const file = agentFiles(home)[agent];
+  // Gemini CLI, iFlow CLI and Qwen Code: mcpServers in their settings.json; Kimi Code: in its mcp.json. The others by hand.
+  const file = agent === 'kimi' ? path.join(home, '.kimi-code', 'mcp.json') : ['gemini', 'iflow', 'qwen'].includes(agent) && agentFiles(home)[agent];
+  if (!file) return { ok: false, hint: agent === 'qoder' ? `qodercli mcp add trace-canvas -- "${NODE}" "${cli}" mcp` : `add an MCP server running "${NODE}" "${cli}" mcp with TRACE_CANVAS_AGENT=${agent}` };
   const s = fs.existsSync(file) && fs.readFileSync(file, 'utf8').trim() ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
   s.mcpServers = { ...(s.mcpServers || {}), 'trace-canvas': { command: NODE, args: [cli, 'mcp'], env: { TRACE_CANVAS_AGENT: agent } } };
   fs.mkdirSync(path.dirname(file), { recursive: true });

@@ -556,11 +556,11 @@ async function main() {
         writeConfig({ machine });
         console.log(`4. This computer is "${machine}"${cfg.map ? `; the canvas syncs through ${cfg.map} with trace-canvas sync` : ''}`);
       }
-      // --agents claude,codex,gemini,iflow,qwen,qoder,trae,kimi,dsh also wires the other CLIs (user scope only); missing ones are skipped.
+      // --agents claude,codex,gemini,iflow,qwen,qoder,trae,kimi,dsh,minimax also wires the other CLIs (user scope only); missing ones are skipped.
       const others = str(flag('agents', '')).split(',').map(x => x.trim()).filter(x => AGENT_SETUP[x]);
       for (const a of s.user ? others : []) {
         if (!onPath(AGENT_SETUP[a].bin)) { console.log(`   ${a}: not found on PATH, skipped${a === 'gemini' ? ' (install a current @google/gemini-cli, then run setup again)' : ''}`); continue; }
-        if (AGENT_SETUP[a].guide) { console.log(`   ${AGENT_SETUP[a].guide(hookCommand(SELF, a), SELF)} (experimental)`); continue; }
+        if (AGENT_SETUP[a].setup) { console.log(`   ${a}: ${AGENT_SETUP[a].setup(SELF, home())} (experimental: built from its docs, not yet run here)`); continue; }
         const f = agentFiles(os.homedir())[a], cmd = hookCommand(SELF, a);
         install(f, cmd, AGENT_SETUP[a].hooks(cmd));
         const r = installAgentMcp(a, SELF);

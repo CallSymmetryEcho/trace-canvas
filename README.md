@@ -238,22 +238,22 @@ For Codex, setup also links the skill into `~/.agents/skills/trace-canvas`. Invo
 
 Codex has no notification event, so a permission request stands in for "needs you". Checked against real Codex 0.164 sessions (`test/fixtures/codex/`): prompts, shell commands, `apply_patch` edits, commits, permission requests, the context at session start and ticking a to-do over MCP. Gemini CLI support follows its documented hook events and will be checked against a current `@google/gemini-cli`.
 
-### Chinese coding agents: iFlow, Qwen Code, Qoder, TRAE, Kimi Code, DeepSeek Harness
+### Chinese coding agents: Kimi Code, DeepSeek Harness, MiniMax Code and others
 
-Most of them took Claude Code's hooks as their model, so one adapter covers them; `setup --user --agents iflow,qwen,qoder,trae` wires the ones on your PATH.
+`setup --user --agents kimi,dsh,minimax` wires the ones on your PATH (add `qwen,qoder,trae,iflow` for those).
 
 | Agent | What works | How it is wired | Checked |
 | --- | --- | --- | --- |
 | **Claude Code on DeepSeek, Kimi, Qwen, MiniMax, GLM or Doubao** | everything | it is Claude Code (`ANTHROPIC_BASE_URL` set to their Anthropic-compatible API); records say whose model, e.g. *Claude Code · DeepSeek* | yes |
-| **iFlow CLI** (Alibaba) | hooks, live bar, MCP tools, resume (`iflow -r`), history import, Retro | hooks and MCP in `~/.iflow/settings.json`; its Claude Code-format transcripts in `~/.iflow/projects` | payloads replayed as iFlow 0.4 builds them; a live session not yet |
+| **Kimi Code** (Moonshot) | hooks, live bar, "needs you", MCP tools, resume (`kimi --session`) | `[[hooks]]` tables in `~/.kimi-code/config.toml`, MCP in `~/.kimi-code/mcp.json` | experimental: payloads replayed as its source builds them |
+| **DeepSeek Harness** (`dsh`) | hooks, live bar, MCP tools, a message to a session (`dsh headless --session-id`) | its `dsh-hooks-claude-code` plugin runs a hooks file setup writes; setup also writes a patch that mounts it and `dsh-mcp-client`: add the two plugins once, then `dsh web --patch ~/.trace-canvas/dsh.patch.yml` (setup prints both lines) | experimental: payloads replayed as its bridge builds them |
+| **MiniMax Code** (`mcode`) | hooks, live bar, "needs you", MCP tools, resume (`mcode --session`) | a local plugin in Claude Code's plugin format in `~/.minimax/plugins/trace-canvas`, turned on with `mcode plugin enable trace-canvas@local` | experimental: from its source |
 | **Qwen Code** | hooks, live bar, MCP tools | `~/.qwen/settings.json` | experimental: from its docs |
 | **Qoder CLI** | hooks, live bar (MCP: `qodercli mcp add`, printed by setup) | `~/.qoder/settings.json` | experimental: from its docs |
 | **TRAE CLI** (ByteDance) | hooks, live bar (MCP by hand) | `~/.trae/hooks.json` (`~/.trae-cn` for the Chinese edition) | experimental: from its docs |
-| **Kimi Code** | hooks once added by hand (TOML), MCP tools | setup prints what to add to `~/.kimi-code/config.toml` and the `kimi mcp add` line | experimental |
-| **DeepSeek Harness** | the Claude Code hooks through its `dsh-hooks-claude-code` plugin, told apart by its `~/.dsh` sessions; MCP by hand | setup prints the steps | experimental |
-| **MiniMax Code** | MCP tools only (no hooks documented): the agent logs with `trace_log` itself | add an MCP server running `trace-canvas mcp` | not built |
+| **iFlow CLI** (Alibaba, being discontinued) | hooks, live bar, MCP tools, resume (`iflow -r`), history import, Retro | hooks and MCP in `~/.iflow/settings.json`; its Claude Code-format transcripts in `~/.iflow/projects` | payloads replayed as iFlow 0.4 builds them |
 
-Tool names differ between them (`run_shell_command`, `RunCommand`, `write_file`…), so commands and edits are recognised by the shape of a tool's input, not its name. An agent that does not hand its reply to the Stop hook gets it from its transcript.
+Tool names differ between them (`run_shell_command`, `RunCommand`, `write_file`…), so commands and edits are recognised by the shape of a tool's input, not its name. Kimi Code and DeepSeek Harness do not hand the agent's reply to their Stop hook, so their turns show the files they changed rather than what the agent said.
 
 ## Several machines, one canvas
 

@@ -235,7 +235,9 @@ export function handleHook(input, env = process.env) {
       const files = state.turnFiles, todos = state.turnTodos;
       const acted = files.length > 0 || (state.turnActions || 0) > 0;
       const log = cfg.turns === 'all' ? !!(msg || acted) : cfg.turns === 'changes' ? acted : false;
-      if (log) {
+      // A turn with no reply (Kimi Code and DeepSeek Harness hand their Stop hook none) whose only action was a
+      // commit, already on the line, adds nothing.
+      if (log && (msg || files.length)) {
         const t = thread(state.lastPrompt);
         addCommit(d, { thread: t.id, kind: 'agent', title: headline(msg) || tr(cfg.lang, 'turnChanged', files.length), body: turnBody(cfg.lang, msg, files, todos), agent: ag.name, links: [ag.resume(sid)], extra: { session: sid, files: files.slice(0, 50) } });
       }

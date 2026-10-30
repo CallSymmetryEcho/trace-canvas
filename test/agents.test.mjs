@@ -257,16 +257,22 @@ test('a Kimi Code session, its payloads as Kimi Code builds them, is recorded as
 test('Kimi Code\'s hooks are [[hooks]] tables in its config.toml, replaced on a second setup; its MCP server goes in mcp.json', async () => {
   const { installKimi, installAgentMcp } = await import('../src/install.mjs');
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-kimi-')), file = path.join(home, '.kimi-code', 'config.toml');
-  const mine = 'default_model = "kimi-k2"\n\n[[hooks]]\nevent = "Notification"\nmatcher = "task\\\\.completed"\ncommand = "terminal-notifier -message done"\n\n[mcp]\nstartup_timeout_ms = 30000\n';
-  fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, mine);
+  // The person's settings and hooks, another tool's closed block, and Orca's start marker left without its end.
+  const mine = 'default_model = "kimi-k2"\n\n[[hooks]]\nevent = "Notification"\nmatcher = "task\\\\.completed"\ncommand = "terminal-notifier -message done"\n\n[mcp]\nstartup_timeout_ms = 30000\n'
+    + '# --- vibe-island START ---\n[[hooks]]\nevent = "Stop"\ncommand = "/v/bridge"\n# --- vibe-island END ---\n';
+  const orca = '\n# >>> orca-managed-kimi-hooks (managed by Orca; do not edit) >>>';
+  fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, mine + orca);
   const cmd = '"/usr/bin/node" "/x/bin/trace-canvas.mjs" hook --agent kimi';
   installKimi(file, cmd); installKimi(file, cmd);
   const toml = fs.readFileSync(file, 'utf8'), tables = toml.split(/^(?=\[)/m);
-  assert.ok(toml.startsWith(mine.trimEnd())); // the person's settings and hooks are kept, in place
+  assert.ok(toml.startsWith(mine.trimEnd())); // kept, in place
+  assert.ok(toml.endsWith(orca + '\n')); // still last
+  // Orca removes its block from its start marker to its end marker, or to the end of the file: ours stays.
+  assert.match(toml.replace(/\n*# >>> orca-managed-kimi-hooks[\s\S]*?(?:# <<< orca-managed-kimi-hooks <<<[^\n]*|$)/g, ''), /--agent kimi[\s\S]*# <<< trace-canvas hooks <<<$/);
   const ours = tables.filter(t => t.includes('--agent kimi'));
   assert.deepEqual(ours.map(t => t.match(/event = "(\w+)"/)[1]), ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PermissionRequest', 'Stop', 'Interrupt', 'SubagentStart', 'SubagentStop', 'SessionEnd']);
-  assert.equal(ours[0], `[[hooks]]\nevent = "SessionStart"\ncommand = '${cmd}'\ntimeout = 10\n\n`);
-  for (const t of ours) assert.deepEqual(t.trim().split('\n').slice(1).map(l => l.split(' = ')[0]), ['event', 'command', 'timeout']); // only keys it allows
+  assert.ok(ours[0].startsWith(`[[hooks]]\nevent = "SessionStart"\ncommand = "\\"/usr/bin/node\\" \\"/x/bin/trace-canvas.mjs\\" hook --agent kimi"\ntimeout = 10\n`));
+  for (const t of ours) assert.deepEqual(t.trim().split('\n').filter(l => l && !l.startsWith('#')).slice(1).map(l => l.split(' = ')[0]), ['event', 'command', 'timeout']); // only keys it allows
   installAgentMcp('kimi', '/x/bin/trace-canvas.mjs', home);
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(home, '.kimi-code', 'mcp.json'), 'utf8')).mcpServers['trace-canvas'].env, { TRACE_CANVAS_AGENT: 'kimi' });
 });

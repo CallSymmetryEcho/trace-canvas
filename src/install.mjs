@@ -58,16 +58,20 @@ export const agentFiles = home => ({
   qwen: path.join(home, '.qwen', 'settings.json'), qoder: path.join(home, '.qoder', 'settings.json'), trae: path.join(home, fs.existsSync(path.join(home, '.trae-cn')) ? '.trae-cn' : '.trae', 'hooks.json'),
 });
 // Kimi Code (~/.kimi-code/config.toml): [[hooks]] tables of event, command and timeout (seconds). A text edit, since
-// Node has no TOML parser: our tables, from their header to the next one, are replaced. ponytail: the command goes in
-// a literal string, so a path with a ' in it breaks it; KIMI_CODE_HOME is not followed.
+// Node has no TOML parser: our tables sit between our own markers, as other tools' do, and are replaced. They go at
+// the end (tables must follow the top-level keys), but before a trailing comment block: Orca's start marker without
+// its end marker means "to the end of the file" to Orca, which would delete ours. ponytail: KIMI_CODE_HOME is not followed.
 const KIMI_EVENTS = { SessionStart: 10, UserPromptSubmit: 5, PreToolUse: 5, PostToolUse: 5, PermissionRequest: 5, Stop: 10, Interrupt: 5, SubagentStart: 5, SubagentStop: 5, SessionEnd: 10 };
+const KIMI_START = '# >>> trace-canvas hooks >>>', KIMI_END = '# <<< trace-canvas hooks <<<';
 export function installKimi(file, command) {
   const raw = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
   if (raw) fs.writeFileSync(file + '.bak', raw);
-  const kept = raw.split(/^(?=\[)/m).filter(t => !(t.startsWith('[[hooks]]') && t.includes(MARK))).join('').trimEnd();
-  const ours = Object.entries(KIMI_EVENTS).map(([event, t]) => `[[hooks]]\nevent = "${event}"\ncommand = '${command}'\ntimeout = ${t}\n`).join('\n');
+  const kept = raw.replace(new RegExp(`\\n*${KIMI_START}[\\s\\S]*?${KIMI_END}`), '').trim();
+  const tail = (kept.match(/\n\n(?:#[^\n]*\n?)+$/) || [''])[0], head = kept.slice(0, kept.length - tail.length);
+  // JSON's string escapes are TOML's basic-string escapes.
+  const ours = [KIMI_START, ...Object.entries(KIMI_EVENTS).map(([event, t]) => `[[hooks]]\nevent = "${event}"\ncommand = ${JSON.stringify(command)}\ntimeout = ${t}\n`), KIMI_END].join('\n');
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, (kept ? kept + '\n\n' : '') + ours);
+  fs.writeFileSync(file, (head ? head + '\n\n' : '') + ours + tail + '\n');
 }
 // DeepSeek Harness: its dsh-hooks-claude-code plugin runs a Claude Code hooks file, and dsh-mcp-client connects an MCP
 // server. Both files go in the data folder: the hooks, and a patch that mounts the two plugins on them, to boot with.

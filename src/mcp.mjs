@@ -21,7 +21,7 @@ const INSTRUCTIONS = `Trace Canvas keeps a trace of parallel work as threads (li
 Use trace_capture_session to put the current Claude Code session on the canvas; write 2-6 highlights (decisions, outcomes, next steps) and a short summary yourself, in the user's language.
 Use trace_tasks at the start of work to read the goals and open to-dos of the thread you work on, and trace_task_done when you finish one, so the person can follow progress without asking. When the person gives a new goal, idea or next step, add it right away as a to-do: trace_log with kind "task" on the thread you work on.
 Use trace_live to see which sessions are running now and whether one waits for the user; trace_bind puts a session on a thread.
-Use trace_list_threads before trace_merge, and confirm with the user which threads to merge and how: "merge" keeps every line and draws merges; "combine" folds them into one line and removes the others.`;
+Use trace_list_threads before trace_merge, and confirm with the user which threads to merge and how: use "merge" (keeps every line and its records, draws the merge, and the canvas folds the merged line into the target); "combine" deletes the source lines, so use it only when the person explicitly asks for that.`;
 
 const KIND = { type: 'string', enum: ['idea', 'task', 'agent', 'decision', 'note'] };
 const TOOLS = [

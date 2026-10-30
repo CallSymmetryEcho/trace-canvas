@@ -55,7 +55,7 @@ Call `trace_fork` with `from` (the thread or record the user named) and `name`. 
 2. Confirm three things with the user before merging:
    - the sources
    - the target: an existing thread, or a new name
-   - the mode: **merge** keeps every line and draws the merge, like git; **combine** moves every record onto the target in time order and removes the source threads
+   - the mode: use **merge** (keeps every line and its records, draws the merge like git, and folds the merged line into the target on the canvas). Use **combine** (moves every record onto the target and deletes the source threads) only if the user explicitly asks to drop the source lines
 3. Call `trace_merge`. Report what happened in one line.
 
 ## tasks: goals and to-dos

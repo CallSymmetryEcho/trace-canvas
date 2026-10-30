@@ -74,6 +74,8 @@ Promo site: [trace-canvas.bin-lian.com](https://trace-canvas.bin-lian.com) ([`si
 
 *Branches: running sessions sit as live tips on top of their lines. The orange one waits for you; once approved it turns green, your decision appears dark and the agent's result in the line's colour. Made-up data.*
 
+In the Branches view, **Show** next to the lines' legend keeps only the kinds you pick (say decisions and notes): other records drop out, the lines stay whole and the matching stations get a halo; the canvas and the timeline dim the rest instead. The legend keeps the lines on one row (**All N** opens them). Click a line, or its chip, to bring it forward and open its panel; click it again to let go. Columns are reused the way `git log --graph` does it, so a line that has ended gives its column to a later one, and a fork sits next to the line it came from.
+
 Four views of the same data:
 
 | View | What it shows |
@@ -217,6 +219,8 @@ Agents use the same list. At the start of work they read the goal and the open t
 
 *Agents tick to-dos off on the shared list, one by Claude Code and one by Codex, and the line's progress bar moves forward. Made-up data.*
 
+**Lines that have gone quiet.** A line nobody has touched for three times its usual gap (at least three days), with no session on it, gets a small dot on **Goals** and a chip under **Gone quiet** at the top of the list; nothing pops up. Click the chip for one sentence and three answers: a line with no open to-dos is asked whether it is finished (**Done**, **Parked**, **Still on it**), one with open to-dos whether to park it. **Still on it** counts as activity, so it asks again only after another quiet spell.
+
 ## Several agents on one machine: Claude Code, Codex, Gemini CLI
 
 Claude Code, Codex and Gemini CLI can share the canvas and split the work through to-dos:
@@ -276,12 +280,12 @@ Put lines that belong together in a group: select them (**Select**) and press **
 
 Several sessions about the same piece of work can become one line, in two ways:
 
-- **Merge** keeps every source line, marks it merged and draws the merge into the target, like git. History stays visible.
-- **Combine** moves every record onto the target in time order and removes the source threads. Links to them now point to the target.
+- **Merge** (the one to use) keeps every source line, marks it merged and draws the merge into the target, like git. Nothing is lost and it can be undone. A merged line then folds into its target: the canvas shows the target's card with **N merged in**, its panel links each merged line, and the Branches view still draws its history (More → Show merged threads lays them all out again).
+- **Combine** moves every record onto the target in time order and removes the source threads; their name, colour and goal are gone and it cannot be undone. Links to them now point to the target. The canvas no longer offers it; agents use it only when you ask for it by name, and the command line keeps `--combine`.
 
 The target can be an existing thread or a new one. Three places to do it:
 
-- **On the canvas**: Shift-click cards (or turn on **Select** in the toolbar, handy on touch screens). The bar lists the lines you picked; the first one is kept and the others go into it (click another to keep that one, or pick another line or a new one under **into**), and a line under the buttons says what goes where. Then **Merge** or **Combine**.
+- **On the canvas**: Shift-click cards (or turn on **Select** in the toolbar, handy on touch screens). The bar lists the lines you picked; the first one is kept and the others go into it (click another to keep that one, or pick another line or a new one under **into**), and a line under the buttons says what goes where. Then **Merge**.
 - **In Claude Code**: `/trace-canvas merge`, or ask in your own words.
 - **On the command line**: `trace-canvas merge "Survey A" "Survey B" --into "Survey analysis" --combine`.
 

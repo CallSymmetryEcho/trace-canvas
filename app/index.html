@@ -265,12 +265,41 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .lane-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px 3px 6px; border: 1px solid var(--rule); border-radius: 999px; background: var(--surface); font-size: 12.5px; cursor: pointer; }
 .lane-chip i { width: 10px; height: 10px; border-radius: 50%; border: 3px solid var(--c); background: var(--surface); }
 .lane-chip.is-sel { border-color: var(--accent); }
+.kind-chip { padding-left: 4px; }
+/* Lines sit in one row that scrolls sideways; "All N" wraps them. The kind filter stays on the same row. */
+.git-legend { flex-wrap: nowrap; }
+.lane-chips { display: flex; gap: 6px; flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.lane-chips::-webkit-scrollbar { display: none; }
+.lane-chips > *, .git-legend > * { flex: none; }
+.git-legend > .lane-chips { flex: 1 1 auto; }
+.git-legend.open { flex-wrap: wrap; }
+.git-legend.open .lane-chips { flex-wrap: wrap; flex-basis: 100%; order: 0; }
+.lane-more { color: var(--muted); }
+.g-hit { opacity: .28; }
+/* Quiet lines: a dot on Goals, and one row of chips on the Goals page. Nothing pops up. */
+.has-nudge { position: relative; }
+.has-nudge::after { content: ''; position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--warn); opacity: .85; }
+.q-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 6px; }
+.q-label { font-size: 12px; color: var(--faint); margin-right: 2px; }
+.q-chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px 2px 7px; border: 1px dashed var(--rule); border-radius: 999px; background: none; color: var(--muted); font-size: 12.5px; cursor: pointer; }
+.q-chip b { font-weight: 500; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.q-chip i { width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--c); opacity: .6; }
+.q-chip span { color: var(--faint); font-family: var(--f-mono); font-size: 11px; }
+.q-chip:hover, .q-chip.is-open { border-style: solid; color: var(--ink); }
+.q-ask { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 13px; color: var(--muted); }
+.q-ask span { margin-right: 4px; }
+.kind-chip.is-sel { background: var(--accent-soft); border-color: var(--accent); }
 .git-body { position: relative; padding-left: max(4px, env(safe-area-inset-left, 0px)); }
 .git-svg { position: absolute; top: 0; overflow: visible; }
 .git-svg .lane { stroke-width: 3; stroke-linecap: round; fill: none; }
 .git-svg .lane-open { stroke-width: 3; stroke-dasharray: 2 5; stroke-linecap: round; fill: none; }
 .git-svg .link { stroke-width: 3; fill: none; stroke-linecap: round; }
 .git-svg [data-cid] { cursor: pointer; }
+/* Choosing a line (click it, or its chip) brings it forward and fades the rest. */
+.git-svg .lane-hit { stroke: transparent; pointer-events: stroke; cursor: pointer; }
+.git-svg .ln:hover .lane, .git-svg .ln.on .lane { stroke-width: 5; }
+.git-svg .off { opacity: .18; }
+.g-row.is-other { opacity: .45; }
 .g-row {
   /* border-box: the row is exactly ROW tall with its border, so each title stays level with its station */
   display: flex; align-items: center; gap: 10px; height: 44px; box-sizing: border-box; border-bottom: 1px solid var(--rule-soft);
@@ -483,6 +512,11 @@ body.sheet-open .top { z-index: 80; }
   .git-legend { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   .git-legend::-webkit-scrollbar { display: none; }
   .git-legend > * { flex: none; }
+  /* Legend on a phone: the lines get what is left of the row and scroll inside it; kinds are icons only; chips are taller to tap. */
+  .git-legend > .lane-chips { flex: 1 1 0; min-width: 96px; }
+  .git-legend .legend-label, .git-legend .legend-actors, .kind-chip span { display: none; }
+  .git-legend .lane-chip { padding-block: 7px; }
+  .kind-chip { padding: 7px 6px; }
   .capture:not(:focus-within) .cap-meta { display: none; }
   .capture:not(:focus-within) .cap-input textarea { height: 38px !important; overflow: hidden; }
 
@@ -723,6 +757,7 @@ body.sheet-open .top { z-index: 80; }
       <div class="menu" id="menu" hidden>
         <button data-menu="new-thread"><span data-i18n="menuNewThread">New thread</span> <span class="k">N</span></button>
         <button data-menu="toggle-done"><span id="toggle-done-label"></span></button>
+        <button data-menu="toggle-merged"><span id="toggle-merged-label"></span></button>
         <button data-menu="focus" data-i18n="menuFocus">Focus on a group…</button>
         <button data-menu="theme"><span id="theme-label"></span></button>
         <hr>
@@ -876,7 +911,7 @@ const I18N = {
     exChip: 'Example data', exClear: 'Clear', exChipTitle: 'Records added to show how the views work',
     searchPh: 'Search records…', aiBtn: 'AI tidy-up', aiBtnTitle: 'Ask Claude to sort the inbox and find links between threads',
     langGroup: 'Language', more: 'More',
-    menuNewThread: 'New thread', menuHideDone: 'Hide finished threads', menuShowDone: 'Show finished threads',
+    menuNewThread: 'New thread', menuHideDone: 'Hide finished threads', menuShowDone: 'Show finished threads', quietLabel: 'Gone quiet', quietDays: n => `${n}d`, quietDot: n => `${n} line${n === 1 ? ' has' : 's have'} gone quiet`, quietAsk: (n, u) => `Nothing for ${n} days, where it usually moves every ${u === 1 ? 'day' : `${u} days`}. Finished?`, quietAskOpen: (n, k) => `Nothing for ${n} days, with ${k} to-do${k === 1 ? '' : 's'} still open. Park it for now?`, quietStill: 'Still on it', menuShowMerged: 'Show merged threads', menuHideMerged: 'Fold merged threads', mergedInCount: n => ` · ${n} merged in`, mergedInLabel: 'Merged in',
     arrange: 'Arrange', arrangeTitle: 'Lay the lines out by group, forks next to the lines they came from', tArranged: 'Arranged', tUndo: 'Undo',
     groupLabel: 'Group', groupName: 'Name', groupLines: 'Lines in this group', groupCount: n => `${n} line${n === 1 ? '' : 's'}`, groupArrange: 'Arrange this group', groupFocus: 'Focus on this group', menuFocus: 'Focus on a group…', menuTheme: n => `Theme: ${n}`, theme_auto: 'match the system', theme_light: 'light', theme_dark: 'dark', theme_mist: 'mist', focusTitle: 'Focus on a group', focusLabel: 'Focus', focusPick: 'Change', focusExit: 'Leave focus', groupFold: 'Fold this group', foldedLabel: 'Folded', foldOpenAll: 'Unfold all', foldOpen: 'Unfold', foldedChip: n => `${n} line${n === 1 ? '' : 's'} · folded`, fromMachines: ms => `from ${ms.join(', ')}`, fromTitle: (m, n) => `${n} record${n === 1 ? '' : 's'} written on ${m}`, foldTitle: 'Fold groups', foldIntro: 'Folded groups stay out of every view (the canvas keeps a small chip for each) until you unfold them. Focus still works on any group.', foldShown: 'Shown', tFolded: g => `Folded "${g}"`,
     focusIntro: 'Every view then shows only the lines of the group you pick: the canvas, the branches, the timeline and the goals. It stays on, also after a reload, until you leave it.',
@@ -927,7 +962,7 @@ const I18N = {
     justNow: 'just now', minAgo: n => `${n} min ago`, hAgo: n => `${n} h ago`, yesterday: 'yesterday', daysAgo: n => `${n} days ago`,
     edgeRelated: 'related', edgeFork: 'fork', edgeMerge: 'merge', labelChips: ['depends on', 'references', 'derived from', 'blocks', 'conflicts', 'same goal'],
     connectFrom: n => `From <b>${n}</b>: now pick a second thread`, connectPick: 'Pick the thread to start from',
-    legend: 'Lines', tlCorner: 'Threads', tlNowLabel: 'now',
+    legend: 'Lines', legendKinds: 'Show', lanesAll: n => `All ${n}`, lanesLess: 'Collapse', tlCorner: 'Threads', tlNowLabel: 'now',
     week: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
     months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
     dayLabel: d => `${I18N.en.week[d.getDay()]} ${d.getMonth() + 1}/${d.getDate()}`,
@@ -1050,7 +1085,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     exChip: '示例数据', exClear: '清除', exChipTitle: '这些是演示各个视图用的示例数据',
     searchPh: '搜索记录…', aiBtn: 'AI 梳理', aiBtnTitle: '让 Claude 归类收件箱并找出线程间的关联',
     langGroup: '语言', more: '更多',
-    menuNewThread: '新建线程', menuHideDone: '隐藏已完成的线程', menuShowDone: '显示已完成的线程',
+    menuNewThread: '新建线程', menuHideDone: '隐藏已完成的线程', menuShowDone: '显示已完成的线程', quietLabel: '安静了', quietDays: n => `${n} 天`, quietDot: n => `${n} 条线安静了`, quietAsk: (n, u) => `${n} 天没动静，平时${u === 1 ? '每天' : ` ${u} 天`}一更。做完了吗？`, quietAskOpen: (n, k) => `${n} 天没动静，还有 ${k} 项待办。先搁置？`, quietStill: '还在做', menuShowMerged: '显示已合并的线程', menuHideMerged: '收起已合并的线程', mergedInCount: n => ` · 已并入 ${n} 条`, mergedInLabel: '已并入',
     arrange: '整理', arrangeTitle: '按分组排好线程，分叉排在原线旁边', tArranged: '已整理', tUndo: '撤销',
     groupLabel: '分组', groupName: '名称', groupLines: '组里的线', groupCount: n => `${n} 条线`, groupArrange: '整理这一组', groupFocus: '专注这一组', menuFocus: '专注某个分组…', menuTheme: n => `主题：${n}`, theme_auto: '跟随系统', theme_light: '浅色', theme_dark: '深色', theme_mist: '雾蓝', focusTitle: '专注模式', focusLabel: '专注', focusPick: '换一个', focusExit: '退出专注', groupFold: '折叠这一组', foldedLabel: '已折叠', foldOpenAll: '全部展开', foldOpen: '展开', foldedChip: n => `${n} 条线 · 已折叠`, fromMachines: ms => `来自 ${ms.join('、')}`, fromTitle: (m, n) => `${n} 条记录写在 ${m} 上`, foldTitle: '折叠分组', foldIntro: '折叠的分组不会出现在任何视图里（画布上只留一个小条），直到你展开。专注仍然可以选任何分组。', foldShown: '显示中', tFolded: g => `已折叠「${g}」`,
     focusIntro: '选一个分组后，画布、分支、时间线和目标都只显示这个组里的线。刷新后也保持，直到你退出。',
@@ -1101,7 +1136,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     justNow: '刚刚', minAgo: n => `${n} 分钟前`, hAgo: n => `${n} 小时前`, yesterday: '昨天', daysAgo: n => `${n} 天前`,
     edgeRelated: '相关', edgeFork: '分叉', edgeMerge: '合并', labelChips: ['依赖', '参考', '衍生', '阻塞', '冲突', '同一目标'],
     connectFrom: n => `从「<b>${n}</b>」出发，再点一条线程完成连线`, connectPick: '点一条线程作为起点',
-    legend: '线路', tlCorner: '线程', tlNowLabel: '现在',
+    legend: '线路', legendKinds: '只看', lanesAll: n => `全部 ${n}`, lanesLess: '收起', tlCorner: '线程', tlNowLabel: '现在',
     week: ['日', '一', '二', '三', '四', '五', '六'],
     dayLabel: d => `${d.getMonth() + 1}/${d.getDate()} 周${I18N.zh.week[d.getDay()]}`,
     monthLabel: d => `${d.getFullYear()} 年 ${d.getMonth() + 1} 月`,
@@ -1252,8 +1287,9 @@ const COLS = ['threads', 'commits', 'edges'];
 const S = {
   threads: new Map(), commits: new Map(), edges: new Map(),
   view: 'canvas', sel: null, ui: {}, q: '',
+  kinds: new Set(ls.get('tc.kinds', [])), lanesOpen: ls.get('tc.lanesOpen', false), // record kinds picked in the Branches legend; empty = all
   glDraft: {}, glEdit: null, // Goals page: half-typed to-dos per line; the to-do id (or goal:<line>) being edited
-  hideDone: ls.get('tc.hideDone', false),
+  hideDone: ls.get('tc.hideDone', false), showMerged: ls.get('tc.showMerged', false),
   cam: { x: 40, y: 40, z: 1 }, fitted: false,
   inboxPos: ls.get('tc.inboxPos', { x: 0, y: 0 }),
   tlZoom: ls.get('tc.tlZoom', 'week'), tlScroll: true,
@@ -1310,7 +1346,9 @@ function byThread() {
   return m;
 }
 function orderedThreads() { return [...S.threads.values()].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)); }
-function isHidden(th) { return S.hideDone && (th.status === 'done' || th.status === 'merged'); }
+// A merged line folds into the line it merged into: hidden unless More → Show merged lines; its records stay where they are.
+function isHidden(th) { return th.status === 'merged' ? !S.showMerged || S.hideDone : S.hideDone && th.status === 'done'; }
+const mergedIn = id => orderedThreads().filter(x => x.status === 'merged' && x.mergedInto === id);
 // Focus mode: every view shows only one group's lines (More → Focus on a group, or the group's panel). Kept per device.
 // What every view shows: in focus mode one group's lines; otherwise every line but those of folded groups.
 function inFocus(th) { return S.focusGroup ? th.group === S.focusGroup : !(th.group && S.folded.includes(th.group)); }
@@ -1327,8 +1365,27 @@ function setFocus(g) {
   select(null); render();
   if (S.view === 'canvas') requestAnimationFrame(() => requestAnimationFrame(fit));
 }
+// A line has gone quiet when it has been still for three times its usual gap between active days (at least
+// 3 days), with no session on it. "Still on it" (quietAck) counts as activity, so it asks again only after
+// another quiet spell.
+const DAY = 86400e3;
+function quietInfo(th, by) {
+  if (!th || th.id === INBOX || th.status !== 'active' || liveOn(th.id).length) return null;
+  const cs = by.get(th.id) || [];
+  const last = Math.max(cs.length ? cs[cs.length - 1].ts : th.createdAt || 0, th.quietAck || 0);
+  const days = [...new Set(cs.map(c => Math.floor(c.ts / DAY)))];
+  const gaps = days.slice(1).map((d, i) => d - days[i]).sort((a, b) => a - b);
+  const usual = gaps.length ? gaps[Math.floor(gaps.length / 2)] : 1;
+  const idle = Math.floor((Date.now() - last) / DAY);
+  if (idle < Math.max(3, 3 * usual)) return null;
+  return { th, idle, usual, open: cs.filter(c => isTodo(c) && !c.done).length };
+}
+const quietLines = (by = byThread()) => viewLines().map(th => quietInfo(th, by)).filter(Boolean);
 function lastCommit(tid) { let best = null; for (const c of S.commits.values()) if (tidOf(c) === tid && (!best || c.ts > best.ts)) best = c; return best; }
+// Search text and the kind filter both narrow what stays bright; the rest is dimmed, never hidden, so lanes stay whole.
+const filtering = () => !!(S.q || S.kinds.size);
 function matches(c) {
+  if (S.kinds.size && !S.kinds.has(c.kind)) return false;
   if (!S.q) return true;
   const q = S.q.toLowerCase();
   return [c.title, c.body, c.agent, ...(c.links || [])].some(v => v && String(v).toLowerCase().includes(q));
@@ -1901,6 +1958,8 @@ function renderFocus() {
 }
 function render() { if (rq) return; rq = requestAnimationFrame(() => { rq = 0; renderAll(); }); }
 function renderAll() {
+  const nQuiet = quietLines().length;
+  for (const b of [$('#goals-btn'), $('#tab-goals')]) { b.classList.toggle('has-nudge', nQuiet > 0); b.title = nQuiet ? t('quietDot', nQuiet) : ''; }
   $('#group-list').innerHTML = groupNames().map(g => `<option value="${esc(g)}">`).join('');
   renderSync();
   renderLive();
@@ -1918,6 +1977,7 @@ function renderAll() {
   $('#ex-banner').hidden = !(loaded() && hasExamples());
   $('#clear-ex-item').hidden = !hasExamples();
   $('#toggle-done-label').textContent = S.hideDone ? t('menuShowDone') : t('menuHideDone');
+  $('#toggle-merged-label').textContent = S.showMerged ? t('menuHideMerged') : t('menuShowMerged');
   $('#theme-label').textContent = t('menuTheme', t('theme_' + themeNow()));
   $('#away-label').textContent = t('menuAway', !!S.awayLive);
   if (S.view === 'canvas') renderCanvas();
@@ -2019,7 +2079,6 @@ function renderMulti() {
     <select id="multi-target"><optgroup label="${esc(t('multiInGroup'))}">${picked.map(opt).join('')}</optgroup><option value="__new" ${tgt === '__new' ? 'selected' : ''}>${esc(t('multiNew'))}</option>${others.length ? `<optgroup label="${esc(t('multiOthers'))}">${others.map(opt).join('')}</optgroup>` : ''}</select>
     <input id="multi-name" placeholder="${esc(t('multiNamePh'))}" value="${esc(S.multiName)}" ${tgt === '__new' ? '' : 'hidden'}>
     <button class="btn btn-primary" data-multi="merge" title="${esc(t('multiMergeTitle'))}">${esc(t('multiMerge'))}</button>
-    <button class="btn" data-multi="combine" title="${esc(t('multiCombineTitle'))}">${esc(t('multiCombine'))}</button>
     <input id="multi-group" list="group-list" placeholder="${esc(t('multiGroupPh'))}" value="${esc(S.multiGroup)}">
     <button class="btn" data-multi="group">${esc(t('multiGroup'))}</button>
     <button class="btn btn-quiet" data-multi="clear">${esc(t('multiClear'))}</button>
@@ -2227,11 +2286,11 @@ function cardHTML(th, cs, selT) {
   const recent = cs.slice(-4).reverse();
   const more = cs.length - recent.length;
   const last = cs[cs.length - 1];
-  const anyHit = !S.q || cs.some(matches);
+  const anyHit = !filtering() || cs.some(matches);
   const selC = S.sel && S.sel.type === 'commit' ? S.sel.id : null;
-  const cls = ['card', isInbox ? 'is-inbox' : `st-${th.status || 'active'}`, selT === th.id ? 'is-sel' : '', S.q && !anyHit ? 'is-dim' : '', S.connect && S.connect.from === th.id ? 'is-from' : '', S.multi.has(th.id) ? 'is-multi' : '', S.multi.has(th.id) && th.id === S.multiTarget ? 'is-multi-target' : ''].filter(Boolean).join(' ');
+  const cls = ['card', isInbox ? 'is-inbox' : `st-${th.status || 'active'}`, selT === th.id ? 'is-sel' : '', filtering() && !anyHit ? 'is-dim' : '', S.connect && S.connect.from === th.id ? 'is-from' : '', S.multi.has(th.id) ? 'is-multi' : '', S.multi.has(th.id) && th.id === S.multiTarget ? 'is-multi-target' : ''].filter(Boolean).join(' ');
   const items = recent.length
-    ? recent.map(c => `<li data-cid="${esc(c.id)}" class="${c.id === selC ? 'is-sel' : ''} ${S.q && matches(c) ? 'hit' : ''}">${mini(c.kind, stationColor(c, th), c.done)}<span class="s-title">${esc(c.title)}</span><time class="s-time">${fmtShort(c.ts)}</time></li>`).join('')
+    ? recent.map(c => `<li data-cid="${esc(c.id)}" class="${c.id === selC ? 'is-sel' : ''} ${filtering() && matches(c) ? 'hit' : ''}">${mini(c.kind, stationColor(c, th), c.done)}<span class="s-title">${esc(c.title)}</span><time class="s-time">${fmtShort(c.ts)}</time></li>`).join('')
       + (more > 0 ? `<li class="s-more"><span></span><span>${esc(t('moreEarlier', more))}</span><span></span></li>` : '')
     : `<li class="s-empty"><span></span><span>${esc(isInbox ? t('inboxEmpty') : t('noRecords'))}</span><span></span></li>`;
   const chip = isInbox ? `<span class="chip">${esc(t('unsorted'))}</span>` : `<span class="chip chip-${th.status || 'active'}">${esc(statusLabel(th.status))}</span>`;
@@ -2239,7 +2298,7 @@ function cardHTML(th, cs, selT) {
   return `<div class="${cls}" data-tid="${esc(th.id)}" style="left:${th.x || 0}px;top:${th.y || 0}px;--c:${th.color}">
     <div class="card-head"><span class="roundel"></span><span class="card-name">${esc(th.name)}</span>${liveBadge(th.id)}${chip}</div>
     <ol class="strip">${items}</ol>
-    <div class="card-foot"><span>${esc(t('countRecords', cs.length))}${agents ? esc(t('countAgent', agents)) : ''}</span><span>${last ? esc(t('updated', fmtRel(last.ts))) : ''}</span></div>
+    <div class="card-foot"><span>${esc(t('countRecords', cs.length))}${agents ? esc(t('countAgent', agents)) : ''}${mergedIn(th.id).length && !S.showMerged ? esc(t('mergedInCount', mergedIn(th.id).length)) : ''}</span><span>${last ? esc(t('updated', fmtRel(last.ts))) : ''}</span></div>
   </div>`;
 }
 function border(R, c, toward, gap) {
@@ -2434,67 +2493,110 @@ function createThreadAndEdit() {
 const machineTag = m => (m && S.machine && m !== S.machine ? `<span class="agent-tag m-tag" title="${esc(t('onMachine', m))}">${esc(m)}</span>` : '');
 function renderGit() {
   const by = byThread();
-  const visible = new Set(viewLines().map(th => th.id));
-  const list = [...S.commits.values()].filter(c => visible.has(tidOf(c))).sort((a, b) => b.ts - a.ts);
+  const visible = new Set(viewLines(th => !isHidden(th) || (th.status === 'merged' && !S.hideDone)).map(th => th.id));
+  // The kind filter drops rows here (forks and merges stay so lines keep their shape); search only dims.
+  const kindOk = c => !S.kinds.size || S.kinds.has(c.kind) || c.kind === 'fork' || c.kind === 'merge';
+  const list = [...S.commits.values()].filter(c => visible.has(tidOf(c)) && kindOk(c)).sort((a, b) => b.ts - a.ts);
   // Live tips: sessions working on a visible line right now take the top rows, above its newest record.
   const tips = S.live.filter(s => s.threadId && visible.has(s.threadId));
   const body = $('#git-body'), legend = $('#git-legend');
   if (!list.length && !tips.length) { body.innerHTML = ''; legend.innerHTML = ''; return; }
   const tipLines = new Set(tips.map(s => s.threadId));
   const laneOrder = [INBOX, ...orderedThreads().map(th => th.id)].filter(id => visible.has(id) && (by.has(id) || tipLines.has(id)));
-  const lane = new Map(laneOrder.map((id, i) => [id, i]));
   const row = new Map(list.map((c, i) => [c.id, i + tips.length]));
+  // Rows each line takes up: it runs over every row inside its own time span (so it stays whole when the kind
+  // filter hides its records), plus its live tips, the row its fork curve leaves from, the row its merge curve
+  // reaches, and the stub above an open line.
+  const info = new Map();
+  for (const id of laneOrder) {
+    const th = getThread(id), all = by.get(id) || [];
+    const span = list.map((c, i) => (all.length && c.ts >= all[0].ts && c.ts <= all[all.length - 1].ts ? i + tips.length : -1)).filter(i => i >= 0);
+    const myTips = tips.map((s, i) => (s.threadId === id ? i : -1)).filter(i => i >= 0);
+    const ys = [...span, ...myTips];
+    let lo = Math.min(...ys), hi = Math.max(...ys);
+    const fc = th.forkOf && S.commits.get(th.forkOf);
+    if (fc && row.has(fc.id)) hi = Math.max(hi, row.get(fc.id) - 1);
+    if (!myTips.length && id !== INBOX && (th.status === 'active' || th.status === 'parked')) lo -= 1;
+    info.set(id, { span, myTips, ys, lo, hi });
+  }
+  for (const c of list) if (c.kind === 'merge' && info.has(c.mergeOf)) { const m = info.get(c.mergeOf); m.lo = Math.min(m.lo, row.get(c.id) + 1); }
+  // Columns are reused like git log --graph: once a line has ended (merged or gone quiet), a later line takes its column.
+  const lane = new Map(), cols = [];
+  // A fork takes the free column nearest its parent's (right first), a merged line the one nearest its target's,
+  // so the curve between them stays short.
+  for (const id of laneOrder) {
+    const { ys, lo, hi } = info.get(id);
+    if (!ys.length) { lane.set(id, 0); continue; }
+    const th = getThread(id), fc = th.forkOf && S.commits.get(th.forkOf);
+    const near = fc && lane.has(tidOf(fc)) ? lane.get(tidOf(fc)) : th.mergedInto && lane.has(th.mergedInto) ? lane.get(th.mergedInto) : null;
+    const free = k => cols[k].every(u => u.hi + 1 < lo || hi + 1 < u.lo);
+    let k = -1;
+    if (near == null) k = cols.findIndex((_, i) => free(i));
+    else for (let d = 1; d <= cols.length && k < 0; d++) for (const c of [near + d, near - d]) if (c >= 0 && c < cols.length && free(c)) { k = c; break; }
+    if (k < 0) { k = cols.length; cols.push([]); }
+    cols[k].push({ lo, hi }); lane.set(id, k);
+  }
+  const nCols = Math.max(1, cols.length);
   // A phone keeps the graph to about two fifths of the screen so the titles stay readable, and gives each
   // row two lines (ROW matches .g-row's height in the narrow-screen CSS).
   const phone = PHONE.matches, ROW = phone ? 52 : 44, PADX = phone ? 10 : 16;
-  const LW = phone ? Math.max(7, Math.min(20, Math.floor((innerWidth * 0.4 - 2 * PADX) / Math.max(1, laneOrder.length - 1)))) : 20;
+  const LW = phone ? Math.max(9, Math.min(22, Math.floor((innerWidth * 0.42 - 2 * PADX) / Math.max(1, nCols - 1)))) : 28;
   const lx = i => PADX + i * LW, ry = i => i * ROW + ROW / 2;
-  const gw = PADX * 2 + Math.max(0, laneOrder.length - 1) * LW;
+  const gw = PADX * 2 + (nCols - 1) * LW;
   const selT = selThreadId();
   const selC = S.sel && S.sel.type === 'commit' ? S.sel.id : null;
-  legend.innerHTML = `<span class="legend-label">${esc(t('legend'))}</span>` + laneOrder.map(id => {
+  legend.classList.toggle('open', !!S.lanesOpen);
+  const chipIds = laneOrder.filter(id => !isHidden(getThread(id)));
+  legend.innerHTML = `<span class="legend-label">${esc(t('legend'))}</span><span class="lane-chips">` + chipIds.map(id => {
     const th = getThread(id);
     return `<button class="lane-chip ${selT === id ? 'is-sel' : ''}" data-tid="${esc(id)}" style="--c:${th.color}"><i></i>${esc(th.name)}<span class="mono" style="color:var(--faint);font-size:11px">${(by.get(id) || []).length}</span></button>`;
-  }).join('') + `<span class="legend-actors">${ACTOR_ICON.human ? `<span class="actor a-human">${ACTOR_ICON.human}</span>${esc(t('actorHuman'))}` : ''}<span class="actor a-agent" style="margin-left:8px">${ACTOR_ICON.agent}</span>${esc(t('actorAgent'))}</span>`;
+  }).join('') + `</span><button class="lane-chip lane-more" data-lanes-toggle>${esc(S.lanesOpen ? t('lanesLess') : t('lanesAll', chipIds.length))}</button><span class="legend-label" style="margin-left:10px">${esc(t('legendKinds'))}</span>` + USER_KINDS.map(k => `<button class="lane-chip kind-chip ${S.kinds.has(k) ? 'is-sel' : ''}" data-kind="${k}" title="${esc(kindLabel(k))}" aria-label="${esc(kindLabel(k))}" aria-pressed="${S.kinds.has(k)}">${mini(k, 'var(--ink)', false)}<span>${esc(kindLabel(k))}</span></button>`).join('') + `<span class="legend-actors">${ACTOR_ICON.human ? `<span class="actor a-human">${ACTOR_ICON.human}</span>${esc(t('actorHuman'))}` : ''}<span class="actor a-agent" style="margin-left:8px">${ACTOR_ICON.agent}</span>${esc(t('actorAgent'))}</span>`;
   let svg = '';
   for (const id of laneOrder) {
     const th = getThread(id);
-    const rs = (by.get(id) || []).map(c => row.get(c.id)).filter(v => v != null);
-    const myTips = tips.map((s, i) => (s.threadId === id ? i : -1)).filter(i => i >= 0);
+    const { span, myTips, ys } = info.get(id);
     const x = lx(lane.get(id));
-    if (rs.length) {
-      const top = Math.min(...rs), bot = Math.max(...rs);
+    // Each line is one group with a wide invisible stroke to click (no wider than the gap, so a click can't land on the neighbour).
+    svg += `<g class="ln${selT ? (selT === id ? ' on' : ' off') : ''}" data-tid="${esc(id)}">`;
+    if (ys.length) svg += `<line class="lane-hit" x1="${x}" y1="${ry(Math.min(...ys)) - 8}" x2="${x}" y2="${ry(Math.max(...ys)) + 8}" stroke-width="${Math.min(14, LW - 2)}"><title>${esc(th.name)}</title></line>`;
+    if (span.length) {
+      const top = span[0], bot = span[span.length - 1];
       if (bot > top) svg += `<line class="lane" x1="${x}" y1="${ry(top)}" x2="${x}" y2="${ry(bot)}" style="stroke:${th.color}"/>`;
       if (myTips.length) svg += `<line class="lane-live" x1="${x}" y1="${ry(Math.min(...myTips))}" x2="${x}" y2="${ry(top)}" style="stroke:${th.color}"/>`;
       else if (id !== INBOX && (th.status === 'active' || th.status === 'parked')) svg += `<line class="lane-open" x1="${x}" y1="${ry(top) - 9}" x2="${x}" y2="${Math.max(4, ry(top) - ROW / 2 - 6)}" style="stroke:${th.color}"/>`;
     } else if (myTips.length > 1) svg += `<line class="lane-live" x1="${x}" y1="${ry(Math.min(...myTips))}" x2="${x}" y2="${ry(Math.max(...myTips))}" style="stroke:${th.color}"/>`;
+    svg += '</g>';
   }
-  tips.forEach((s, i) => { svg += `<g data-sid="${esc(s.id)}"><circle class="tip st-${esc(s.status)}" cx="${lx(lane.get(s.threadId))}" cy="${ry(i)}" r="7.5"/></g>`; });
+  const off = tid => (selT && tid !== selT ? ' off' : '');
+  const off2 = (a, b) => (selT && a !== selT && b !== selT ? ' off' : ''); // a fork or merge stays bright if either end is the chosen line
+  tips.forEach((s, i) => { svg += `<g data-sid="${esc(s.id)}" class="${off(s.threadId)}"><circle class="tip st-${esc(s.status)}" cx="${lx(lane.get(s.threadId))}" cy="${ry(i)}" r="7.5"/></g>`; });
   for (const th of S.threads.values()) {
     if (!th.forkOf || !lane.has(th.id)) continue;
     const fc = S.commits.get(th.forkOf);
     if (!fc || !row.has(fc.id) || !lane.has(tidOf(fc))) continue;
-    const child = by.get(th.id)[0];
+    const child = by.get(th.id).find(x => row.has(x.id));
+    if (!child) continue;
     const x1 = lx(lane.get(tidOf(fc))), y1 = ry(row.get(fc.id)), x2 = lx(lane.get(th.id)), y2 = ry(row.get(child.id));
     if (x1 === x2) continue;
-    if (y2 >= y1) { svg += `<line class="link" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="stroke:${th.color}"/>`; continue; }
+    if (y2 >= y1) { svg += `<line class="link${off2(th.id, tidOf(fc))}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="stroke:${th.color}"/>`; continue; }
     const bend = Math.max(y2, y1 - ROW);
-    svg += `<path class="link" d="M${x1} ${y1} C${x1} ${(y1 + bend) / 2} ${x2} ${(y1 + bend) / 2} ${x2} ${bend} L${x2} ${y2}" style="stroke:${th.color}"/>`;
+    svg += `<path class="link${off2(th.id, tidOf(fc))}" d="M${x1} ${y1} C${x1} ${(y1 + bend) / 2} ${x2} ${(y1 + bend) / 2} ${x2} ${bend} L${x2} ${y2}" style="stroke:${th.color}"/>`;
   }
   for (const c of list) {
     if (c.kind !== 'merge' || !c.mergeOf || !lane.has(c.mergeOf)) continue;
-    const src = by.get(c.mergeOf).filter(x => x.ts <= c.ts).pop();
+    const src = by.get(c.mergeOf).filter(x => x.ts <= c.ts && row.has(x.id)).pop();
     if (!src) continue;
     const st = getThread(c.mergeOf);
     const x1 = lx(lane.get(c.mergeOf)), y1 = ry(row.get(src.id)), x2 = lx(lane.get(tidOf(c))), y2 = ry(row.get(c.id));
-    if (y1 <= y2) { svg += `<line class="link" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="stroke:${st.color}"/>`; continue; }
+    if (y1 <= y2) { svg += `<line class="link${off2(c.mergeOf, tidOf(c))}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="stroke:${st.color}"/>`; continue; }
     const bend = Math.min(y1, y2 + ROW);
-    svg += `<path class="link" d="M${x1} ${y1} L${x1} ${bend} C${x1} ${(bend + y2) / 2} ${x2} ${(bend + y2) / 2} ${x2} ${y2}" style="stroke:${st.color}"/>`;
+    svg += `<path class="link${off2(c.mergeOf, tidOf(c))}" d="M${x1} ${y1} L${x1} ${bend} C${x1} ${(bend + y2) / 2} ${x2} ${(bend + y2) / 2} ${x2} ${y2}" style="stroke:${st.color}"/>`;
   }
   for (const c of list) {
     const th = getThread(tidOf(c));
     const cx = lx(lane.get(tidOf(c))), cy = ry(row.get(c.id));
-    svg += `<g data-cid="${esc(c.id)}">${glyph(c.kind, stationColor(c, th), cx, cy, 6, { done: c.done, dim: S.q && !matches(c) })}${c.id === selC ? `<circle cx="${cx}" cy="${cy}" r="11" fill="none" style="stroke:var(--accent)" stroke-width="2"/>` : ''}</g>`;
+    const hit = S.kinds.has(c.kind) && matches(c);
+    svg += `<g data-cid="${esc(c.id)}" class="${off(tidOf(c))}">${hit ? `<circle class="g-hit" cx="${cx}" cy="${cy}" r="10" style="fill:${th.color}"/>` : ''}${glyph(c.kind, stationColor(c, th), cx, cy, 6, { done: c.done, dim: filtering() && !matches(c) })}${c.id === selC ? `<circle cx="${cx}" cy="${cy}" r="11" fill="none" style="stroke:var(--accent)" stroke-width="2"/>` : ''}</g>`;
   }
   const selS = S.sel && S.sel.type === 'live' ? S.sel.id : null;
   const tipRows = tips.map(s => {
@@ -2511,7 +2613,7 @@ ${machineTag(s.away && s.machine)}
   }).join('');
   const rows = tipRows + list.map(c => {
     const th = getThread(tidOf(c));
-    return `<div class="g-row k-${c.kind} ${c.done ? 'done' : ''} ${c.id === selC ? 'is-sel' : ''} ${S.q && !matches(c) ? 'is-dim' : ''}" data-cid="${esc(c.id)}" style="padding-left:${gw + 6}px">
+    return `<div class="g-row k-${c.kind} ${c.done ? 'done' : ''} ${selT && tidOf(c) !== selT ? 'is-other' : ''} ${c.id === selC ? 'is-sel' : ''} ${filtering() && !matches(c) ? 'is-dim' : ''}" data-cid="${esc(c.id)}" style="padding-left:${gw + 6}px">
       ${c.kind === 'fork' || c.kind === 'merge' ? '<span class="actor"></span>' : actorMark(c, th.color)}
       <span class="g-title">${esc(c.title)}</span>
       ${c.agent ? `<span class="agent-tag">${esc(c.agent)}</span>` : ''}${machineTag(c.machine)}
@@ -2525,8 +2627,23 @@ ${machineTag(s.away && s.machine)}
 $('#git-scroll').addEventListener('click', e => {
   const tip = e.target.closest('[data-sid]');
   if (tip) { select({ type: 'live', id: tip.dataset.sid }); return; }
+  // A tap on the graph between stations picks the nearest line within a fingertip (lines are only 7px apart on a phone).
+  if (e.target.matches('.git-svg')) {
+    const b = e.target.getBoundingClientRect(), x = e.clientX - b.left, y = e.clientY - b.top;
+    let best = null, bd = 12;
+    for (const h of e.target.querySelectorAll('.lane-hit')) {
+      const d = Math.abs(+h.getAttribute('x1') - x);
+      if (y >= +h.getAttribute('y1') && y <= +h.getAttribute('y2') && d <= bd) { best = h.closest('.ln'); bd = d; }
+    }
+    if (best) { const tid = best.dataset.tid; select(S.sel && S.sel.type === 'thread' && S.sel.id === tid ? null : { type: 'thread', id: tid }); }
+    return;
+  }
+  if (e.target.closest('[data-lanes-toggle]')) { S.lanesOpen = !S.lanesOpen; ls.set('tc.lanesOpen', S.lanesOpen); render(); return; }
+  const kc = e.target.closest('[data-kind]');
+  if (kc) { const k = kc.dataset.kind; S.kinds.has(k) ? S.kinds.delete(k) : S.kinds.add(k); ls.set('tc.kinds', [...S.kinds]); render(); return; }
   const chip = e.target.closest('[data-tid]');
-  if (chip) { select({ type: 'thread', id: chip.dataset.tid }); return; }
+  // Clicking the chosen line again lets it go.
+  if (chip) { select(S.sel && S.sel.type === 'thread' && S.sel.id === chip.dataset.tid && chip.matches('.ln') ? null : { type: 'thread', id: chip.dataset.tid }); return; }
   const r = e.target.closest('[data-cid]');
   if (r) select({ type: 'commit', id: r.dataset.cid });
 });
@@ -2605,7 +2722,7 @@ function renderTimeline() {
   b += `<line class="now" x1="${X(now)}" y1="0" x2="${X(now)}" y2="${BH}"/>`;
   for (const id of ids) {
     const th = getThread(id), cs = by.get(id), y = rowY.get(id);
-    for (const c of cs) b += `<g data-cid="${esc(c.id)}" class="${c.id === selC ? 'is-sel' : ''}"><title>${esc(fmtAbs(c.ts) + ' · ' + kindLabel(c.kind) + ' · ' + c.title)}</title>${glyph(c.kind, stationColor(c, th), X(c.ts), y, 6, { done: c.done, dim: S.q && !matches(c) })}</g>`;
+    for (const c of cs) b += `<g data-cid="${esc(c.id)}" class="${c.id === selC ? 'is-sel' : ''}"><title>${esc(fmtAbs(c.ts) + ' · ' + kindLabel(c.kind) + ' · ' + c.title)}</title>${glyph(c.kind, stationColor(c, th), X(c.ts), y, 6, { done: c.done, dim: filtering() && !matches(c) })}</g>`;
     const tip = cs[cs.length - 1];
     const label = tip.title.length > 26 ? tip.title.slice(0, 25) + '…' : tip.title;
     b += `<text class="tip" x="${X(tip.ts) + 12}" y="${y - 14}">${esc(label)}</text>`;
@@ -2845,6 +2962,7 @@ function threadDetail(th) {
       <div class="meta">
         <span>${esc(t('createdAt', fmtAbs(th.createdAt || Date.now())))}${cs[0] ? esc(t('lastUpdate', fmtRel(cs[0].ts))) : ''}</span>
         ${th.parent ? `<span>${esc(t('forkedFromThread'))} <button class="linkish" data-act="goto-thread" data-tid="${esc(th.parent)}">${esc(getThread(th.parent).name)}</button>${forkC ? ` ${esc(t('of'))} <button class="linkish" data-act="goto-commit" data-cid="${esc(forkC.id)}">${esc(forkC.title.slice(0, 40))}</button>` : ''}</span>` : ''}
+        ${mergedIn(th.id).length ? `<span>${esc(t('mergedInLabel'))} ${mergedIn(th.id).map(x => `<button class="linkish" data-act="goto-thread" data-tid="${esc(x.id)}">${esc(x.name)}</button>`).join('、')}</span>` : ''}
         ${th.mergedInto ? `<span>${esc(t('mergedInto'))} <button class="linkish" data-act="goto-thread" data-tid="${esc(th.mergedInto)}">${esc(getThread(th.mergedInto).name)}</button></span>` : ''}
       </div>`}
       ${lineSessions(th.id)}
@@ -3104,6 +3222,7 @@ menu.addEventListener('click', e => {
   if (k === 'theme') { ls.set('tc.theme', THEMES[(THEMES.indexOf(themeNow()) + 1) % THEMES.length]); applyTheme(); render(); menu.hidden = false; return; }
   if (k === 'new-thread') { setView('canvas'); createThreadAndEdit(); }
   else if (k === 'toggle-done') { S.hideDone = !S.hideDone; ls.set('tc.hideDone', S.hideDone); render(); }
+  else if (k === 'toggle-merged') { S.showMerged = !S.showMerged; ls.set('tc.showMerged', S.showMerged); render(); }
   else if (k === 'clear-examples') { if (canWrite()) clearExamples(); }
   else if (k === 'sync') syncNow();
   else if (k === 'update') {
@@ -3309,6 +3428,7 @@ function renderGoals() {
     return `<li class="${c.done ? 'done' : ''} ${S.glOpen === c.id ? 'open' : ''}"><input type="checkbox" data-task="${esc(c.id)}" ${c.done ? 'checked' : ''} aria-label="${esc(c.title)}">${title}<span class="gl-acts">${who}<button class="btn gl-edit" data-edit="${esc(c.id)}">${esc(t('goalsEdit'))}</button><button class="btn gl-view" data-view-rec="${esc(c.id)}">${esc(t('goalsView'))}</button></span>${by}<time>${fmtShort(c.doneAt || c.ts)}</time></li>`;
   };
   const body = (PHONE.matches ? `<details class="gl-help"><summary>${esc(t('goalsHelp'))}</summary><span>${t('goalsTip')}</span></details>` : tipHidden ? '' : `<div class="gl-tip"><span>${t('goalsTip')}</span><button class="btn" id="gl-tip-hide">${esc(t('goalsTipHide'))}</button></div>`)
+    + quietStrip()
     + `<div class="gl-bar-top"><span>${esc(t('goalsSummary', totalOpen, groups.filter(g => g.open.length).length))}</span><label class="check"><input type="checkbox" id="gl-show-done" ${S.goalsShowDone ? 'checked' : ''}>${esc(t('goalsShowDone'))}</label></div>`
     + (groups.length ? groups.map(({ th, tasks, open, goal }) => {
       const shown = S.goalsShowDone ? tasks : open;
@@ -3338,6 +3458,25 @@ function handCommand(c) {
   return `${dir ? `cd ${shq(dir)} && ` : ''}TRACE_CANVAS_THREAD=${tid} ${AGENT_LAUNCH[c.assignee](t('handPrompt', th.name, tid, c.title))}`;
 }
 const sheetBody = $('#sheet-body');
+// Quiet lines sit in one row of small chips; a chip opens one sentence and three answers.
+function quietStrip() {
+  const q = quietLines();
+  if (!q.length) return '';
+  const chips = q.map(({ th, idle }) => `<button class="q-chip ${S.glQuiet === th.id ? 'is-open' : ''}" data-quiet="${esc(th.id)}" style="--c:${th.color}" title="${esc(th.name)}"><i></i><b>${esc(th.name)}</b><span>${esc(t('quietDays', idle))}</span></button>`).join('');
+  const o = q.find(x => x.th.id === S.glQuiet);
+  const ask = o ? `<div class="q-ask"><span>${esc(o.open ? t('quietAskOpen', o.idle, o.open) : t('quietAsk', o.idle, o.usual))}</span>${(o.open ? ['parked', 'done'] : ['done', 'parked']).map((st, i) => `<button class="btn ${i ? '' : 'btn-primary'}" data-quiet-set="${st}" data-tid="${esc(o.th.id)}">${esc(statusLabel(st))}</button>`).join('')}<button class="btn btn-quiet" data-quiet-set="ack" data-tid="${esc(o.th.id)}">${esc(t('quietStill'))}</button></div>` : '';
+  return `<div class="q-strip"><span class="q-label">${esc(t('quietLabel'))}</span>${chips}</div>${ask}`;
+}
+sheetBody.addEventListener('click', e => {
+  if (S.sheet !== 'goals') return;
+  const qc = e.target.closest('[data-quiet]');
+  if (qc) { S.glQuiet = S.glQuiet === qc.dataset.quiet ? null : qc.dataset.quiet; renderGoals(); return; }
+  const qs = e.target.closest('[data-quiet-set]');
+  if (qs && canWrite()) {
+    patchDoc('threads', qs.dataset.tid, qs.dataset.quietSet === 'ack' ? { quietAck: Date.now() } : { status: qs.dataset.quietSet }, 0);
+    S.glQuiet = null; setTimeout(render, 0);
+  }
+});
 sheetBody.addEventListener('click', e => {
   const f = e.target.closest('[data-focus]'); if (f && S.sheet === 'focus') { closeSheet(); setFocus(f.dataset.focus); return; }
   const d = e.target.closest('[data-fold]'); if (d && S.sheet === 'focus') { setFold(d.dataset.fold, !S.folded.includes(d.dataset.fold)); openSheet('focus'); }

@@ -1,6 +1,6 @@
 {
   "name": "trace-canvas",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A transit map of your work: scattered ideas and parallel AI agent sessions on a canvas, a git-style branch graph and a timeline.",
   "private": true,
   "type": "module",

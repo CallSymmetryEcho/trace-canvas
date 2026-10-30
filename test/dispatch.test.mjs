@@ -114,3 +114,26 @@ test('dispatch hands each line\'s new to-dos to the agent working on it, and say
   assert.match(lab.command, /^ssh -t lab 'exec "\$SHELL" -lc .*TRACE_CANVAS_THREAD=/);
   assert.doesNotMatch(lab.command, /cd /); // this machine's folder means nothing there
 });
+
+test('a to-do assigned to an agent goes to that agent\'s session, keeps its assignee, and skips heartbeat sessions', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-dispatch-'));
+  const env = { ...process.env, TRACE_CANVAS_HOME: path.join(tmp, 'home'), TRACE_CANVAS_DESKTOP_DIR: path.join(tmp, 'desk'), TRACE_CANVAS_LANG: 'en', TRACE_CANVAS_MACHINE: machineName() };
+  const now = Date.now(), d = emptyData();
+  const videos = createThread(d, { name: 'Videos' }).id;
+  // A Claude Code session made the videos; a Codex heartbeat on the line worked there last.
+  d.sessions.cc = { id: 'cc', thread: videos, agent: 'Claude Code', cwd: tmp, last: now - 9e5, title: 'Make video 24' };
+  d.sessions.hb = { id: 'hb', thread: videos, agent: 'Codex', cwd: tmp, last: now - 1e5, title: '<heartbeat>' };
+  d.sessions.cx = { id: 'cx', thread: videos, agent: 'Codex', cwd: tmp, last: now - 8e5, title: 'Post video 23' };
+  addCommit(d, { thread: videos, kind: 'agent', title: 'Video 24 is ready', agent: 'Claude Code', ts: now - 9e5, extra: { session: 'cc' } });
+  addCommit(d, { thread: videos, kind: 'agent', title: 'Video 23 posted', agent: 'Codex', ts: now - 8e5, extra: { session: 'cx' } });
+  addCommit(d, { thread: videos, kind: 'agent', title: 'Heartbeat: nothing new', agent: 'Codex', ts: now - 1e5, extra: { session: 'hb' } });
+  const v25 = addCommit(d, { thread: videos, kind: 'task', title: 'Make video 25', agent: 'Claude Code', ts: now, extra: { assignee: 'claude' } });
+  const post = addCommit(d, { thread: videos, kind: 'task', title: 'Post video 25', ts: now });
+
+  const rows = dispatch(d, { refs: [v25.id, post.id] }, env);
+  assert.deepEqual(rows.map(r => [r.agent, r.session && r.session.id, r.todos.map(c => c.title)]).sort(), [
+    ['claude', 'cc', ['Make video 25']],
+    ['codex', 'cx', ['Post video 25']], // the latest real worker; the heartbeat does not count
+  ]);
+  assert.equal(d.commits[v25.id].assignee, 'claude');
+});

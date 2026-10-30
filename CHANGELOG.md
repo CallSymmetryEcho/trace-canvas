@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.1 (2026-10-30)
+
+Two fixes: dispatch respects who a to-do is for, and quiet commits get their station and diff.
+
+### Fixed
+
+- **Dispatch respects the assignee.** A to-do assigned to Claude Code, Codex or Gemini CLI goes only to that agent's sessions on its line (a running one first, as before), or to a new session of that agent; before, it went to whichever session had worked on the line last, and its assignee was then rewritten to that session's agent. An assignee someone set is never changed. Automated sessions whose prompt is a tag such as Codex's `<heartbeat>` no longer count as the line's agent.
+- **`dispatch --print` changes nothing.** It used to assign the to-dos it printed and save them.
+- **Quiet commits are recorded.** `git commit -q`, or a commit whose output is cut off, printed no sha, so no commit station was made and the commit had no diff on the canvas (0.3.0's own commit was one). The hook now reads HEAD instead, when the commit did not fail, HEAD was made in the last two minutes and carries the command's message, and it is not on the canvas yet.
+
 ## 0.3.0 (2026-10-30)
 
 Trace Canvas now spans machines and hands work out: several machines share one canvas, to-dos are dispatched to the agent working on each line, Retro shows where the back-and-forth went, and the map itself got easier to read: filter the Branches view by kind, click a line to bring it forward, merged lines fold into the line they went into, and lines that have gone quiet say so without getting in the way.

@@ -151,25 +151,30 @@ export function dispatch(d, { refs = [], all = false, self = null, on = '', away
     }
     // No session has worked here yet: the sessions the line has (bound to it, or there by their folder).
     if (!at.size) for (const [id, e] of Object.entries(d.sessions || {})) if (e.thread === tid) worked(id, e.last || 1);
-    const ranked = [...at].sort((a, b) => b[1] - a[1]).map(([id]) => id).filter(id => known.has(id));
+    // Automated prompts (a Codex <heartbeat> and the like) are not anyone working on the line.
+    const ranked = [...at].sort((a, b) => b[1] - a[1]).map(([id]) => id).filter(id => known.has(id) && !/^<[\w-]+>/.test(String(known.get(id).title || '').trim()));
     // Which session, among those on one machine when the to-dos are for it: the line's own sessions first (one that only
     // logged a result here from its own line, when none has worked here); of those a running one, this machine's before
     // another's (whose messages do not reach it yet); then this machine's latest; then the latest anywhere.
-    const pick = machine => {
-      const pool = ranked.filter(id => !machine || machineOf(id) === machine), own = pool.filter(onLine), c = own.length ? own : pool;
+    // A to-do assigned to an agent goes only to that agent's sessions (or a new one of it).
+    const pick = (machine, agent) => {
+      const pool = ranked.filter(id => (!machine || machineOf(id) === machine) && (!agent || known.get(id).agent === AGENTS[agent].name)), own = pool.filter(onLine), c = own.length ? own : pool;
       return c.find(id => machineOf(id) === me && runOf(id)) || c.find(id => runOf(id)) || c.find(id => machineOf(id) === me) || c[0];
     };
     // The line's open to-dos nobody has, in one group per machine they are for (dispatch's `on`, else the to-do's own).
     const groups = new Map();
-    for (const c of cs) if (isTodo(c) && !c.done && (named.has(c.id) || (lines.has(tid) && !c.assignee))) { const m = on || c.on || ''; groups.set(m, [...(groups.get(m) || []), c]); }
-    for (const [machine, group] of groups) {
-      const sid = pick(machine), s = sid && known.get(sid);
+    for (const c of cs) if (isTodo(c) && !c.done && (named.has(c.id) || (lines.has(tid) && !c.assignee))) {
+      const g = `${on || c.on || ''}\t${AGENTS[c.assignee] ? c.assignee : ''}`;
+      groups.set(g, [...(groups.get(g) || []), c]);
+    }
+    for (const [g, group] of groups) {
+      const [machine, agent] = g.split('\t'), sid = pick(machine, agent), s = sid && known.get(sid);
       const todos = group.filter(c => named.has(c.id) || all || !s || !c.agent || (c.fromSession && c.fromSession !== sid)).sort((a, b) => a.ts - b.ts);
       if (!todos.length) continue;
       const away = s ? (s.machine && s.machine !== me ? s.machine : '') : (machine && machine !== me ? machine : '');
       const run = sid && runOf(sid);
-      const key = s ? Object.keys(AGENTS).find(k => AGENTS[k].name === s.agent) || 'claude' : 'claude';
-      for (const c of todos) c.assignee = key;
+      const key = agent || (s ? Object.keys(AGENTS).find(k => AGENTS[k].name === s.agent) || 'claude' : 'claude');
+      for (const c of todos) c.assignee ||= key; // an assignee someone set stays
       const row = { thread: { id: tid, name: th.name }, agent: key, todos: todos.map(c => ({ id: c.id, title: c.title })), ...(machine ? { on: machine } : {}) };
       if (!s) {
         // A new session; on another machine over ssh, from its home folder (the line's folder is this machine's).

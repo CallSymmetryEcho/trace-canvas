@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { home, mutate, readConfig, readData, createThread, addCommit, lastCommit, goalOf, hashId, threadById, threadByKey } from './store.mjs';
-import { gitEvents, redirectTargets, BASH_WRITES, EDIT_TOOLS, GIT_COMMIT, commandDir, headline, firstLine, cleanPrompt } from './git-events.mjs';
+import { gitEvents, redirectTargets, BASH_WRITES, EDIT_TOOLS, GIT_COMMIT, commandDir, commitMessage, headline, firstLine, cleanPrompt } from './git-events.mjs';
 import { tr } from './i18n.mjs';
 const threadIdOfLocal = (d, c) => (c && c.thread && d.threads[c.thread] ? c.thread : 'inbox');
 import { dropLive, readLive, terminalOf, updateLive, listLive as listLiveLocal } from './live.mjs';
@@ -173,6 +173,9 @@ export function handleHook(input, env = process.env) {
   // The repository a commit landed in, which is often not cwd's (`cd other && git commit`).
   const bashCmd = ev === 'PostToolUse' && input.tool_name === 'Bash' ? String((input.tool_input || {}).command || '') : '';
   const commitRepo = GIT_COMMIT.test(bashCmd) ? gitRoot(commandDir(bashCmd, cwd)) : null;
+  // `git commit -q` (or output cut by `| tail`) prints no sha: then the commit is HEAD, if it was made just now.
+  const head = commitRepo ? git(commitRepo, ['log', '-1', '--format=%H%x09%ct%x09%s']).split('\t') : [];
+  const headNow = head.length === 3 && Date.now() - Number(head[1]) * 1000 < 120e3 ? { sha: head[0], subject: head[2] } : null;
   try { updateLive(input, { info, key: info ? threadKey(info, cfg, sid) : null, env, agent: ag.name, agentKey: input._agent || 'claude', resume: ag.resume(sid), machine: cfg.machine, terminal }); } catch {}
   if (!LOG_EVENTS.includes(ev)) return { live: ev };
 
@@ -226,6 +229,9 @@ export function handleHook(input, env = process.env) {
         for (const f of targets) { pushUnique(state.turnFiles, f); pushUnique(state.files, f); }
         if (targets.length || BASH_WRITES.test(cmd)) state.turnActions = (state.turnActions || 0) + 1;
         const g = { ...gitEvents(cmd, out.stdout, out.stderr, out.gitOperation), repo: commitRepo };
+        // Only when the commit did not fail, HEAD carries the message the command gave, and it is not on the canvas yet.
+        const msg = commitMessage(cmd), failed = /\b(fatal|error):|nothing to commit|no changes added/i.test(`${out.stdout || ''}\n${out.stderr || ''}`);
+        if (!g.commits.length && headNow && !failed && !/--dry-run/.test(cmd) && (!msg || msg === headNow.subject) && !Object.values(d.commits).some(c => c.gitCommit === headNow.sha)) g.commits.push(headNow);
         if (logGitEvents(d, g, { info, cfg, sid, thread, state, agent: ag.name })) state.turnActions = (state.turnActions || 0) + 1;
       }
     } else if (ev === 'Stop') {

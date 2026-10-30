@@ -286,8 +286,10 @@ async function main() {
       // that called this (the skill), since only an agent can reach it.
       const { dispatch } = await import('../src/ops.mjs');
       const { AGENTS, openTerminal, terminalCommand } = await import('../src/agents.mjs');
-      const on = str(flag('on', '')), all = !!flag('all', false), json = !!flag('json', false), run = !flag('print', false) && !!terminalCommand('');
-      const rows = mutate(d => dispatch(d, { refs: argv.filter(Boolean), all, on, self: process.env.CLAUDE_CODE_SESSION_ID || null }));
+      const on = str(flag('on', '')), all = !!flag('all', false), json = !!flag('json', false), print = !!flag('print', false), run = !print && !!terminalCommand('');
+      // --print only shows what would happen: nothing is assigned or saved.
+      let rows = [];
+      mutate(d => { rows = dispatch(d, { refs: argv.filter(Boolean), all, on, self: process.env.CLAUDE_CODE_SESSION_ID || null }); return print ? false : rows; });
       for (const r of rows) if (r.command && run) openTerminal(r.command);
       if (json) { console.log(JSON.stringify(rows, null, 2)); break; }
       if (!rows.length) { console.log('Nothing new to dispatch: every open to-do has an agent, or was logged by the agent working on its line (--all takes those too).'); break; }

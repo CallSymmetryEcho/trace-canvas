@@ -52,7 +52,7 @@ export function gitEvents(cmd, stdout = '', stderr = '', gitOperation = null) {
 }
 
 // The commit subject from `-m "…"`, or from the heredoc in the usual `-m "$(cat <<'EOF' … EOF)"` form.
-function commitMessage(cmd) {
+export function commitMessage(cmd) {
   const m = cmd.match(/<<-?\s*['"]?(\w+)['"]?\n([\s\S]*?)\n\s*\1/) || cmd.match(/\s-m\s+(["'])([\s\S]*?)\1/);
   return m ? m[2].split('\n').map(s => s.trim()).find(Boolean) || '' : '';
 }

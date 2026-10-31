@@ -240,6 +240,7 @@ html[lang="zh-CN"] .kicker, html[lang="zh-CN"] .duo b { text-transform: none; }
 .play:disabled::after { position: absolute; left: 50%; bottom: 16px; translate: -50% 0; padding: 6px 12px; border-radius: 999px; background: rgba(21, 24, 28, .8); color: #fff; font: 500 13px/1.3 var(--f-mono); white-space: nowrap; }
 html[lang="en"] .play:disabled::after { content: "Plays here once it is published"; }
 html[lang="zh-CN"] .play:disabled::after { content: "发布后在这里播放"; }
+.lessons summary { cursor: pointer; margin: 12px 4px 0; color: var(--accent); font-weight: 600; }
 .chapters { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 2px 18px; }
 @media (min-width: 720px) { .chapters { grid-template-columns: 1fr 1fr; grid-template-rows: repeat(6, auto); grid-auto-flow: column; } }
 .chapters button { display: flex; gap: 12px; width: 100%; padding: 7px 4px; border: 0; border-bottom: 1px solid var(--rule-soft); background: none; color: var(--ink); font: 15px/1.4 var(--f-body); text-align: left; cursor: pointer; }
@@ -319,11 +320,11 @@ footer a { color: inherit; }
       </div>
       <p class="tagline"><span data-l="en">Claude Code · Codex · every machine you work on</span><span data-l="zh">Claude Code · Codex · 你的每台电脑</span></p>
       <h1><span data-l="en">One map both you and your agents can read</span><span data-l="zh">人和 agent 都看得懂的一张地图</span></h1>
-      <p class="lead" data-l="en">Every session, Claude Code or Codex, on this computer or another, becomes a line on one transit map. You and your agents read the same map:</p>
-      <p class="lead" data-l="zh">每个会话，不管是 Claude Code 还是 Codex、在这台电脑还是那台，都是同一张地铁图上的一条线。你和 agent 看的是同一张图：</p>
+      <p class="lead" data-l="en">Every session is a line on one transit map.</p>
+      <p class="lead" data-l="zh">每个会话都是一条线，画在同一张地铁图上。</p>
       <ul class="duo">
-        <li><b><span data-l="en">For you</span><span data-l="zh">给你看</span></b><span data-l="en">what each agent is doing, how far it got and what it changed, at a glance.</span><span data-l="zh">每个 agent 在干嘛、做到哪、改了什么，一眼就知道。</span></li>
-        <li><b><span data-l="en">For agents</span><span data-l="zh">给 agent 读</span></b><span data-l="en">the goal, the to-dos and what the others did, so a new one picks up in seconds, even on another tool or machine.</span><span data-l="zh">目标、待办和别人做过的事，新开的 agent 几秒接上，换个工具、换台电脑也不断线。</span></li>
+        <li><b><span data-l="en">For you</span><span data-l="zh">给你看</span></b><span data-l="en">Who's doing what, how far it got, what it changed. At a glance.</span><span data-l="zh">谁在干嘛、做到哪、改了什么，一眼看清。</span></li>
+        <li><b><span data-l="en">For agents</span><span data-l="zh">给 agent 读</span></b><span data-l="en">The goal, the to-dos, the last agent's progress. A new one picks up in seconds.</span><span data-l="zh">目标、待办、上一个 agent 的进度，新会话几秒接上。</span></li>
       </ul>
       <div class="cta">
         <a class="btn primary" href="#tutorial"><span data-l="en">Watch the tutorial</span><span data-l="zh">看完整教程</span> ↓</a>
@@ -333,7 +334,7 @@ footer a { color: inherit; }
     </div>
     <figure class="panel">
       <div class="frame"><video data-clip="handoff" width="760" height="428" muted loop playsinline preload="none"></video></div>
-      <figcaption><span data-l="en">On the laptop, a to-do goes to Codex. The workstation does it, and after a sync it comes back ticked by Codex, marked On workstation; a new Claude Code session reads the line and carries on. Made-up data.</span><span data-l="zh">笔记本上把一条待办交给 Codex。工作站做完，同步之后它回来时已由 Codex 勾选，标着「在 workstation 上」；新开的 Claude Code 会话读这条线，接着往下做。虚构数据。</span></figcaption>
+      <figcaption><span data-l="en">The laptop hands a to-do to Codex, the workstation ticks it, a new session reads the line and carries on. Made-up data.</span><span data-l="zh">笔记本交给 Codex，工作站做完勾掉，新会话读线接着干。虚构数据。</span></figcaption>
     </figure>
   </div>
 </section>
@@ -345,7 +346,7 @@ footer a { color: inherit; }
     <header class="sec-head veil">
       <p class="kicker"><span data-l="en">Start here</span><span data-l="zh">从这里开始</span></p>
       <h2><i class="dot"></i><span data-l="en">The full 0.3.0 tutorial</span><span data-l="zh">0.3.0 完整教程</span></h2>
-      <p><span data-l="en">From setup to several machines in eleven lessons, with narration. It plays right here; pick a lesson to start there.</span><span data-l="zh">从装好讲到几台电脑一起用，十一课，带讲解。就在这里播放，点哪一课就从哪开始。</span></p>
+      <p><span data-l="en">Ten minutes from install to running agents on several machines.</span><span data-l="zh">10 分钟，从装好到几台电脑一起用 agent。</span></p>
     </header>
     <div class="player panel">
       <!-- ponytail: data-embed stays empty until video 26 is public; {t} is the start second. YouTube: https://www.youtube-nocookie.com/embed/<id>?autoplay=1&amp;rel=0&amp;start={t} · Bilibili: https://player.bilibili.com/player.html?bvid=<bv>&amp;autoplay=1&amp;high_quality=1&amp;t={t} -->
@@ -355,6 +356,7 @@ footer a { color: inherit; }
         <h4><span data-l="en">Trace Canvas 0.3.0: the full tutorial · 10:32</span><span data-l="zh">Trace Canvas 0.3.0 版本完整教程 · 10:26</span></h4>
         <span class="where"></span>
       </div>
+      <details class="lessons"><summary><span data-l="en">All 11 lessons</span><span data-l="zh">11 课目录</span></summary>
       <ol class="chapters" data-l="en">
         <li><button type="button" data-t="0"><span>0:00</span>Opening</button></li>
         <li><button type="button" data-t="36"><span>0:36</span>Lesson 1: Set up and connect</button></li>
@@ -383,109 +385,100 @@ footer a { color: inherit; }
         <li><button type="button" data-t="559"><span>9:19</span>第 10 课：几台电脑，一张画布</button></li>
         <li><button type="button" data-t="602"><span>10:02</span>第 11 课：收尾</button></li>
       </ol>
+      </details>
     </div>
   </section>
   <section id="tour">
     <header class="sec-head veil">
       <p class="kicker"><span data-l="en">The tour</span><span data-l="zh">导览</span></p>
       <h2><span data-l="en">Follow the line</span><span data-l="zh">沿着这条线走一遍</span></h2>
-      <p><span data-l="en">Eight stations: what you see on the map, and what your agents read from it. Side lines fork off and merge back, the way your sessions do.</span><span data-l="zh">八站：你在图上看到什么，agent 又从图上读到什么。支线分出去又合回来，就像你的会话一样。</span></p>
+      <p><span data-l="en">Eight stops. One map.</span><span data-l="zh">八站，看懂这张图。</span></p>
     </header>
     <article class="st wide">
       <div class="st-text panel">
         <span class="num" aria-hidden="true">01</span>
         <p class="kicker"><span data-l="en">The problem</span><span data-l="zh">问题</span></p>
-        <h3><i class="dot"></i><span data-l="en">More agents: you lose track of them, and they can't see each other's work</span><span data-l="zh">agent 一多，你看不清它们，它们也看不见彼此</span></h3>
-        <p class="big" data-l="en">Claude Code in one window, Codex in another, a third session on the workstation. You can no longer say which one is doing what, how far it got or what it changed. A new agent can't see what the others did either, so it starts by asking you, all over again. The record is scattered across chats and machines, and there is no one place that both you and your agents can read.</p>
-        <p class="big" data-l="zh">一个窗口里是 Claude Code，另一个是 Codex，工作站上还跑着一个。你说不清哪个在干嘛、做到哪、改了什么；新开的 agent 也看不到别人做过的事，只能从头问你。记录散在各个对话和各台电脑里，没有一个地方是你和 agent 都能看的。</p>
+        <h3><i class="dot"></i><span data-l="en">More agents: you lose track of them, they lose track of each other</span><span data-l="zh">agent 一多，你看不清它们，它们也看不见彼此</span></h3>
+        <p class="big" data-l="en">Claude Code here, Codex there, one more on the workstation. A day later nobody knows who did what, and every new agent starts by asking you.</p>
+        <p class="big" data-l="zh">Claude Code 一个窗口，Codex 一个窗口，工作站上还跑着一个。过一天，谁做了什么就说不清；每个新 agent 都得从头问你。</p>
       </div>
     </article>
     <article class="st">
       <div class="st-text panel">
         <span class="num" aria-hidden="true">02</span>
-        <p class="kicker"><span data-l="en">For you: lines and stations</span><span data-l="zh">给你看：线路和站点</span></p>
-        <h3><i class="dot"></i><span data-l="en">Every session is a line you read at a glance</span><span data-l="zh">每个会话一条线，谁做了什么一眼看懂</span></h3>
-        <p data-l="en">Your instructions and decisions are dark stations; the agents' edits, commits and results are stations in the line's colour. Running sessions sit at the tips, and the one waiting for you is orange. Forks and merges are drawn like git.</p>
-        <p data-l="zh">你的指令和决定是深色站点，agent 的改动、提交和产出用线路的颜色。正在跑的会话挂在线头上，等你的那个是橙色。分叉与合并像 git 一样画出来。</p>
-        <p data-l="en">Hooks draw it while you work. You do nothing.</p>
-        <p data-l="zh">这些由 hooks 在你工作时自动画上，你什么都不用做。</p>
+        <p class="kicker"><span data-l="en">For you</span><span data-l="zh">给你看</span></p>
+        <h3><i class="dot"></i><span data-l="en">One session, one line. Who did what, at a glance</span><span data-l="zh">一个会话一条线，谁做了什么一眼看懂</span></h3>
+        <p data-l="en">Dark stations are yours, coloured ones the agents'. Forks and merges are drawn like git. Hooks draw it; you do nothing.</p>
+        <p data-l="zh">深色站点是你的指令，彩色是 agent 的产出，分叉合并像 git。hooks 自动画，你什么都不用做。</p>
       </div>
       <figure class="st-media panel">
         <div class="frame"><video data-clip="branches" width="1000" height="562" muted loop playsinline preload="none"></video></div>
-        <figcaption><span data-l="en">Branches: running sessions sit as live tips on top of their lines. The orange one waits for you; once approved it turns green, your decision appears dark and the agent's result in the line's colour.</span><span data-l="zh">分支视图：正在运行的会话以线头显示在各自线路的顶端。橙色的在等你；批准后变绿，你的决定显示为深色，agent 的产出用线路的颜色。</span></figcaption>
+        <figcaption><span data-l="en">Live tips are running sessions; the orange one is waiting for you.</span><span data-l="zh">线头是正在跑的会话，橙色的在等你批准。</span></figcaption>
       </figure>
     </article>
     <article class="st">
       <div class="st-text panel">
         <span class="num" aria-hidden="true">03</span>
-        <p class="kicker"><span data-l="en">For agents: the same map</span><span data-l="zh">给 agent 读：同一张图</span></p>
+        <p class="kicker"><span data-l="en">For agents</span><span data-l="zh">给 agent 读</span></p>
         <h3><i class="dot"></i><span data-l="en">A new agent catches up in seconds</span><span data-l="zh">新开的 agent，几秒接上进度</span></h3>
-        <p data-l="en">Through the MCP tools <code>trace_read_thread</code> and <code>trace_tasks</code>, a new session, Claude Code or Codex, reads the line you see: its goal, its to-dos, every result and decision. It picks up where another left off instead of asking you to explain it all again.</p>
-        <p data-l="zh">通过 MCP 工具 <code>trace_read_thread</code> 和 <code>trace_tasks</code>，新开的会话，不管是 Claude Code 还是 Codex，读的就是你看到的这条线：目标、待办，还有之前每个结果和决定。它接着别人停下的地方做，不用你再从头讲一遍。</p>
+        <p data-l="en">Over MCP, Claude Code and Codex read the same line you see: the goal, the to-dos, every result. No more explaining it all again.</p>
+        <p data-l="zh">Claude Code、Codex 通过 MCP 读你看到的同一条线：目标、待办、每个结果。不用你再讲一遍。</p>
       </div>
       <figure class="st-media panel">
         <div class="frame"><video data-clip="sessions" width="1000" height="562" muted loop playsinline preload="none"></video></div>
-        <figcaption><span data-l="en">A resumed session logs on its line again; the line panel lists its sessions, each with a resume command.</span><span data-l="zh">恢复的会话接着记在原来的线上；线面板列出这条线上的会话，每个都能复制恢复命令。</span></figcaption>
+        <figcaption><span data-l="en">Sessions stay on their line, one click from resuming.</span><span data-l="zh">会话留在线上，一键就能恢复。</span></figcaption>
       </figure>
     </article>
     <article class="st">
       <div class="st-text panel">
         <span class="num" aria-hidden="true">04</span>
-        <p class="kicker"><span data-l="en">Goals, to-dos, dispatch</span><span data-l="zh">目标、待办、分派</span></p>
+        <p class="kicker"><span data-l="en">Goals and to-dos</span><span data-l="zh">目标和待办</span></p>
         <h3><i class="dot"></i><span data-l="en">One list for you and your agents</span><span data-l="zh">人和 agent 共用一份清单</span></h3>
-        <p data-l="en">Write down what a line should achieve and its next steps. Agents read them when they start and tick each one off with <code>trace_task_done</code>; the list shows who ticked it, Claude Code or Codex. Let them work while you are away, and see where things stand when you come back.</p>
-        <p data-l="zh">写下一条线要达到的目标和下一步。agent 开工时读它，做完一项就用 <code>trace_task_done</code> 勾掉，清单上标着是谁勾的：Claude Code 还是 Codex。你离开时它们照样推进，回来一看就知道做到哪了。</p>
-        <p data-l="en">Say dispatch (<code>/trace-canvas dispatch</code>, also from the Claude app on your phone) and each line's new to-dos go to the agent working on it.</p>
-        <p data-l="zh">说一句「分派」（<code>/trace-canvas dispatch</code>，手机上的 Claude app 里也行），每条线上新记的待办就交给正在做这条线的 agent。</p>
+        <p data-l="en">You write the goal and the to-dos; agents tick them off and sign it. Say "dispatch" and every line gets to work.</p>
+        <p data-l="zh">你写目标和待办，agent 做完自己勾，标着是谁勾的。说一句「分派」，每条线都开工。</p>
       </div>
       <figure class="st-media panel">
         <div class="frame"><video data-clip="goals" width="1000" height="562" muted loop playsinline preload="none"></video></div>
-        <figcaption><span data-l="en">Agents tick to-dos off on the shared list, one by Claude Code and one by Codex, and the line's progress bar moves forward.</span><span data-l="zh">agent 在共用的清单上勾掉待办：一项由 Claude Code 勾选，一项由 Codex 勾选，这条线的进度条随之前进。</span></figcaption>
+        <figcaption><span data-l="en">One ticked by Claude Code, one by Codex.</span><span data-l="zh">一项 Claude Code 勾的，一项 Codex 勾的。</span></figcaption>
       </figure>
     </article>
     <article class="st">
       <div class="st-text panel">
         <span class="num" aria-hidden="true">05</span>
-        <p class="kicker"><span data-l="en">For you: what changed</span><span data-l="zh">给你看：改了什么</span></p>
-        <h3><i class="dot"></i><span data-l="en">What did the agent change? One click to the diff</span><span data-l="zh">agent 到底改了什么？点开就是 diff</span></h3>
-        <p data-l="en">A commit station lists the files it changed, biggest first. Click a file for its diff, or compare with an earlier station to see everything since then. When an agent says it's done, the proof is right there.</p>
-        <p data-l="zh">提交站点列出这次改过的文件，改得多的在前。点文件看 diff，或者和更早的站点对比，看从那以后改了什么。agent 说「做完了」，证据就在旁边。</p>
-        <p data-l="en">The canvas keeps only the commit and its repository; the diff comes straight from git when you open it.</p>
-        <p data-l="zh">画布只记提交和它所在的仓库，diff 在你打开时直接向 git 要。</p>
+        <p class="kicker"><span data-l="en">What changed</span><span data-l="zh">改了什么</span></p>
+        <h3><i class="dot"></i><span data-l="en">"Done," says the agent. The diff is one click away</span><span data-l="zh">agent 说做完了？diff 就在旁边</span></h3>
+        <p data-l="en">A commit station lists its files. Click for the diff, or compare with any earlier station. Straight from git.</p>
+        <p data-l="zh">提交站点列出改过的文件，点开看 diff，还能和任意更早的站点对比。直接读 git。</p>
       </div>
       <figure class="st-media panel">
         <div class="frame"><video data-clip="changes" width="1000" height="562" muted loop playsinline preload="none"></video></div>
-        <figcaption><span data-l="en">A commit station lists the files it changed; a click opens a diff; Compare with shows what changed since an earlier station.</span><span data-l="zh">提交站点列出改过的文件，点文件看 diff，「对比」看与更早站点之间的改动。</span></figcaption>
+        <figcaption><span data-l="en">Files, diff, compare.</span><span data-l="zh">文件 → diff → 对比。</span></figcaption>
       </figure>
     </article>
     <article class="st">
       <div class="st-text panel">
         <span class="num" aria-hidden="true">06</span>
         <p class="kicker"><span data-l="en">Retro</span><span data-l="zh">复盘</span></p>
-        <h3><i class="dot"></i><span data-l="en">Where did the back-and-forth go?</span><span data-l="zh">和 agent 来回最多的，是哪件事？</span></h3>
-        <p data-l="en">Press Retro in a line's panel. Your own local <code>claude</code> or <code>codex</code> reads the line's conversations and ranks the work by rounds, time and tokens, then names where it got stuck, the sentence that finally made it clear, and a rule.</p>
-        <p data-l="zh">在线面板里点「复盘」。用你本机的 <code>claude</code> 或 <code>codex</code> 读这条线上的对话，按来回轮次、时间和 token 给每件事排行，再指出卡在哪、哪一句终于说清楚了，提炼成一条规矩。</p>
-        <p data-l="en">Nothing is written until you press Write: to the project's CLAUDE.md and AGENTS.md, the line, or long-term memory, so next time any agent gets it in one round.</p>
-        <p data-l="zh">点「写入」才会写：写进项目的 CLAUDE.md 和 AGENTS.md、这条线，或者长期记忆。下次换个 agent，也一轮就过。</p>
+        <h3><i class="dot"></i><span data-l="en">Twelve rounds this time. One round next time</span><span data-l="zh">这次来回十几轮，下次一轮就过</span></h3>
+        <p data-l="en">Retro finds the work that took the most back-and-forth, where it got stuck, and turns it into a rule for CLAUDE.md, AGENTS.md or memory, written only when you say so.</p>
+        <p data-l="zh">点「复盘」，找出来回最多的事、卡在哪，提炼成规矩；你点「写入」才写进 CLAUDE.md、AGENTS.md 或长期记忆。</p>
       </div>
       <figure class="st-media panel">
         <div class="frame"><video data-clip="retro" width="1000" height="562" muted loop playsinline preload="none"></video></div>
-        <figcaption><span data-l="en">Retro on a line: the work ranked by rounds, where each piece got stuck, the sentence that made it clear, and the rule it suggests.</span><span data-l="zh">在一条线上复盘：按来回轮次排行，每件事卡在哪、哪一句说清楚了，以及它建议的规矩。</span></figcaption>
+        <figcaption><span data-l="en">Ranked by rounds, with the sticking point and the rule.</span><span data-l="zh">按轮次排行，写明卡点和规矩。</span></figcaption>
       </figure>
     </article>
     <article class="st">
       <div class="st-text panel">
         <span class="num" aria-hidden="true">07</span>
-        <p class="kicker"><span data-l="en">Machines and your phone</span><span data-l="zh">多台电脑和手机</span></p>
-        <h3><i class="dot"></i><span data-l="en">Several machines, one canvas, and your phone too</span><span data-l="zh">多台电脑，同一张画布，手机上也能看</span></h3>
-        <p data-l="en">Laptop, workstation and lab PC share one canvas through a private git repository. Each machine writes only its own file, and <code>trace-canvas sync</code> brings in the others. Records from another machine carry its name, a to-do can be sent to a machine, and its resume command runs over ssh.</p>
-        <p data-l="zh">笔记本、工作站和实验室电脑通过一个私有 git 仓库共用一张画布。每台机器只写自己的文件，<code>trace-canvas sync</code> 把其他机器的拉进来。来自别的机器的记录标着机器名，待办可以指定交给哪台机器，恢复命令通过 ssh 执行。</p>
-        <p data-l="en">Away from the desk, open the canvas on your phone through Tailscale, with nothing opened to the internet: read your lines, drop ideas and to-dos into them, and edit a line's goal right there.</p>
-        <p data-l="zh">离开桌子，就通过 Tailscale 在手机上打开画布，不对公网开放：看各条线、往线上记想法和待办、就地改线的目标。</p>
+        <p class="kicker"><span data-l="en">Machines and phone</span><span data-l="zh">多台电脑和手机</span></p>
+        <h3><i class="dot"></i><span data-l="en">Every machine on one map, your phone too</span><span data-l="zh">几台电脑一张图，手机上也能记</span></h3>
+        <p data-l="en">Machines sync through your private git repo, records carry the machine's name, and a to-do can go to a given machine. On the phone, open it over Tailscale.</p>
+        <p data-l="zh">几台电脑经私有 git 仓库同步，记录标着机器名，待办能指定交给哪台。手机经 Tailscale 打开，随手记、随手改。</p>
       </div>
       <figure class="st-media phone panel">
         <div class="frame"><video data-clip="goaledit" width="420" height="708" muted loop playsinline preload="none"></video></div>
-        <figcaption><span data-l="en">On a phone, Goals is a page of its own: tap a line's goal to change it, tap a to-do to edit it, and a half-typed to-do stays, with an Add button.</span><span data-l="zh">在手机上，「目标」是单独的一页：点线的目标就地修改，点待办就能编辑，写到一半的待办还在，旁边多了「添加」按钮。</span></figcaption>
+        <figcaption><span data-l="en">Goals on a phone: tap to edit.</span><span data-l="zh">手机上的目标页，点一下就改。</span></figcaption>
       </figure>
     </article>
     <article class="st wide">
@@ -494,9 +487,9 @@ footer a { color: inherit; }
         <p class="kicker"><span data-l="en">Local and light</span><span data-l="zh">本地、轻量</span></p>
         <h3><i class="dot"></i><span data-l="en">On your computer, at about 1% of the tokens</span><span data-l="zh">跑在你的电脑上，只占约 1% 的 token</span></h3>
         <div class="facts">
-          <div class="fact"><b>Node.js</b><p data-l="en">Runs on your computer and needs only Node.js 18.17+. No <code>npm install</code>; your data stays in <code>~/.trace-canvas</code>.</p><p data-l="zh">在你的电脑上运行，只需要 Node.js 18.17+，不用 <code>npm install</code>；数据留在 <code>~/.trace-canvas</code>。</p></div>
-          <div class="fact"><b>MIT</b><p data-l="en">Open source under the MIT licence.</p><p data-l="zh">MIT 许可，开源。</p></div>
-          <div class="fact"><b>~1%</b><p data-l="en">Trace Canvas text is about 1% of a session's tokens, and that share does not grow as the canvas grows. The hooks run outside the model.</p><p data-l="zh">Trace Canvas 的文字约占一个会话 token 的 1%，而且不随画布变大而增长。hooks 在模型之外运行。</p></div>
+          <div class="fact"><b>Node.js</b><p data-l="en">Just Node.js 18.17+. No <code>npm install</code>; your data stays in <code>~/.trace-canvas</code>.</p><p data-l="zh">只要 Node.js 18.17+，不用 <code>npm install</code>；数据留在 <code>~/.trace-canvas</code>。</p></div>
+          <div class="fact"><b>MIT</b><p data-l="en">Open source, free to use.</p><p data-l="zh">开源，免费用。</p></div>
+          <div class="fact"><b>~1%</b><p data-l="en">About 1% of a session's tokens, however big the map gets. The hooks run outside the model.</p><p data-l="zh">约占会话 token 的 1%，图再大也不涨。hooks 在模型之外运行。</p></div>
         </div>
       </div>
     </article>
@@ -506,48 +499,48 @@ footer a { color: inherit; }
     <header class="sec-head veil">
       <p class="kicker"><span data-l="en">Short clips</span><span data-l="zh">短片</span></p>
       <h2><i class="dot"></i><span data-l="en">Feature demos</span><span data-l="zh">功能演示</span></h2>
-      <p><span data-l="en">A few seconds each, recorded from the real page. All data in the clips is made up.</span><span data-l="zh">每段几秒钟，录自真实页面。片中数据都是虚构的。</span></p>
+      <p><span data-l="en">A few seconds each, from the real page, on made-up data.</span><span data-l="zh">每段几秒，录自真实页面，数据是虚构的。</span></p>
     </header>
     <div class="grid">
       <figure class="card panel">
         <div class="frame"><video data-clip="replay" width="1000" height="562" muted loop playsinline preload="none"></video></div>
         <h4><span data-l="en">All your past sessions, one map</span><span data-l="zh">过去的会话，一张地图</span></h4>
-        <figcaption><span data-l="en">Past sessions arrive on the canvas one after another, each as its own line.</span><span data-l="zh">过去的会话一个接一个落到画布上，每个会话一条线。</span></figcaption>
+        <figcaption><span data-l="en">One sentence, and your past sessions land on the map.</span><span data-l="zh">一句话，过去的会话一条条落到图上。</span></figcaption>
       </figure>
       <figure class="card panel">
         <div class="frame"><video data-clip="dispatch" width="1000" height="562" muted loop playsinline preload="none"></video></div>
         <h4><span data-l="en">Dispatch: every line at work</span><span data-l="zh">分派：每条线都开工</span></h4>
-        <figcaption><span data-l="en"><code>/trace-canvas dispatch</code> hands each line's new to-do to the agent working on it: a message to the running session, a resume for the stopped one, a new session for the line nobody works on.</span><span data-l="zh"><code>/trace-canvas dispatch</code> 把每条线的新待办交给在做这条线的 agent：正在运行的会话收到消息，停了的会话被恢复，没人做的线新开一个会话。</span></figcaption>
+        <figcaption><span data-l="en">One "dispatch", and three lines wake up.</span><span data-l="zh">一句「分派」，三条线同时开工。</span></figcaption>
       </figure>
       <figure class="card panel">
         <div class="frame"><video data-clip="timeline" width="1000" height="562" muted loop playsinline preload="none"></video></div>
         <h4><span data-l="en">Timeline</span><span data-l="zh">时间线</span></h4>
-        <figcaption><span data-l="en">Day, week and month. Each band shows when a line was active; dashed curves are forks and merges.</span><span data-l="zh">按日、周、月查看。色带是每条线活跃的时段，虚线曲线是分叉与合并。</span></figcaption>
+        <figcaption><span data-l="en">Day, week, month: when each line was moving.</span><span data-l="zh">按日、周、月，看每条线什么时候在动。</span></figcaption>
       </figure>
       <figure class="card panel">
         <div class="frame"><video data-clip="agents" width="1000" height="562" muted loop playsinline preload="none"></video></div>
         <h4><span data-l="en">Agent view: who started whom</span><span data-l="zh">Agent 视图：谁启动了谁</span></h4>
-        <figcaption><span data-l="en">A session waiting for approval turns green once approved, a subagent finishes and fades, and the panel shows who started the session.</span><span data-l="zh">等待批准的会话批准后变成绿色，子 agent 完成后变淡，面板显示这个会话由谁启动。</span></figcaption>
+        <figcaption><span data-l="en">Who started whom, and who is waiting for you.</span><span data-l="zh">谁启动了谁，哪个在等你。</span></figcaption>
       </figure>
       <figure class="card panel">
         <div class="frame"><video data-clip="jump" width="1000" height="562" muted loop playsinline preload="none"></video></div>
         <h4><span data-l="en">One click back to its window</span><span data-l="zh">一键跳回它的对话或终端</span></h4>
-        <figcaption><span data-l="en">In the Agents view, ↗ opens a session's chat in the Claude app or the Codex app, and Go to its terminal brings a Terminal session's tab to the front.</span><span data-l="zh">在 Agent 视图里，↗ 在 Claude app 或 Codex app 里打开那次对话，「跳到终端」把终端里那个会话的标签页调到最前。</span></figcaption>
+        <figcaption><span data-l="en">One click back to its chat or its terminal tab.</span><span data-l="zh">一键回到那次对话，或那个终端标签页。</span></figcaption>
       </figure>
       <figure class="card panel">
         <div class="frame"><video data-clip="merge" width="1000" height="562" muted loop playsinline preload="none"></video></div>
         <h4><span data-l="en">Merge two lines</span><span data-l="zh">合并两条线</span></h4>
-        <figcaption><span data-l="en">A close look at one card (dark stations are yours, coloured ones the agents'), then Shift-click two lines, pick the line to keep and Merge: they fold into it, and nothing is deleted.</span><span data-l="zh">先近看一张卡片（深色站点是你的，彩色的是 agent 的），再 Shift 点选两条线，选好留下哪条，点「合并」：它们收进这条线，什么都不删。</span></figcaption>
+        <figcaption><span data-l="en">Two lines into one. Nothing is deleted.</span><span data-l="zh">两条线合成一条，什么都不删。</span></figcaption>
       </figure>
       <figure class="card panel">
         <div class="frame"><video data-clip="groups" width="1000" height="562" muted loop playsinline preload="none"></video></div>
         <h4><span data-l="en">Groups and Arrange</span><span data-l="zh">分组与整理</span></h4>
-        <figcaption><span data-l="en">Scattered lines go into groups, each with a frame; Arrange lays them out by group, and a group moves by its label.</span><span data-l="zh">散乱的线放进分组，每组一个框；「整理」按分组排好，拖标签整组移动。</span></figcaption>
+        <figcaption><span data-l="en">Group by project, tidy in one click.</span><span data-l="zh">按项目分组，一键排整齐。</span></figcaption>
       </figure>
       <figure class="card panel">
         <div class="frame"><video data-clip="quiet" width="1000" height="562" muted loop playsinline preload="none"></video></div>
         <h4><span data-l="en">Gone quiet</span><span data-l="zh">安静了</span></h4>
-        <figcaption><span data-l="en">A line that has stopped moving puts a small dot on Goals; nothing pops up. Its chip asks one question: finished, parked, or still on it?</span><span data-l="zh">停下来的线只在「目标」上亮一个小点，不弹窗。点它的标签，只问一句：做完了、先搁置，还是还在做？</span></figcaption>
+        <figcaption><span data-l="en">A stalled line gets a dot, not a pop-up, and one question.</span><span data-l="zh">停下的线亮个小点，不弹窗，只问一句。</span></figcaption>
       </figure>
     </div>
   </section>
@@ -556,7 +549,7 @@ footer a { color: inherit; }
     <header class="sec-head veil">
       <p class="kicker"><span data-l="en">Videos</span><span data-l="zh">视频</span></p>
       <h2><i class="dot"></i><span data-l="en">Latest videos</span><span data-l="zh">最新视频</span></h2>
-      <p><span data-l="en">Short videos with narration, newest first. New ones are added here as they come out. Each opens in a new tab.</span><span data-l="zh">带讲解的短视频，最新的在前，新视频发布后会陆续加到这里。点开在新标签页播放。</span></p>
+      <p><span data-l="en">Newest first, added as they come out.</span><span data-l="zh">最新的在前，发一条加一条。</span></p>
     </header>
     <div class="grid">
       <a class="tut panel" data-l="en" href="https://youtu.be/f9jsTllv35o" target="_blank" rel="noopener"><div class="frame"><img src="media/cover-changes.en.jpg" alt="" width="960" height="540" loading="lazy"></div><div class="meta"><h4>What did the agent change?</h4><span class="where">YouTube ↗</span></div></a>
@@ -590,10 +583,10 @@ node ~/trace-canvas/bin/trace-canvas.mjs setup --user</code></pre>
     <p data-l="zh">然后新开一个 Claude Code 会话，输入 <code>/trace-canvas 把现在所有的会话展示在画布上</code>。它会把这个项目过去的会话放上地图，并在 <code>http://localhost:4777/</code> 打开；之后每个新会话都会自动出现在上面。</p>
     <h3 class="sub"><span data-l="en">Which agents</span><span data-l="zh">支持哪些 agent</span></h3>
     <dl class="support">
-      <div><dt>Claude Code</dt><dd><b class="ok"><span data-l="en">Supported</span><span data-l="zh">已支持</span></b> <span data-l="en">Tested with real sessions.</span><span data-l="zh">用真实会话测过。</span></dd></div>
-      <div><dt>Codex</dt><dd><b class="ok"><span data-l="en">Supported</span><span data-l="zh">已支持</span></b> <span data-l="en">Tested with real Codex sessions; add <code>--agents codex</code>.</span><span data-l="zh">用真实的 Codex 会话测过；安装时加 <code>--agents codex</code>。</span></dd></div>
-      <div><dt>Gemini CLI</dt><dd><b class="pre"><span data-l="en">Preview</span><span data-l="zh">预览</span></b> <span data-l="en">Hooked up from its documented events (<code>--agents gemini</code>), not yet tested against a current release.</span><span data-l="zh">按官方文档里的 hook 事件接上（<code>--agents gemini</code>），还没在当前版本上实测。</span></dd></div>
-      <div><dt>iFlow CLI · Qwen Code · Qoder · TRAE · Kimi Code</dt><dd><b class="plan"><span data-l="en">Planned</span><span data-l="zh">计划中</span></b> <span data-l="en">Not supported yet.</span><span data-l="zh">还不支持。</span></dd></div>
+      <div><dt>Claude Code</dt><dd><b class="ok"><span data-l="en">Tested</span><span data-l="zh">已实测</span></b> <span data-l="en">Tested with real sessions.</span><span data-l="zh">用真实会话测过。</span></dd></div>
+      <div><dt>Codex</dt><dd><b class="ok"><span data-l="en">Tested</span><span data-l="zh">已实测</span></b> <span data-l="en">Tested with real sessions; add <code>--agents codex</code>.</span><span data-l="zh">用真实会话测过；安装时加 <code>--agents codex</code>。</span></dd></div>
+      <div><dt>Gemini CLI</dt><dd><b class="pre"><span data-l="en">Supported, not yet tested</span><span data-l="zh">已支持，待实测</span></b> <span data-l="en">Built in (<code>--agents gemini</code>), following its documented hooks.</span><span data-l="zh">已内置（<code>--agents gemini</code>），按官方 hook 接好。</span></dd></div>
+      <div><dt><span data-l="en">Other coding CLIs: Qwen Code, Qoder, TRAE, Kimi Code…</span><span data-l="zh">其他编程 CLI：Qwen Code、Qoder、TRAE、Kimi Code……</span></dt><dd><b class="plan"><span data-l="en">Not tested yet</span><span data-l="zh">待测试</span></b> <span data-l="en">Next on the list.</span><span data-l="zh">排在下一批。</span></dd></div>
     </dl>
     <div class="cta">
       <a class="btn primary" href="https://github.com/CallSymmetryEcho/trace-canvas" target="_blank" rel="noopener"><span data-l="en">Trace Canvas on GitHub</span><span data-l="zh">GitHub 上的 Trace Canvas</span> ↗</a>

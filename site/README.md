@@ -18,7 +18,7 @@ Then open <http://localhost:8000/>.
 
 ## Media
 
-- `media/<name>.<lang>.mp4` and `.jpg`: a silent clip and its poster. They come from `docs/video/make.mjs gifs`, which renders `docs/video/out/gif-<name>.<lang>.mp4` (no captions, no sound) before making the README GIF. For the site: `ffmpeg -i out/gif-<name>.<lang>.mp4 -vf fps=24,scale=1000:-2 -c:v libx264 -crf 28 -preset slow -pix_fmt yuv420p -movflags +faststart -an media/<name>.<lang>.mp4`, and a late frame as the poster (`-sseof -1 -frames:v 1 -q:v 4`). The phone clip (`goaledit`) is 420 wide, cropped to the phone.
+- `media/<name>.<lang>.mp4` and `.jpg`: a silent clip and its poster. They come from `docs/video/make.mjs gifs`, which renders `docs/video/out/gif-<name>.<lang>.mp4` (no captions, no sound) before making the README GIF. For the site: `ffmpeg -i out/gif-<name>.<lang>.mp4 -vf fps=24,scale=1000:-2 -c:v libx264 -crf 28 -preset slow -pix_fmt yuv420p -movflags +faststart -an media/<name>.<lang>.mp4`, and a late frame as the poster (`-sseof -1 -frames:v 1 -q:v 4`). The phone clip (`goaledit`) is 420 wide, cropped to the phone. The hero clip (`demo`) is the READMEs' opening GIF, `docs/demo.<lang>.gif`, which was cut by hand.
 - `media/cover-<video>.<lang>.jpg`: 960 × 540 covers of the published videos, scaled from the masters' `cover-wide` images.
 
 ## Adding a video

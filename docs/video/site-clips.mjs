@@ -1,26 +1,8 @@
 // Not imported anywhere yet. Site clips (宣传站 v2): silent GIF scenes for the promo site, written against the
 // uncommitted make.mjs of 2026-10-31 (QUIET, RETRO and their helpers). When that make.mjs is committed, paste this
 // block right before `if (process.env.TC_GIFS) VIDEOS.gifs = ...` and delete this file.
-// Render: TC_GIFS=handoff,quiet,retro node make.mjs gifs; the site's encoding is in site/README.md.
-// handoff: the hero. On the laptop a to-do goes to Codex; the workstation does it off screen; after a sync it comes
-// back ticked by Codex, on workstation; then a new Claude Code session on the laptop reads the line and carries on.
+// Render: TC_GIFS=quiet,retro node make.mjs gifs; the site's encoding is in site/README.md.
 const SITE_GIFS = [
-  { ...GIFS.find(g => g.name === 'machines'), name: 'handoff' },
-  { name: 'handoff', page: { terminal: 'claude — laptop:~/tripsplit' }, text: [],
-    run: async h => {
-      const L = v => pick(v, h.lang), arg = JSON.stringify({ thread: 'receipt-ocr' });
-      await h.cmd(L(['Carry on with receipt OCR', '接着做小票识别']), '> ');
-      await h.wait(300);
-      h.out(`⏺ trace-canvas - trace_read_thread (MCP)(${arg})`, 'k');
-      h.out(`  ⎿  ${h.tools.read(MCH.ocr)}`);
-      await h.wait(600);
-      h.out(`⏺ trace-canvas - trace_tasks (MCP)(${arg})`, 'k');
-      h.out(`  ⎿  ${h.tools.tasks(MCH.ocr)}`);
-      await h.wait(600);
-      h.out(L(['⏺ Codex on the workstation tried the vision model: 94% of receipt totals, against 61% for Tesseract, and ticked the to-do. Next: use it for imports. I’m on it.',
-        '⏺ workstation 上的 Codex 已经试过视觉模型：小票总额认对 94%，Tesseract 只有 61%，待办也勾了。下一步把它接进导入，我来做。']), 'p');
-      await h.wait(3200);
-    } },
   // Gone quiet, on a computer: the dot on Goals, the row of quiet lines, one question, one click.
   { name: 'quiet', page: 'app', fresh: true, view: 'canvas', zoom: 1, focus: { x: 640, y: 360 }, text: [], preload: qtData,
     run: async h => {

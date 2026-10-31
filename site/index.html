@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Trace Canvas — A map both people and agents can read</title>
-<meta name="description" content="Claude Code, Codex and every machine you work on, on one transit map: goals, records and hand-offs travel with the line, so any agent picks up where another left off. Runs locally, needs only Node.js, MIT.">
+<meta name="description" content="One map both you and your agents can read: every Claude Code and Codex session, on any of your machines, becomes a line. You see what each agent is doing and what it changed; your agents read the same map to pick up where another left off. Runs locally, needs only Node.js, MIT.">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Trace Canvas — A map both people and agents can read">
-<meta property="og:description" content="Claude Code, Codex and every machine you work on, on one transit map: goals, records and hand-offs travel with the line, so any agent picks up where another left off. Runs locally, needs only Node.js, MIT.">
+<meta property="og:description" content="One map both you and your agents can read: every Claude Code and Codex session, on any of your machines, becomes a line. You see what each agent is doing and what it changed; your agents read the same map to pick up where another left off. Runs locally, needs only Node.js, MIT.">
 <meta property="og:url" content="https://trace-canvas.bin-lian.com/">
 <meta property="og:image" content="https://trace-canvas.bin-lian.com/media/cover-tutorial.en.jpg">
 <link rel="canonical" href="https://trace-canvas.bin-lian.com/">
@@ -217,8 +217,13 @@ pre code { background: none; border: 0; padding: 0; font-size: inherit; overflow
 .support b.pre { color: #1d1d1d; background: #F29F05; border-color: transparent; }
 
 /* hero extras and the tutorial player */
-.tagline { font: 500 13px/1.4 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-top: 22px; }
-html[lang="zh-CN"] .tagline { text-transform: none; letter-spacing: .06em; font-size: 14px; }
+.tagline { font: 500 13px/1.4 var(--f-mono); letter-spacing: .08em; color: var(--muted); margin-top: 22px; }
+html[lang="zh-CN"] .tagline { letter-spacing: .06em; font-size: 14px; }
+.duo { list-style: none; padding: 0; margin: 16px 0 0; display: grid; gap: 10px; max-width: 36em; }
+.duo li { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: baseline; font-size: clamp(16px, 1.5vw, 18px); }
+.duo b { font: 600 12px/1.6 var(--f-mono); letter-spacing: .06em; text-transform: uppercase; padding: 2px 9px; border-radius: 999px; white-space: nowrap; color: #fff; background: #E4002B; }
+.duo li + li b { background: #0072CE; }
+html[lang="zh-CN"] .kicker, html[lang="zh-CN"] .duo b { text-transform: none; }
 .hero .small { margin-top: 14px; font-size: 14.5px; color: var(--faint); }
 .player { max-width: 960px; padding: 14px; }
 .play { position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; padding: 0; cursor: pointer; font: inherit; }
@@ -230,6 +235,17 @@ html[lang="zh-CN"] .tagline { text-transform: none; letter-spacing: .06em; font-
 .player .meta { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 14px 4px 2px; }
 .player h4 { margin: 0; font: 700 23px/1.2 var(--f-display); }
 .player .where { font: 500 13px/1 var(--f-mono); white-space: nowrap; }
+.play:disabled { cursor: default; }
+.play:disabled .tri { display: none; }
+.play:disabled::after { position: absolute; left: 50%; bottom: 16px; translate: -50% 0; padding: 6px 12px; border-radius: 999px; background: rgba(21, 24, 28, .8); color: #fff; font: 500 13px/1.3 var(--f-mono); white-space: nowrap; }
+html[lang="en"] .play:disabled::after { content: "Plays here once it is published"; }
+html[lang="zh-CN"] .play:disabled::after { content: "发布后在这里播放"; }
+.chapters { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 2px 18px; }
+@media (min-width: 720px) { .chapters { grid-template-columns: 1fr 1fr; grid-template-rows: repeat(6, auto); grid-auto-flow: column; } }
+.chapters button { display: flex; gap: 12px; width: 100%; padding: 7px 4px; border: 0; border-bottom: 1px solid var(--rule-soft); background: none; color: var(--ink); font: 15px/1.4 var(--f-body); text-align: left; cursor: pointer; }
+.chapters button:hover:not(:disabled) { color: var(--accent); }
+.chapters button:disabled { cursor: default; color: var(--muted); }
+.chapters button span { flex: none; width: 3.2em; color: var(--muted); font: 13px/1.6 var(--f-mono); }
 
 footer { max-width: 1200px; margin: 0 auto; padding: 8px 16px 48px var(--gut); color: var(--muted); font-size: 15px; }
 footer .veil { display: inline-block; max-width: 100%; padding: 10px 16px; overflow-wrap: anywhere; }
@@ -301,10 +317,14 @@ footer a { color: inherit; }
         <svg class="mark" viewBox="0 0 1000 240" role="img" aria-label="Trace Canvas mark"><g fill="none" stroke-width="22" stroke-linecap="round"><path pathLength="1" d="M60 120 H940" stroke="#E4002B"/><path pathLength="1" d="M220 120 C300 120 300 40 380 40 H640 C720 40 720 120 800 120" stroke="#0072CE"/><path pathLength="1" d="M380 120 C440 120 430 200 470 200 H940" stroke="#00A651"/></g><g fill="#fff" stroke-width="11"><circle style="--x:.11" cx="110" cy="120" r="21" stroke="#E4002B"/><circle style="--x:.3" cx="300" cy="120" r="21" stroke="#E4002B"/><circle style="--x:.52" cx="520" cy="120" r="21" stroke="#E4002B"/><circle style="--x:.74" cx="740" cy="120" r="21" stroke="#E4002B"/><circle style="--x:.89" cx="890" cy="120" r="21" stroke="#E4002B"/><circle style="--x:.38" cx="380" cy="40" r="21" stroke="#0072CE"/><circle style="--x:.64" cx="640" cy="40" r="21" stroke="#0072CE"/><circle style="--x:.47" cx="470" cy="200" r="21" stroke="#00A651"/><circle style="--x:.72" cx="720" cy="200" r="21" stroke="#00A651"/></g></svg>
         <p class="wordmark">Trace Canvas</p>
       </div>
-      <p class="tagline"><span data-l="en">A map both people and agents can read</span><span data-l="zh">人和 agent 都看得懂的地图</span></p>
-      <h1><span data-l="en">One map. Any agent picks up where another left off.</span><span data-l="zh">一张图，谁都能接着别人停下的地方干。</span></h1>
-      <p class="lead" data-l="en">Claude Code here, Codex there, another machine down the hall. Every session becomes a line on one transit map, and its goal, records and hand-offs travel with the line, so switching agents or machines doesn't lose the thread.</p>
-      <p class="lead" data-l="zh">这边 Claude Code，那边 Codex，隔壁还有一台电脑。每个会话都是同一张地铁图上的一条线，目标、记录和交接都跟着线走，换个 agent、换台电脑也接得上。</p>
+      <p class="tagline"><span data-l="en">Claude Code · Codex · every machine you work on</span><span data-l="zh">Claude Code · Codex · 你的每台电脑</span></p>
+      <h1><span data-l="en">One map both you and your agents can read</span><span data-l="zh">人和 agent 都看得懂的一张地图</span></h1>
+      <p class="lead" data-l="en">Every session, Claude Code or Codex, on this computer or another, becomes a line on one transit map. You and your agents read the same map:</p>
+      <p class="lead" data-l="zh">每个会话，不管是 Claude Code 还是 Codex、在这台电脑还是那台，都是同一张地铁图上的一条线。你和 agent 看的是同一张图：</p>
+      <ul class="duo">
+        <li><b><span data-l="en">For you</span><span data-l="zh">给你看</span></b><span data-l="en">what each agent is doing, how far it got and what it changed, at a glance.</span><span data-l="zh">每个 agent 在干嘛、做到哪、改了什么，一眼就知道。</span></li>
+        <li><b><span data-l="en">For agents</span><span data-l="zh">给 agent 读</span></b><span data-l="en">the goal, the to-dos and what the others did, so a new one picks up in seconds, even on another tool or machine.</span><span data-l="zh">目标、待办和别人做过的事，新开的 agent 几秒接上，换个工具、换台电脑也不断线。</span></li>
+      </ul>
       <div class="cta">
         <a class="btn primary" href="#tutorial"><span data-l="en">Watch the tutorial</span><span data-l="zh">看完整教程</span> ↓</a>
         <a class="btn" href="#install"><span data-l="en">Install</span><span data-l="zh">安装</span></a>
@@ -324,40 +344,69 @@ footer a { color: inherit; }
   <section id="tutorial">
     <header class="sec-head veil">
       <p class="kicker"><span data-l="en">Start here</span><span data-l="zh">从这里开始</span></p>
-      <h2><i class="dot"></i><span data-l="en">The tutorial</span><span data-l="zh">教程</span></h2>
-      <p><span data-l="en">From install to merging lines, with narration. It plays here; nothing loads until you press play.</span><span data-l="zh">从安装讲到合并线路，带讲解。就在这里播放，点了才加载。</span></p>
+      <h2><i class="dot"></i><span data-l="en">The full 0.3.0 tutorial</span><span data-l="zh">0.3.0 完整教程</span></h2>
+      <p><span data-l="en">From setup to several machines in eleven lessons, with narration. It plays right here; pick a lesson to start there.</span><span data-l="zh">从装好讲到几台电脑一起用，十一课，带讲解。就在这里播放，点哪一课就从哪开始。</span></p>
     </header>
     <div class="player panel">
-      <button class="play frame" type="button" data-l="en" data-embed="https://www.youtube-nocookie.com/embed/gDkbh4GVjno?autoplay=1&amp;rel=0" aria-label="Play: Trace Canvas in 3 minutes (YouTube)"><img src="media/cover-tutorial.en.jpg" alt="" width="960" height="540" loading="lazy"><span class="tri" aria-hidden="true"></span></button>
-      <button class="play frame" type="button" data-l="zh" data-embed="https://player.bilibili.com/player.html?bvid=BV1y5xG6rEX9&amp;autoplay=1&amp;high_quality=1" aria-label="播放：3 分钟上手 Trace Canvas（B站）"><img src="media/cover-tutorial.zh.jpg" alt="" width="960" height="540" loading="lazy"><span class="tri" aria-hidden="true"></span></button>
+      <!-- ponytail: data-embed stays empty until video 26 is public; {t} is the start second. YouTube: https://www.youtube-nocookie.com/embed/<id>?autoplay=1&amp;rel=0&amp;start={t} · Bilibili: https://player.bilibili.com/player.html?bvid=<bv>&amp;autoplay=1&amp;high_quality=1&amp;t={t} -->
+      <button class="play frame" type="button" data-l="en" data-embed="" aria-label="Play: Trace Canvas 0.3.0, the full tutorial"><img src="media/cover-course.en.jpg" alt="" width="960" height="540" loading="lazy"><span class="tri" aria-hidden="true"></span></button>
+      <button class="play frame" type="button" data-l="zh" data-embed="" aria-label="播放：Trace Canvas 0.3.0 版本完整教程"><img src="media/cover-course.zh.jpg" alt="" width="960" height="540" loading="lazy"><span class="tri" aria-hidden="true"></span></button>
       <div class="meta">
-        <h4><span data-l="en">Trace Canvas in 3 minutes</span><span data-l="zh">3 分钟上手 Trace Canvas</span></h4>
-        <span class="where"><a data-l="en" href="https://youtu.be/gDkbh4GVjno" target="_blank" rel="noopener">YouTube ↗</a><a data-l="zh" href="https://www.bilibili.com/video/BV1y5xG6rEX9" target="_blank" rel="noopener">Bilibili ↗</a></span>
+        <h4><span data-l="en">Trace Canvas 0.3.0: the full tutorial · 10:32</span><span data-l="zh">Trace Canvas 0.3.0 版本完整教程 · 10:26</span></h4>
+        <span class="where"></span>
       </div>
+      <ol class="chapters" data-l="en">
+        <li><button type="button" data-t="0"><span>0:00</span>Opening</button></li>
+        <li><button type="button" data-t="36"><span>0:36</span>Lesson 1: Set up and connect</button></li>
+        <li><button type="button" data-t="83"><span>1:23</span>Lesson 2: Lines: projects, branches, agents</button></li>
+        <li><button type="button" data-t="176"><span>2:56</span>Lesson 3: Example: every agent on your computer</button></li>
+        <li><button type="button" data-t="262"><span>4:22</span>Lesson 4: Read the map</button></li>
+        <li><button type="button" data-t="337"><span>5:37</span>Lesson 5: Sessions stay on their line</button></li>
+        <li><button type="button" data-t="389"><span>6:29</span>Lesson 6: Goals and to-dos</button></li>
+        <li><button type="button" data-t="460"><span>7:40</span>Lesson 7: See what changed</button></li>
+        <li><button type="button" data-t="487"><span>8:07</span>Lesson 8: Trace back: what stalled</button></li>
+        <li><button type="button" data-t="526"><span>8:46</span>Lesson 9: Retro: what took the most rounds</button></li>
+        <li><button type="button" data-t="566"><span>9:26</span>Lesson 10: Several machines, one map</button></li>
+        <li><button type="button" data-t="607"><span>10:07</span>Lesson 11: Wrapping up</button></li>
+      </ol>
+      <ol class="chapters" data-l="zh">
+        <li><button type="button" data-t="0"><span>0:00</span>开场</button></li>
+        <li><button type="button" data-t="33"><span>0:33</span>第 1 课：装好、接上</button></li>
+        <li><button type="button" data-t="76"><span>1:16</span>第 2 课：线：项目、分支和 agent</button></li>
+        <li><button type="button" data-t="176"><span>2:56</span>第 3 课：一个例子：管起整台电脑的 agent</button></li>
+        <li><button type="button" data-t="261"><span>4:21</span>第 4 课：读懂这张图</button></li>
+        <li><button type="button" data-t="337"><span>5:37</span>第 5 课：会话留在线上</button></li>
+        <li><button type="button" data-t="390"><span>6:30</span>第 6 课：目标和待办</button></li>
+        <li><button type="button" data-t="453"><span>7:33</span>第 7 课：看改了什么</button></li>
+        <li><button type="button" data-t="481"><span>8:01</span>第 8 课：回头找：哪条线停了</button></li>
+        <li><button type="button" data-t="522"><span>8:42</span>第 9 课：复盘：哪件事来回最多</button></li>
+        <li><button type="button" data-t="559"><span>9:19</span>第 10 课：几台电脑，一张画布</button></li>
+        <li><button type="button" data-t="602"><span>10:02</span>第 11 课：收尾</button></li>
+      </ol>
     </div>
   </section>
   <section id="tour">
     <header class="sec-head veil">
       <p class="kicker"><span data-l="en">The tour</span><span data-l="zh">导览</span></p>
       <h2><span data-l="en">Follow the line</span><span data-l="zh">沿着这条线走一遍</span></h2>
-      <p><span data-l="en">Each station is one idea. Side lines fork off and merge back, the way your sessions do.</span><span data-l="zh">每一站讲一件事。支线分出去又合回来，就像你的会话一样。</span></p>
+      <p><span data-l="en">Eight stations: what you see on the map, and what your agents read from it. Side lines fork off and merge back, the way your sessions do.</span><span data-l="zh">八站：你在图上看到什么，agent 又从图上读到什么。支线分出去又合回来，就像你的会话一样。</span></p>
     </header>
     <article class="st wide">
       <div class="st-text panel">
         <span class="num" aria-hidden="true">01</span>
         <p class="kicker"><span data-l="en">The problem</span><span data-l="zh">问题</span></p>
-        <h3><i class="dot"></i><span data-l="en">Many sessions at once, and no one remembers who did what</span><span data-l="zh">同时开着好几个会话，谁做了什么已经说不清</span></h3>
-        <p class="big" data-l="en">Claude Code in one window, Codex in another, a third session on the workstation. Ideas and tasks run in parallel and scatter across chats and machines. A day later you no longer know which session did what, or how far each one got, and the next agent starts from zero.</p>
-        <p class="big" data-l="zh">一个窗口里是 Claude Code，另一个是 Codex，工作站上还开着一个会话。想法和任务并行推进，散落在各个对话和各台电脑上。过一天，就说不清哪个会话做了什么、各自做到了哪一步，下一个 agent 又得从零开始。</p>
+        <h3><i class="dot"></i><span data-l="en">More agents: you lose track of them, and they can't see each other's work</span><span data-l="zh">agent 一多，你看不清它们，它们也看不见彼此</span></h3>
+        <p class="big" data-l="en">Claude Code in one window, Codex in another, a third session on the workstation. You can no longer say which one is doing what, how far it got or what it changed. A new agent can't see what the others did either, so it starts by asking you, all over again. The record is scattered across chats and machines, and there is no one place that both you and your agents can read.</p>
+        <p class="big" data-l="zh">一个窗口里是 Claude Code，另一个是 Codex，工作站上还跑着一个。你说不清哪个在干嘛、做到哪、改了什么；新开的 agent 也看不到别人做过的事，只能从头问你。记录散在各个对话和各台电脑里，没有一个地方是你和 agent 都能看的。</p>
       </div>
     </article>
     <article class="st">
       <div class="st-text panel">
         <span class="num" aria-hidden="true">02</span>
-        <p class="kicker"><span data-l="en">Lines and stations</span><span data-l="zh">线路和站点</span></p>
-        <h3><i class="dot"></i><span data-l="en">Every session becomes a line</span><span data-l="zh">每个会话都是一条线</span></h3>
-        <p data-l="en">Your instructions and decisions are dark stations; the agents' edits, commits and results are stations in the line's colour. Fork a line from any station and merge it back when it is done, drawn like git.</p>
-        <p data-l="zh">你的指令和决定是深色站点，agent 的改动、提交和产出用线路的颜色。可以从任意站点分叉出新线，做完再合并回来，像 git 一样画出来。</p>
+        <p class="kicker"><span data-l="en">For you: lines and stations</span><span data-l="zh">给你看：线路和站点</span></p>
+        <h3><i class="dot"></i><span data-l="en">Every session is a line you read at a glance</span><span data-l="zh">每个会话一条线，谁做了什么一眼看懂</span></h3>
+        <p data-l="en">Your instructions and decisions are dark stations; the agents' edits, commits and results are stations in the line's colour. Running sessions sit at the tips, and the one waiting for you is orange. Forks and merges are drawn like git.</p>
+        <p data-l="zh">你的指令和决定是深色站点，agent 的改动、提交和产出用线路的颜色。正在跑的会话挂在线头上，等你的那个是橙色。分叉与合并像 git 一样画出来。</p>
         <p data-l="en">Hooks draw it while you work. You do nothing.</p>
         <p data-l="zh">这些由 hooks 在你工作时自动画上，你什么都不用做。</p>
       </div>
@@ -369,12 +418,25 @@ footer a { color: inherit; }
     <article class="st">
       <div class="st-text panel">
         <span class="num" aria-hidden="true">03</span>
-        <p class="kicker"><span data-l="en">Hand-offs</span><span data-l="zh">交接</span></p>
-        <h3><i class="dot"></i><span data-l="en">The next agent picks up where the last one stopped</span><span data-l="zh">下一个 agent，接着上一个停下的地方</span></h3>
-        <p data-l="en">A line keeps its goal, its to-dos and everything done on it. A new session, Claude Code or Codex, reads it through the MCP tools <code>trace_read_thread</code> and <code>trace_tasks</code> and catches up in seconds instead of rereading old chats.</p>
-        <p data-l="zh">一条线记着它的目标、待办和做过的每件事。新开的会话，不管是 Claude Code 还是 Codex，都通过 MCP 工具 <code>trace_read_thread</code> 和 <code>trace_tasks</code> 读它，几秒钟就跟上进度，不用重读旧对话。</p>
-        <p data-l="en">Agents tick to-dos off with <code>trace_task_done</code> and the list shows who ticked each one, so you can let them work while you are away and see where things stand when you come back.</p>
-        <p data-l="zh">agent 做完一项就用 <code>trace_task_done</code> 勾掉，清单上标着是谁勾的。你离开时让它们干，回来一看就知道做到哪了。</p>
+        <p class="kicker"><span data-l="en">For agents: the same map</span><span data-l="zh">给 agent 读：同一张图</span></p>
+        <h3><i class="dot"></i><span data-l="en">A new agent catches up in seconds</span><span data-l="zh">新开的 agent，几秒接上进度</span></h3>
+        <p data-l="en">Through the MCP tools <code>trace_read_thread</code> and <code>trace_tasks</code>, a new session, Claude Code or Codex, reads the line you see: its goal, its to-dos, every result and decision. It picks up where another left off instead of asking you to explain it all again.</p>
+        <p data-l="zh">通过 MCP 工具 <code>trace_read_thread</code> 和 <code>trace_tasks</code>，新开的会话，不管是 Claude Code 还是 Codex，读的就是你看到的这条线：目标、待办，还有之前每个结果和决定。它接着别人停下的地方做，不用你再从头讲一遍。</p>
+      </div>
+      <figure class="st-media panel">
+        <div class="frame"><video data-clip="sessions" width="1000" height="562" muted loop playsinline preload="none"></video></div>
+        <figcaption><span data-l="en">A resumed session logs on its line again; the line panel lists its sessions, each with a resume command.</span><span data-l="zh">恢复的会话接着记在原来的线上；线面板列出这条线上的会话，每个都能复制恢复命令。</span></figcaption>
+      </figure>
+    </article>
+    <article class="st">
+      <div class="st-text panel">
+        <span class="num" aria-hidden="true">04</span>
+        <p class="kicker"><span data-l="en">Goals, to-dos, dispatch</span><span data-l="zh">目标、待办、分派</span></p>
+        <h3><i class="dot"></i><span data-l="en">One list for you and your agents</span><span data-l="zh">人和 agent 共用一份清单</span></h3>
+        <p data-l="en">Write down what a line should achieve and its next steps. Agents read them when they start and tick each one off with <code>trace_task_done</code>; the list shows who ticked it, Claude Code or Codex. Let them work while you are away, and see where things stand when you come back.</p>
+        <p data-l="zh">写下一条线要达到的目标和下一步。agent 开工时读它，做完一项就用 <code>trace_task_done</code> 勾掉，清单上标着是谁勾的：Claude Code 还是 Codex。你离开时它们照样推进，回来一看就知道做到哪了。</p>
+        <p data-l="en">Say dispatch (<code>/trace-canvas dispatch</code>, also from the Claude app on your phone) and each line's new to-dos go to the agent working on it.</p>
+        <p data-l="zh">说一句「分派」（<code>/trace-canvas dispatch</code>，手机上的 Claude app 里也行），每条线上新记的待办就交给正在做这条线的 agent。</p>
       </div>
       <figure class="st-media panel">
         <div class="frame"><video data-clip="goals" width="1000" height="562" muted loop playsinline preload="none"></video></div>
@@ -383,24 +445,41 @@ footer a { color: inherit; }
     </article>
     <article class="st">
       <div class="st-text panel">
-        <span class="num" aria-hidden="true">04</span>
-        <p class="kicker"><span data-l="en">Dispatch</span><span data-l="zh">分派</span></p>
-        <h3><i class="dot"></i><span data-l="en">One sentence, every line at work</span><span data-l="zh">一句话，每条线都开工</span></h3>
-        <p data-l="en">Say dispatch (<code>/trace-canvas dispatch</code>, also from the Claude app on your phone) and each line's new to-dos go to the agent working on that line. A running session gets a message, a stopped one is resumed with its to-dos, and a line nobody works on gets a new session. A to-do for Codex goes only to Codex, and one meant for a machine goes to that machine.</p>
-        <p data-l="zh">说一句「分派」（<code>/trace-canvas dispatch</code>，在手机上的 Claude app 里也行），每条线上新记的待办就交给正在做这条线的 agent。正在运行的会话收到消息，停了的会话带着待办恢复，没人做的线新开一个会话。指定给 Codex 的只交给 Codex，指定了机器的就交到那台机器上。</p>
+        <span class="num" aria-hidden="true">05</span>
+        <p class="kicker"><span data-l="en">For you: what changed</span><span data-l="zh">给你看：改了什么</span></p>
+        <h3><i class="dot"></i><span data-l="en">What did the agent change? One click to the diff</span><span data-l="zh">agent 到底改了什么？点开就是 diff</span></h3>
+        <p data-l="en">A commit station lists the files it changed, biggest first. Click a file for its diff, or compare with an earlier station to see everything since then. When an agent says it's done, the proof is right there.</p>
+        <p data-l="zh">提交站点列出这次改过的文件，改得多的在前。点文件看 diff，或者和更早的站点对比，看从那以后改了什么。agent 说「做完了」，证据就在旁边。</p>
+        <p data-l="en">The canvas keeps only the commit and its repository; the diff comes straight from git when you open it.</p>
+        <p data-l="zh">画布只记提交和它所在的仓库，diff 在你打开时直接向 git 要。</p>
       </div>
       <figure class="st-media panel">
-        <div class="frame"><video data-clip="dispatch" width="1000" height="562" muted loop playsinline preload="none"></video></div>
-        <figcaption><span data-l="en"><code>/trace-canvas dispatch</code> hands each line's new to-do to the agent working on it, and three lines wake up: a message to the running session, a resume for the stopped one, a new session for the line nobody works on.</span><span data-l="zh"><code>/trace-canvas dispatch</code> 把每条线的新待办交给在做这条线的 agent，三条线随之开工：正在运行的会话收到消息，停了的会话被恢复，没人做的线新开一个会话。</span></figcaption>
+        <div class="frame"><video data-clip="changes" width="1000" height="562" muted loop playsinline preload="none"></video></div>
+        <figcaption><span data-l="en">A commit station lists the files it changed; a click opens a diff; Compare with shows what changed since an earlier station.</span><span data-l="zh">提交站点列出改过的文件，点文件看 diff，「对比」看与更早站点之间的改动。</span></figcaption>
       </figure>
     </article>
     <article class="st">
       <div class="st-text panel">
-        <span class="num" aria-hidden="true">05</span>
+        <span class="num" aria-hidden="true">06</span>
+        <p class="kicker"><span data-l="en">Retro</span><span data-l="zh">复盘</span></p>
+        <h3><i class="dot"></i><span data-l="en">Where did the back-and-forth go?</span><span data-l="zh">和 agent 来回最多的，是哪件事？</span></h3>
+        <p data-l="en">Press Retro in a line's panel. Your own local <code>claude</code> or <code>codex</code> reads the line's conversations and ranks the work by rounds, time and tokens, then names where it got stuck, the sentence that finally made it clear, and a rule.</p>
+        <p data-l="zh">在线面板里点「复盘」。用你本机的 <code>claude</code> 或 <code>codex</code> 读这条线上的对话，按来回轮次、时间和 token 给每件事排行，再指出卡在哪、哪一句终于说清楚了，提炼成一条规矩。</p>
+        <p data-l="en">Nothing is written until you press Write: to the project's CLAUDE.md and AGENTS.md, the line, or long-term memory, so next time any agent gets it in one round.</p>
+        <p data-l="zh">点「写入」才会写：写进项目的 CLAUDE.md 和 AGENTS.md、这条线，或者长期记忆。下次换个 agent，也一轮就过。</p>
+      </div>
+      <figure class="st-media panel">
+        <div class="frame"><video data-clip="retro" width="1000" height="562" muted loop playsinline preload="none"></video></div>
+        <figcaption><span data-l="en">Retro on a line: the work ranked by rounds, where each piece got stuck, the sentence that made it clear, and the rule it suggests.</span><span data-l="zh">在一条线上复盘：按来回轮次排行，每件事卡在哪、哪一句说清楚了，以及它建议的规矩。</span></figcaption>
+      </figure>
+    </article>
+    <article class="st">
+      <div class="st-text panel">
+        <span class="num" aria-hidden="true">07</span>
         <p class="kicker"><span data-l="en">Machines and your phone</span><span data-l="zh">多台电脑和手机</span></p>
         <h3><i class="dot"></i><span data-l="en">Several machines, one canvas, and your phone too</span><span data-l="zh">多台电脑，同一张画布，手机上也能看</span></h3>
-        <p data-l="en">Laptop, workstation and lab PC share one canvas through a private git repository. Each machine writes only its own file, and <code>trace-canvas sync</code> brings in the others. Records from another machine carry its name, and their resume command runs over ssh.</p>
-        <p data-l="zh">笔记本、工作站和实验室电脑通过一个私有 git 仓库共用一张画布。每台机器只写自己的文件，<code>trace-canvas sync</code> 把其他机器的拉进来。来自别的机器的记录标着机器名，恢复命令通过 ssh 执行。</p>
+        <p data-l="en">Laptop, workstation and lab PC share one canvas through a private git repository. Each machine writes only its own file, and <code>trace-canvas sync</code> brings in the others. Records from another machine carry its name, a to-do can be sent to a machine, and its resume command runs over ssh.</p>
+        <p data-l="zh">笔记本、工作站和实验室电脑通过一个私有 git 仓库共用一张画布。每台机器只写自己的文件，<code>trace-canvas sync</code> 把其他机器的拉进来。来自别的机器的记录标着机器名，待办可以指定交给哪台机器，恢复命令通过 ssh 执行。</p>
         <p data-l="en">Away from the desk, open the canvas on your phone through Tailscale, with nothing opened to the internet: read your lines, drop ideas and to-dos into them, and edit a line's goal right there.</p>
         <p data-l="zh">离开桌子，就通过 Tailscale 在手机上打开画布，不对公网开放：看各条线、往线上记想法和待办、就地改线的目标。</p>
       </div>
@@ -411,7 +490,7 @@ footer a { color: inherit; }
     </article>
     <article class="st wide">
       <div class="st-text panel">
-        <span class="num" aria-hidden="true">06</span>
+        <span class="num" aria-hidden="true">08</span>
         <p class="kicker"><span data-l="en">Local and light</span><span data-l="zh">本地、轻量</span></p>
         <h3><i class="dot"></i><span data-l="en">On your computer, at about 1% of the tokens</span><span data-l="zh">跑在你的电脑上，只占约 1% 的 token</span></h3>
         <div class="facts">
@@ -436,9 +515,9 @@ footer a { color: inherit; }
         <figcaption><span data-l="en">Past sessions arrive on the canvas one after another, each as its own line.</span><span data-l="zh">过去的会话一个接一个落到画布上，每个会话一条线。</span></figcaption>
       </figure>
       <figure class="card panel">
-        <div class="frame"><video data-clip="sessions" width="1000" height="562" muted loop playsinline preload="none"></video></div>
-        <h4><span data-l="en">Sessions stay on their line</span><span data-l="zh">会话留在线上</span></h4>
-        <figcaption><span data-l="en">A resumed session logs on its line again; the line panel lists its sessions, each with a resume command.</span><span data-l="zh">恢复的会话接着记在原来的线上；线面板列出这条线上的会话，每个都能复制恢复命令。</span></figcaption>
+        <div class="frame"><video data-clip="dispatch" width="1000" height="562" muted loop playsinline preload="none"></video></div>
+        <h4><span data-l="en">Dispatch: every line at work</span><span data-l="zh">分派：每条线都开工</span></h4>
+        <figcaption><span data-l="en"><code>/trace-canvas dispatch</code> hands each line's new to-do to the agent working on it: a message to the running session, a resume for the stopped one, a new session for the line nobody works on.</span><span data-l="zh"><code>/trace-canvas dispatch</code> 把每条线的新待办交给在做这条线的 agent：正在运行的会话收到消息，停了的会话被恢复，没人做的线新开一个会话。</span></figcaption>
       </figure>
       <figure class="card panel">
         <div class="frame"><video data-clip="timeline" width="1000" height="562" muted loop playsinline preload="none"></video></div>
@@ -456,11 +535,6 @@ footer a { color: inherit; }
         <figcaption><span data-l="en">In the Agents view, ↗ opens a session's chat in the Claude app or the Codex app, and Go to its terminal brings a Terminal session's tab to the front.</span><span data-l="zh">在 Agent 视图里，↗ 在 Claude app 或 Codex app 里打开那次对话，「跳到终端」把终端里那个会话的标签页调到最前。</span></figcaption>
       </figure>
       <figure class="card panel">
-        <div class="frame"><video data-clip="changes" width="1000" height="562" muted loop playsinline preload="none"></video></div>
-        <h4><span data-l="en">What did the agent change?</span><span data-l="zh">agent 到底改了什么？</span></h4>
-        <figcaption><span data-l="en">A commit station lists the files it changed; a click opens a diff; Compare with shows what changed since an earlier station.</span><span data-l="zh">提交站点列出改过的文件，点文件看 diff，「对比」看与更早站点之间的改动。</span></figcaption>
-      </figure>
-      <figure class="card panel">
         <div class="frame"><video data-clip="merge" width="1000" height="562" muted loop playsinline preload="none"></video></div>
         <h4><span data-l="en">Merge two lines</span><span data-l="zh">合并两条线</span></h4>
         <figcaption><span data-l="en">A close look at one card (dark stations are yours, coloured ones the agents'), then Shift-click two lines, pick the line to keep and Merge: they fold into it, and nothing is deleted.</span><span data-l="zh">先近看一张卡片（深色站点是你的，彩色的是 agent 的），再 Shift 点选两条线，选好留下哪条，点「合并」：它们收进这条线，什么都不删。</span></figcaption>
@@ -474,11 +548,6 @@ footer a { color: inherit; }
         <div class="frame"><video data-clip="quiet" width="1000" height="562" muted loop playsinline preload="none"></video></div>
         <h4><span data-l="en">Gone quiet</span><span data-l="zh">安静了</span></h4>
         <figcaption><span data-l="en">A line that has stopped moving puts a small dot on Goals; nothing pops up. Its chip asks one question: finished, parked, or still on it?</span><span data-l="zh">停下来的线只在「目标」上亮一个小点，不弹窗。点它的标签，只问一句：做完了、先搁置，还是还在做？</span></figcaption>
-      </figure>
-      <figure class="card panel">
-        <div class="frame"><video data-clip="retro" width="1000" height="562" muted loop playsinline preload="none"></video></div>
-        <h4><span data-l="en">Retro: where the back-and-forth went</span><span data-l="zh">复盘：来回最多的是哪件事</span></h4>
-        <figcaption><span data-l="en">Retro on a line ranks its work by rounds with the agents, shows where it got stuck and the sentence that made it clear, and suggests a rule.</span><span data-l="zh">在一条线上点「复盘」，按和 agent 来回的轮次给每件事排行，指出卡在哪、哪一句终于说清楚了，再提炼成一条规矩。</span></figcaption>
       </figure>
     </div>
   </section>
@@ -497,6 +566,8 @@ footer a { color: inherit; }
       <a class="tut panel" data-l="en" href="https://youtu.be/aFysm6fsloo" target="_blank" rel="noopener"><div class="frame"><img src="media/cover-goalmap.en.jpg" alt="" width="960" height="540" loading="lazy"></div><div class="meta"><h4>Goals: several projects, never lost</h4><span class="where">YouTube ↗</span></div></a>
       <a class="tut panel" data-l="zh" href="https://www.bilibili.com/video/BV1KqxL6WE9j" target="_blank" rel="noopener"><div class="frame"><img src="media/cover-goalmap.zh.jpg" alt="" width="960" height="540" loading="lazy"></div><div class="meta"><h4>用好目标：推好几个项目不迷路</h4><span class="where">Bilibili ↗</span></div></a>
       <a class="tut panel" data-l="en" href="https://youtu.be/WovF8GNHvrs" target="_blank" rel="noopener"><div class="frame"><img src="media/cover-jump.en.jpg" alt="" width="960" height="540" loading="lazy"></div><div class="meta"><h4>One click back to its window</h4><span class="where">YouTube Shorts ↗</span></div></a>
+      <a class="tut panel" data-l="en" href="https://youtu.be/gDkbh4GVjno" target="_blank" rel="noopener"><div class="frame"><img src="media/cover-tutorial.en.jpg" alt="" width="960" height="540" loading="lazy"></div><div class="meta"><h4>Trace Canvas in 3 minutes</h4><span class="where">YouTube ↗</span></div></a>
+      <a class="tut panel" data-l="zh" href="https://www.bilibili.com/video/BV1y5xG6rEX9" target="_blank" rel="noopener"><div class="frame"><img src="media/cover-tutorial.zh.jpg" alt="" width="960" height="540" loading="lazy"></div><div class="meta"><h4>3 分钟上手 Trace Canvas</h4><span class="where">Bilibili ↗</span></div></a>
       <a class="tut panel" data-l="en" href="https://x.com/BinLiano9m5/status/2115209429498917273" target="_blank" rel="noopener"><div class="frame"><img src="media/cover-saga.zh.jpg" alt="" width="960" height="540" loading="lazy"></div><div class="meta"><h4>Origin story: 413 stations in 4 days</h4><span class="where">X ↗</span></div></a>
       <a class="tut panel" data-l="zh" href="https://www.bilibili.com/video/BV11VxG6GEjy" target="_blank" rel="noopener"><div class="frame"><img src="media/cover-saga.zh.jpg" alt="" width="960" height="540" loading="lazy"></div><div class="meta"><h4>诞生记：4 天 413 个站点</h4><span class="where">Bilibili ↗</span></div></a>
       <a class="tut panel" data-l="en" href="https://youtube.com/shorts/XZEhi_UO9bA" target="_blank" rel="noopener"><div class="frame"><img src="media/cover-focus.en.jpg" alt="" width="960" height="540" loading="lazy"></div><div class="meta"><h4>Focus mode</h4><span class="where">YouTube Shorts ↗</span></div></a>
@@ -571,13 +642,22 @@ node ~/trace-canvas/bin/trace-canvas.mjs setup --user</code></pre>
   clips.forEach(v => { near.observe(v); seen.observe(v); });
 
   /* ---------- the tutorial: the cover until play is pressed, then the platform's player (YouTube in English, Bilibili in Chinese) ---------- */
+  // A lesson in the list starts the player at its second ({t} in data-embed). An empty data-embed: not published yet.
   const plays = $$('.play');
   const unplay = () => $$('.player iframe').forEach(f => f.replaceWith(f.btn));
-  plays.forEach(b => b.onclick = () => {
+  const start = (b, t = 0) => {
+    unplay();
     const f = document.createElement('iframe');
-    Object.assign(f, { src: b.dataset.embed, title: b.getAttribute('aria-label'), allow: 'autoplay; encrypted-media; picture-in-picture; fullscreen', allowFullscreen: true, btn: b });
+    Object.assign(f, { src: b.dataset.embed.replace('{t}', t), title: b.getAttribute('aria-label'), allow: 'autoplay; encrypted-media; picture-in-picture; fullscreen', allowFullscreen: true, btn: b });
     f.dataset.l = b.dataset.l;
     b.replaceWith(f);
+    return f;
+  };
+  plays.forEach(b => { b.disabled = !b.dataset.embed; b.onclick = () => start(b); });
+  $$('.chapters button').forEach(c => {
+    const b = plays.find(p => p.dataset.l === c.closest('ol').dataset.l);
+    c.disabled = b.disabled;
+    c.onclick = () => start(b, c.dataset.t).scrollIntoView({ block: 'nearest', behavior: still ? 'auto' : 'smooth' });
   });
 
   /* ---------- language: switched in place, remembered ---------- */
@@ -654,7 +734,7 @@ node ~/trace-canvas/bin/trace-canvas.mjs setup --user</code></pre>
   const rclip = rail.querySelector('.rail-clip'), rinner = rail.querySelector('.rail-inner'), rsvg = rinner.querySelector('svg');
   const dots = $$('.dot', wrap), foot = document.querySelector('footer');
   // [fork after station, merge before station, lane, colour]; the inner lane closes first, so lines never cross.
-  // Stations: 0 tutorial, 1–6 the tour, 7 demos, 8 videos, 9 install.
+  // Stations: 0 tutorial, 1–8 the tour, 9 demos, 10 videos, 11 install.
   const SIDE = [[1, 5, 2, '#0072CE'], [2, 3, 1, '#00A651'], [6, 8, 1, '#F29F05']];
   let H = 0, top = 0, docH = 0, vh = 0, main = stations([]), side = stations([]), boot = still ? 1 : 0, queued = false;
 

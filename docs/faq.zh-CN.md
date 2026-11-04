@@ -94,8 +94,21 @@
 **dispatch 说已经启动了 agent，但什么窗口都没打开（macOS）。**
 打开终端窗口需要「自动化」权限，请到「系统设置 → 隐私与安全性 → 自动化」里放行。现在窗口没打开时，dispatch 会如实报告，并给出可以自己运行的命令。
 
+**agent 都开在新窗口里，我想要标签页。**
+- macOS：装上 iTerm2（`brew install --cask iterm2`）以后，dispatch 和「在终端打开」会把每个 agent 开在 iTerm2 的新标签页里。
+  - `trace-canvas terminal terminal`：改回「终端」新窗口。
+  - `trace-canvas terminal iterm`：改用 iTerm2 标签页。
+  - 第一次用时，macOS 会问是否允许页面控制 iTerm，点允许即可。
+- Linux：Konsole、GNOME Terminal 和 Xfce Terminal 会开新标签页，其他终端开新窗口。
+
+**在 iTerm2 里，命令提示符的符号显示不对。**
+agnoster、powerlevel10k 这类主题会画箭头、分支等符号，只有部分字体带这些符号。按下面三步设置：
+1. 在「iTerm2 → Settings → Profiles → Text → Font」里，选和你原来终端一样的字体。
+2. 在同一页勾选 **Use built-in Powerline glyphs**。如果用的是 powerlevel10k，请选 MesloLGS NF 这类 Nerd Font。
+3. 在「Profiles → Other Actions → Set as Default」把这个配置设为默认，这样 agent 新开的标签页也会用它。
+
 **在 Linux 上，dispatch 会自己弹出终端窗口。**
-这是它在 Linux 上启动或恢复 agent 的方式。如果只想看它打算做什么，用 `dispatch --print`。
+这是它在 Linux 上启动或恢复 agent 的方式（Konsole、GNOME Terminal 和 Xfce Terminal 会开成标签页）。如果只想看它打算做什么，用 `dispatch --print`。
 
 **在项目文件夹里随口问了 agent 一句话，结果成了那个项目线上的一条记录。**
 记录落在哪条线上，由所在的文件夹决定。可以在这条记录的详情里把它换到别的线，或者删掉。

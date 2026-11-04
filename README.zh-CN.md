@@ -235,8 +235,13 @@ node bin/trace-canvas.mjs setup --user --agents codex,gemini
 对于 Codex，setup 还会把 skill 链接到 `~/.agents/skills/trace-canvas`。用 `$trace-canvas` 调用，例如 `$trace-canvas tasks`。已有安装只补 skill 时，运行 `node bin/trace-canvas.mjs install-skill --user --agents codex`；换成 `--project <目录>` 就装到该目录的 `.agents/skills/trace-canvas`。skill 链接到这份仓库，后续拉取更新也会同步生效。
 
 - **谁做什么**：**目标**清单里每项待办都能选"由谁做"（Claude Code、Codex、Gemini CLI 或任何人）。agent 用 `trace_tasks`（`mine: true`）读分给自己的待办，做完用 `trace_task_done` 勾上，清单会标出是谁勾的。
-- **交出去**：已指定的待办旁边有**交给它**按钮，会复制一条命令；`trace-canvas hand "<待办>" --to codex` 也能打印同样的命令。这条命令在这条线的目录里启动那个 agent，并设置 `TRACE_CANVAS_THREAD`，新会话一开始就落在这条线上。在 macOS 和 Linux 桌面上，旁边的**在终端打开**会直接在新的终端窗口里运行这条命令（macOS 用「终端」；Linux 用 `$TERMINAL`，没有就找 Konsole、GNOME Terminal、kitty 等，服务即使是通过 ssh 启动的，也会开在桌面上）。agent 也可以自己领下一条待办：`/trace-canvas pick`（Codex 里是 `$trace-canvas pick`）。
-- **分派**：对一个 agent 说「分派」（`/trace-canvas dispatch`，在手机上的 Claude app 里也行），每条线上新记的待办就交给正在做这条线的 agent，也就是最后在这条线上干过活的那个会话（只是在这里结束、只是从别的线给它记待办、或者之后已经绑到别的线的会话，都不算；从别的线在这里记过结果的会话，只有这条线自己的会话都没在这里干过活时才算）。几台机器都做过这条线时，先给正在运行的会话（本机的优先），再给本机最新的，最后是哪台都算的最新的。指定了机器的待办（`trace-canvas dispatch --on bsuperstation`，或者记待办时带 `on`）交给那台机器上这条线最新的会话，那边没有就通过 ssh 在那边新开一个。正在运行的 Claude Code 会话由这个 agent 发消息过去；已经停了的会话带着待办恢复；没人做的线新开一个会话（Claude Code 会打开 Remote Control，在 Claude app 里看得到）。在 macOS 和 Linux 桌面上，每个都在新的终端窗口里打开。「新」是指还没人认领、那个 agent 也还不知道的待办：你自己记的（在页面、手机或命令行上），或者别的会话替这条线记的。分出去的待办就有了主人，不会再分一次（`--all` 连这条线的 agent 自己记的也分）。点名一条待办（而不是一条线），就只分这一条，不管是谁记的。指定给某个 agent（Claude Code、Codex 或 Gemini CLI）的待办，只交给这条线上那个 agent 的会话，没有就新开一个，指定人不会被改掉；Codex 的 `<heartbeat>` 这类自动会话不算这条线上干活的人。命令行：`trace-canvas dispatch [线|待办…]`，加 `--print` 只打印命令（不指定、不保存）。
+- **交出去**：已指定的待办旁边有**交给它**按钮，会复制一条命令；`trace-canvas hand "<待办>" --to codex` 也能打印同样的命令。这条命令在这条线的目录里启动那个 agent，并设置 `TRACE_CANVAS_THREAD`，新会话一开始就落在这条线上。在 macOS 和 Linux 桌面上，旁边的**在终端打开**会在新的终端标签页或窗口里运行这条命令。
+  - macOS：装了 iTerm2 就开在 iTerm2 的新标签页里，没装就开「终端」的新窗口。用 `trace-canvas terminal iterm` 或 `terminal` 可以指定用哪个。
+  - Linux：用 `$TERMINAL`，没有就找 Konsole、GNOME Terminal、kitty 等。Konsole、GNOME Terminal 和 Xfce Terminal 会开新标签页。即使服务是通过 ssh 启动的，窗口也会开在桌面上。
+  - 第一次用时，macOS 会问是否允许页面控制终端，点允许即可。之后可以在「系统设置 → 隐私与安全性 → 自动化」里改。
+
+  agent 也可以自己领下一条待办：`/trace-canvas pick`（Codex 里是 `$trace-canvas pick`）。
+- **分派**：对一个 agent 说「分派」（`/trace-canvas dispatch`，在手机上的 Claude app 里也行），每条线上新记的待办就交给正在做这条线的 agent，也就是最后在这条线上干过活的那个会话（只是在这里结束、只是从别的线给它记待办、或者之后已经绑到别的线的会话，都不算；从别的线在这里记过结果的会话，只有这条线自己的会话都没在这里干过活时才算）。几台机器都做过这条线时，先给正在运行的会话（本机的优先），再给本机最新的，最后是哪台都算的最新的。指定了机器的待办（`trace-canvas dispatch --on bsuperstation`，或者记待办时带 `on`）交给那台机器上这条线最新的会话，那边没有就通过 ssh 在那边新开一个。正在运行的 Claude Code 会话由这个 agent 发消息过去；已经停了的会话带着待办恢复；没人做的线新开一个会话（Claude Code 会打开 Remote Control，在 Claude app 里看得到）。在 macOS 和 Linux 桌面上，每个都在新的终端标签页或窗口里打开，规则同上。「新」是指还没人认领、那个 agent 也还不知道的待办：你自己记的（在页面、手机或命令行上），或者别的会话替这条线记的。分出去的待办就有了主人，不会再分一次（`--all` 连这条线的 agent 自己记的也分）。点名一条待办（而不是一条线），就只分这一条，不管是谁记的。指定给某个 agent（Claude Code、Codex 或 Gemini CLI）的待办，只交给这条线上那个 agent 的会话，没有就新开一个，指定人不会被改掉；Codex 的 `<heartbeat>` 这类自动会话不算这条线上干活的人。命令行：`trace-canvas dispatch [线|待办…]`，加 `--print` 只打印命令（不指定、不保存）。
 - **回到那次对话**：agent 记下的每条记录都保存了是在哪个会话里记的。记录面板里**记在这个会话里**一栏可以打开那次对话或复制恢复命令，`trace_read_thread` 里是 `from`。
 - **开局就知道情况**：三个 agent 无论哪个开新会话，hook 都会告诉它：在哪条线上、线的目标、分给它的待办、还有谁在这条线上，以及（配好位置地图时）本机上的东西在哪里。
 - 记录、实时线头和 Agent 视图都会标出是哪个 agent 做的。每个会话都有自己的恢复命令：`claude --resume`、`codex resume` 或 `gemini --resume`。
@@ -379,6 +384,8 @@ node bin/trace-canvas.mjs log "文献对比表完成" \
   trace-canvas install-hooks | install-mcp | install-skill | uninstall-hooks
   trace-canvas mcp              以 stdio 运行 MCP 服务（由 Claude Code 启动）
   trace-canvas lang <en|zh>     hooks 写入记录的语言
+  trace-canvas terminal [iterm|terminal]   macOS：agent 开在 iTerm2 标签页，还是「终端」新窗口（默认：装了 iTerm2 就用它）
+  trace-canvas doctor           检查设置，逐项告诉你怎么修（页面上是「更多 → 检查设置」）
   trace-canvas where            显示数据存放位置
   trace-canvas phone            在手机上打开画布（Tailscale 扫码，见 docs/phone.zh-CN.md）
   trace-canvas where <关键词> [--machine 机器]   在位置地图（~/agent-map）里查东西

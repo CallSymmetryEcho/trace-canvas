@@ -72,8 +72,14 @@ Fixed in 0.3.2: a session counts as running while its process runs, however long
 **Dispatch said it started an agent, but nothing opened (macOS).**
 Opening a Terminal window needs Automation permission. Allow it in **System Settings → Privacy & Security → Automation**; dispatch now says when the window did not open and prints the command to run yourself.
 
+**Agents open in new windows; I want tabs.**
+On macOS, install iTerm2 (`brew install --cask iterm2`): with it installed, dispatch and **Open in Terminal** open each agent in a new iTerm2 tab. `trace-canvas terminal terminal` goes back to Terminal windows, `trace-canvas terminal iterm` to iTerm2 tabs. The first time, macOS asks whether the page may control iTerm: allow it. On Linux, Konsole, GNOME Terminal and Xfce Terminal open tabs; other terminals open windows.
+
+**The symbols in my prompt look broken in iTerm2.**
+Prompt themes such as agnoster or powerlevel10k draw arrows and branch marks that only some fonts have. Use the same font as in your other terminal (iTerm2 → Settings → Profiles → Text → Font), and turn on **Use built-in Powerline glyphs** in the same place; for powerlevel10k, pick a Nerd Font such as MesloLGS NF. Set that profile as the default (Profiles → Other Actions → Set as Default) so new agent tabs use it too.
+
 **On Linux, dispatch opens a terminal window by itself.**
-That is how it starts or resumes an agent there. `dispatch --print` only shows what it would do.
+That is how it starts or resumes an agent there (a tab in Konsole, GNOME Terminal and Xfce Terminal). `dispatch --print` only shows what it would do.
 
 **A question I asked an agent in a project folder became a record on that project's line.**
 The folder decides the line. Move the record to another line in its panel, or delete it.

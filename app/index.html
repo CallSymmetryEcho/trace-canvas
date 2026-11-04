@@ -241,24 +241,31 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .ap-row > span b { font-weight: 600; }
 .ap-row > span em { font-style: normal; font-weight: 600; margin-left: 6px; color: var(--muted); }
 .ap-row.is-wait > span em { color: var(--ok); } .ap-row.is-run > span em { color: var(--ap-v); }
-.ap-row.is-run { border-color: color-mix(in srgb, var(--ap-v) 35%, var(--rule)); background: color-mix(in srgb, var(--ap-v) 4%, var(--surface)); }
+.ap-row { transition: border-color .4s, background-color .4s; } .ap-row > span em { transition: color .4s; }
+.ap-row.is-run { border-color: color-mix(in srgb, var(--ap-v) 35%, var(--rule)); background-color: color-mix(in srgb, var(--ap-v) 4%, var(--surface)); }
 .ap-track { flex: 1 0 100%; position: relative; height: 23px; border-radius: 5px; --k: 23px;
   --ap-grid: repeating-linear-gradient(90deg, #000 0 5px, transparent 5px 6px), repeating-linear-gradient(#000 0 5px, transparent 5px 6px); }
 /* The whole bar is pixels: a grid mask cuts the gray track and the fill into 5px squares with 1px gaps. */
 .ap-track::before, .ap-fill { -webkit-mask: var(--ap-grid); -webkit-mask-composite: source-in; mask: var(--ap-grid); mask-composite: intersect; }
 .ap-track::before { content: ''; position: absolute; inset: 0; background: var(--rule); opacity: .7; }
-.ap-fill { position: absolute; inset: 0 auto 0 0; width: calc(var(--i) * (100% - var(--k)) / 2 + var(--k)); overflow: hidden; opacity: 0; transition: width .35s steps(8), opacity .2s; }
-.is-wait .ap-fill { opacity: 1; background: var(--ok); }
-.is-run .ap-fill { opacity: 1; background: linear-gradient(90deg, #8fa1b3, #b7a6ee 38%, #9b5cf6 72%, #6c4ac0); }
+.ap-track { --ap-ease: cubic-bezier(.34, 1.2, .5, 1); }
+.ap-fill { position: absolute; inset: 0 auto 0 0; width: calc(var(--i) * (100% - var(--k)) / 2 + var(--k)); overflow: hidden; opacity: 0; background: var(--ok); transition: width .5s var(--ap-ease), opacity .3s; }
+.is-wait .ap-fill, .is-run .ap-fill { opacity: 1; }
+/* Running crossfades its night sky in over the green, so asked → running melts rather than swaps. */
+.ap-v { position: absolute; inset: 0; opacity: 0; background: linear-gradient(90deg, #8fa1b3, #b7a6ee 38%, #9b5cf6 72%, #6c4ac0); transition: opacity .45s; }
+.is-run .ap-v { opacity: 1; }
 /* Running: the motion is in the squares' colour. Bright comets, cell by cell, race right along each row of pixels;
    rows 1 and 3 run faster than rows 2 and 4, a cell at a time, so the bar shimmers like an LED strip. */
-.is-run .ap-fill::before, .is-run .ap-fill::after { content: ''; position: absolute; inset: 0; background-repeat: repeat-x; }
-.is-run .ap-fill::before { background-image: linear-gradient(90deg, rgba(255,255,255,0) 0px 6px, rgba(255,255,255,0) 6px 12px, rgba(255,255,255,0) 12px 18px, rgba(255,255,255,0) 18px 24px, rgba(255,255,255,0) 24px 30px, rgba(255,255,255,0) 30px 36px, rgba(255,255,255,0.05) 36px 42px, rgba(255,255,255,0.1) 42px 48px, rgba(255,255,255,0.18) 48px 54px, rgba(255,255,255,0.3) 54px 60px, rgba(255,255,255,0.48) 60px 66px, rgba(255,255,255,0.72) 66px 72px), linear-gradient(90deg, rgba(255,255,255,0) 0px 6px, rgba(255,255,255,0) 6px 12px, rgba(255,255,255,0) 12px 18px, rgba(255,255,255,0) 18px 24px, rgba(255,255,255,0) 24px 30px, rgba(255,255,255,0) 30px 36px, rgba(255,255,255,0.05) 36px 42px, rgba(255,255,255,0.1) 42px 48px, rgba(255,255,255,0.18) 48px 54px, rgba(255,255,255,0.3) 54px 60px, rgba(255,255,255,0.48) 60px 66px, rgba(255,255,255,0.72) 66px 72px); background-size: 72px 6px; background-position: 0 0, -36px 12px; animation: ap-px1 .5s steps(12) infinite; }
-.is-run .ap-fill::after { background-image: linear-gradient(90deg, rgba(255,255,255,0) 0px 6px, rgba(255,255,255,0) 6px 12px, rgba(255,255,255,0) 12px 18px, rgba(255,255,255,0) 18px 24px, rgba(255,255,255,0.06) 24px 30px, rgba(255,255,255,0.12) 30px 36px, rgba(255,255,255,0.22) 36px 42px, rgba(255,255,255,0.36) 42px 48px, rgba(255,255,255,0.55) 48px 54px, rgba(255,255,255,0.8) 54px 60px), linear-gradient(90deg, rgba(255,255,255,0) 0px 6px, rgba(255,255,255,0) 6px 12px, rgba(255,255,255,0) 12px 18px, rgba(255,255,255,0) 18px 24px, rgba(255,255,255,0.06) 24px 30px, rgba(255,255,255,0.12) 30px 36px, rgba(255,255,255,0.22) 36px 42px, rgba(255,255,255,0.36) 42px 48px, rgba(255,255,255,0.55) 48px 54px, rgba(255,255,255,0.8) 54px 60px); background-size: 60px 6px; background-position: -18px 6px, -48px 18px; animation: ap-px2 .65s steps(10) infinite; }
+.ap-v::before, .ap-v::after { content: ''; position: absolute; inset: 0; background-repeat: repeat-x; }
+.ap-v::before { background-image: linear-gradient(90deg, rgba(255,255,255,0) 0px 6px, rgba(255,255,255,0) 6px 12px, rgba(255,255,255,0) 12px 18px, rgba(255,255,255,0) 18px 24px, rgba(255,255,255,0) 24px 30px, rgba(255,255,255,0) 30px 36px, rgba(255,255,255,0.05) 36px 42px, rgba(255,255,255,0.1) 42px 48px, rgba(255,255,255,0.18) 48px 54px, rgba(255,255,255,0.3) 54px 60px, rgba(255,255,255,0.48) 60px 66px, rgba(255,255,255,0.72) 66px 72px), linear-gradient(90deg, rgba(255,255,255,0) 0px 6px, rgba(255,255,255,0) 6px 12px, rgba(255,255,255,0) 12px 18px, rgba(255,255,255,0) 18px 24px, rgba(255,255,255,0) 24px 30px, rgba(255,255,255,0) 30px 36px, rgba(255,255,255,0.05) 36px 42px, rgba(255,255,255,0.1) 42px 48px, rgba(255,255,255,0.18) 48px 54px, rgba(255,255,255,0.3) 54px 60px, rgba(255,255,255,0.48) 60px 66px, rgba(255,255,255,0.72) 66px 72px); background-size: 72px 6px; background-position: 0 0, -36px 12px; }
+.is-run .ap-v::before { animation: ap-px1 .5s steps(12) infinite; }
+.ap-v::after { background-image: linear-gradient(90deg, rgba(255,255,255,0) 0px 6px, rgba(255,255,255,0) 6px 12px, rgba(255,255,255,0) 12px 18px, rgba(255,255,255,0) 18px 24px, rgba(255,255,255,0.06) 24px 30px, rgba(255,255,255,0.12) 30px 36px, rgba(255,255,255,0.22) 36px 42px, rgba(255,255,255,0.36) 42px 48px, rgba(255,255,255,0.55) 48px 54px, rgba(255,255,255,0.8) 54px 60px), linear-gradient(90deg, rgba(255,255,255,0) 0px 6px, rgba(255,255,255,0) 6px 12px, rgba(255,255,255,0) 12px 18px, rgba(255,255,255,0) 18px 24px, rgba(255,255,255,0.06) 24px 30px, rgba(255,255,255,0.12) 30px 36px, rgba(255,255,255,0.22) 36px 42px, rgba(255,255,255,0.36) 42px 48px, rgba(255,255,255,0.55) 48px 54px, rgba(255,255,255,0.8) 54px 60px); background-size: 60px 6px; background-position: -18px 6px, -48px 18px; }
+.is-run .ap-v::after { animation: ap-px2 .65s steps(10) infinite; }
 @keyframes ap-px1 { to { background-position: 72px 0, 36px 12px; } }
 @keyframes ap-px2 { to { background-position: 42px 6px, 12px 18px; } }
-.ap-dot { position: absolute; top: 50%; left: calc(var(--d) * (100% - var(--k)) / 2 + var(--k) / 2); width: 5px; height: 5px; margin: -2.5px; border-radius: 1px; background: var(--muted); opacity: .55; }
-.ap-knob { position: absolute; top: -2px; left: calc(var(--i) * (100% - var(--k)) / 2 - 2px); width: calc(var(--k) + 4px); height: calc(var(--k) + 4px); border-radius: 7px; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.22), 0 0 0 .5px rgba(0,0,0,.06); transition: left .35s cubic-bezier(.3,1.2,.5,1); pointer-events: none; }
+.ap-dot { position: absolute; top: 50%; left: calc(var(--d) * (100% - var(--k)) / 2 + var(--k) / 2); width: 5px; height: 5px; margin: -2.5px; border-radius: 1px; background: var(--muted); opacity: .55; transition: opacity .3s; }
+.is-wait .ap-dot.d1, .is-run .ap-dot { opacity: 0; }
+.ap-knob { position: absolute; top: -2px; left: calc(var(--i) * (100% - var(--k)) / 2 - 2px); width: calc(var(--k) + 4px); height: calc(var(--k) + 4px); border-radius: 7px; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.22), 0 0 0 .5px rgba(0,0,0,.06); transition: left .5s var(--ap-ease); pointer-events: none; }
 .is-wait .ap-knob { animation: ap-halo 1.6s ease-in-out infinite; }
 @keyframes ap-halo { 50% { box-shadow: 0 1px 4px rgba(0,0,0,.22), 0 0 0 5px color-mix(in srgb, var(--ok) 25%, transparent); } }
 .ap-track button { position: absolute; top: 0; bottom: 0; width: 33.34%; left: calc(var(--b) * 33.33%); border: 0; padding: 0; background: none; cursor: pointer; border-radius: 999px; z-index: 1; }
@@ -284,8 +291,8 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 @keyframes ap-tick { to { transform: translateX(-100%); } }
 .chip-wait { color: var(--ok); border: 1px dashed var(--ok); opacity: .75; }
 @keyframes ap-wait { 50% { opacity: .55; } }
-@media (prefers-reduced-motion: reduce) { .chip-auto { animation: none; } .ap-burst::before { animation: none; display: none; } .ap-fill, .ap-knob { transition: none; }
-  .card.ap-on::after, .detail.ap-on::after, .is-run .ap-fill::before, .is-run .ap-fill::after, .is-wait .ap-knob { animation: none; } .ap-tick span { animation: none; padding-left: 8px; } }
+@media (prefers-reduced-motion: reduce) { .chip-auto { animation: none; } .ap-burst::before { animation: none; display: none; } .ap-fill, .ap-knob, .ap-v, .ap-dot, .ap-row, .ap-row > span em { transition: none; }
+  .card.ap-on::after, .detail.ap-on::after, .is-run .ap-v::before, .is-run .ap-v::after, .is-wait .ap-knob { animation: none; } .ap-tick span { animation: none; padding-left: 8px; } }
 .chip-done { background: var(--surface-2); }
 .chip-merged { background: var(--surface-2); }
 .strip { list-style: none; margin: 0; padding: 2px 10px 4px 4px; position: relative; }
@@ -3094,8 +3101,8 @@ function threadDetail(th) {
       <label class="fld"><span>${esc(t('threadName'))}</span><input id="t-name" class="big-input" value="${esc(th.name)}"></label>
       <div class="fld"><span>${esc(t('threadStatus'))}</span><div class="seg">${['active', 'parked', 'done'].map(s => `<button data-act="status" data-status="${s}" aria-pressed="${th.status === s}">${esc(statusLabel(s))}</button>`).join('')}${th.status === 'merged' ? `<button aria-pressed="true" disabled>${esc(statusLabel('merged'))}</button>` : ''}</div></div>
       ${SERVER && !S.remote && th.status !== 'merged' ? (() => { const k = apRun(th) ? 'run' : apWait(th) ? 'wait' : 'off', i = ['off', 'wait', 'run'].indexOf(k);
-        return `<div class="ap-row is-${k}${apD(th.id) != null ? ` ap-burst" style="--apd:${apD(th.id)}ms` : ''}"><span><b>${esc(t('apTitle'))}</b><em>${esc(t('apSeg_' + k))}</em><small>${esc(t(k === 'run' ? 'apOn' : k === 'wait' ? 'apWait' : 'apOff'))}</small></span>
-          <div class="ap-track" role="group" aria-label="${esc(t('apTitle'))}" style="--i:${i}"><i class="ap-fill"></i>${[1, 2].filter(d => d > i).map(d => `<i class="ap-dot" style="--d:${d}"></i>`).join('')}<i class="ap-knob"></i>${['off', 'wait', 'run'].map((x, n) => `<button data-act="autopilot" data-ap="${x}" style="--b:${n}" aria-pressed="${x === k}" aria-label="${esc(t('apSeg_' + x))}" title="${esc(t('apSeg_' + x))}"></button>`).join('')}</div></div>`; })() : ''}
+        return `<div data-k="${k}" data-tid="${esc(th.id)}" class="ap-row is-${k}${apD(th.id) != null ? ` ap-burst" style="--apd:${apD(th.id)}ms` : ''}"><span><b>${esc(t('apTitle'))}</b><em>${esc(t('apSeg_' + k))}</em><small>${esc(t(k === 'run' ? 'apOn' : k === 'wait' ? 'apWait' : 'apOff'))}</small></span>
+          <div class="ap-track" role="group" aria-label="${esc(t('apTitle'))}" style="--i:${i}"><i class="ap-dot d1" style="--d:1"></i><i class="ap-dot d2" style="--d:2"></i><i class="ap-fill"><i class="ap-v"></i></i><i class="ap-knob"></i>${['off', 'wait', 'run'].map((x, n) => `<button data-act="autopilot" data-ap="${x}" style="--b:${n}" aria-pressed="${x === k}" aria-label="${esc(t('apSeg_' + x))}" title="${esc(t('apSeg_' + x))}"></button>`).join('')}</div></div>`; })() : ''}
       <div class="fld"><span>${esc(t('threadColor'))}</span><div class="swatches">${LINE_COLORS.map(c => `<button class="swatch" data-act="color" data-color="${c}" style="--c:${c}" aria-pressed="${th.color === c}" aria-label="${esc(t('colorAria', c))}"></button>`).join('')}</div></div>
       <label class="fld"><span>${esc(t('threadGoal'))}</span><textarea id="t-goal" rows="3" placeholder="${esc(t('threadGoalPh'))}">${esc(goalOf(th))}</textarea></label>
       <label class="fld"><span>${esc(t('threadGroup'))}</span><input id="t-group" list="group-list" value="${esc(th.group || '')}" placeholder="${esc(t('threadGroupPh'))}"></label>
@@ -3155,6 +3162,7 @@ function renderDetail() {
   const top = sc ? sc.scrollTop : 0;
   detail.hidden = false;
   detail.innerHTML = html;
+  apMove();
   const sc2 = $('.d-scroll', detail);
   if (sc2) sc2.scrollTop = top;
   if (S.readOnly) $$('input, textarea, select', detail).forEach(el => { el.disabled = true; });
@@ -3763,6 +3771,18 @@ function runAutopilot(tid) {
 // One short sweep over the switch row and the line's card; skipped when the system asks for less motion (CSS).
 // Kept as state, so a re-render in the middle carries on where the sweep was (negative delay).
 const apBurst = tid => { S.apBurst = { tid, at: Date.now() }; renderDetail(); render(); setTimeout(() => { S.apBurst = null; renderDetail(); render(); }, 950); };
+// The panel is rebuilt on every change, so CSS alone never sees the step move. When this line's step changed since it was
+// last shown, the new row starts at the old step and slides on to the new one (knob, fill, colours all transition).
+function apMove() {
+  const row = $('.ap-row', detail); if (!row) return;
+  const { k, tid } = row.dataset, was = S.apShown && S.apShown.tid === tid ? S.apShown.k : k;
+  S.apShown = { tid, k };
+  if (was === k) return;
+  const tr = $('.ap-track', row), steps = ['off', 'wait', 'run'];
+  row.classList.replace('is-' + k, 'is-' + was); tr.style.setProperty('--i', steps.indexOf(was));
+  void row.offsetWidth; // commit the old step before moving
+  row.classList.replace('is-' + was, 'is-' + k); tr.style.setProperty('--i', steps.indexOf(k));
+}
 // Asked is not running: a round runs once a session's hook has taken its prompt (src/hook.mjs sets autopilot.session).
 const apRun = th => !!(th && th.autopilot && th.autopilot.session), apWait = th => !!(th && th.autopilot && !th.autopilot.session);
 // The sweep plays when the round is taken up, once per round, wherever the page sees it first.

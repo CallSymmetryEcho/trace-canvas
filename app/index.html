@@ -3742,7 +3742,9 @@ function renderGoals() {
       </section>`;
     }).join('') : `<p>${esc(t('goalsEmpty'))}</p>`)
     + (others > 0 ? `<p>${esc(t('goalsOthers', others))}</p>` : '');
+  const keep = $('#sheet-body').scrollTop; // a redraw (new data, a live update) leaves the list where the person is
   setSheet(t('goalsTitle'), body);
+  $('#sheet-body').scrollTop = keep;
 }
 // The command `trace-canvas hand` prints, built here too: start the assigned agent on the to-do's
 // line, in the line's folder (its repository path, else where a session on it works now).
@@ -3809,7 +3811,7 @@ function addTodo(tid) {
   addCommit({ thread: tid, kind: 'task', title, agent: '' });
   S.glDraft[tid] = '';
   toast(t('tTaskAdded'));
-  setTimeout(() => { renderGoals(); const again = $(`.gl-add[data-thread="${CSS.escape(tid)}"]`); if (again) again.focus(); }, 0);
+  setTimeout(() => { renderGoals(); const again = $(`.gl-add[data-thread="${CSS.escape(tid)}"]`); if (again) again.focus({ preventScroll: true }); }, 0);
 }
 sheetBody.addEventListener('keydown', e => {
   if (S.sheet !== 'goals' || e.key !== 'Enter' || e.isComposing) return;

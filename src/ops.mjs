@@ -46,7 +46,8 @@ export function listTasks(d, { thread, includeDone = false, assignee } = {}) {
   if (thread && !only) throw new Error(`No thread "${thread}"`);
   const by = {};
   for (const c of Object.values(d.commits)) if (isTodo(c) && (!assignee || c.assignee === assignee)) (by[threadIdOf(d, c)] ||= []).push(c);
-  const ids = only ? [only] : [INBOX, ...Object.keys(d.threads)];
+  // An archived project's lines (on the History wall) are out of the list unless asked for by name.
+  const ids = only ? [only] : [INBOX, ...Object.keys(d.threads).filter(id => !d.threads[id].archived)];
   return ids.map(id => {
     const th = id === INBOX ? { name: 'Inbox', status: 'active' } : d.threads[id];
     const tasks = (by[id] || []).sort((a, b) => a.ts - b.ts);
@@ -128,7 +129,7 @@ export function dispatch(d, { refs = [], all = false, self = null, on = '', away
     if (threadIdOf(d, c) === INBOX) throw new Error(`"${c.title}" is in the inbox: put it on a line first`);
     named.add(c.id);
   }
-  if (!refs.length) for (const t of Object.values(d.threads)) if (!['done', 'merged'].includes(t.status)) lines.add(t.id);
+  if (!refs.length) for (const t of Object.values(d.threads)) if (!['done', 'merged'].includes(t.status) && !t.archived) lines.add(t.id);
   const tids = [...lines, ...[...named].map(id => threadIdOf(d, d.commits[id]))].filter((t, i, a) => a.indexOf(t) === i);
   const known = new Map(threadSessions(d, null, env).map(s => [s.id, s]));
   const live = new Map(liveSessions(d, env).sessions.map(s => [s.id, s])), awayCache = new Map();

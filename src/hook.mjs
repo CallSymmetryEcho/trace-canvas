@@ -147,6 +147,9 @@ const LOG_EVENTS = ['UserPromptSubmit', 'PostToolUse', 'Stop', 'SessionEnd'];
 const APP_PROMPT = /^\s*This is an app-generated request/;
 const LIVE_EVENTS = [...LOG_EVENTS, 'SessionStart', 'PreToolUse', 'Notification', 'SubagentStart', 'SubagentStop'];
 
+// The openings of the prompts Trace Canvas itself writes to hand a line over (src/ops.mjs, app/index.html).
+export const HANDOFF = /^(You are taking over the Trace Canvas line|New to-dos on the Trace Canvas line|Read the Trace Canvas line|读 Trace Canvas 上的线)/;
+
 export function handleHook(input, env = process.env) {
   if (!input || typeof input !== 'object') return { skipped: 'no input' };
   if (env.TRACE_CANVAS_DISABLE === '1') return { skipped: 'disabled' };
@@ -200,7 +203,10 @@ export function handleHook(input, env = process.env) {
       state.prompts++;
       if (prompt && !prompt.startsWith('/')) state.lastPrompt = firstLine(prompt, 200);
       const isCommand = prompt.startsWith('/');
-      const log = !isCommand && prompt && (cfg.prompts === 'all' || (cfg.prompts === 'first' && !s.prompted) || (cfg.prompts === 'long' && prompt.length >= 60));
+      // A hand-off prompt written by dispatch, hand or the page restates to-dos that are already on the line: not a new one.
+      const handoff = HANDOFF.test(prompt);
+      if (handoff) s.prompted = true;
+      const log = !isCommand && prompt && !handoff && (cfg.prompts === 'all' || (cfg.prompts === 'first' && !s.prompted) || (cfg.prompts === 'long' && prompt.length >= 60));
       if (log) {
         const t = thread(prompt);
         addCommit(d, { thread: t.id, kind: 'task', title: firstLine(prompt, 120), body: prompt.slice(0, 3000), agent: ag.name, links: [ag.resume(sid)], extra: { session: sid, actor: 'human' } });

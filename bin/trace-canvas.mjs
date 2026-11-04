@@ -643,7 +643,8 @@ async function main() {
       if (flag('quiet', false)) break;
       if (r.error) { console.error(`Sync failed: ${r.error}`); process.exit(1); }
       if (r.busy) { console.log('Another sync is running.'); break; }
-      console.log(`${r.machine}: ${r.imported} change${r.imported === 1 ? '' : 's'} from other machines, ${r.changed} here${r.moved ? `; ${r.moved} lines got stable ids` : ''}. ${r.offline ? 'Offline: pushes next time.' : r.pushed ? 'Pushed.' : r.committed ? 'Committed.' : 'Up to date.'}`);
+      console.log(`${r.machine}: ${r.imported} change${r.imported === 1 ? '' : 's'} from other machines, ${r.changed} here${r.moved ? `; ${r.moved} lines got stable ids` : ''}. ${r.offline ? 'Offline: pushes next time.' : r.unpushed ? `${r.unpushed} commit${r.unpushed === 1 ? '' : 's'} not pushed yet: the other machines do not have them.` : r.pushed ? 'Pushed.' : r.committed ? 'Committed.' : 'Up to date.'}`);
+      if (r.offline || r.unpushed) process.exitCode = 1;
       break;
     }
     case 'help': case '--help': case '-h': console.log(HELP); break;

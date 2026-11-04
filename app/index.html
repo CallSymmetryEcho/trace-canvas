@@ -230,43 +230,49 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .chip { flex: none; font-size: 11px; font-weight: 500; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--rule); color: var(--muted); white-space: nowrap; }
 .chip-active { border-color: var(--accent); color: var(--accent); }
 .chip-parked { border-style: dashed; }
-.chip-auto { color: var(--ok); border-color: var(--ok); animation: ap-pulse 1.6s ease-in-out infinite; }
-@keyframes ap-pulse { 50% { opacity: .45; } }
-/* Autopilot switch: a settings-style row in the line panel. Turning it on plays one short sweep over the row and the card. */
+.chip-auto { border-color: #9b6bff; color: transparent; background: var(--ap-rb); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; animation: ap-rainbow 3s linear infinite; }
+/* Autopilot row in the line panel. When a round is taken up, one short sweep plays over the row and the card. */
 .ap-row { flex: none; display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid var(--rule); border-radius: 10px; position: relative; }
 .ap-row > span { flex: 1; font-size: 13px; font-weight: 500; }
 .ap-row > span small { display: block; font-size: 11.5px; font-weight: 400; color: var(--muted); }
-.ap-sw { appearance: none; -webkit-appearance: none; flex: none; width: 42px; height: 25px; margin: 0; border-radius: 999px; background: var(--rule); position: relative; cursor: pointer; transition: background .2s; }
-.ap-sw::after { content: ''; position: absolute; top: 2px; left: 2px; width: 21px; height: 21px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .2s; }
-.ap-sw:checked { background: var(--ok); }
-.ap-sw:checked::after { transform: translateX(17px); }
-.ap-sw:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Three steps, like an effort picker: off · asked · running. A thumb slides under the step the line is on;
+   running gets the rainbow (the name, the thumb, the light round the card), like an ultra mode. */
+.ap-seg { flex: none; position: relative; display: grid; grid-template-columns: repeat(3, 1fr); padding: 2px; border: 1px solid var(--rule); border-radius: 999px; background: var(--surface-2); }
+.ap-seg::before { content: ''; position: absolute; top: 2px; bottom: 2px; left: 2px; width: calc((100% - 4px) / 3); border-radius: 999px; background: var(--ink); transform: translateX(calc(var(--i) * 100%)); transition: transform .25s cubic-bezier(.3,1.3,.5,1), background .2s; }
+.ap-seg button { position: relative; z-index: 1; border: 0; background: none; padding: 4px 11px; font-size: 12px; color: var(--muted); cursor: pointer; border-radius: 999px; white-space: nowrap; }
+.ap-seg button[aria-pressed="true"] { color: var(--surface); font-weight: 600; }
+.ap-seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ap-row.is-wait .ap-seg::before { background: color-mix(in srgb, var(--ok) 55%, var(--rule)); animation: ap-wait 1.4s ease-in-out infinite; }
+.ap-row.is-run { border-color: transparent; background: linear-gradient(var(--surface), var(--surface)) padding-box, var(--ap-rb) border-box; background-size: 100%, 200% 100%; animation: ap-rainbow2 4s linear infinite; }
+.ap-row.is-run .ap-seg::before, .ap-row.is-run b { background: var(--ap-rb); background-size: 200% 100%; animation: ap-rainbow 3s linear infinite; }
+.ap-row.is-run b { -webkit-background-clip: text; background-clip: text; color: transparent; }
+.ap-row b { font-weight: 600; }
+:root { --ap-rb: linear-gradient(90deg, #ff5f6d, #ffb347, #f4e04d, #3ddc84, #3fa9ff, #9b6bff, #ff5f6d); }
+@keyframes ap-rainbow { to { background-position: 200% 0; } }
+@keyframes ap-rainbow2 { to { background-position: 0 0, 200% 0; } }
 .ap-burst::before { content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit; z-index: 1;
   background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--ok) 28%, transparent) 50%, transparent 70%) no-repeat;
   background-size: 250% 100%; animation: ap-sweep .9s ease-out var(--apd, 0s) forwards; box-shadow: inset 0 0 0 1px var(--ok); }
 @keyframes ap-sweep { from { background-position: 120% 0; } to { background-position: -20% 0; opacity: 0; } }
 /* While a round runs: a light runs round the card's border, a ticker under its head names the to-do in hand,
-   and the switch's knob breathes. Compositor-friendly (one rotating angle, one translate); off when motion is reduced. */
+   and the name and the selector's thumb run in rainbow. Compositor-friendly (one rotating angle, one translate); off when motion is reduced. */
 @property --ap-a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
 .card.ap-on::after, .detail.ap-on::after { content: ''; position: absolute; inset: -1px; padding: 2px; border-radius: inherit; pointer-events: none; z-index: 2;
-  background: conic-gradient(from var(--ap-a), transparent 0 50%, color-mix(in srgb, var(--ok) 40%, transparent) 72%, var(--ok) 90%, transparent 97%);
+  background: conic-gradient(from var(--ap-a), #ff5f6d, #ffb347, #f4e04d, #3ddc84, #3fa9ff, #9b6bff, #ff5f6d);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: ap-run 3.2s linear infinite; }
 @keyframes ap-run { to { --ap-a: 360deg; } }
+.card.ap-on { box-shadow: 0 0 18px -4px color-mix(in srgb, #9b6bff 45%, transparent); }
 /* The line panel of a running line: the same light, slower and softer, just inside its border (the panel clips overflow). */
 .detail.ap-on::after { inset: 0; padding: 1.5px; z-index: 5; opacity: .8; animation-duration: 6s; }
 .ap-tick { overflow: hidden; margin: -2px 12px 6px; height: 18px; border-radius: 999px; background: color-mix(in srgb, var(--ok) 9%, transparent); font-size: 11.5px; line-height: 18px; color: var(--ok); white-space: nowrap;
   -webkit-mask: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); mask: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
 .ap-tick span { display: inline-block; padding-left: 100%; animation: ap-tick 14s linear infinite; }
 @keyframes ap-tick { to { transform: translateX(-100%); } }
-.ap-sw:checked::after { animation: ap-knob 2s ease-in-out infinite; }
 .chip-wait { color: var(--ok); border: 1px dashed var(--ok); opacity: .75; }
-/* Asked, not taken up yet: the knob sits a third of the way, dimmed, until the agent's hook says it runs. */
-.ap-sw.is-wait { background: color-mix(in srgb, var(--ok) 35%, var(--rule)); }
-.ap-sw.is-wait::after { transform: translateX(8px); animation: ap-wait 1.4s ease-in-out infinite; }
+/* Asked, not taken up yet: the thumb sits on the middle step, dimmed, until the agent's hook says it runs. */
 @keyframes ap-wait { 50% { opacity: .55; } }
-@keyframes ap-knob { 50% { box-shadow: 0 1px 3px rgba(0,0,0,.25), 0 0 0 4px color-mix(in srgb, var(--ok) 30%, transparent); } }
-@media (prefers-reduced-motion: reduce) { .chip-auto { animation: none; } .ap-burst::before { animation: none; display: none; } .ap-sw, .ap-sw::after { transition: none; }
-  .card.ap-on::after, .detail.ap-on::after, .ap-sw:checked::after, .ap-sw.is-wait::after { animation: none; } .ap-tick span { animation: none; padding-left: 8px; } }
+@media (prefers-reduced-motion: reduce) { .chip-auto { animation: none; } .ap-burst::before { animation: none; display: none; } .ap-seg::before { transition: none; }
+  .card.ap-on::after, .detail.ap-on::after, .ap-row.is-run, .ap-row.is-run b, .ap-seg::before { animation: none !important; } .ap-tick span { animation: none; padding-left: 8px; } }
 .chip-done { background: var(--surface-2); }
 .chip-merged { background: var(--surface-2); }
 .strip { list-style: none; margin: 0; padding: 2px 10px 4px 4px; position: relative; }
@@ -988,7 +994,7 @@ const I18N = {
     retroStats: (r, tok) => `${r.rounds} rounds · ${r.minutes} min · ${tok} tokens · ${r.corrections} correction${r.corrections === 1 ? '' : 's'} · ${r.sessions} session${r.sessions === 1 ? '' : 's'} · difficulty ${r.difficulty}`,
     retroStuck: 'Stuck on', retroSinceLast: d => `By default: since the last retro (${d}) up to now`, retroNoLast: 'No retro on this line yet: from the start up to now', retroFrom: 'From', retroTo: 'To (empty: now)', retroAll: 'Everything', retroStart: 'Start the retro', retroRange: (a, b) => `${a} → ${b}`, retroStartOfLine: 'the start', retroClear: 'Made clear by', retroRule: 'Rule', retroApply: 'Write', retroApplied: l => `Written: ${l}`,
     retroLayers: { project: 'Project rules (CLAUDE.md, AGENTS.md)', line: 'This line', memory: 'Long-term memory' }, tRetroApplied: w => `Written to ${w}`,
-apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent to take it up (it lights when its session gets the prompt)', apOff: 'Off: turn on for one round by your decision profile', apTitle: 'Autopilot (beta)', apGo: 'Start this round', apCancel: 'Not now',
+apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent to take it up (it lights when its session gets the prompt)', apOff: 'Off: turn on for one round by your decision profile', apTitle: 'Autopilot (beta)', apSeg_off: 'Off', apSeg_wait: 'Asked', apSeg_run: 'Running', apGo: 'Start this round', apCancel: 'Not now',
     apIntro: 'One round on this line: its agent works through every open to-do by your decision profile, and logs each decision with the rule it rests on.',
     apNever: 'It never sends email or messages to people, pushes, publishes anything, or changes permissions or credentials: it gets those ready and asks you.',
     apAsk: 'It stops and asks you when something touches security, no rule covers it, or the rule is still swinging.',
@@ -1170,7 +1176,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     retroStats: (r, tok) => `${r.rounds} 轮 · ${r.minutes} 分钟 · ${tok} token · 纠正 ${r.corrections} 次 · ${r.sessions} 个会话 · 难度 ${r.difficulty}`,
     retroStuck: '卡在', retroSinceLast: d => `默认：从上次复盘（${d}）到现在`, retroNoLast: '这条线还没复盘过：从头到现在', retroFrom: '从', retroTo: '到（空着就是现在）', retroAll: '全部', retroStart: '开始复盘', retroRange: (a, b) => `${a} → ${b}`, retroStartOfLine: '开头', retroClear: '说清楚的那句', retroRule: '规矩', retroApply: '写入', retroApplied: l => `已写入：${l}`,
     retroLayers: { project: '项目规矩（CLAUDE.md、AGENTS.md）', line: '这条线', memory: '长期记忆' }, tRetroApplied: w => `已写入 ${w}`,
-apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的会话收到提示后才亮起', apOff: '关着：打开后按决策画像跑一轮', apTitle: 'Autopilot（beta）', apGo: '开始这一轮', apCancel: '先不了',
+apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的会话收到提示后才亮起', apOff: '关着：打开后按决策画像跑一轮', apTitle: 'Autopilot（beta）', apSeg_off: '关', apSeg_wait: '等接手', apSeg_run: '运行', apGo: '开始这一轮', apCancel: '先不了',
     apIntro: '在这条线上跑一轮：这条线的 agent 按你的决策画像，把所有没做完的待办一条条做下去，每个决定都在线上写明依据哪条规则。',
     apNever: '它绝不做：发邮件或给人发消息、推送、对外发布、改权限或凭据。这些事它只准备好，然后问你。',
     apAsk: '遇到安全相关的事、没有规则覆盖的事、或者规则还在摇摆的事，它会停下来问你。',
@@ -3074,7 +3080,8 @@ function threadDetail(th) {
       ${isInbox ? `<p style="margin:0;color:var(--muted)">${esc(t('inboxDesc'))}</p>` : `
       <label class="fld"><span>${esc(t('threadName'))}</span><input id="t-name" class="big-input" value="${esc(th.name)}"></label>
       <div class="fld"><span>${esc(t('threadStatus'))}</span><div class="seg">${['active', 'parked', 'done'].map(s => `<button data-act="status" data-status="${s}" aria-pressed="${th.status === s}">${esc(statusLabel(s))}</button>`).join('')}${th.status === 'merged' ? `<button aria-pressed="true" disabled>${esc(statusLabel('merged'))}</button>` : ''}</div></div>
-      ${SERVER && !S.remote && th.status !== 'merged' ? `<label class="ap-row${apD(th.id) != null ? ` ap-burst" style="--apd:${apD(th.id)}ms` : ''}"><span>${esc(t('apTitle'))}<small>${esc(t(apRun(th) ? 'apOn' : apWait(th) ? 'apWait' : 'apOff'))}</small></span><input type="checkbox" role="switch" class="ap-sw${apWait(th) ? ' is-wait' : ''}" data-act="autopilot" ${apRun(th) ? 'checked' : ''}></label>` : ''}
+      ${SERVER && !S.remote && th.status !== 'merged' ? (() => { const k = apRun(th) ? 'run' : apWait(th) ? 'wait' : 'off', i = ['off', 'wait', 'run'].indexOf(k);
+        return `<div class="ap-row is-${k}${apD(th.id) != null ? ` ap-burst" style="--apd:${apD(th.id)}ms` : ''}"><span><b>${esc(t('apTitle'))}</b><small>${esc(t(k === 'run' ? 'apOn' : k === 'wait' ? 'apWait' : 'apOff'))}</small></span><div class="ap-seg" role="group" aria-label="${esc(t('apTitle'))}" style="--i:${i}">${['off', 'wait', 'run'].map(x => `<button data-act="autopilot" data-ap="${x}" aria-pressed="${x === k}">${esc(t('apSeg_' + x))}</button>`).join('')}</div></div>`; })() : ''}
       <div class="fld"><span>${esc(t('threadColor'))}</span><div class="swatches">${LINE_COLORS.map(c => `<button class="swatch" data-act="color" data-color="${c}" style="--c:${c}" aria-pressed="${th.color === c}" aria-label="${esc(t('colorAria', c))}"></button>`).join('')}</div></div>
       <label class="fld"><span>${esc(t('threadGoal'))}</span><textarea id="t-goal" rows="3" placeholder="${esc(t('threadGoalPh'))}">${esc(goalOf(th))}</textarea></label>
       <label class="fld"><span>${esc(t('threadGroup'))}</span><input id="t-group" list="group-list" value="${esc(th.group || '')}" placeholder="${esc(t('threadGroupPh'))}"></label>
@@ -3187,6 +3194,7 @@ detail.addEventListener('click', e => {
     case 'detach': detachThread(s.id); break;
     case 'start': startOn({ thread: s.id }); break;
     case 'autopilot':
+      if (!!getThread(s.id).autopilot === (b.dataset.ap !== 'off')) break; // already off, or already asked/running
       if (getThread(s.id).autopilot) postJSON('/api/autopilot', { thread: s.id, stop: true }).then(r => { if (!r.error) delete getThread(s.id).autopilot; toast(r.error || t('tApStopped')); renderDetail(); });
       else if (ls.get('tc.apIntro', false)) runAutopilot(s.id);
       else { S.apLine = s.id; openSheet('autopilot'); renderDetail(); } // the switch stays off until the round starts

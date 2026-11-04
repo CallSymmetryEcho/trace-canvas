@@ -267,6 +267,13 @@ body.history-open .hist-btn span { display: inline; }
 .h-dec { margin: 0; padding-left: 16px; font-size: 12.5px; color: var(--muted); } .h-dec li { margin: 3px 0; }
 .h-plaque footer { display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 6px; border-top: 1px solid color-mix(in srgb, var(--rule) 60%, transparent); font-size: 12px; color: var(--muted); }
 .h-plaque footer span { flex: 1; }
+.h-replay { --h-glass: color-mix(in srgb, var(--surface) 84%, transparent); position: fixed; z-index: 2; left: 50%; top: calc(var(--top-h, 56px) + 24px); transform: translateX(-50%); width: min(1040px, calc(100vw - 32px)); max-height: calc(100vh - var(--top-h, 56px) - 48px); overflow: auto; border-radius: 18px; padding: 16px 18px 14px; display: grid; gap: 10px; }
+.h-replay header { display: flex; align-items: center; gap: 10px; } .h-replay h3 { margin: 0; flex: 1; font: 600 24px/1.1 var(--f-display); }
+.h-rmap { width: 100%; height: auto; border-radius: 12px; background: color-mix(in srgb, var(--surface) 45%, transparent); box-shadow: inset 0 0 0 1px var(--h-edge); }
+.h-rmap text { font: 12px var(--f-body); fill: var(--muted); }
+.h-rnow { display: flex; gap: 10px; align-items: baseline; min-height: 22px; font-size: 13px; } .h-rnow time { flex: none; font: 12px var(--f-mono); color: var(--muted); }
+.h-rnow span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .h-rnow .dec { font-weight: 600; color: var(--ink); }
+.h-rbar { display: flex; align-items: center; gap: 10px; } .h-rbar input { flex: 1; accent-color: var(--ok); }
 .h-empty { border-radius: 16px; padding: 28px; text-align: center; color: var(--muted); }
 .h-empty b { display: block; font: 600 22px var(--f-display); color: var(--ink); margin-bottom: 6px; }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .h-glass, .h-plaque { background: var(--surface); } }
@@ -1025,7 +1032,7 @@ const I18N = {
     langGroup: 'Language', more: 'More',
     menuNewThread: 'New thread', menuHideDone: 'Hide finished threads', menuShowDone: 'Show finished threads', quietLabel: 'Gone quiet', quietDays: n => `${n}d`, quietDot: n => `${n} line${n === 1 ? ' has' : 's have'} gone quiet`, quietAsk: (n, u) => `Nothing for ${n} days, where it usually moves every ${u === 1 ? 'day' : `${u} days`}. Finished?`, quietAskOpen: (n, k) => `Nothing for ${n} days, with ${k} to-do${k === 1 ? '' : 's'} still open. Park it for now?`, quietStill: 'Still on it', menuShowMerged: 'Show merged threads', menuHideMerged: 'Fold merged threads', mergedInCount: n => ` · ${n} merged in`, mergedInLabel: 'Merged in',
     arrange: 'Arrange', arrangeTitle: 'Lay the lines out by group, forks next to the lines they came from', tArranged: 'Arranged', tUndo: 'Undo',
-    groupLabel: 'Group', groupName: 'Name', groupLines: 'Lines in this group', groupCount: n => `${n} line${n === 1 ? '' : 's'}`, groupArrange: 'Arrange this group', groupFocus: 'Focus on this group', menuFocus: 'Focus on a group…', menuTheme: n => `Theme: ${n}`, theme_auto: 'match the system', theme_light: 'light', theme_dark: 'dark', theme_mist: 'mist', focusTitle: 'Focus on a group', focusLabel: 'Focus', focusPick: 'Change', focusExit: 'Leave focus', groupFold: 'Fold this group', foldedLabel: 'Folded', foldOpenAll: 'Unfold all', foldOpen: 'Unfold', foldedChip: n => `${n} line${n === 1 ? '' : 's'} · folded`, fromMachines: ms => `from ${ms.join(', ')}`, fromTitle: (m, n) => `${n} record${n === 1 ? '' : 's'} written on ${m}`, foldTitle: 'Fold groups', foldIntro: 'Folded groups stay out of every view (the canvas keeps a small chip for each) until you unfold them. Focus still works on any group.', foldShown: 'Shown', tFolded: g => `Folded "${g}"`, unpark: 'Unfold: make it active again', histBtn: 'History', histBack: '← Back to the workspace', histTitle: 'Finished projects, archived', histSub: 'Projects you finished, one plaque each.', histProjects: 'projects', histLines: 'lines', histStations: 'stations', histDecisions: 'decisions', histSessions: 'sessions', histDays: n => `${n} day${n === 1 ? '' : 's'}`, histArchived: 'Archived', histArchivedOn: d => `Archived ${d}`, histRestore: 'Restore', histEmptyHead: 'Nothing on the wall yet', histEmpty: 'When a project is finished, open its group and press Archive this project: it leaves the workspace and gets a plaque here.', archiveBtn: 'Archive this project', archiveHead: g => `Archive "${g}"`, archiveP: 'Its lines leave every view, the live bar and dispatch, and the project gets a plaque on the History wall. Restore brings it back.', archiveOpen: n => `${n} to-do${n === 1 ? '' : 's'} still open`, archiveLive: n => `${n} session${n === 1 ? '' : 's'} still running`, archiveClean: 'Nothing open or running: ready for the wall.', archiveGo: 'Archive', tArchived: g => `"${g}" is on the History wall`, tRestored: g => `"${g}" is back in the workspace`, apTick: x => `Autopilot · working on: ${x}`, apTickIdle: 'Autopilot · wrapping up the round', reopen: 'Unfold: reopen it', wrapHead: 'Wrap up this line', wrapP: 'A done line folds like a parked one and leaves the other views. This wrap-up becomes its last station; edit it first.', wrapSave: 'Save and mark done', wrapSkip: 'Done, no wrap-up', wrapRec: n => `Wrap-up: ${n}`, wrapGoal: 'Goal: ', wrapSpan: (a, b, n, s) => `${a} – ${b} · ${n} records · ${s} sessions`, wrapDec: 'Key decisions:', wrapTodos: (d, n) => `To-dos done: ${d}/${n}`, wrapOpen: 'Left open:', wrapOut: 'Outputs and where they are kept:\n- ', tUnparked: n => `"${n}" is active again`,
+    groupLabel: 'Group', groupName: 'Name', groupLines: 'Lines in this group', groupCount: n => `${n} line${n === 1 ? '' : 's'}`, groupArrange: 'Arrange this group', groupFocus: 'Focus on this group', menuFocus: 'Focus on a group…', menuTheme: n => `Theme: ${n}`, theme_auto: 'match the system', theme_light: 'light', theme_dark: 'dark', theme_mist: 'mist', focusTitle: 'Focus on a group', focusLabel: 'Focus', focusPick: 'Change', focusExit: 'Leave focus', groupFold: 'Fold this group', foldedLabel: 'Folded', foldOpenAll: 'Unfold all', foldOpen: 'Unfold', foldedChip: n => `${n} line${n === 1 ? '' : 's'} · folded`, fromMachines: ms => `from ${ms.join(', ')}`, fromTitle: (m, n) => `${n} record${n === 1 ? '' : 's'} written on ${m}`, foldTitle: 'Fold groups', foldIntro: 'Folded groups stay out of every view (the canvas keeps a small chip for each) until you unfold them. Focus still works on any group.', foldShown: 'Shown', tFolded: g => `Folded "${g}"`, unpark: 'Unfold: make it active again', histBtn: 'History', histBack: '← Back to the workspace', histTitle: 'Finished projects, archived', histSub: 'Projects you finished, one plaque each.', histProjects: 'projects', histLines: 'lines', histStations: 'stations', histDecisions: 'decisions', histSessions: 'sessions', histDays: n => `${n} day${n === 1 ? '' : 's'}`, histArchived: 'Archived', histArchivedOn: d => `Archived ${d}`, histRestore: 'Restore', histReplay: 'Replay', histPlay: 'Play', histPause: 'Pause', histAgain: 'Play again', histEmptyHead: 'Nothing on the wall yet', histEmpty: 'When a project is finished, open its group and press Archive this project: it leaves the workspace and gets a plaque here.', archiveBtn: 'Archive this project', archiveHead: g => `Archive "${g}"`, archiveP: 'Its lines leave every view, the live bar and dispatch, and the project gets a plaque on the History wall. Restore brings it back.', archiveOpen: n => `${n} to-do${n === 1 ? '' : 's'} still open`, archiveLive: n => `${n} session${n === 1 ? '' : 's'} still running`, archiveClean: 'Nothing open or running: ready for the wall.', archiveGo: 'Archive', tArchived: g => `"${g}" is on the History wall`, tRestored: g => `"${g}" is back in the workspace`, apTick: x => `Autopilot · working on: ${x}`, apTickIdle: 'Autopilot · wrapping up the round', reopen: 'Unfold: reopen it', wrapHead: 'Wrap up this line', wrapP: 'A done line folds like a parked one and leaves the other views. This wrap-up becomes its last station; edit it first.', wrapSave: 'Save and mark done', wrapSkip: 'Done, no wrap-up', wrapRec: n => `Wrap-up: ${n}`, wrapGoal: 'Goal: ', wrapSpan: (a, b, n, s) => `${a} – ${b} · ${n} records · ${s} sessions`, wrapDec: 'Key decisions:', wrapTodos: (d, n) => `To-dos done: ${d}/${n}`, wrapOpen: 'Left open:', wrapOut: 'Outputs and where they are kept:\n- ', tUnparked: n => `"${n}" is active again`,
     focusIntro: 'Every view then shows only the lines of the group you pick: the canvas, the branches, the timeline and the goals. It stays on, also after a reload, until you leave it.',
     focusNoGroups: 'No groups yet. Select lines on the canvas and press Group, or fill in a group in a line\'s panel.', groupUngroup: 'Ungroup',
     threadGroup: 'Group', threadGroupPh: 'None', multiGroup: 'Group', multiGroupPh: 'Group name', tGroupNeedName: 'Type a group name first',
@@ -1207,7 +1214,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     langGroup: '语言', more: '更多',
     menuNewThread: '新建线程', menuHideDone: '隐藏已完成的线程', menuShowDone: '显示已完成的线程', quietLabel: '安静了', quietDays: n => `${n} 天`, quietDot: n => `${n} 条线安静了`, quietAsk: (n, u) => `${n} 天没动静，平时${u === 1 ? '每天' : ` ${u} 天`}一更。做完了吗？`, quietAskOpen: (n, k) => `${n} 天没动静，还有 ${k} 项待办。先搁置？`, quietStill: '还在做', menuShowMerged: '显示已合并的线程', menuHideMerged: '收起已合并的线程', mergedInCount: n => ` · 已并入 ${n} 条`, mergedInLabel: '已并入',
     arrange: '整理', arrangeTitle: '按分组排好线程，分叉排在原线旁边', tArranged: '已整理', tUndo: '撤销',
-    groupLabel: '分组', groupName: '名称', groupLines: '组里的线', groupCount: n => `${n} 条线`, groupArrange: '整理这一组', groupFocus: '专注这一组', menuFocus: '专注某个分组…', menuTheme: n => `主题：${n}`, theme_auto: '跟随系统', theme_light: '浅色', theme_dark: '深色', theme_mist: '雾蓝', focusTitle: '专注模式', focusLabel: '专注', focusPick: '换一个', focusExit: '退出专注', groupFold: '折叠这一组', foldedLabel: '已折叠', foldOpenAll: '全部展开', foldOpen: '展开', foldedChip: n => `${n} 条线 · 已折叠`, fromMachines: ms => `来自 ${ms.join('、')}`, fromTitle: (m, n) => `${n} 条记录写在 ${m} 上`, foldTitle: '折叠分组', foldIntro: '折叠的分组不会出现在任何视图里（画布上只留一个小条），直到你展开。专注仍然可以选任何分组。', foldShown: '显示中', tFolded: g => `已折叠「${g}」`, unpark: '展开：恢复为进行中', histBtn: '历史', histBack: '← 回到工作区', histTitle: '做完并归档的项目', histSub: '做完的项目，一个项目一块牌子。', histProjects: '个项目', histLines: '条线', histStations: '站', histDecisions: '个决定', histSessions: '个会话', histDays: n => `${n} 天`, histArchived: '已归档', histArchivedOn: d => `归档于 ${d}`, histRestore: '恢复', histEmptyHead: '墙上还空着', histEmpty: '一个项目做完后，打开它的分组，点「归档这个项目」：它会离开工作区，在这里得到一块牌子。', archiveBtn: '归档这个项目', archiveHead: g => `归档「${g}」`, archiveP: '它的线会从所有视图、实时栏和分派里移走，项目在历史墙上得到一块牌子。随时可以恢复。', archiveOpen: n => `还有 ${n} 项待办没做完`, archiveLive: n => `还有 ${n} 个会话在跑`, archiveClean: '没有没做完的待办，也没有在跑的会话，可以上墙了。', archiveGo: '归档', tArchived: g => `「${g}」已经挂上历史墙`, tRestored: g => `「${g}」已回到工作区`, apTick: x => `Autopilot · 正在做：${x}`, apTickIdle: 'Autopilot · 正在收尾这一轮', reopen: '展开：重新打开', wrapHead: '收尾这条线', wrapP: '完成的线会像搁置一样折叠，并从其他视图里隐去。下面的收尾总结会成为它的最后一站，先改好再保存。', wrapSave: '保存并完成', wrapSkip: '直接完成，不写总结', wrapRec: n => `收尾总结：${n}`, wrapGoal: '目标：', wrapSpan: (a, b, n, s) => `${a} – ${b} · ${n} 条记录 · ${s} 个会话`, wrapDec: '关键决定：', wrapTodos: (d, n) => `完成的待办：${d}/${n}`, wrapOpen: '没做完的：', wrapOut: '产出和存放位置：\n- ', tUnparked: n => `「${n}」恢复为进行中`,
+    groupLabel: '分组', groupName: '名称', groupLines: '组里的线', groupCount: n => `${n} 条线`, groupArrange: '整理这一组', groupFocus: '专注这一组', menuFocus: '专注某个分组…', menuTheme: n => `主题：${n}`, theme_auto: '跟随系统', theme_light: '浅色', theme_dark: '深色', theme_mist: '雾蓝', focusTitle: '专注模式', focusLabel: '专注', focusPick: '换一个', focusExit: '退出专注', groupFold: '折叠这一组', foldedLabel: '已折叠', foldOpenAll: '全部展开', foldOpen: '展开', foldedChip: n => `${n} 条线 · 已折叠`, fromMachines: ms => `来自 ${ms.join('、')}`, fromTitle: (m, n) => `${n} 条记录写在 ${m} 上`, foldTitle: '折叠分组', foldIntro: '折叠的分组不会出现在任何视图里（画布上只留一个小条），直到你展开。专注仍然可以选任何分组。', foldShown: '显示中', tFolded: g => `已折叠「${g}」`, unpark: '展开：恢复为进行中', histBtn: '历史', histBack: '← 回到工作区', histTitle: '做完并归档的项目', histSub: '做完的项目，一个项目一块牌子。', histProjects: '个项目', histLines: '条线', histStations: '站', histDecisions: '个决定', histSessions: '个会话', histDays: n => `${n} 天`, histArchived: '已归档', histArchivedOn: d => `归档于 ${d}`, histRestore: '恢复', histReplay: '回放', histPlay: '播放', histPause: '暂停', histAgain: '再放一遍', histEmptyHead: '墙上还空着', histEmpty: '一个项目做完后，打开它的分组，点「归档这个项目」：它会离开工作区，在这里得到一块牌子。', archiveBtn: '归档这个项目', archiveHead: g => `归档「${g}」`, archiveP: '它的线会从所有视图、实时栏和分派里移走，项目在历史墙上得到一块牌子。随时可以恢复。', archiveOpen: n => `还有 ${n} 项待办没做完`, archiveLive: n => `还有 ${n} 个会话在跑`, archiveClean: '没有没做完的待办，也没有在跑的会话，可以上墙了。', archiveGo: '归档', tArchived: g => `「${g}」已经挂上历史墙`, tRestored: g => `「${g}」已回到工作区`, apTick: x => `Autopilot · 正在做：${x}`, apTickIdle: 'Autopilot · 正在收尾这一轮', reopen: '展开：重新打开', wrapHead: '收尾这条线', wrapP: '完成的线会像搁置一样折叠，并从其他视图里隐去。下面的收尾总结会成为它的最后一站，先改好再保存。', wrapSave: '保存并完成', wrapSkip: '直接完成，不写总结', wrapRec: n => `收尾总结：${n}`, wrapGoal: '目标：', wrapSpan: (a, b, n, s) => `${a} – ${b} · ${n} 条记录 · ${s} 个会话`, wrapDec: '关键决定：', wrapTodos: (d, n) => `完成的待办：${d}/${n}`, wrapOpen: '没做完的：', wrapOut: '产出和存放位置：\n- ', tUnparked: n => `「${n}」恢复为进行中`,
     focusIntro: '选一个分组后，画布、分支、时间线和目标都只显示这个组里的线。刷新后也保持，直到你退出。',
     focusNoGroups: '还没有分组。在画布上选中几条线点「编组」，或者在线面板里填写分组。', groupUngroup: '解散分组',
     threadGroup: '分组', threadGroupPh: '无', multiGroup: '编组', multiGroupPh: '分组名称', tGroupNeedName: '先填分组名称',
@@ -3447,6 +3454,7 @@ document.addEventListener('keydown', e => {
   const typing = e.target.matches && e.target.matches('input, textarea, select');
   if (e.key === 'Escape') {
     if (!$('#scrim').hidden) { closeSheet(); return; }
+    if (S.replay) { closeReplay(); return; }
     if (S.history) { openHistory(false); return; }
     if (S.connect) { S.connect = null; render(); return; }
     if (S.multi.size || S.selectMode) { clearMulti(); return; }
@@ -3686,7 +3694,8 @@ function historyMap(p) {
   }).join('')}</svg>`;
 }
 function renderHistory() {
-  const el = $('#history'), ps = archivedProjects(), day = ts => new Date(ts).toLocaleDateString(LANG === 'zh' ? 'zh-CN' : undefined);
+  closeReplay();
+  const el = $('#history'), ps = S.histPs = archivedProjects(), day = ts => new Date(ts).toLocaleDateString(LANG === 'zh' ? 'zh-CN' : undefined);
   const sum = k => ps.reduce((a, p) => a + p[k], 0);
   const bg = `<svg class="h-bg" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><g fill="none" stroke-linecap="round" stroke-width="26" opacity=".5">
     <path d="M-50 180 H520 Q600 180 640 260 L760 500 Q800 580 880 580 H1700" stroke="${LINE_COLORS[0]}"/><path d="M-50 720 H300 Q380 720 420 640 L560 360 Q600 280 680 280 H1700" stroke="${LINE_COLORS[1]}"/>
@@ -3706,17 +3715,63 @@ function renderHistory() {
     <div class="h-nums">${[[p.lines.length, 'histLines'], [p.records, 'histStations'], [p.decisions, 'histDecisions'], [p.sessions, 'histSessions']].map(([v, k]) => `<div><b>${v.toLocaleString()}</b><span>${esc(t(k))}</span></div>`).join('')}</div>
     ${p.wins.length ? `<div class="h-wins">${p.wins.map(w => `<span class="h-win">${esc(w)}</span>`).join('')}</div>` : ''}
     ${p.top.length ? `<ul class="h-dec">${p.top.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
-    <footer><span>${esc(t('histArchivedOn', day(p.at)))}</span><button class="btn" data-hist-restore="${esc(p.name)}">${esc(t('histRestore'))}</button></footer></article>`).join('');
+    <footer><span>${esc(t('histArchivedOn', day(p.at)))}</span><button class="btn btn-primary" data-hist-replay="${i}">${esc(t('histReplay'))}</button><button class="btn" data-hist-restore="${esc(p.name)}">${esc(t('histRestore'))}</button></footer></article>`).join('');
   el.innerHTML = bg + `<div class="h-wrap">${head}${rail}<main class="h-wall">${wall}</main></div>`;
 }
+// Replay: a project's line map grows from its first station to its last; the record at the playhead reads below.
+// One SVG drawn once; playing only moves a clip and a playhead (no redraw per frame).
+function openReplay(i) {
+  const p = S.histPs && S.histPs[i]; if (!p) return;
+  closeReplay();
+  const W = 1000, rowH = 34, top = 18, left = 150, right = 20, n = p.lines.length, H = top + n * rowH + 12, span = Math.max(1, p.t1 - p.t0);
+  const X = ts => left + (W - left - right) * (ts - p.t0) / span;
+  const all = p.lines.flatMap((l, k) => l.cs.map(c => ({ c, k, color: l.th.color }))).sort((a, b) => a.c.ts - b.c.ts);
+  const rows = p.lines.map((l, k) => { const y = top + k * rowH + rowH / 2, a = X(l.cs[0].ts), b = Math.max(X(l.cs[l.cs.length - 1].ts), a + 4);
+    return `<text x="8" y="${y + 4}">${esc(l.th.name.length > 18 ? l.th.name.slice(0, 17) + '…' : l.th.name)}</text><line x1="${a.toFixed(1)}" y1="${y}" x2="${b.toFixed(1)}" y2="${y}" stroke="${l.th.color}" stroke-width="5" stroke-linecap="round"/>`; }).join('');
+  const dots = all.map(({ c, k, color }) => { const d = c.kind === 'decision', y = top + k * rowH + rowH / 2;
+    return `<circle cx="${X(c.ts).toFixed(1)}" cy="${y}" r="${d ? 4.6 : 2.4}" fill="${d ? 'var(--surface)' : color}" stroke="${color}" stroke-width="${d ? 2.2 : 0}"/>`; }).join('');
+  const box = document.createElement('div');
+  box.className = 'h-replay h-glass'; box.id = 'h-replay';
+  box.innerHTML = `<header><span class="roundel" style="--c:${p.color}"></span><h3>${esc(p.name)}</h3><button class="icon-btn" data-replay-close aria-label="${esc(t('close'))}">×</button></header>
+    <svg class="h-rmap" viewBox="0 0 ${W} ${H}" style="filter:var(--line-filter,none)"><defs><clipPath id="h-clip"><rect id="h-cliprect" x="0" y="0" width="${left}" height="${H}"/></clipPath></defs>
+      <g clip-path="url(#h-clip)">${rows}${dots}</g><line id="h-head" x1="${left}" x2="${left}" y1="4" y2="${H - 4}" stroke="var(--ok)" stroke-width="1.5" stroke-dasharray="3 4"/></svg>
+    <div class="h-rnow"><time id="h-rtime"></time><span id="h-rtext"></span></div>
+    <div class="h-rbar"><button class="btn" data-replay-play>${esc(t('histPause'))}</button><input type="range" id="h-rpos" min="0" max="1000" value="0" aria-label="${esc(t('histReplay'))}"></div>`;
+  $('#history').appendChild(box);
+  const day = ts => new Date(ts).toLocaleString(LANG === 'zh' ? 'zh-CN' : undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  const show = f => { // f in 0..1 of the project's span
+    const ts = p.t0 + f * span, x = X(ts);
+    $('#h-cliprect').setAttribute('width', String(x + 6)); $('#h-head').setAttribute('x1', String(x)); $('#h-head').setAttribute('x2', String(x));
+    let lo = 0, hi = all.length - 1, at = -1; while (lo <= hi) { const m = (lo + hi) >> 1; if (all[m].c.ts <= ts) { at = m; lo = m + 1; } else hi = m - 1; }
+    const c = at >= 0 ? all[at].c : null;
+    // A decision near the playhead reads in bold; otherwise the latest record.
+    const dec = all.slice(Math.max(0, at - 6), at + 1).reverse().find(x => x.c.kind === 'decision');
+    const pick = dec && ts - dec.c.ts < span / 40 ? dec.c : c;
+    $('#h-rtime').textContent = day(ts); $('#h-rtext').textContent = pick ? pick.title : ''; $('#h-rtext').className = pick && pick.kind === 'decision' ? 'dec' : '';
+    $('#h-rpos').value = String(Math.round(f * 1000));
+  };
+  const R = S.replay = { f: 0, playing: !matchMedia('(prefers-reduced-motion: reduce)').matches, last: 0, show };
+  const btn = box.querySelector('[data-replay-play]');
+  const label = () => { btn.textContent = t(R.playing ? 'histPause' : R.f >= 1 ? 'histAgain' : 'histPlay'); };
+  const step = now => { if (S.replay !== R || !R.playing) return; const dt = R.last ? now - R.last : 0; R.last = now; R.f = Math.min(1, R.f + dt / 8000); show(R.f); if (R.f >= 1) { R.playing = false; label(); return; } R.raf = requestAnimationFrame(step); };
+  R.play = () => { if (R.f >= 1) R.f = 0; R.playing = true; R.last = 0; label(); R.raf = requestAnimationFrame(step); };
+  R.pause = () => { R.playing = false; cancelAnimationFrame(R.raf); label(); };
+  box.querySelector('#h-rpos').addEventListener('input', e => { R.pause(); R.f = Number(e.target.value) / 1000; show(R.f); label(); });
+  btn.onclick = () => (R.playing ? R.pause() : R.play());
+  if (R.playing) { show(0); R.play(); } else { R.f = 1; show(1); label(); }
+}
+function closeReplay() { if (S.replay) { cancelAnimationFrame(S.replay.raf); S.replay = null; } const b = $('#h-replay'); if (b) b.remove(); }
 function openHistory(on) {
   S.history = on; $('#history').hidden = !on; $('#hist-btn').setAttribute('aria-pressed', String(on));
   document.body.classList.toggle('history-open', on); $('#hist-label').textContent = t(on ? 'histBack' : 'histBtn');
+  closeReplay();
   if (on) { select(null); renderHistory(); $('#history').scrollTop = 0; } else $('#history').innerHTML = '';
 }
 $('#hist-btn').onclick = () => openHistory(!S.history);
 $('#history').addEventListener('click', e => {
   const cap = e.target.closest('.h-cap'); if (cap) return $(`#hp-${cap.dataset.hp}`).scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+  if (e.target.closest('[data-replay-close]')) return closeReplay();
+  const rp = e.target.closest('[data-hist-replay]'); if (rp) return openReplay(Number(rp.dataset.histReplay));
   const r = e.target.closest('[data-hist-restore]');
   if (r) { const g = r.dataset.histRestore; for (const th of S.threads.values()) if (th.group === g && th.archived) patchDoc('threads', th.id, { archived: null }, 0); toast(t('tRestored', g)); renderHistory(); }
 });

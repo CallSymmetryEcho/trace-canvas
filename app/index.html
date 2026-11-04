@@ -246,15 +246,15 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .ap-fill { position: absolute; inset: 0 auto 0 0; width: calc(var(--i) * (100% - var(--k)) / 2 + var(--k)); border-radius: inherit; overflow: hidden; opacity: 0; transition: width .35s cubic-bezier(.3,1.2,.5,1), opacity .2s; }
 .is-wait .ap-fill { opacity: 1; background: color-mix(in srgb, var(--ok) 78%, #fff); }
 .is-run .ap-fill { opacity: 1; background: linear-gradient(90deg, #8fa1b3, #b7a6ee 38%, #9b5cf6 72%, #6c4ac0); }
-/* Stars: two repeating tiles drifting toward the knob at different speeds (near and far), each twinkling. */
-.is-run .ap-fill::before, .is-run .ap-fill::after { content: ''; position: absolute; inset: 0; background-repeat: repeat;
-  background-image: radial-gradient(1.6px 1.6px at 12px 7px, #fff, transparent), radial-gradient(1.1px 1.1px at 41px 19px, #fff, transparent), radial-gradient(1.4px 1.4px at 73px 11px, #fff, transparent), radial-gradient(1px 1px at 96px 21px, #fff, transparent);
-  background-size: 120px 26px; animation: ap-drift 7s linear infinite, ap-twinkle 1.8s ease-in-out infinite alternate; }
-.is-run .ap-fill::after { background-image: radial-gradient(1px 1px at 8px 16px, #fff, transparent), radial-gradient(1.3px 1.3px at 30px 5px, #fff, transparent), radial-gradient(.9px .9px at 55px 22px, #fff, transparent), radial-gradient(1.2px 1.2px at 70px 13px, #fff, transparent);
-  background-size: 84px 26px; opacity: .7; animation: ap-drift2 11s linear infinite, ap-twinkle 2.4s ease-in-out -1.2s infinite alternate; }
-@keyframes ap-drift { from { background-position: 0 0; } to { background-position: 120px -26px; } }
-@keyframes ap-drift2 { from { background-position: 0 0; } to { background-position: 84px 26px; } }
-@keyframes ap-twinkle { from { opacity: .3; } to { opacity: 1; } }
+/* Stars dash toward the knob: two repeating tiles of streaks racing right, the near one faster (parallax), twinkling. */
+.is-run .ap-fill::before, .is-run .ap-fill::after { content: ''; position: absolute; inset: 0; background-repeat: repeat-x;
+  background-image: radial-gradient(5px 1.3px at 12px 7px, #fff, transparent), radial-gradient(3px 1px at 41px 19px, #fff, transparent), radial-gradient(6px 1.4px at 73px 12px, #fff, transparent), radial-gradient(3px .9px at 96px 21px, #fff, transparent);
+  background-size: 120px 26px; animation: ap-dash 1.1s linear infinite, ap-twinkle .9s ease-in-out infinite alternate; }
+.is-run .ap-fill::after { background-image: radial-gradient(2.5px .9px at 8px 16px, #fff, transparent), radial-gradient(3.5px 1px at 30px 5px, #fff, transparent), radial-gradient(2px .8px at 55px 22px, #fff, transparent), radial-gradient(3px 1px at 70px 10px, #fff, transparent);
+  background-size: 84px 26px; animation: ap-dash2 1.7s linear infinite, ap-twinkle 1.3s ease-in-out -.6s infinite alternate; }
+@keyframes ap-dash { to { background-position: 120px 0; } }
+@keyframes ap-dash2 { to { background-position: 84px 0; } }
+@keyframes ap-twinkle { from { opacity: .45; } to { opacity: 1; } }
 .ap-dot { position: absolute; top: 50%; left: calc(var(--d) * (100% - var(--k)) / 2 + var(--k) / 2); width: 5px; height: 5px; margin: -2.5px; border-radius: 50%; background: var(--muted); opacity: .55; }
 .ap-knob { position: absolute; top: -2px; left: calc(var(--i) * (100% - var(--k)) / 2 - 2px); width: calc(var(--k) + 4px); height: calc(var(--k) + 4px); border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.22), 0 0 0 .5px rgba(0,0,0,.06); transition: left .35s cubic-bezier(.3,1.2,.5,1); pointer-events: none; }
 .is-wait .ap-knob { animation: ap-halo 1.6s ease-in-out infinite; }

@@ -1678,12 +1678,13 @@ function qrSvg(text, scale = 6) {
 // The Claude desktop app opens a session's chat from this link (desktopId comes from its session records).
 const chatHref = id => `claude://claude.ai/epitaxy/${encodeURIComponent(id)}`;
 // Where a session's chat is: the Claude desktop app, the Codex app (its thread id is the session id),
-// or the Terminal or iTerm2 tab a live session runs in (tty from the hook). cls styles it; text overrides the label.
+// or the tab a live session runs in: Terminal or iTerm2 (tty from the hook), GNOME Terminal or Konsole (their tab id).
+// cls styles it; text overrides the label.
 function jumpTo(s, cls, text) {
   if (s.away) return ''; // another machine's session: its chat and terminal are not here
   const a = (href, key) => `<a class="${cls}" href="${esc(href)}" title="${esc(t(key))}">${text || esc(t(key))}</a>`;
   if (s.desktopId) return a(chatHref(s.desktopId), 'openChat');
-  if (s.tty && !S.remote && ['Apple_Terminal', 'iTerm.app'].includes(s.term)) return `<button class="${cls}" data-act="focus-term" data-sid="${esc(s.id)}" title="${esc(t('goTerm'))}">${text || esc(t('goTerm'))}</button>`;
+  if (!S.remote && (s.tty && ['Apple_Terminal', 'iTerm.app'].includes(s.term) || s.tab && ['gnome-terminal', 'konsole'].includes(s.term))) return `<button class="${cls}" data-act="focus-term" data-sid="${esc(s.id)}" title="${esc(t('goTerm'))}">${text || esc(t('goTerm'))}</button>`;
   // Remote Control on (▶ Start, claude --bg --remote-control): the same session's chat on claude.ai, also from the phone.
   if (s.rc && /^https:\/\/claude\.ai\//.test(s.rc)) return `<a class="${cls}" href="${esc(s.rc)}" target="_blank" rel="noopener" title="${esc(t('openChat'))}">${text || esc(t('openChat'))}</a>`;
   if (!s.tty && (s.agentKey === 'codex' || /^codex /.test(s.resume || ''))) return a(`codex://threads/${encodeURIComponent(s.id)}`, 'openChat');

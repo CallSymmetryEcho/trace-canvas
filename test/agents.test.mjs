@@ -4,9 +4,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { focusScript, normalize, terminalScript } from '../src/agents.mjs';
+import { focusScript, focusTab, normalize, terminalScript } from '../src/agents.mjs';
 import { handleHook, sessionStartContext, sessionThread } from '../src/hook.mjs';
-import { readLive, updateLive } from '../src/live.mjs';
+import { readLive, terminalOf, updateLive } from '../src/live.mjs';
 import { codexHooks, codexWritable, install } from '../src/install.mjs';
 import { handTo, listTasks } from '../src/ops.mjs';
 import { addCommit, createThread, emptyData, mutate, readData } from '../src/store.mjs';
@@ -169,4 +169,34 @@ test('Go to the terminal finds the Terminal or iTerm2 tab by its tty, and nothin
   assert.equal(focusScript({ tty: '', term: 'Apple_Terminal' }), null);
   assert.equal(focusScript({ tty: '/dev/ttys1" & do shell script "x', term: 'Apple_Terminal' }), null);
   assert.equal(focusScript(), null);
+});
+
+test('Go to the terminal on Linux: the hook notes the GNOME Terminal or Konsole tab, selected over D-Bus and raised with wmctrl', async () => {
+  const uuid = '992dd2f1-e588-4e20-ae74-a289d36308d8', screen = `/org/gnome/Terminal/screen/${uuid.replace(/-/g, '_')}`;
+  const gnome = terminalOf({ GNOME_TERMINAL_SCREEN: screen }), konsole = terminalOf({ KONSOLE_DBUS_SERVICE: ':1.223', KONSOLE_DBUS_WINDOW: '/Windows/1', KONSOLE_DBUS_SESSION: '/Sessions/2' });
+  assert.deepEqual([gnome.term, gnome.tab, konsole.term, konsole.tab], ['gnome-terminal', screen, 'konsole', ':1.223 /Windows/1 /Sessions/2']);
+  assert.deepEqual([terminalOf({ TERM_PROGRAM: 'tmux', GNOME_TERMINAL_SCREEN: screen }).tab, terminalOf({}).tab], ['', '']); // tmux in it: not that tab
+  // Stand-ins for gdbus and wmctrl that answer like the real ones (seen on KDE Plasma, X11) and log their arguments.
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-focus-')), log = path.join(bin, 'log');
+  fs.writeFileSync(path.join(bin, 'gdbus'), `#!/bin/sh\necho "gdbus $*" >> ${log}\ncase "$*" in\n  *GetResultMetas*${uuid}*) echo "([{'id': <'${uuid}'>, 'name': <''>}],)";;\n  *GetResultMetas*) echo "(@aa{sv} [],)";;\n  *"/Sessions/9 "*) exit 1;;\n  *winId*) echo "(int64 150994951,)";;\n  *) echo "()";;\nesac\n`, { mode: 0o755 });
+  fs.writeFileSync(path.join(bin, 'wmctrl'), `#!/bin/sh\necho "wmctrl $*" >> ${log}\n[ "$1" = -lx ] && printf '0x09a0000a  0 gnome-terminal-server.Gnome-terminal  host 终端\\n0x09000007  0 konsole.konsole  host zsh\\n'\nexit 0\n`, { mode: 0o755 });
+  const PATH = process.env.PATH, calls = () => fs.readFileSync(log, 'utf8').trim().split('\n').map(l => l.replace(/ --session --dest | --object-path | --method /g, ' '));
+  process.env.PATH = `${bin}:${PATH}`;
+  try {
+    assert.equal(await focusTab(gnome), true);
+    assert.deepEqual(calls(), [
+      `gdbus call org.gnome.Terminal /org/gnome/Terminal/SearchProvider org.gnome.Shell.SearchProvider2.GetResultMetas ['${uuid}']`,
+      `gdbus call org.gnome.Terminal /org/gnome/Terminal/SearchProvider org.gnome.Shell.SearchProvider2.ActivateResult ${uuid} [] 0`,
+      'wmctrl -lx', 'wmctrl -i -a 0x09a0000a']);
+    fs.rmSync(log);
+    assert.equal(await focusTab({ term: 'gnome-terminal', tab: screen.replace('992d', '000d') }), false); // closed: nothing selected
+    assert.equal(calls().length, 1);
+    fs.rmSync(log);
+    assert.equal(await focusTab(konsole), true);
+    assert.deepEqual(calls(), ['gdbus call :1.223 /Sessions/2 org.kde.konsole.Session.title 0', 'gdbus call :1.223 /Windows/1 org.kde.konsole.Window.setCurrentSession 2',
+      'gdbus call :1.223 /konsole/MainWindow_1 org.kde.KMainWindow.winId', 'wmctrl -i -a 0x9000007']);
+    assert.equal(await focusTab({ term: 'konsole', tab: ':1.223 /Windows/1 /Sessions/9' }), false); // that tab is closed
+    for (const tab of [':1.223 /Windows/1 /Sessions/2;x', 'x /Windows/1 /Sessions/2', screen + "'"]) assert.equal(await focusTab({ term: tab.startsWith('/') ? 'gnome-terminal' : 'konsole', tab }), false);
+    assert.equal(await focusTab({ tty: '/dev/pts/2', term: '' }), false);
+  } finally { process.env.PATH = PATH; }
 });

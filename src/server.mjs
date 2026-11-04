@@ -14,7 +14,7 @@ import { demoData } from './demo.mjs';
 import { liveDir, readLive } from './live.mjs';
 import { bindLiveSession, findThreadLoose, handTo, liveSessions, sessionList, startAutopilot, stopAutopilot } from './ops.mjs';
 import { applyRetro, askAgent, retroRecord, runRetro } from './retro.mjs';
-import { focusScript, openTerminal, terminalCommand } from './agents.mjs';
+import { focusTab, openTerminal, terminalCommand } from './agents.mjs';
 import { otherMachines, remoteLive } from './remote.mjs';
 import { commitDiff, commitInfo } from './git-view.mjs';
 import { runSync, syncSoon, syncStatus } from './sync.mjs';
@@ -160,13 +160,10 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
           return send(res, 200, { rows });
         } catch (e) { return send(res, 200, { error: e.message }); }
       }
-      // Go to the terminal: brings a live session's Terminal or iTerm2 tab to the front, found by its tty.
+      // Go to the terminal: brings a live session's tab to the front (Terminal or iTerm2, GNOME Terminal or Konsole).
       if (req.method === 'POST' && p === '/api/focus') {
         const body = JSON.parse(await readBody(req));
-        const script = process.platform === 'darwin' && focusScript(readLive(String(body.session || '')) || {});
-        if (!script) return send(res, 200, { error: 'no terminal' });
-        execFile('osascript', ['-e', script], { timeout: 5000 }, (err, out) => send(res, 200, String(out).trim() === 'ok' ? { ok: true } : { error: 'not found' }));
-        return;
+        return send(res, 200, await focusTab(readLive(String(body.session || '')) || {}) ? { ok: true } : { error: 'not found' });
       }
       // ▶ Start: a Claude Code session on the line in a new Terminal window, with Remote Control on, so it
       // shows in the Claude app on the phone. Built from the line or to-do id like Open in Terminal; a line

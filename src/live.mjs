@@ -149,7 +149,7 @@ export function activityOf(rawTool, input = {}) {
 
 /**
  * The terminal a session runs in, so the page can bring its tab to the front: the tty of the
- * hook or the nearest ancestor that has one (the agent's), and the app (TERM_PROGRAM).
+ * hook or the nearest ancestor that has one (the agent's), the app (TERM_PROGRAM) and, on Linux, the tab.
  * tty is '' when there is none, as for the desktop apps' sessions.
  */
 export function terminalOf(env = process.env, pid = process.pid) {
@@ -166,7 +166,10 @@ export function terminalOf(env = process.env, pid = process.pid) {
     if (!tty && /^(ttys?\d+|pts\/\d+)$/.test(t)) tty = '/dev/' + t;
     if (!agent && /^(claude|codex|gemini)(\s|$)/i.test(path.basename(comm))) agent = p; // "claude bg-spare" for a claude --bg session
   }
-  return { tty, term: String(env.TERM_PROGRAM || ''), pid: agent }; // pid 0: not found, the 12-hour rule applies
+  // GNOME Terminal and Konsole set no TERM_PROGRAM, but name the tab for their D-Bus interfaces (focusTab).
+  const gnome = env.GNOME_TERMINAL_SCREEN, konsole = env.KONSOLE_DBUS_SESSION && [env.KONSOLE_DBUS_SERVICE, env.KONSOLE_DBUS_WINDOW, env.KONSOLE_DBUS_SESSION].join(' ');
+  const term = String(env.TERM_PROGRAM || (gnome ? 'gnome-terminal' : konsole ? 'konsole' : ''));
+  return { tty, term, tab: String((term === 'gnome-terminal' && gnome) || (term === 'konsole' && konsole) || ''), pid: agent }; // pid 0: not found, the 12-hour rule applies
 }
 
 /**

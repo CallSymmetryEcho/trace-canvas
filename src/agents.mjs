@@ -89,6 +89,36 @@ export function focusScript({ tty = '', term = '' } = {}) {
   if (term === 'iTerm.app') return `tell application "iTerm2"\n  repeat with w in windows\n    repeat with t in tabs of w\n      repeat with s in sessions of t\n        if tty of s is "${tty}" then\n          tell w to select\n          tell t to select\n          tell s to select\n          activate\n          return "ok"\n        end if\n      end repeat\n    end repeat\n  end repeat\nend tell`;
   return null;
 }
+const run = (file, args) => new Promise(done => execFile(file, args, { timeout: 5000 }, (err, out) => done(err ? null : String(out))));
+const dbus = (dest, obj, method, ...args) => run('gdbus', ['call', '--session', '--dest', dest, '--object-path', obj, '--method', method, ...args]);
+const SEARCH = ['org.gnome.Terminal', '/org/gnome/Terminal/SearchProvider', 'org.gnome.Shell.SearchProvider2.'];
+/**
+ * Go to the terminal: brings a live session's tab to the front; true when it did. On a Mac the Terminal or iTerm2
+ * tab with its tty. On Linux the GNOME Terminal or Konsole tab terminalOf noted, selected over D-Bus; KDE does not
+ * let an app raise itself over another (focus-stealing prevention), so wmctrl raises the window (X11).
+ * ponytail: with several GNOME Terminal windows open only the tab is selected (its window asks for attention);
+ * Konsole's /Windows/N is taken to be its /konsole/MainWindow_N; Wayland raises nothing past what the app does.
+ */
+export async function focusTab({ tty = '', term = '', tab = '' } = {}) {
+  const script = focusScript({ tty, term });
+  if (script) return (await run('osascript', ['-e', script]) || '').trim() === 'ok';
+  if (term === 'gnome-terminal') {
+    const id = tab.replace('/org/gnome/Terminal/screen/', '').replace(/_/g, '-');
+    // Its search provider knows each tab by this id: no result means the tab is closed.
+    if (!/^[0-9a-f-]{36}$/.test(id) || !/'id'/.test(await dbus(SEARCH[0], SEARCH[1], SEARCH[2] + 'GetResultMetas', `['${id}']`) || '')) return false;
+    await dbus(SEARCH[0], SEARCH[1], SEARCH[2] + 'ActivateResult', id, '[]', '0');
+    const wins = (await run('wmctrl', ['-lx']) || '').split('\n').filter(l => /\sgnome-terminal-server\./.test(l));
+    if (wins.length === 1) await run('wmctrl', ['-i', '-a', wins[0].split(/\s/)[0]]);
+    return true;
+  }
+  const [svc, win, ses] = tab.split(' ');
+  if (term !== 'konsole' || !/^(:\d+\.\d+|org\.kde\.konsole[\w.-]*)$/.test(svc) || !/^\/Windows\/\d+$/.test(win) || !/^\/Sessions\/\d+$/.test(ses)) return false;
+  if (await dbus(svc, ses, 'org.kde.konsole.Session.title', '0') == null) return false; // the tab, or Konsole, is closed
+  await dbus(svc, win, 'org.kde.konsole.Window.setCurrentSession', ses.slice('/Sessions/'.length));
+  const wid = / (\d+),\)/.exec(await dbus(svc, '/konsole/MainWindow_' + win.slice('/Windows/'.length), 'org.kde.KMainWindow.winId') || '');
+  if (wid) await run('wmctrl', ['-i', '-a', '0x' + Number(wid[1]).toString(16)]);
+  return true;
+}
 // Which agent the current process serves: set in each CLI's MCP config; Claude Code needs none.
 export const agentKey = (env = process.env) => (AGENTS[env.TRACE_CANVAS_AGENT] ? env.TRACE_CANVAS_AGENT : 'claude');
 

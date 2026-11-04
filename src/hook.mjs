@@ -148,6 +148,8 @@ const APP_PROMPT = /^\s*This is an app-generated request/;
 const LIVE_EVENTS = [...LOG_EVENTS, 'SessionStart', 'PreToolUse', 'Notification', 'SubagentStart', 'SubagentStop'];
 
 // The openings of the prompts Trace Canvas itself writes to hand a line over (src/ops.mjs, app/index.html).
+// Keystrokes typed into the session rather than asked of it (":q", "login", "ok"): never a to-do.
+export const notTask = prompt => { const p = String(prompt || '').trim(); return p.length < 3 || (!/\s/.test(p) && (/^:/.test(p) || /^(login|logout|exit|quit|clear|yes|no|ok|okay)$/i.test(p))); };
 export const HANDOFF = /^(You are taking over the Trace Canvas line|New to-dos on the Trace Canvas line|Read the Trace Canvas line|读 Trace Canvas 上的线)/;
 
 export function handleHook(input, env = process.env) {
@@ -206,7 +208,7 @@ export function handleHook(input, env = process.env) {
       // A hand-off prompt written by dispatch, hand or the page restates to-dos that are already on the line: not a new one.
       const handoff = HANDOFF.test(prompt);
       if (handoff) s.prompted = true;
-      const log = !isCommand && prompt && !handoff && (cfg.prompts === 'all' || (cfg.prompts === 'first' && !s.prompted) || (cfg.prompts === 'long' && prompt.length >= 60));
+      const log = !isCommand && prompt && !handoff && !notTask(prompt) && (cfg.prompts === 'all' || (cfg.prompts === 'first' && !s.prompted) || (cfg.prompts === 'long' && prompt.length >= 60));
       if (log) {
         const t = thread(prompt);
         addCommit(d, { thread: t.id, kind: 'task', title: firstLine(prompt, 120), body: prompt.slice(0, 3000), agent: ag.name, links: [ag.resume(sid)], extra: { session: sid, actor: 'human' } });

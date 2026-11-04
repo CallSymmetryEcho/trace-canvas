@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **A stray keystroke is not a to-do.** Input typed into a session rather than asked of it, such as `:q`, `login` or `ok` (under three characters, a single word starting with `:`, or a lone command word), is no longer logged as a to-do.
+
 ## 0.3.3 (2026-11-04)
 
 See what is wrong at a glance: `trace-canvas doctor` and Common questions, a dot when sync fails, commits from other machines that open, parked lines that fold away, and agents that open in a tab.

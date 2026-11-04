@@ -36,7 +36,7 @@ test('every instruction reminds the agent to put new goals on its line as to-dos
   assert.equal(hookConfig('x').UserPromptSubmit[0].hooks[0].async, undefined);
 });
 
-test('a hand-off prompt Trace Canvas wrote is not logged as a new to-do', () => {
+test('a hand-off prompt Trace Canvas wrote, or a stray keystroke, is not logged as a new to-do', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-handoff-'));
   const env = { ...process.env, TRACE_CANVAS_HOME: path.join(root, 'home'), TRACE_CANVAS_LANG: 'en', TRACE_CANVAS_DESKTOP_DIR: path.join(root, 'desktop'), TRACE_CANVAS_MAP: '' };
   delete env.TRACE_CANVAS_DISABLE; delete env.TRACE_CANVAS_THREAD;
@@ -45,6 +45,7 @@ test('a hand-off prompt Trace Canvas wrote is not logged as a new to-do', () => 
   execFileSync('git', ['-C', repo, 'init', '-q', '-b', 'main']);
   handleHook({ session_id: 'h1', cwd: repo, hook_event_name: 'UserPromptSubmit', prompt: 'You are taking over the Trace Canvas line "tripsplit" (thread t1). First call the MCP tool trace_bind.' }, env);
   handleHook({ session_id: 'h2', cwd: repo, hook_event_name: 'UserPromptSubmit', prompt: '读 Trace Canvas 上的线「tripsplit」（thread t1）：用 trace_read_thread 看待办。' }, env);
+  for (const typed of [':q', 'login', 'ok', ':wq', 'y']) handleHook({ session_id: 'h4', cwd: repo, hook_event_name: 'UserPromptSubmit', prompt: typed }, env); // keystrokes, not asks
   handleHook({ session_id: 'h3', cwd: repo, hook_event_name: 'UserPromptSubmit', prompt: 'Split the bill by item' }, env);
   assert.deepEqual(Object.values(readData(env).commits).filter(c => c.kind === 'task').map(c => c.title), ['Split the bill by item']);
 });

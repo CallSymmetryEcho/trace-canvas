@@ -235,7 +235,7 @@ body.history-open .hist-btn span { display: inline; }
   background: var(--bg) radial-gradient(circle, color-mix(in srgb, var(--ink) 13%, transparent) 1.2px, transparent 1.6px) 0 0 / 22px 22px; }
 :root[data-theme="dark"] .history { --h-glass: color-mix(in srgb, var(--surface) 40%, transparent); --h-edge: rgba(255,255,255,.12); --h-hi: rgba(255,255,255,.12); --h-sheen: rgba(255,255,255,.07); --h-shadow: 0 1px 1px rgba(0,0,0,.3), 0 18px 44px -8px rgba(0,0,0,.55); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme]) .history { --h-glass: color-mix(in srgb, var(--surface) 40%, transparent); --h-edge: rgba(255,255,255,.12); --h-hi: rgba(255,255,255,.12); --h-sheen: rgba(255,255,255,.07); --h-shadow: 0 1px 1px rgba(0,0,0,.3), 0 18px 44px -8px rgba(0,0,0,.55); } }
-.h-bg { position: fixed; left: 0; right: 0; bottom: 0; top: var(--top-h, 56px); width: 100%; height: calc(100% - var(--top-h, 56px)); pointer-events: none; filter: var(--line-filter, none); }
+.h-bg { position: fixed; left: 0; right: 0; bottom: 0; top: var(--top-h, 56px); width: 100%; height: calc(100% - var(--top-h, 56px)); pointer-events: none; }
 .h-wrap { position: relative; max-width: 1240px; margin: 0 auto; padding: 26px 24px 56px; }
 .h-glass, .h-plaque { background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='.07'/%3E%3C/svg%3E"), linear-gradient(135deg, var(--h-sheen), transparent 42%), var(--h-glass);
   -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid var(--h-edge); box-shadow: inset 0 1px 0 var(--h-hi), var(--h-shadow); }
@@ -3695,6 +3695,13 @@ function wrapDraft(th) {
     dec.length && `${t('wrapDec')}\n${dec.join('\n')}`, todos.length && t('wrapTodos', todos.length - open.length, todos.length), open.length && `${t('wrapOpen')}\n${open.join('\n')}`,
     t('wrapOut')].filter(Boolean).join('\n\n');
 }
+// History draws in its own quiet palette (after traditional Japanese colours: celadon, wisteria, pale persimmon, light
+// indigo, cherry grey, young bamboo, mustard, slate), alike in lightness and low in chroma, so lines sit together on glass.
+const HIST_COLORS = ['#7FA99B', '#9D8FBF', '#D9A47F', '#6FA3C0', '#C99AA3', '#8DB580', '#C9B26B', '#8E9AA6'];
+// A line with some body: a soft halo, the stroke, and a thin light along its upper edge.
+const tube = (x1, y1, x2, y2, c, w) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-opacity=".22" stroke-width="${w * 2.6}" stroke-linecap="round"/>`
+  + `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-width="${w}" stroke-linecap="round"/>`
+  + `<line x1="${x1}" y1="${(y1 - w * .22).toFixed(1)}" x2="${x2}" y2="${(y2 - w * .22).toFixed(1)}" stroke="#fff" stroke-opacity=".45" stroke-width="${Math.max(.8, w * .28).toFixed(1)}" stroke-linecap="round"/>`;
 // History: projects (groups) whose lines are all archived, as plaques. Drawn only while the layer is open.
 function archivedProjects() {
   const by = new Map();
@@ -3712,14 +3719,16 @@ function archivedProjects() {
     out.push({ name, lines, t0: Math.min(...ts), t1: Math.max(...ts), at: Math.max(...ths.map(th => th.archived)), records: all.length, decisions: dec.length,
       sessions: new Set(all.map(c => c.session).filter(Boolean)).size, commits: all.filter(c => c.commit).length, top: dec.slice(0, 3).map(c => c.title), wins, color: lines[0].th.color });
   }
-  return out.sort((a, b) => b.t1 - a.t1);
+  out.sort((a, b) => b.t1 - a.t1);
+  out.forEach((p, i) => { p.color = HIST_COLORS[i % HIST_COLORS.length]; p.lines.forEach((l, k) => { l.color = HIST_COLORS[(i + k) % HIST_COLORS.length]; }); });
+  return out;
 }
 function historyMap(p) {
   const W = 300, H = 78, ls = p.lines.slice(0, 7), n = ls.length, span = Math.max(1, p.t1 - p.t0), X = t => 14 + (W - 28) * (t - p.t0) / span;
-  return `<svg class="h-map" viewBox="0 0 ${W} ${H}" aria-hidden="true" style="filter:var(--line-filter,none)">${ls.map((l, i) => {
-    const y = n > 1 ? 12 + (H - 24) * i / (n - 1) : H / 2, a = X(l.cs[0].ts), b = Math.max(X(l.cs[l.cs.length - 1].ts), a + 6), c = l.th.color;
-    return `<line x1="${a.toFixed(1)}" y1="${y.toFixed(1)}" x2="${b.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${c}" stroke-width="3.5" stroke-linecap="round"/>`
-      + l.cs.filter(x => x.kind === 'decision').slice(-8).map(x => `<circle cx="${X(x.ts).toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="var(--surface)" stroke="${c}" stroke-width="1.8"/>`).join('')
+  return `<svg class="h-map" viewBox="0 0 ${W} ${H}" aria-hidden="true">${ls.map((l, i) => {
+    const y = n > 1 ? 12 + (H - 24) * i / (n - 1) : H / 2, a = X(l.cs[0].ts), b = Math.max(X(l.cs[l.cs.length - 1].ts), a + 6), c = l.color;
+    return tube(a.toFixed(1), y.toFixed(1), b.toFixed(1), y.toFixed(1), c, 3.6)
+      + l.cs.filter(x => x.kind === 'decision').slice(-8).map(x => `<circle cx="${X(x.ts).toFixed(1)}" cy="${y.toFixed(1)}" r="3.1" fill="#fff" stroke="${c}" stroke-width="1.7"/>`).join('')
       + `<circle cx="${b.toFixed(1)}" cy="${y.toFixed(1)}" r="4.2" fill="${c}"/>`;
   }).join('')}</svg>`;
 }
@@ -3727,10 +3736,10 @@ function renderHistory() {
   closeReplay();
   const el = $('#history'), ps = S.histPs = archivedProjects(), day = ts => new Date(ts).toLocaleDateString(LANG === 'zh' ? 'zh-CN' : undefined);
   const sum = k => ps.reduce((a, p) => a + p[k], 0);
-  const bg = `<svg class="h-bg" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><g fill="none" stroke-linecap="round" stroke-width="26" opacity=".5">
-    <path d="M-50 180 H520 Q600 180 640 260 L760 500 Q800 580 880 580 H1700" stroke="${LINE_COLORS[0]}"/><path d="M-50 720 H300 Q380 720 420 640 L560 360 Q600 280 680 280 H1700" stroke="${LINE_COLORS[1]}"/>
-    <path d="M980 -50 V300 Q980 380 1060 420 L1300 540 Q1380 580 1380 660 V1100" stroke="${LINE_COLORS[3]}"/><path d="M-50 900 H700 Q780 900 820 820 L900 660 Q940 580 1020 580" stroke="${LINE_COLORS[2]}"/>
-    <path d="M1200 -50 V120 Q1200 200 1280 200 H1700" stroke="${LINE_COLORS[4]}"/></g></svg>`;
+  const bg = `<svg class="h-bg" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><g fill="none" stroke-linecap="round" stroke-width="26" opacity=".42">
+    <path d="M-50 180 H520 Q600 180 640 260 L760 500 Q800 580 880 580 H1700" stroke="${HIST_COLORS[0]}"/><path d="M-50 720 H300 Q380 720 420 640 L560 360 Q600 280 680 280 H1700" stroke="${HIST_COLORS[3]}"/>
+    <path d="M980 -50 V300 Q980 380 1060 420 L1300 540 Q1380 580 1380 660 V1100" stroke="${HIST_COLORS[2]}"/><path d="M-50 900 H700 Q780 900 820 820 L900 660 Q940 580 1020 580" stroke="${HIST_COLORS[4]}"/>
+    <path d="M1200 -50 V120 Q1200 200 1280 200 H1700" stroke="${HIST_COLORS[1]}"/></g></svg>`;
   const head = `<div class="h-hero"><div><h2 id="h-title">${esc(t('histBtn'))}</h2><p>${esc(t('histSub'))}</p></div>
     ${ps.length ? `<div class="h-totals h-glass">${[[ps.length, 'histProjects'], [sum('records'), 'histStations'], [sum('decisions'), 'histDecisions'], [sum('sessions'), 'histSessions']].map(([v, k]) => `<div><b>${v.toLocaleString()}</b><span>${esc(t(k))}</span></div>`).join('')}</div>` : ''}
 </div>`;
@@ -3755,18 +3764,18 @@ function openReplay(i) {
   closeReplay();
   const W = 1000, rowH = 34, top = 18, left = 150, right = 20, n = p.lines.length, H = top + n * rowH + 12, span = Math.max(1, p.t1 - p.t0);
   const X = ts => left + (W - left - right) * (ts - p.t0) / span;
-  const all = p.lines.flatMap((l, k) => l.cs.map(c => ({ c, k, color: l.th.color }))).sort((a, b) => a.c.ts - b.c.ts);
+  const all = p.lines.flatMap((l, k) => l.cs.map(c => ({ c, k, color: l.color }))).sort((a, b) => a.c.ts - b.c.ts);
   const rows = p.lines.map((l, k) => { const y = top + k * rowH + rowH / 2, a = X(l.cs[0].ts), b = Math.max(X(l.cs[l.cs.length - 1].ts), a + 4);
-    return `<text x="8" y="${y + 4}">${esc(l.th.name.length > 18 ? l.th.name.slice(0, 17) + '…' : l.th.name)}</text><line x1="${a.toFixed(1)}" y1="${y}" x2="${b.toFixed(1)}" y2="${y}" stroke="${l.th.color}" stroke-width="5" stroke-linecap="round"/>`; }).join('');
+    return `<text x="8" y="${y + 4}">${esc(l.th.name.length > 18 ? l.th.name.slice(0, 17) + '…' : l.th.name)}</text>${tube(a.toFixed(1), y, b.toFixed(1), y, l.color, 5)}`; }).join('');
   const dots = all.map(({ c, k, color }) => { const d = c.kind === 'decision', y = top + k * rowH + rowH / 2;
-    return `<circle cx="${X(c.ts).toFixed(1)}" cy="${y}" r="${d ? 4.6 : 2.4}" fill="${d ? 'var(--surface)' : color}" stroke="${color}" stroke-width="${d ? 2.2 : 0}"/>`; }).join('');
+    return d ? `<circle cx="${X(c.ts).toFixed(1)}" cy="${y}" r="4.6" fill="#fff" stroke="${color}" stroke-width="2.2"/>` : `<circle cx="${X(c.ts).toFixed(1)}" cy="${y}" r="1.6" fill="#fff" fill-opacity=".85"/>`; }).join('');
   const box = document.createElement('div');
   box.className = 'h-replay h-glass'; box.id = 'h-replay';
   box.innerHTML = `<header><span class="roundel" style="--c:${p.color}"></span><h3>${esc(p.name)}</h3><button class="icon-btn" data-replay-close aria-label="${esc(t('close'))}">×</button></header>
-    <svg class="h-rmap" viewBox="0 0 ${W} ${H}" style="filter:var(--line-filter,none)"><defs><clipPath id="h-clip"><rect id="h-cliprect" x="0" y="0" width="${left}" height="${H}"/></clipPath></defs>
-      <g clip-path="url(#h-clip)">${rows}${dots}</g><line id="h-head" x1="${left}" x2="${left}" y1="4" y2="${H - 4}" stroke="var(--ok)" stroke-width="1.5" stroke-dasharray="3 4"/></svg>
+    <svg class="h-rmap" viewBox="0 0 ${W} ${H}"><defs><clipPath id="h-clip"><rect id="h-cliprect" x="0" y="0" width="${left}" height="${H}"/></clipPath></defs>
+      <g clip-path="url(#h-clip)">${rows}${dots}</g><line id="h-head" x1="${left}" x2="${left}" y1="4" y2="${H - 4}" stroke="${p.color}" stroke-width="1.5" stroke-dasharray="3 4"/></svg>
     <div class="h-rnow"><time id="h-rtime"></time><span id="h-rtext"></span></div>
-    <div class="h-rbar"><button class="btn" data-replay-play>${esc(t('histPause'))}</button><input type="range" id="h-rpos" min="0" max="1000" value="0" aria-label="${esc(t('histReplay'))}"></div>`;
+    <div class="h-rbar"><button class="btn" data-replay-play>${esc(t('histPause'))}</button><input type="range" id="h-rpos" min="0" max="1000" value="0" style="accent-color:${p.color}" aria-label="${esc(t('histReplay'))}"></div>`;
   $('#history').appendChild(box);
   const day = ts => new Date(ts).toLocaleString(LANG === 'zh' ? 'zh-CN' : undefined, { year: 'numeric', month: 'short', day: 'numeric' });
   const show = f => { // f in 0..1 of the project's span

@@ -323,9 +323,8 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .agent-tag { flex: none; font-size: 11px; color: var(--muted); background: var(--surface-2); border-radius: 4px; padding: 1px 6px; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #more-btn.has-update, #more-btn.has-sync-fail { position: relative; }
 #more-btn.has-sync-fail::after { content: ''; position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
-#sync-item { flex-direction: column; align-items: flex-start; }
-.menu-sub { display: block; max-width: 300px; text-align: left; white-space: normal; font-size: 11.5px; color: var(--muted); }
-.menu-sub.bad { color: var(--warn); }
+#sync-item.has-dot::after { content: ''; display: inline-block; width: 6px; height: 6px; margin-left: 6px; border-radius: 50%; background: var(--warn); vertical-align: 2px; }
+.sheet-body p.sync-bad { color: var(--warn); }
 #more-btn.has-update::after { content: ''; position: absolute; top: 4px; right: 4px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
 .s-latest { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 4px; background: color-mix(in srgb, var(--accent) 14%, var(--surface)); color: var(--accent); font-size: 11px; font-weight: 600; vertical-align: 1px; }
 .g-time { flex: none; font-family: var(--f-mono); font-size: 11.5px; color: var(--faint); min-width: 78px; text-align: right; }
@@ -480,6 +479,8 @@ body.sheet-open .top { z-index: 80; }
 .ai-list { display: grid; gap: 6px; }
 .ai-item { display: grid; grid-template-columns: 20px 1fr; gap: 8px; align-items: start; padding: 8px 10px; border: 1px solid var(--rule-soft); border-radius: 8px; cursor: pointer; }
 .ai-item input { margin-top: 3px; }
+.ai-item.help-item { grid-template-columns: 64px 1fr; cursor: default; }
+.help-item .mono { justify-self: start; padding: 0 6px; border: 1px solid var(--rule); border-radius: 5px; background: var(--surface-2); white-space: nowrap; }
 .ai-row { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border: 1px solid var(--rule-soft); border-radius: 8px; }
 .ai-row > div:first-child { flex: 1; min-width: 0; }
 .ai-row .why { display: block; font-size: 12px; color: var(--faint); margin-top: 2px; }
@@ -772,7 +773,7 @@ body.sheet-open .top { z-index: 80; }
         <hr>
         <button data-menu="agent" data-i18n="menuAgent">Connect an AI agent</button>
         <button data-menu="io" data-i18n="menuIO">Import / export</button>
-        <button data-menu="sync" id="sync-item" hidden><span data-i18n="menuSync">Sync with other machines</span><span class="menu-sub" id="sync-sub"></span></button>
+        <button data-menu="sync" id="sync-item" hidden data-i18n="menuSync">Sync with other machines</button>
         <button data-menu="away" id="away-item" hidden><span id="away-label"></span></button>
         <button data-menu="away-git" id="away-git-item" hidden><span id="away-git-label"></span></button>
         <button data-menu="update" id="update-item" hidden><span id="update-label"></span></button>
@@ -941,7 +942,7 @@ const I18N = {
     retroLayers: { project: 'Project rules (CLAUDE.md, AGENTS.md)', line: 'This line', memory: 'Long-term memory' }, tRetroApplied: w => `Written to ${w}`,
     agentAsk: 'Prompt for an agent', agentPromptTitle: 'Copy a prompt that sends an agent to read this line and carry on', tAgentPrompt: 'Prompt copied: paste it to an agent, for example in the Claude app on your phone',
     agentPromptText: (name, id) => `Read the Trace Canvas line "${name}" (thread ${id}): use trace_read_thread and trace_tasks for its goal and open to-dos, carry on with them, and tick each one with trace_task_done when it is done.`, tSyncing: 'Syncing…', tSyncBusy: 'A sync is already running', tSyncFailed: e => `Sync failed: ${e}`,
-    syncFailedAt: (when, why) => `Failed ${when}: ${why}`, syncOkAt: when => `Last synced ${when}`, syncStale: (m, when) => `${m} last updated ${when}`, tSynced: (n, off) => `Synced: ${n} change${n === 1 ? '' : 's'} from other machines${off ? ' (offline; pushes next time)' : ''}`, onMachine: m => `On ${m}`, latestOn: m => `${m} · latest`,
+    syncFailedAt: (when, why) => `Failed ${when}: ${why}`, syncOkAt: when => `Last good sync ${when}`, syncNowBtn: 'Sync now', syncStale: (m, when) => `${m} last updated ${when}`, tSynced: (n, off) => `Synced: ${n} change${n === 1 ? '' : 's'} from other machines${off ? ' (offline; pushes next time)' : ''}`, onMachine: m => `On ${m}`, latestOn: m => `${m} · latest`,
     menuAgent: 'Connect an AI agent', menuIO: 'Import / export', menuClearEx: 'Clear example data', menuHelp: 'Shortcuts and help',
     zoomOut: 'Zoom out', zoomIn: 'Zoom in', zoomReset: 'Reset to 100%', fit: 'Fit', connect: 'Connect', connectTitle: 'Draw a link between two threads', newThread: 'New thread',
     selectMode: 'Select', selectTitle: 'Pick several threads (or Shift-click cards), then merge them',
@@ -1116,7 +1117,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     retroLayers: { project: '项目规矩（CLAUDE.md、AGENTS.md）', line: '这条线', memory: '长期记忆' }, tRetroApplied: w => `已写入 ${w}`,
     agentAsk: '给 agent 的提示', agentPromptTitle: '复制一段提示，让 agent 去读这条线并接着做', tAgentPrompt: '提示已复制：粘贴给 agent，比如手机 Claude app 里的会话',
     agentPromptText: (name, id) => `读 Trace Canvas 上的线「${name}」（thread ${id}）：用 trace_read_thread 和 trace_tasks 看它的目标和未完成的待办，接着做，每做完一项就用 trace_task_done 勾掉。`, tSyncing: '正在同步…', tSyncBusy: '已经有一个同步在进行', tSyncFailed: e => `同步失败：${e}`,
-    syncFailedAt: (when, why) => `${when}失败：${why}`, syncOkAt: when => `上次同步：${when}`, syncStale: (m, when) => `${m} 最后更新：${when}`, tSynced: (n, off) => `已同步：从其他电脑收到 ${n} 处改动${off ? '（离线，下次再推送）' : ''}`, onMachine: m => `在 ${m} 上`, latestOn: m => `${m} 最新`,
+    syncFailedAt: (when, why) => `${when}失败：${why}`, syncOkAt: when => `上次成功同步：${when}`, syncNowBtn: '立即同步', syncStale: (m, when) => `${m} 最后更新：${when}`, tSynced: (n, off) => `已同步：从其他电脑收到 ${n} 处改动${off ? '（离线，下次再推送）' : ''}`, onMachine: m => `在 ${m} 上`, latestOn: m => `${m} 最新`,
     menuAgent: '接入 AI agent', menuIO: '导入 / 导出', menuClearEx: '清除示例数据', menuHelp: '快捷键与用法',
     zoomOut: '缩小', zoomIn: '放大', zoomReset: '重置为 100%', fit: '适配', connect: '连线', connectTitle: '在两个线程之间画一条关联', newThread: '新线程',
     selectMode: '多选', selectTitle: '点选多条线程（或 Shift+点击卡片），然后合并',
@@ -1314,16 +1315,18 @@ const S = {
   live: [], liveOthers: [], sessions: [], machine: '', goalsShowDone: false, multiGroup: '', dragMembers: null, focusGroup: ls.get('tc.focusGroup', null), folded: ls.get('tc.folded', []), platform: '',
 };
 
-// The sync item in More: how the last sync went, and other machines quiet for over a day; a dot on More when it failed.
+// Sync trouble (it failed, or another machine has been quiet for over a day) is only a dot: on More and on the
+// sync item. Opening the item then shows what is wrong; without trouble it just syncs.
+function syncTrouble() {
+  const s = S.sync;
+  if (!s) return [];
+  const stale = Object.entries(s.others || {}).filter(([, ts]) => Date.now() - ts > 864e5).map(([m, ts]) => t('syncStale', m, fmtRel(ts)));
+  return [...(s.failed ? [t('syncFailedAt', fmtRel(s.at), s.failed)] : []), ...stale];
+}
 function showSync() {
-  const s = S.sync, sub = $('#sync-sub');
-  if (!sub) return;
-  const stale = s ? Object.entries(s.others || {}).filter(([, ts]) => Date.now() - ts > 864e5).map(([m, ts]) => t('syncStale', m, fmtRel(ts))) : [];
-  const why = s && s.failed && (s.failed.length > 70 ? `${s.failed.slice(0, 70)}…` : s.failed);
-  sub.textContent = !s ? '' : [s.failed ? t('syncFailedAt', fmtRel(s.at), why) : t('syncOkAt', fmtRel(s.at)), ...stale].join(' · ');
-  sub.title = (s && s.failed) || '';
-  sub.classList.toggle('bad', !!(s && (s.failed || stale.length)));
-  $('#more-btn').classList.toggle('has-sync-fail', !!(s && s.failed));
+  const bad = syncTrouble().length > 0;
+  $('#sync-item').classList.toggle('has-dot', bad);
+  $('#more-btn').classList.toggle('has-sync-fail', bad);
 }
 function fmtAbs(ts) { const d = new Date(ts); return `${pad2(d.getMonth() + 1)}/${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
 function fmtRel(ts) {
@@ -3272,7 +3275,7 @@ menu.addEventListener('click', e => {
   else if (k === 'toggle-done') { S.hideDone = !S.hideDone; ls.set('tc.hideDone', S.hideDone); render(); }
   else if (k === 'toggle-merged') { S.showMerged = !S.showMerged; ls.set('tc.showMerged', S.showMerged); render(); }
   else if (k === 'clear-examples') { if (canWrite()) clearExamples(); }
-  else if (k === 'sync') syncNow();
+  else if (k === 'sync') { if (syncTrouble().length) openSheet('sync'); else syncNow(); }
   else if (k === 'update') {
     if (S.remote) { toast(t('tUpdateHere')); return; }
     postJSON('/api/update', {}).then(r => { if (r.error) return toast(r.error); toast(t('tUpdating')); setTimeout(() => location.reload(), 6000); });
@@ -3404,8 +3407,10 @@ function openSheet(kind) {
   } else if (kind === 'help') {
     setSheet(t('helpTitle'), `
       <p>${t('helpIntro')}</p>
-      <div class="ai-list">${t('help').map(([k, v]) => `<div class="ai-item" style="cursor:default"><span class="mono">${esc(k)}</span><span>${v}</span></div>`).join('')}</div>
+      <div class="ai-list">${t('help').map(([k, v]) => `<div class="ai-item help-item"><span class="mono">${esc(k)}</span><span>${v}</span></div>`).join('')}</div>
       <p>${esc(t('helpShapes'))}</p>`);
+  } else if (kind === 'sync') {
+    setSheet(t('menuSync'), `${syncTrouble().map(l => `<p class="sync-bad">${esc(l)}</p>`).join('')}${S.sync && S.sync.lastOk ? `<p>${esc(t('syncOkAt', fmtRel(S.sync.lastOk)))}</p>` : ''}<button class="btn btn-primary" data-sync-now>${esc(t('syncNowBtn'))}</button>`);
   } else if (kind === 'phone') {
     setSheet(t('phoneTitle'), `<p>${esc(t('phoneIntro'))}</p><div class="phone-qr">${qrSvg(S.phoneUrl, 5)}</div><div class="l-cmd"><code>${esc(S.phoneUrl)}</code><button class="btn" data-copy-phone>${esc(t('copy'))}</button></div><p>${esc(t('phoneAfter'))}</p>`);
   } else if (kind === 'ai') runAI();
@@ -3570,6 +3575,7 @@ sheetBody.addEventListener('keydown', e => {
 });
 sheetBody.addEventListener('click', e => {
   if (e.target.closest('[data-copy-phone]')) { copyText(S.phoneUrl); return; }
+  if (e.target.closest('[data-sync-now]')) { closeSheet(); syncNow(); return; }
   if (S.sheet !== 'goals') return;
   if (e.target.id === 'gl-tip-hide') { try { localStorage.setItem('tc.goalsTipHidden', '1'); } catch {} renderGoals(); return; }
   const open = e.target.closest('[data-hand-open]');

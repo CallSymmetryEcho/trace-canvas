@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- **A failed sync shows.** **More → Sync with other machines** says when the last sync ran and why it failed (it could not pull, or commits are still not pushed), and names any other machine that has not updated in over a day; More gets a dot while sync is failing. `trace-canvas sync` no longer reports a sync whose commits did not reach the remote as fine, and exits 1 then.
+- **A failed sync shows, quietly.** When the last sync failed, or another machine has not updated in over a day, More and its sync item get a small dot; opening the item then says what is wrong and offers **Sync now** (without trouble it syncs straight away, as before). `trace-canvas sync` no longer reports a sync whose commits did not reach the remote as fine, and exits 1 then.
+- **Shortcuts and help reads cleanly.** Each key sits in its own column.
 - **Fold a group from the canvas.** Each group's label has a switch: ▾ folds the group into a small chip, ▸ on the chip unfolds it.
 - **Parked means folded.** A parked line shows as its head only on the canvas and leaves the branch view and the timeline, like a folded group; ▸ on it makes it active again, and so does any new record on it. Parking a line that has gone quiet folds it.
 - **A commit made on another machine shows its changes here.** This machine's clone of the same repository is used, in whatever folder; without one, the changes are read on the machine the commit was made on, over ssh (the same machine names as the live bar). **More → Other machines' changes** turns the ssh reading off; then the panel says which computer the repository is on.

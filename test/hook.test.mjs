@@ -213,4 +213,8 @@ test('an Autopilot round lights only when its prompt reaches a session, and an o
   s.fire('UserPromptSubmit', { prompt: `<pasted_content id="6cbc">\nAutopilot (beta) on the Trace Canvas line "App" (thread ${tid}): work\n</pasted_content id="6cbc">`, prompt_id: 'p3' });
   assert.equal(s.data().threads[tid].autopilot.session, 's1');
   assert.ok(!s.commits().some(c => /Autopilot \(beta\)/.test(c.title))); // a hand-off, not a new to-do
+  // Pasted with a few words of the person's own after it.
+  mutate(d => { d.threads[tid].autopilot = { at: Date.now() }; }, s.env);
+  s.fire('UserPromptSubmit', { prompt: `<pasted_content id="6cbc">\nAutopilot (beta) on the Trace Canvas line "App" (thread ${tid}): work\n</pasted_content id="6cbc">\n\n why not the rest`, prompt_id: 'p4' });
+  assert.equal(s.data().threads[tid].autopilot.session, 's1');
 });

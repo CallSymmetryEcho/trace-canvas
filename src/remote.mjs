@@ -4,7 +4,7 @@ import { execFile, execFileSync } from 'node:child_process';
 import { readConfig } from './store.mjs';
 import { q } from './agents.mjs';
 
-const ARGS = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5', '-o', 'ControlMaster=auto', '-o', 'ControlPath=/tmp/tc-ssh-%C', '-o', 'ControlPersist=120'];
+export const ARGS = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5', '-o', 'ControlMaster=auto', '-o', 'ControlPath=/tmp/tc-ssh-%C', '-o', 'ControlPersist=120'];
 const CMD = `exec "$SHELL" -lc 'trace-canvas live --json'`;
 const parse = (machine, out) => {
   const sessions = JSON.parse(out);

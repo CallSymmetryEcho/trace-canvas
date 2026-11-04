@@ -99,3 +99,28 @@ test('the page reads a commit and a diff through the server', async () => {
     fs.unwatchFile(path.join(process.env.TRACE_CANVAS_HOME, 'data.json'));
   }
 });
+
+test('a commit with no clone here is read on the machine it was made on, over ssh, unless that is off', async () => {
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'tc-gitaway-')));
+  const r = repo(root, 'studio-only'), sha = r.commit({ 'a.txt': 'one\n' }, 'Made on the studio');
+  // A stand-in ssh: drops the options and the machine, then runs the command here with /away/ taken out of its paths.
+  const bin = path.join(root, 'bin');
+  fs.mkdirSync(bin);
+  fs.writeFileSync(path.join(bin, 'ssh'), '#!/bin/sh\nwhile [ "$1" = "-o" ]; do shift 2; done\nshift\nexec sh -c "$(printf %s "$1" | sed s#/away/#/#)"\n', { mode: 0o755 });
+  const keep = { PATH: process.env.PATH, HOME_: process.env.TRACE_CANVAS_HOME, M: process.env.TRACE_CANVAS_MACHINE };
+  Object.assign(process.env, { PATH: `${bin}:${keep.PATH}`, TRACE_CANVAS_HOME: path.join(root, 'tc'), TRACE_CANVAS_MACHINE: 'mac' });
+  try {
+    const d = emptyData(), th = createThread(d, { name: 'studio' });
+    d.commits.s1 = { id: 's1', thread: th.id, kind: 'agent', title: 's1', ts: 1, gitCommit: sha, repo: path.join(root, 'away', 'studio-only'), machine: 'studio' };
+    fs.mkdirSync(path.join(root, 'tc'));
+    fs.writeFileSync(path.join(root, 'tc', 'config.json'), JSON.stringify({ awayGit: false }));
+    assert.deepEqual([(await commitInfo(d, 's1')).missing, (await commitInfo(d, 's1')).machine], ['no-repo', 'studio']);
+    fs.writeFileSync(path.join(root, 'tc', 'config.json'), '{}');
+    const i = await commitInfo(d, 's1');
+    assert.deepEqual([i.machine, i.subject, i.files.map(f => f.path)], ['studio', 'Made on the studio', ['a.txt']]);
+    assert.match((await commitDiff(d, 's1', 'a.txt')).diff, /^\+one$/m);
+  } finally {
+    process.env.PATH = keep.PATH;
+    for (const [k, v] of [['TRACE_CANVAS_HOME', keep.HOME_], ['TRACE_CANVAS_MACHINE', keep.M]]) if (v === undefined) delete process.env[k]; else process.env[k] = v;
+  }
+});

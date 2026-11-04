@@ -96,6 +96,8 @@ export function readConfig(env = process.env) {
     phone: file.phone || null,
     // The live bar also shows other machines' running sessions, read over ssh (More → Other machines' sessions).
     awayLive: !!file.awayLive,
+    // A commit made on another machine, with no clone here, is read from that machine over ssh (More → Other machines' changes).
+    awayGit: file.awayGit !== false,
   };
 }
 const machines = new Map(); // data folder → machine name; ponytail: read once per process

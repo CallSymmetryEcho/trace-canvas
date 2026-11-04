@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Update works with a systemd service.** When the page server is a systemd service's main process, `trace-canvas update` restarts it with `systemctl` instead of starting a second server that took the port from it. `serve` exits when its port is taken, so a service manager no longer keeps an idle copy running.
+
 ## 0.3.2 (2026-11-04)
 
 Open sessions stay on the map, dispatch says what it did, a fork can become its own line, and AI tidy-up suggests instead of acting.

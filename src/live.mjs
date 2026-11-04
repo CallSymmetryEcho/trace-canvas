@@ -212,3 +212,12 @@ export function updateLive(input, { info = null, key = null, env = process.env, 
   writeJson(fileOf(sid, env), doc, env);
   return doc;
 }
+
+// The systemd service a process runs in (Linux), from its cgroup: { name, user } or null.
+export function systemdUnit(pid, read = f => fs.readFileSync(f, 'utf8')) {
+  let cg = '';
+  try { cg = read(`/proc/${pid}/cgroup`); } catch { return null; }
+  const parts = (cg.split('\n').find(l => l.startsWith('0::')) || cg.split('\n')[0] || '').split('/');
+  const name = [...parts].reverse().find(x => x.endsWith('.service') && !/^user@\d+\.service$/.test(x));
+  return name ? { name, user: parts.some(x => /^user@\d+\.service$/.test(x)) } : null;
+}

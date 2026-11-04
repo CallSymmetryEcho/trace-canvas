@@ -205,3 +205,12 @@ test('Claude Code\'s session register gives the pid of a session quiet since bef
   const [x] = listLive(env, now + 2 * STALE_MS);
   assert.deepEqual([x.id, x.pid, x.kind, x.name], ['old', process.pid, 'bg', 'lianbin-x']);
 });
+
+test('systemdUnit: a user service, a system service, and a terminal scope', async () => {
+  const { systemdUnit } = await import('../src/live.mjs');
+  const cg = s => () => s;
+  assert.deepEqual(systemdUnit(1, cg('0::/user.slice/user-1000.slice/user@1000.service/app.slice/trace-canvas.service\n')), { name: 'trace-canvas.service', user: true });
+  assert.deepEqual(systemdUnit(1, cg('0::/system.slice/trace-canvas.service\n')), { name: 'trace-canvas.service', user: false });
+  assert.equal(systemdUnit(1, cg('0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-org.kde.konsole-123.scope\n')), null);
+  assert.equal(systemdUnit(1, () => { throw new Error('ENOENT'); }), null);
+});

@@ -9,6 +9,7 @@ import { execFileSync } from 'node:child_process';
 import { handleHook, python3, readStdin } from '../src/hook.mjs';
 import { agentFiles, allowSafeTools, codexHooks, codexWritable, geminiHooks, hookCommand, install, installAgentMcp, installMcp, installSkill, linkCommand, onPath, settingsPath, uninstall } from '../src/install.mjs';
 import { normalize } from '../src/agents.mjs';
+import { systemdUnit } from '../src/live.mjs';
 import os from 'node:os';
 import crypto from 'node:crypto';
 
@@ -154,6 +155,7 @@ async function main() {
         if (e.code === 'EADDRINUSE') {
           console.log(`Port ${port} is in use; Trace Canvas may already be running at http://localhost:${port}/`);
           if (!noOpen) openBrowser(`http://localhost:${port}/`);
+          process.exit(1); // nothing to serve: never sit idle holding a service manager's slot
         } else throw e;
       }
       break;
@@ -462,7 +464,17 @@ async function main() {
       // The page server, if one runs: stopped, then started again from this clone on the same port.
       let srv = null;
       try { srv = JSON.parse(fs.readFileSync(path.join(home(), 'server.json'), 'utf8')); process.kill(srv.pid, 0); } catch { srv = null; }
-      if (srv) {
+      // A systemd service restarts it itself; starting one here would take the port from it.
+      // Only when the server is that service's main process (a terminal's own service must never be restarted).
+      const sysctl = u => ['systemctl', ...(u.user ? ['--user'] : [])];
+      let unit = srv && systemdUnit(srv.pid);
+      try { if (unit && execFileSync(sysctl(unit)[0], [...sysctl(unit).slice(1), 'show', '-p', 'MainPID', '--value', unit.name], { encoding: 'utf8' }).trim() !== String(srv.pid)) unit = null; } catch { unit = null; }
+      if (unit) {
+        try {
+          execFileSync('systemctl', [...sysctl(unit).slice(1), '--no-block', 'restart', unit.name], { stdio: 'ignore' });
+          console.log(`Restarting the page server (systemd ${unit.name}); an open page reloads by itself.`);
+        } catch { console.log(`The page server runs as systemd ${unit.name}; restart it with: ${unit.user ? 'systemctl --user' : 'sudo systemctl'} restart ${unit.name}`); }
+      } else if (srv) {
         process.kill(srv.pid, 'SIGTERM');
         for (let i = 0; i < 50; i++) { try { process.kill(srv.pid, 0); await new Promise(r => setTimeout(r, 100)); } catch { break; } }
         const log = fs.openSync(path.join(home(), 'server.log'), 'a');

@@ -524,7 +524,32 @@ body.history-open .hist-btn span { display: inline; }
 .d-head { display: flex; align-items: center; gap: 8px; padding: 10px 10px 8px 14px; border-bottom: 1px solid var(--rule-soft); }
 .d-eyebrow { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px; font-family: var(--f-display); font-weight: 600; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .d-eyebrow .mono { text-transform: none; letter-spacing: 0; font-weight: 400; font-size: 11.5px; color: var(--faint); }
-.d-scroll { flex: 1 1 auto; overflow: auto; padding: 12px 14px 16px; display: grid; gap: 12px; align-content: start; }
+.d-scroll { flex: 1 1 auto; overflow: auto; overflow-x: hidden; padding: 12px 14px 16px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-content: start; }
+/* Long titles and details wrap and grow with their text instead of scrolling inside a small box. */
+textarea.grow { field-sizing: content; resize: none; min-height: 2.2em; max-height: 60vh; }
+textarea.big-input { line-height: 1.3; }
+.fld-head { display: flex; align-items: baseline; gap: 10px; font-size: 11.5px; color: var(--muted); font-weight: 500; }
+.fld-head .linkish { font-size: 12px; } .fld-head .spacer { flex: 1; }
+/* Markdown, read: the record's details in the drawer, and reports in the reader. */
+.md { font-size: 13.5px; line-height: 1.65; color: var(--ink); overflow-wrap: anywhere; min-width: 0; }
+.md > :first-child { margin-top: 0; } .md > :last-child { margin-bottom: 0; }
+.md p, .md ul, .md ol, .md pre, .md blockquote, .md table { margin: 0 0 .7em; }
+.md h1, .md h2, .md h3, .md h4, .md h5, .md h6 { font-family: var(--f-display); margin: 1.1em 0 .45em; line-height: 1.3; }
+.md h1 { font-size: 1.35em; } .md h2 { font-size: 1.2em; } .md h3 { font-size: 1.08em; } .md h4, .md h5, .md h6 { font-size: 1em; color: var(--muted); }
+.md ul, .md ol { padding-left: 1.35em; } .md li + li { margin-top: .2em; } .md li > ul, .md li > ol { margin: .2em 0 0; }
+.md code { font-family: var(--f-mono); font-size: .88em; background: var(--surface-2); border: 1px solid var(--rule-soft); padding: .05em .35em; border-radius: 4px; }
+.md pre { background: var(--surface-2); border: 1px solid var(--rule-soft); border-radius: 8px; padding: 10px 12px; overflow: auto; }
+.md pre code { background: none; border: 0; padding: 0; font-size: 12px; overflow-wrap: normal; white-space: pre; }
+.md blockquote { border-left: 3px solid var(--rule); padding: .1em 0 .1em .8em; color: var(--muted); }
+.md hr { border: 0; border-top: 1px solid var(--rule); margin: 1em 0; }
+.md a { color: var(--accent); } .md .md-ref { text-decoration: underline dotted var(--faint); text-underline-offset: 3px; }
+.md .tbl { overflow-x: auto; margin: 0 0 .7em; } .md table { border-collapse: collapse; font-size: .93em; margin: 0; }
+.md th, .md td { border: 1px solid var(--rule); padding: 4px 8px; text-align: left; vertical-align: top; } .md th { background: var(--surface-2); }
+.md-body { background: var(--surface-2); border: 1px solid var(--rule-soft); border-radius: 8px; padding: 10px 12px; max-height: 46vh; overflow: auto; }
+body.read-page .sheet { width: min(860px, 100%); }
+.md-read { font-size: 15px; line-height: 1.75; max-width: 72ch; margin: 0 auto; width: 100%; }
+.md-src { font-family: var(--f-mono); font-size: 11.5px; color: var(--faint); overflow-wrap: anywhere; }
+.links > div { display: flex; gap: 8px; align-items: baseline; min-width: 0; } .links > div code { flex: 1; }
 .fld { display: grid; gap: 4px; min-width: 0; }
 .fld > span { font-size: 11.5px; color: var(--muted); font-weight: 500; }
 .fld input, .fld select, .fld textarea {
@@ -553,6 +578,7 @@ body.history-open .hist-btn span { display: inline; }
 .d-strip { list-style: none; margin: 0; padding: 0 0 0 2px; position: relative; display: grid; }
 .d-strip::before { content: ""; position: absolute; left: 12.5px; top: 12px; bottom: 12px; width: 3px; border-radius: 2px; background: var(--c); }
 .d-strip li { position: relative; display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: center; padding: 4px 0; cursor: pointer; }
+.d-strip .s-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.4; }
 .d-strip li:hover .s-title { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
 .d-strip .g { justify-self: center; }
 .sec-label { font-family: var(--f-display); font-weight: 600; font-size: 12.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--faint); }
@@ -1122,7 +1148,7 @@ apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent 
     dayLabel: d => `${I18N.en.week[d.getDay()]} ${d.getMonth() + 1}/${d.getDate()}`,
     monthLabel: d => `${I18N.en.months[d.getMonth()]} ${d.getFullYear()}`,
     tickDay: d => `${I18N.en.week[d.getDay()]} ${d.getDate()}`,
-    dRecord: 'Record', dTitle: 'Title', dKind: 'Type', dThread: 'Thread', dDone: 'Done', dBody: 'Details', dBodyPh: 'Context, a summary of what the agent produced, next steps…',
+    dRecord: 'Record', dTitle: 'Title', dKind: 'Type', dThread: 'Thread', dDone: 'Done', dBody: 'Details', mdEdit: 'Edit', mdDone: 'Done', mdExpand: 'Read', mdRead: 'Read', mdErr_missing: 'This file is not on this computer: it may have been moved or renamed, or it is on another machine.', mdErr_big: 'This file is over 2 MB.', mdErr_unlinked: 'No record links this file.', mdErr_type: 'Only .md files open here.', dBodyPh: 'Context, a summary of what the agent produced, next steps…',
     dLinks: 'Links or file paths, one per line', dLinksPh: 'https://…  or  ~/Documents/plan.md', dAgent: 'Source', dAgentPh: 'me / Claude Code…', dTime: 'Time',
     forkedFromRec: 'Forked from', mergedFromThread: 'Merged from thread', forkedHere: 'Forked from here:',
     forkHere: 'Fork from here', viewThread: 'View thread', forkNamePh: 'Name of the new thread', createBranch: 'Create branch',
@@ -1303,7 +1329,7 @@ apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的
     dayLabel: d => `${d.getMonth() + 1}/${d.getDate()} 周${I18N.zh.week[d.getDay()]}`,
     monthLabel: d => `${d.getFullYear()} 年 ${d.getMonth() + 1} 月`,
     tickDay: d => `${d.getDate()} ${I18N.zh.week[d.getDay()]}`,
-    dRecord: '记录', dTitle: '标题', dKind: '类型', dThread: '所在线程', dDone: '已完成', dBody: '详情', dBodyPh: '背景、agent 的输出摘要、下一步要做什么…',
+    dRecord: '记录', dTitle: '标题', dKind: '类型', dThread: '所在线程', dDone: '已完成', dBody: '详情', mdEdit: '编辑', mdDone: '完成', mdExpand: '放大阅读', mdRead: '阅读', mdErr_missing: '这台电脑上找不到这个文件：可能已被移动或改名，或者在另一台机器上。', mdErr_big: '文件超过 2 MB。', mdErr_unlinked: '没有记录链接这个文件。', mdErr_type: '这里只能打开 .md 文件。', dBodyPh: '背景、agent 的输出摘要、下一步要做什么…',
     dLinks: '链接或文件路径，每行一个', dLinksPh: 'https://…  或  ~/Documents/方案.md', dAgent: '来源', dAgentPh: '自己 / Claude Code…', dTime: '时间',
     forkedFromRec: '分叉自', mergedFromThread: '合并自线程', forkedHere: '从这里分出了',
     forkHere: '从这里分叉', viewThread: '查看线程', forkNamePh: '新线程名称', createBranch: '创建分支',
@@ -2516,7 +2542,7 @@ function cardHTML(th, cs, selT) {
   const apNow = apRun(th) && !shut ? cs.find(c => isTodo(c) && !c.done) : null;
   const cls = ['card', isInbox ? 'is-inbox' : `st-${th.status || 'active'}`, shut ? 'is-shut' : '', apRun(th) ? 'ap-on' : '', selT === th.id ? 'is-sel' : '', filtering() && !anyHit ? 'is-dim' : '', S.connect && S.connect.from === th.id ? 'is-from' : '', S.multi.has(th.id) ? 'is-multi' : '', S.multi.has(th.id) && th.id === S.multiTarget ? 'is-multi-target' : ''].filter(Boolean).join(' ');
   const items = recent.length
-    ? recent.map(c => `<li data-cid="${esc(c.id)}" class="${c.id === selC ? 'is-sel' : ''} ${filtering() && matches(c) ? 'hit' : ''}">${mini(c.kind, stationColor(c, th), c.done)}<span class="s-title">${esc(c.title)}</span><time class="s-time">${fmtShort(c.ts)}</time></li>`).join('')
+    ? recent.map(c => `<li data-cid="${esc(c.id)}" class="${c.id === selC ? 'is-sel' : ''} ${filtering() && matches(c) ? 'hit' : ''}">${mini(c.kind, stationColor(c, th), c.done)}<span class="s-title" title="${esc(c.title)}">${esc(c.title)}</span><time class="s-time">${fmtShort(c.ts)}</time></li>`).join('')
       + (more > 0 ? `<li class="s-more"><span></span><span>${esc(t('moreEarlier', more))}</span><span></span></li>` : '')
     : `<li class="s-empty"><span></span><span>${esc(isInbox ? t('inboxEmpty') : t('noRecords'))}</span><span></span></li>`;
   const chip = (apRun(th) ? `<span class="chip chip-auto" title="${esc(t('apTitle'))}">Autopilot</span>` : apWait(th) ? `<span class="chip chip-wait" title="${esc(t('apWait'))}">Autopilot…</span>` : '') + (isInbox ? `<span class="chip">${esc(t('unsorted'))}</span>` : `<span class="chip chip-${th.status || 'active'}">${esc(statusLabel(th.status))}</span>`);
@@ -3002,11 +3028,76 @@ function threadOptions(selected, { excludeId, onlyOpen } = {}) {
   const opts = [...(S.focusGroup && selected !== INBOX ? [] : [{ id: INBOX, name: t('inbox') }]), ...orderedThreads().filter(th => th.id !== excludeId && (inFocus(th) || th.id === selected) && (!onlyOpen || th.status === 'active' || th.status === 'parked' || th.id === selected))];
   return opts.map(th => `<option value="${esc(th.id)}" ${th.id === selected ? 'selected' : ''}>${esc(th.name)}${th.status && th.status !== 'active' && th.id !== INBOX ? ` (${esc(statusLabel(th.status))})` : ''}</option>`).join('');
 }
+// A local report (a .md file a record links) gets 阅读, which shows it rendered in the reader.
+const isMdPath = l => !/^https?:\/\//i.test(l) && /\.(md|markdown)$/i.test(l.trim());
 function linksView(links) {
   if (!links || !links.length) return '';
   return `<div class="links">${links.map(l => /^https?:\/\//i.test(l)
     ? `<a href="${esc(l)}" target="_blank" rel="noopener noreferrer">${esc(l)}</a>`
-    : `<code>${esc(l)}</code>`).join('')}</div>`;
+    : isMdPath(l) && SERVER ? `<div><code>${esc(l)}</code><button class="linkish" data-act="read-file" data-path="${esc(l)}">${esc(t('mdRead'))}</button></div>` : `<code>${esc(l)}</code>`).join('')}</div>`;
+}
+// <md>
+// Markdown to HTML, for reading: the text is escaped first, so only these tags come out.
+// ponytail: headings, lists, quotes, code, tables, links, bold/italic; no nested blockquotes or HTML passthrough.
+function mdInline(s) {
+  const codes = [];
+  s = esc(s).replace(/`([^`]+)`/g, (_, c) => `\u0000${codes.push(c) - 1}\u0000`);
+  s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+    .replace(/\[([^\]]+)\]\(([^\s)]+)\)/g, '<span class="md-ref" title="$2">$1</span>') // a file next to the report: its name, the path on hover
+    .replace(/(^|[\s(])(https?:\/\/[^\s<)]*[^\s<).,;:!?。，；])/g, '$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/(^|[^*\w])\*([^*\s][^*]*)\*/g, '$1<em>$2</em>')
+    .replace(/~~([^~]+)~~/g, '<del>$1</del>');
+  return s.replace(/\u0000(\d+)\u0000/g, (_, i) => `<code>${codes[i]}</code>`);
+}
+function mdHTML(src) {
+  const L = String(src || '').replace(/\r\n?/g, '\n').split('\n'), out = [];
+  const cells = l => l.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+  const isList = l => /^\s*([-*+]|\d+[.)])\s+/.test(l);
+  for (let i = 0; i < L.length;) {
+    const l = L[i];
+    if (!l.trim()) { i++; continue; }
+    let m;
+    if ((m = /^\s*(`{3,}|~{3,})/.exec(l))) {
+      const body = []; for (i++; i < L.length && !L[i].trim().startsWith(m[1]); i++) body.push(L[i]);
+      i++; out.push(`<pre><code>${esc(body.join('\n'))}</code></pre>`); continue;
+    }
+    if ((m = /^(#{1,6})\s+(.*?)\s*#*$/.exec(l))) { out.push(`<h${m[1].length}>${mdInline(m[2])}</h${m[1].length}>`); i++; continue; }
+    if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(l)) { out.push('<hr>'); i++; continue; }
+    if (/\|/.test(l) && i + 1 < L.length && /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/.test(L[i + 1])) {
+      const head = cells(l), rows = []; for (i += 2; i < L.length && /\|/.test(L[i]) && L[i].trim(); i++) rows.push(cells(L[i]));
+      out.push(`<div class="tbl"><table><thead><tr>${head.map(c => `<th>${mdInline(c)}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${r.map(c => `<td>${mdInline(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`); continue;
+    }
+    if (/^\s*>/.test(l)) {
+      const q = []; for (; i < L.length && /^\s*>/.test(L[i]); i++) q.push(L[i].replace(/^\s*>\s?/, ''));
+      out.push(`<blockquote>${mdHTML(q.join('\n'))}</blockquote>`); continue;
+    }
+    if (isList(l)) {
+      // Items by indent: deeper lines belong to the item above them.
+      const base = l.search(/\S/), items = [];
+      for (; i < L.length && (L[i].trim() ? (L[i].search(/\S/) > base || (L[i].search(/\S/) === base && isList(L[i]))) : i + 1 < L.length && L[i + 1].search(/\S/) > base); i++) {
+        if (L[i].search(/\S/) === base && isList(L[i])) items.push([L[i].replace(/^\s*([-*+]|\d+[.)])\s+/, '')]); else items[items.length - 1].push(L[i].slice(Math.min(base + 2, L[i].search(/\S/) < 0 ? 0 : L[i].search(/\S/))));
+      }
+      const tag = /^\s*\d/.test(l) ? 'ol' : 'ul';
+      out.push(`<${tag}>${items.map(([first, ...rest]) => {
+        const box = /^\[([ xX])\]\s+/.exec(first), head = box ? `${box[1] === ' ' ? '☐' : '☑'} ${mdInline(first.slice(box[0].length))}` : mdInline(first);
+        return `<li>${head}${rest.some(x => x.trim()) ? mdHTML(rest.join('\n')) : ''}</li>`;
+      }).join('')}</${tag}>`); continue;
+    }
+    const para = []; for (; i < L.length && L[i].trim() && !/^(#{1,6}\s|\s*(`{3,}|~{3,})|\s*>)/.test(L[i]) && !(para.length && isList(L[i])); i++) para.push(L[i].trim());
+    out.push(`<p>${para.map(mdInline).join('<br>')}</p>`);
+  }
+  return out.join('');
+}
+// </md>
+function openReader(title, md, src) {
+  S.sheet = 'read'; document.body.classList.add('sheet-open', 'read-page');
+  setSheet(title, `${src ? `<div class="md-src">${esc(src)}</div>` : ''}<article class="md md-read">${md === null ? `<p>${esc(t('gxLoading'))}</p>` : mdHTML(md)}</article>`);
+  $('#sheet-body').scrollTop = 0;
+}
+async function readFile(path) {
+  openReader(path.split('/').pop(), null, path);
+  const r = await fetch(`/api/md?path=${encodeURIComponent(path)}`, { headers: { 'X-Trace-Canvas': '1' }, cache: 'no-store' }).then(x => x.json()).catch(() => ({ error: t('syncOfflineTitle') }));
+  if (S.sheet === 'read') openReader(path.split('/').pop(), r.error ? `> ${t('mdErr_' + r.error) === 'mdErr_' + r.error ? r.error : t('mdErr_' + r.error)}` : r.text, path);
 }
 const delUI = q => S.ui.del
   ? `<span class="confirm">${esc(q)}</span><button class="btn btn-danger" data-act="del-confirm">${esc(t('del'))}</button><button class="btn" data-act="del-cancel">${esc(t('cancel'))}</button>`
@@ -3068,13 +3159,15 @@ function commitDetail(c) {
       <button class="icon-btn" data-act="close" aria-label="${esc(t('close'))}">×</button>
     </div>
     <div class="d-scroll">
-      <label class="fld"><span>${esc(t('dTitle'))}</span><input id="d-title" class="big-input" value="${esc(c.title)}"></label>
+      <label class="fld"><span>${esc(t('dTitle'))}</span><textarea id="d-title" class="big-input grow" rows="1">${esc(c.title)}</textarea></label>
       <div class="fld-row">
         <label class="fld"><span>${esc(t('dKind'))}</span>${sys ? `<input disabled value="${esc(kindLabel(c.kind))}">` : `<select id="d-kind">${USER_KINDS.map(k => `<option value="${k}" ${k === c.kind ? 'selected' : ''}>${esc(kindLabel(k))}</option>`).join('')}</select>`}</label>
         <label class="fld"><span>${esc(t('dThread'))}</span><select id="d-thread">${threadOptions(tidOf(c))}</select></label>
       </div>
       ${c.kind === 'task' ? `<label class="check"><input type="checkbox" id="d-done" ${c.done ? 'checked' : ''}>${esc(t('dDone'))}</label>` : ''}
-      ${c.retro ? retroView(c, th) : `<label class="fld"><span>${esc(t('dBody'))}</span><textarea id="d-body" rows="5" placeholder="${esc(t('dBodyPh'))}">${esc(c.body || '')}</textarea></label>`}
+      ${c.retro ? retroView(c, th) : c.body && !S.ui.editBody
+        ? `<div class="fld"><div class="fld-head"><span>${esc(t('dBody'))}</span><span class="spacer"></span><button class="linkish" data-act="read-body">${esc(t('mdExpand'))}</button>${S.readOnly ? '' : `<button class="linkish" data-act="body-edit">${esc(t('mdEdit'))}</button>`}</div><div class="md md-body">${mdHTML(c.body)}</div></div>`
+        : `<label class="fld"><div class="fld-head"><span>${esc(t('dBody'))}</span><span class="spacer"></span>${c.body ? `<button class="linkish" data-act="body-done">${esc(t('mdDone'))}</button>` : ''}</div><textarea id="d-body" class="grow" rows="5" placeholder="${esc(t('dBodyPh'))}">${esc(c.body || '')}</textarea></label>`}
       <label class="fld"><span>${esc(t('dLinks'))}</span><textarea id="d-links" rows="2" placeholder="${esc(t('dLinksPh'))}">${esc((c.links || []).join('\n'))}</textarea></label>
       ${linksView(c.links)}
       ${c.machine && S.machine && c.machine !== S.machine ? `<div class="meta"><span>${esc(t('onMachine', c.machine))}</span></div>` : ''}
@@ -3176,7 +3269,7 @@ function threadDetail(th) {
   const cs = (byThread().get(th.id) || []).slice().reverse();
   const isInbox = th.id === INBOX;
   const forkC = th.forkOf ? S.commits.get(th.forkOf) : null;
-  const items = cs.slice(0, 40).map(c => `<li data-act="goto-commit" data-cid="${esc(c.id)}">${mini(c.kind, stationColor(c, th), c.done)}<span class="s-title">${esc(c.title)}</span><time class="s-time">${fmtShort(c.ts)}</time></li>`).join('');
+  const items = cs.slice(0, 40).map(c => `<li data-act="goto-commit" data-cid="${esc(c.id)}">${mini(c.kind, stationColor(c, th), c.done)}<span class="s-title" title="${esc(c.title)}">${esc(c.title)}</span><time class="s-time">${fmtShort(c.ts)}</time></li>`).join('');
   return `<div class="d-head">
       <span class="d-eyebrow"><span class="roundel" style="--c:${th.color}"></span>${esc(isInbox ? t('inbox') : t('threadLabel'))}<span class="mono">${esc(t('countRecords', cs.length))}</span></span>
       <button class="icon-btn" data-act="close" aria-label="${esc(t('close'))}">×</button>
@@ -3251,12 +3344,12 @@ function renderDetail() {
   const sc2 = $('.d-scroll', detail);
   if (sc2) sc2.scrollTop = top;
   if (S.readOnly) $$('input, textarea, select', detail).forEach(el => { el.disabled = true; });
-  if (S.focusAfter) { const f = $(S.focusAfter, detail); S.focusAfter = null; if (f) { f.focus(); if (f.select) f.select(); } }
+  if (S.focusAfter) { const f = $(S.focusAfter, detail); S.focusAfter = null; if (f) { f.focus(); if (f.tagName === 'INPUT' && f.select) f.select(); } }
 }
 detail.addEventListener('input', e => {
   const el = e.target, s = S.sel; if (!s || S.readOnly) return;
   if (s.type === 'commit') {
-    if (el.id === 'd-title') patchDoc('commits', s.id, { title: el.value }, 600);
+    if (el.id === 'd-title') patchDoc('commits', s.id, { title: el.value.replace(/\s*\n\s*/g, ' ') }, 600);
     else if (el.id === 'd-body') patchDoc('commits', s.id, { body: el.value }, 700);
     else if (el.id === 'd-links') patchDoc('commits', s.id, { links: el.value.split('\n').map(x => x.trim()).filter(Boolean) }, 700);
     else if (el.id === 'd-agent') patchDoc('commits', s.id, { agent: el.value }, 700);
@@ -3286,6 +3379,7 @@ detail.addEventListener('change', e => {
 detail.addEventListener('focusout', () => setTimeout(render, 0));
 detail.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.id === 'd-fork-name' && !e.isComposing) { e.preventDefault(); forkFrom(S.sel.id, e.target.value); }
+  if (e.key === 'Enter' && e.target.id === 'd-title' && !e.isComposing) { e.preventDefault(); e.target.blur(); }
 });
 detail.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
@@ -3329,6 +3423,10 @@ detail.addEventListener('click', e => {
     case 'fork-cancel': case 'del-cancel': case 'merge-cancel': S.ui = {}; render(); break;
     case 'fork-create': forkFrom(s.id, $('#d-fork-name').value); break;
     case 'del-open': S.ui = { del: true }; render(); break;
+    case 'body-edit': S.ui = { editBody: true }; S.focusAfter = '#d-body'; render(); break;
+    case 'body-done': S.ui = {}; render(); break;
+    case 'read-body': { const c = S.commits.get(s.id); if (c) openReader(c.title, c.body || ''); break; }
+    case 'read-file': readFile(b.dataset.path); break;
     case 'del-confirm':
       if (s.type === 'commit') removeDoc('commits', s.id);
       else if (s.type === 'thread') deleteThread(s.id);
@@ -3515,7 +3613,7 @@ topH.observe($('.top')); topH.observe($('#focus-banner'));
 /* ================= sheets ================= */
 const scrim = $('#scrim');
 function closeSheet() {
-  scrim.hidden = true; S.sheet = null; document.body.classList.remove('sheet-open', 'goals-page'); markTabs();
+  scrim.hidden = true; S.sheet = null; document.body.classList.remove('sheet-open', 'goals-page', 'read-page'); markTabs();
   if (S.ai && S.ai.ctl && S.ai.status === 'thinking') S.ai.ctl.abort();
 }
 $('#sheet-close').onclick = closeSheet;

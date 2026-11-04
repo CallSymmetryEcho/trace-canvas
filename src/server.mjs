@@ -17,7 +17,7 @@ import { applyRetro, askAgent, retroRecord, runRetro } from './retro.mjs';
 import { focusTab, openTerminal, terminalCommand } from './agents.mjs';
 import { draftLessons, rememberLesson } from './lessons.mjs';
 import { otherMachines, remoteLive } from './remote.mjs';
-import { commitDiff, commitInfo } from './git-view.mjs';
+import { commitDiff, commitInfo, readLinkedMd } from './git-view.mjs';
 import { runSync, syncSoon, syncStatus } from './sync.mjs';
 import { doctor } from './doctor.mjs';
 import { desktopSessions } from './desktop.mjs';
@@ -118,6 +118,12 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         return send(res, 200, { ...toArrays(d), sessions: sessionList(d).map(s => ({ ...s, desktopId: (desk.get(s.id) || {}).desktopId || null })), machine: readConfig().machine, platform: process.platform, remote, update, start: canStart(remote), awayLive: readConfig().awayLive, awayGit: readConfig().awayGit, sync: syncStatus(), machines: otherMachines(d) });
       }
       if (req.method === 'GET' && p === '/api/live') return send(res, 200, { ...liveSessions(readData()), away });
+      // A report a record links (a local .md file), for the reader. Only files some record links, so the page
+      // cannot be used to read anything else on the computer.
+      if (req.method === 'GET' && p === '/api/md') {
+        if (req.headers['x-trace-canvas'] !== '1') return send(res, 403, { error: 'missing header' });
+        return send(res, 200, readLinkedMd(readData(), url.searchParams.get('path')));
+      }
       // What a commit record changed, read from git on demand (src/git-view.mjs).
       if (req.method === 'GET' && p === '/api/git/commit') return send(res, 200, await commitInfo(readData(), url.searchParams.get('record'), url.searchParams.get('against')));
       if (req.method === 'GET' && p === '/api/git/diff') return send(res, 200, await commitDiff(readData(), url.searchParams.get('record'), url.searchParams.get('file'), url.searchParams.get('against')));

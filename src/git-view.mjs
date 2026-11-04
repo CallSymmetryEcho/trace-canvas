@@ -3,6 +3,7 @@
 // a plain reason instead of an error when the repository or the commit is not here any more.
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { q } from './agents.mjs';
 import { ARGS, otherMachines } from './remote.mjs';
@@ -102,4 +103,18 @@ export async function commitDiff(d, id, file, against = null) {
     ? await git(info, ['diff', ...PLAIN, info.from, info.to, '--', file], CAP)
     : await git(info, ['show', ...PLAIN, '--format=', info.sha, '--', file], CAP);
   return r ? { file, diff: r.out, truncated: !!r.truncated } : { error: 'git could not show this diff' };
+}
+
+/** A local report a record links (.md or .markdown), as text for the page's reader, or an error code. Only a path some record
+ * links is read, so the page cannot read anything else; ~ is the home folder. */
+export function readLinkedMd(d, want) {
+  const p = String(want || '').trim();
+  if (!/\.(md|markdown)$/i.test(p)) return { error: 'type' };
+  if (!Object.values(d.commits || {}).some(c => (c.links || []).some(l => String(l).trim() === p))) return { error: 'unlinked' };
+  const file = p.replace(/^~(?=\/|$)/, os.homedir());
+  try {
+    const st = fs.statSync(file);
+    if (st.size > 2 << 20) return { error: 'big' };
+    return { text: fs.readFileSync(file, 'utf8') };
+  } catch { return { error: 'missing' }; }
 }

@@ -9,12 +9,13 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import { execFile, spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { COLS, dataFile, home, mutate, readConfig, readData, toArrays, writeConfig } from './store.mjs';
+import { COLS, addCommit, dataFile, home, mutate, readConfig, readData, toArrays, writeConfig } from './store.mjs';
 import { demoData } from './demo.mjs';
 import { liveDir, readLive } from './live.mjs';
 import { bindLiveSession, findThreadLoose, handTo, liveSessions, sessionList, startAutopilot, stopAutopilot } from './ops.mjs';
 import { applyRetro, askAgent, retroRecord, runRetro } from './retro.mjs';
 import { focusTab, openTerminal, terminalCommand } from './agents.mjs';
+import { draftLessons, rememberLesson } from './lessons.mjs';
 import { otherMachines, remoteLive } from './remote.mjs';
 import { commitDiff, commitInfo } from './git-view.mjs';
 import { runSync, syncSoon, syncStatus } from './sync.mjs';
@@ -104,7 +105,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         if (!phone || !phone.token || !(same(cookie, phone.token) || same(k, phone.token))) return send(res, 403, { error: 'Open the address trace-canvas phone printed' });
         if (same(k, phone.token) && !same(cookie, phone.token)) res.setHeader('Set-Cookie', `tc_k=${phone.token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000`);
         // These act on the computer itself (a terminal, git pushes, the claude CLI, the whole data set).
-        if (['/api/hand', '/api/focus', '/api/sync', '/api/ai', '/api/demo', '/api/retro', '/api/retro/apply', '/api/update', '/api/autopilot'].includes(p)) return send(res, 403, { error: 'Only on the computer itself' });
+        if (['/api/hand', '/api/focus', '/api/sync', '/api/ai', '/api/demo', '/api/retro', '/api/retro/apply', '/api/update', '/api/autopilot', '/api/lessons', '/api/lessons/save'].includes(p)) return send(res, 403, { error: 'Only on the computer itself' });
       }
       const write = req.method !== 'GET' && req.method !== 'HEAD';
       if (write && req.headers['x-trace-canvas'] !== '1') return send(res, 403, { error: 'missing header' });
@@ -203,6 +204,26 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         const demo = demoData(body.lang === 'zh' ? 'zh' : 'en');
         mutate(d => { for (const col of COLS) for (const doc of demo[col]) d[col][doc.id] = doc; });
         return send(res, 200, { ok: true });
+      }
+      // Lessons from an archived project: drafted by the local claude, written to Theatrum only for the ticked ones,
+      // and noted on the project's first line (the plaque counts them; Autopilot finds their records from there).
+      if (req.method === 'POST' && p === '/api/lessons') {
+        const body = JSON.parse(await readBody(req));
+        try { return send(res, 200, { lessons: await draftLessons(readData(), String(body.group || ''), String(body.lang || 'zh')) }); }
+        catch (e) { return send(res, 200, { error: e.message }); }
+      }
+      if (req.method === 'POST' && p === '/api/lessons/save') {
+        const body = JSON.parse(await readBody(req)), group = String(body.group || '');
+        const ls = (Array.isArray(body.lessons) ? body.lessons : []).slice(0, 8).map(l => ({ title: String(l.title || '').slice(0, 140), body: String(l.body || '').slice(0, 1200), from: (l.from || []).map(String).slice(0, 6) })).filter(l => l.title);
+        const failed = [];
+        for (const l of ls) { const e = await rememberLesson(l, group); if (e) failed.push(e); }
+        const saved = ls.length - failed.length;
+        if (saved) mutate(d => {
+          const th = Object.values(d.threads).filter(t => t.group === group).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))[0];
+          if (th) addCommit(d, { thread: th.id, kind: 'note', title: `Lessons (${saved}): ${group}`, body: ls.map(l => `- ${l.title}\n  ${l.body}${l.from.length ? `\n  (${l.from.join(', ')})` : ''}`).join('\n'), agent: 'Trace Canvas', extra: { lessons: saved } });
+        });
+        broadcast('change');
+        return send(res, 200, failed.length ? { saved, error: failed[0] } : { saved });
       }
       if (req.method === 'POST' && p === '/api/ai') {
         if (!ai) return send(res, 501, { error: 'claude CLI not found' });

@@ -215,7 +215,7 @@ export function applyRetro(d, { record, n, layer }, env = process.env) {
     // Long-term memory: the Theatrum vault when it is installed, otherwise the agents' own user-wide rules.
     const title = it.title.slice(0, 60);
     if (onPath('theatrum', env)) {
-      const r = spawnSync('theatrum', ['remember', '--type', 'lesson', '--scope', 'global', '--source', 'user_requested', '--tags', 'retro', '--title', title, it.rule], { encoding: 'utf8', timeout: 30000, env });
+      const r = spawnSync('theatrum', ['remember', '--type', 'lesson', '--scope', 'global', '--source', 'user_requested', '--tags', 'trace-canvas,lesson,retro', '--title', title, it.rule], { encoding: 'utf8', timeout: 30000, env });
       if (r.status !== 0) throw new Error((r.stderr || r.stdout || 'theatrum failed').trim().slice(-300));
       where = 'Theatrum';
     } else {

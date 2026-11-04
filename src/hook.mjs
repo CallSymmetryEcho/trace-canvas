@@ -11,6 +11,7 @@
 // by hand. Which line a session is on lives in the data's session table, so it
 // survives the session process ending and being resumed. The hook never prints to
 // stdout and never fails the session.
+import { lessonsFor } from './lessons.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -370,6 +371,11 @@ export function sessionStartContext(input, env = process.env) {
     out.push(`Trace Canvas: this session works on the line "${th.name}" (thread ${tid}).`);
     const goal = goalOf(th);
     if (goal) out.push(`Goal: ${goal}`);
+    // Level 1: a line still young is handed the lessons of finished projects that fit it (Theatrum, src/lessons.mjs).
+    if (Object.values(d.commits).filter(c => threadIdOfLocal(d, c) === tid).length < 30 && env.TRACE_CANVAS_LESSONS !== '0') {
+      const ls = lessonsFor([th.name, th.group, goal].filter(Boolean).join(' '));
+      if (ls.length) out.push('Lessons from finished projects that may fit this line (Theatrum; memory_recall reads them in full):', ...ls.map(l => `- ${l.title} [${l.id}]`));
+    }
     if (mine.length) out.push(`Open to-dos for you (${ag.name}):`, ...mine.slice(0, 10).map(c => `- ${c.title} [${c.id}]`));
     if (free.length) out.push(`${free.length} open to-do${free.length === 1 ? ' is' : 's are'} not assigned to anyone yet.`);
     const others = listLiveLocal(env).filter(s => s.id !== sid && sessionThread(d, s, env).threadId === tid);

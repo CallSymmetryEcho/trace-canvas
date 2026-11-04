@@ -178,3 +178,14 @@ test('Autopilot hands every open to-do on a line to its agent with the decision 
   stopAutopilot(d, { thread: 'App' });
   assert.equal(d.threads[app].autopilot, undefined);
 });
+
+test('an archived project is out of the to-do list and of dispatch, unless its line is named', async () => {
+  const { listTasks } = await import('../src/ops.mjs');
+  const d = emptyData();
+  const a = createThread(d, { name: 'Old' }).id, b = createThread(d, { name: 'New' }).id;
+  addCommit(d, { thread: a, kind: 'task', title: 'Left over' });
+  addCommit(d, { thread: b, kind: 'task', title: 'To do' });
+  d.threads[a].archived = Date.now();
+  assert.deepEqual(listTasks(d).map(x => x.name).filter(n => n !== 'Inbox'), ['New']);
+  assert.equal(listTasks(d, { thread: 'Old' })[0].tasks.length, 1);
+});

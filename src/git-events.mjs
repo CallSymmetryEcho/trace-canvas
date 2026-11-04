@@ -91,8 +91,11 @@ export const firstLine = (s, n) => {
 // User prompts arrive with pasted blocks, reminders, background-task notifications and
 // command wrappers; keep what the person typed.
 export function cleanPrompt(p) {
-  return String(p || '')
-    .replace(/<pasted_content[^>]*>[\s\S]*?<\/pasted_content>/g, '[pasted]')
+  // A message that is one paste and nothing else is what the person sent (an Autopilot or hand-off prompt pasted in):
+  // keep its text. A paste among typed words is shortened. The closing tag may carry the paste's id.
+  const only = /^\s*<pasted_content[^>]*>([\s\S]*?)<\/pasted_content[^>]*>\s*$/.exec(String(p || ''));
+  return (only ? only[1] : String(p || ''))
+    .replace(/<pasted_content[^>]*>[\s\S]*?<\/pasted_content[^>]*>/g, '[pasted]')
     .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '')
     .replace(/<task-notification>[\s\S]*?<\/task-notification>/g, '')
     // Messages the desktop app delivers from other sessions arrive as prompts too; nobody typed them.

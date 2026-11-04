@@ -208,4 +208,9 @@ test('an Autopilot round lights only when its prompt reaches a session, and an o
   const ap = s.data().threads[tid].autopilot;
   assert.equal(ap.session, 's1');
   assert.ok(ap.on >= ap.at);
+  // Pasted in by the person (the page's copy button): the paste wrapper, its id on the closing tag too, does not hide it.
+  mutate(d => { d.threads[tid].autopilot = { at: Date.now() }; }, s.env);
+  s.fire('UserPromptSubmit', { prompt: `<pasted_content id="6cbc">\nAutopilot (beta) on the Trace Canvas line "App" (thread ${tid}): work\n</pasted_content id="6cbc">`, prompt_id: 'p3' });
+  assert.equal(s.data().threads[tid].autopilot.session, 's1');
+  assert.ok(!s.commits().some(c => /Autopilot \(beta\)/.test(c.title))); // a hand-off, not a new to-do
 });

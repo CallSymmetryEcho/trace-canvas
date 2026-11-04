@@ -132,14 +132,20 @@ test('setup makes trace-canvas a command in the user\'s own bin folder on the PA
   assert.deepEqual(linkCommand(cli, { PATH: `/usr/bin${path.delimiter}${nodeDir}` }, path.join(home, 'nohome'), node), { ok: true, where: path.join(nodeDir, 'trace-canvas') });
 });
 
-test('a new terminal window: Terminal on macOS; on Linux the terminal found on the PATH, on the display, the window kept open', async () => {
+test('a new terminal tab or window: iTerm2 tabs or Terminal windows on macOS; on Linux the terminal found on the PATH, on the display, the window kept open', async () => {
   const { terminalCommand } = await import('../src/agents.mjs');
-  assert.equal(terminalCommand('ls', {}, 'darwin')[0], 'osascript');
+  const { macTerminal } = await import('../src/agents.mjs');
+  const mac = (extra, has) => macTerminal({ HOME: '/h', TRACE_CANVAS_HOME: fs.mkdtempSync(path.join(os.tmpdir(), 'tc-mac-')), ...extra }, has);
+  assert.equal(mac({}, () => false), 'terminal');
+  assert.equal(mac({}, p => p === '/Applications/iTerm.app'), 'iterm'); // iTerm2 installed: tabs
+  assert.equal(mac({ TRACE_CANVAS_TERMINAL: 'terminal' }, () => true), 'terminal'); // chosen
+  assert.match(terminalCommand('ls', { TRACE_CANVAS_TERMINAL: 'iterm' }, 'darwin')[1][1], /create tab with default profile/);
+  assert.match(terminalCommand('ls', { TRACE_CANVAS_TERMINAL: 'terminal' }, 'darwin')[1][1], /do script "ls"/);
   const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-term-'));
   for (const t of ['konsole', 'gnome-terminal']) { fs.writeFileSync(path.join(bin, t), '#!/bin/sh\n'); fs.chmodSync(path.join(bin, t), 0o755); }
   const env = { PATH: bin, DISPLAY: ':0', SHELL: '/bin/bash' };
-  assert.deepEqual(terminalCommand('claude --resume s1', env, 'linux'), [path.join(bin, 'konsole'), ['-e', '/bin/bash', '-lc', "claude --resume s1; exec '/bin/bash' -l"], env]);
-  assert.deepEqual(terminalCommand('ls', { ...env, TERMINAL: 'gnome-terminal' }, 'linux')[1].slice(0, 2), ['--', '/bin/bash']);
+  assert.deepEqual(terminalCommand('claude --resume s1', env, 'linux'), [path.join(bin, 'konsole'), ['--new-tab', '-e', '/bin/bash', '-lc', "claude --resume s1; exec '/bin/bash' -l"], env]);
+  assert.deepEqual(terminalCommand('ls', { ...env, TERMINAL: 'gnome-terminal' }, 'linux')[1].slice(0, 3), ['--tab', '--', '/bin/bash']);
   assert.equal(terminalCommand('ls', { PATH: '/nowhere', DISPLAY: ':0' }, 'linux'), null); // no terminal
   assert.equal(terminalCommand('ls', env, 'win32'), null);
 });

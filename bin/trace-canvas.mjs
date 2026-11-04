@@ -117,6 +117,7 @@ Setup (pass --user for every project, or --project dir for one)
   trace-canvas uninstall-hooks
   trace-canvas mcp              Run the MCP server on stdio (Claude Code starts this)
   trace-canvas lang <en|zh>     Language of records the hooks write
+  trace-canvas terminal [iterm|terminal]   macOS: open agents in iTerm2 tabs or in Terminal windows (default: iTerm2 when installed)
   trace-canvas where            Show where data is stored
   trace-canvas phone [--off] [--rotate] [--allow-start|--deny-start]
                                Open the canvas on your phone over Tailscale (docs/phone.md)
@@ -589,6 +590,14 @@ async function main() {
         }
       }
       console.log('Start a new Claude Code session, then type /trace-canvas to put it on the canvas.');
+      break;
+    }
+    case 'terminal': {
+      const { macTerminal } = await import('../src/agents.mjs');
+      const pick = argv[0];
+      if (pick && pick !== 'iterm' && pick !== 'terminal') { console.error('Usage: trace-canvas terminal [iterm|terminal]'); process.exit(1); }
+      if (pick) writeConfig({ terminal: pick });
+      console.log(macTerminal() === 'iterm' ? 'Agents open in a new iTerm2 tab.' : 'Agents open in a new Terminal window. With iTerm2 installed, trace-canvas terminal iterm opens them as tabs.');
       break;
     }
     case 'lang': {

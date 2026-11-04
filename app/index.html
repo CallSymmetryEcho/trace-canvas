@@ -217,6 +217,11 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .card.is-shut { width: auto; max-width: 252px; border-style: dashed; opacity: .75; }
 .card.is-shut .strip, .card.is-shut .card-foot { display: none; }
 .card.is-shut .card-head { padding-bottom: 10px; }
+/* A done line folds too, in the ok colour with a check, so it reads apart from a parked (dashed, grey) one. */
+.card.is-shut.st-done { border-style: solid; border-color: var(--ok); }
+.card.st-done .card-name::before { content: '✓ '; color: var(--ok); }
+.chip-done { color: var(--ok); border-color: var(--ok); }
+.wrap-text { width: 100%; min-height: 220px; font: inherit; font-size: 13px; line-height: 1.5; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 7px; background: var(--surface); color: var(--ink); box-sizing: border-box; }
 .card .grp-tog { --c: var(--rule); }
 .card.dragging { box-shadow: var(--shadow); cursor: grabbing; z-index: 3; }
 .card-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px 6px; }
@@ -946,7 +951,7 @@ const I18N = {
     langGroup: 'Language', more: 'More',
     menuNewThread: 'New thread', menuHideDone: 'Hide finished threads', menuShowDone: 'Show finished threads', quietLabel: 'Gone quiet', quietDays: n => `${n}d`, quietDot: n => `${n} line${n === 1 ? ' has' : 's have'} gone quiet`, quietAsk: (n, u) => `Nothing for ${n} days, where it usually moves every ${u === 1 ? 'day' : `${u} days`}. Finished?`, quietAskOpen: (n, k) => `Nothing for ${n} days, with ${k} to-do${k === 1 ? '' : 's'} still open. Park it for now?`, quietStill: 'Still on it', menuShowMerged: 'Show merged threads', menuHideMerged: 'Fold merged threads', mergedInCount: n => ` · ${n} merged in`, mergedInLabel: 'Merged in',
     arrange: 'Arrange', arrangeTitle: 'Lay the lines out by group, forks next to the lines they came from', tArranged: 'Arranged', tUndo: 'Undo',
-    groupLabel: 'Group', groupName: 'Name', groupLines: 'Lines in this group', groupCount: n => `${n} line${n === 1 ? '' : 's'}`, groupArrange: 'Arrange this group', groupFocus: 'Focus on this group', menuFocus: 'Focus on a group…', menuTheme: n => `Theme: ${n}`, theme_auto: 'match the system', theme_light: 'light', theme_dark: 'dark', theme_mist: 'mist', focusTitle: 'Focus on a group', focusLabel: 'Focus', focusPick: 'Change', focusExit: 'Leave focus', groupFold: 'Fold this group', foldedLabel: 'Folded', foldOpenAll: 'Unfold all', foldOpen: 'Unfold', foldedChip: n => `${n} line${n === 1 ? '' : 's'} · folded`, fromMachines: ms => `from ${ms.join(', ')}`, fromTitle: (m, n) => `${n} record${n === 1 ? '' : 's'} written on ${m}`, foldTitle: 'Fold groups', foldIntro: 'Folded groups stay out of every view (the canvas keeps a small chip for each) until you unfold them. Focus still works on any group.', foldShown: 'Shown', tFolded: g => `Folded "${g}"`, unpark: 'Unfold: make it active again', tUnparked: n => `"${n}" is active again`,
+    groupLabel: 'Group', groupName: 'Name', groupLines: 'Lines in this group', groupCount: n => `${n} line${n === 1 ? '' : 's'}`, groupArrange: 'Arrange this group', groupFocus: 'Focus on this group', menuFocus: 'Focus on a group…', menuTheme: n => `Theme: ${n}`, theme_auto: 'match the system', theme_light: 'light', theme_dark: 'dark', theme_mist: 'mist', focusTitle: 'Focus on a group', focusLabel: 'Focus', focusPick: 'Change', focusExit: 'Leave focus', groupFold: 'Fold this group', foldedLabel: 'Folded', foldOpenAll: 'Unfold all', foldOpen: 'Unfold', foldedChip: n => `${n} line${n === 1 ? '' : 's'} · folded`, fromMachines: ms => `from ${ms.join(', ')}`, fromTitle: (m, n) => `${n} record${n === 1 ? '' : 's'} written on ${m}`, foldTitle: 'Fold groups', foldIntro: 'Folded groups stay out of every view (the canvas keeps a small chip for each) until you unfold them. Focus still works on any group.', foldShown: 'Shown', tFolded: g => `Folded "${g}"`, unpark: 'Unfold: make it active again', reopen: 'Unfold: reopen it', wrapHead: 'Wrap up this line', wrapP: 'A done line folds like a parked one and leaves the other views. This wrap-up becomes its last station; edit it first.', wrapSave: 'Save and mark done', wrapSkip: 'Done, no wrap-up', wrapRec: n => `Wrap-up: ${n}`, wrapGoal: 'Goal: ', wrapSpan: (a, b, n, s) => `${a} – ${b} · ${n} records · ${s} sessions`, wrapDec: 'Key decisions:', wrapTodos: (d, n) => `To-dos done: ${d}/${n}`, wrapOpen: 'Left open:', wrapOut: 'Outputs and where they are kept:\n- ', tUnparked: n => `"${n}" is active again`,
     focusIntro: 'Every view then shows only the lines of the group you pick: the canvas, the branches, the timeline and the goals. It stays on, also after a reload, until you leave it.',
     focusNoGroups: 'No groups yet. Select lines on the canvas and press Group, or fill in a group in a line\'s panel.', groupUngroup: 'Ungroup',
     threadGroup: 'Group', threadGroupPh: 'None', multiGroup: 'Group', multiGroupPh: 'Group name', tGroupNeedName: 'Type a group name first',
@@ -1128,7 +1133,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     langGroup: '语言', more: '更多',
     menuNewThread: '新建线程', menuHideDone: '隐藏已完成的线程', menuShowDone: '显示已完成的线程', quietLabel: '安静了', quietDays: n => `${n} 天`, quietDot: n => `${n} 条线安静了`, quietAsk: (n, u) => `${n} 天没动静，平时${u === 1 ? '每天' : ` ${u} 天`}一更。做完了吗？`, quietAskOpen: (n, k) => `${n} 天没动静，还有 ${k} 项待办。先搁置？`, quietStill: '还在做', menuShowMerged: '显示已合并的线程', menuHideMerged: '收起已合并的线程', mergedInCount: n => ` · 已并入 ${n} 条`, mergedInLabel: '已并入',
     arrange: '整理', arrangeTitle: '按分组排好线程，分叉排在原线旁边', tArranged: '已整理', tUndo: '撤销',
-    groupLabel: '分组', groupName: '名称', groupLines: '组里的线', groupCount: n => `${n} 条线`, groupArrange: '整理这一组', groupFocus: '专注这一组', menuFocus: '专注某个分组…', menuTheme: n => `主题：${n}`, theme_auto: '跟随系统', theme_light: '浅色', theme_dark: '深色', theme_mist: '雾蓝', focusTitle: '专注模式', focusLabel: '专注', focusPick: '换一个', focusExit: '退出专注', groupFold: '折叠这一组', foldedLabel: '已折叠', foldOpenAll: '全部展开', foldOpen: '展开', foldedChip: n => `${n} 条线 · 已折叠`, fromMachines: ms => `来自 ${ms.join('、')}`, fromTitle: (m, n) => `${n} 条记录写在 ${m} 上`, foldTitle: '折叠分组', foldIntro: '折叠的分组不会出现在任何视图里（画布上只留一个小条），直到你展开。专注仍然可以选任何分组。', foldShown: '显示中', tFolded: g => `已折叠「${g}」`, unpark: '展开：恢复为进行中', tUnparked: n => `「${n}」恢复为进行中`,
+    groupLabel: '分组', groupName: '名称', groupLines: '组里的线', groupCount: n => `${n} 条线`, groupArrange: '整理这一组', groupFocus: '专注这一组', menuFocus: '专注某个分组…', menuTheme: n => `主题：${n}`, theme_auto: '跟随系统', theme_light: '浅色', theme_dark: '深色', theme_mist: '雾蓝', focusTitle: '专注模式', focusLabel: '专注', focusPick: '换一个', focusExit: '退出专注', groupFold: '折叠这一组', foldedLabel: '已折叠', foldOpenAll: '全部展开', foldOpen: '展开', foldedChip: n => `${n} 条线 · 已折叠`, fromMachines: ms => `来自 ${ms.join('、')}`, fromTitle: (m, n) => `${n} 条记录写在 ${m} 上`, foldTitle: '折叠分组', foldIntro: '折叠的分组不会出现在任何视图里（画布上只留一个小条），直到你展开。专注仍然可以选任何分组。', foldShown: '显示中', tFolded: g => `已折叠「${g}」`, unpark: '展开：恢复为进行中', reopen: '展开：重新打开', wrapHead: '收尾这条线', wrapP: '完成的线会像搁置一样折叠，并从其他视图里隐去。下面的收尾总结会成为它的最后一站，先改好再保存。', wrapSave: '保存并完成', wrapSkip: '直接完成，不写总结', wrapRec: n => `收尾总结：${n}`, wrapGoal: '目标：', wrapSpan: (a, b, n, s) => `${a} – ${b} · ${n} 条记录 · ${s} 个会话`, wrapDec: '关键决定：', wrapTodos: (d, n) => `完成的待办：${d}/${n}`, wrapOpen: '没做完的：', wrapOut: '产出和存放位置：\n- ', tUnparked: n => `「${n}」恢复为进行中`,
     focusIntro: '选一个分组后，画布、分支、时间线和目标都只显示这个组里的线。刷新后也保持，直到你退出。',
     focusNoGroups: '还没有分组。在画布上选中几条线点「编组」，或者在线面板里填写分组。', groupUngroup: '解散分组',
     threadGroup: '分组', threadGroupPh: '无', multiGroup: '编组', multiGroupPh: '分组名称', tGroupNeedName: '先填分组名称',
@@ -1417,8 +1422,8 @@ const mergedIn = id => orderedThreads().filter(x => x.status === 'merged' && x.m
 // What every view shows: in focus mode one group's lines; otherwise every line but those of folded groups.
 function inFocus(th) { return S.focusGroup ? th.group === S.focusGroup : !(th.group && S.folded.includes(th.group)); }
 // The lines a view shows: the inbox and every line in view, or in focus mode the group's lines only.
-// A parked line is folded, like a folded group: a chip on the canvas, out of the branch view and the timeline.
-const isFolded = th => th.status === 'parked';
+// A parked or done line is folded, like a folded group: a chip on the canvas, out of the branch view and the timeline.
+const isFolded = th => th.status === 'parked' || th.status === 'done';
 function viewLines(keep = th => !isHidden(th)) { return [...(S.focusGroup ? [] : [inboxThread()]), ...orderedThreads().filter(th => inFocus(th) && keep(th))]; }
 // Folding keeps groups you rarely use out of the way, in every view, until you unfold them (per browser, like focus).
 function setFold(g, on) {
@@ -2383,7 +2388,7 @@ function cardHTML(th, cs, selT) {
   const chip = (th.autopilot ? `<span class="chip chip-auto" title="${esc(t('apTitle'))}">Autopilot</span>` : '') + (isInbox ? `<span class="chip">${esc(t('unsorted'))}</span>` : `<span class="chip chip-${th.status || 'active'}">${esc(statusLabel(th.status))}</span>`);
   const agents = cs.filter(c => c.kind === 'agent').length;
   return `<div class="${cls}${apD(th.id) != null ? ' ap-burst' : ''}" data-tid="${esc(th.id)}" style="left:${th.x || 0}px;top:${th.y || 0}px;--c:${th.color}${apD(th.id) != null ? `;--apd:${apD(th.id)}ms` : ''}">
-    <div class="card-head">${shut ? `<span class="grp-tog" data-park-tog="1" title="${esc(t('unpark'))}">▸</span>` : ''}<span class="roundel"></span><span class="card-name">${esc(th.name)}</span>${liveBadge(th.id)}${chip}</div>
+    <div class="card-head">${shut ? `<span class="grp-tog" data-park-tog="1" title="${esc(t(th.status === 'done' ? 'reopen' : 'unpark'))}">▸</span>` : ''}<span class="roundel"></span><span class="card-name">${esc(th.name)}</span>${liveBadge(th.id)}${chip}</div>
     <ol class="strip">${items}</ol>
     <div class="card-foot"><span>${esc(t('countRecords', cs.length))}${agents ? esc(t('countAgent', agents)) : ''}${mergedIn(th.id).length && !S.showMerged ? esc(t('mergedInCount', mergedIn(th.id).length)) : ''}</span><span>${last ? esc(t('updated', fmtRel(last.ts))) : ''}</span></div>
   </div>`;
@@ -3188,7 +3193,9 @@ detail.addEventListener('click', e => {
       else if (s.type === 'thread') deleteThread(s.id);
       else removeDoc('edges', s.id);
       select(null); toast(t('tDeleted')); break;
-    case 'status': patchDoc('threads', s.id, { status: b.dataset.status }, 0); break;
+    case 'status':
+      if (b.dataset.status === 'done' && getThread(s.id).status !== 'done') { S.wrapLine = s.id; openSheet('wrap'); break; }
+      patchDoc('threads', s.id, { status: b.dataset.status }, 0); break;
     case 'color': patchDoc('threads', s.id, { color: b.dataset.color }, 0); break;
     case 'capture-here': setCaptureThread(s.id); $('#cap-text').focus(); break;
     case 'merge-open': S.ui = { merge: true }; render(); break;
@@ -3471,6 +3478,10 @@ function openSheet(kind) {
     setSheet(t('apTitle'), `<p>${esc(t('apIntro'))}</p><p>${esc(t('apNever'))}</p><p>${esc(t('apAsk'))}</p><p>${esc(t('apEnd'))}</p>
       <p>${p ? `<a href="#" data-ap-profile="${esc(p.id)}">${esc(t('apProfile'))}: ${esc(p.title)}</a>` : esc(t('apNoProfile'))} · <a href="${svg}" target="_blank" rel="noopener">${esc(t('apDiagram'))}</a></p>
       <div class="d-actions"><button class="btn btn-primary" data-ap-go>${esc(t('apGo'))}</button><button class="btn" data-ap-cancel>${esc(t('apCancel'))}</button></div>`);
+  } else if (kind === 'wrap') {
+    // Marking a line done: a wrap-up drafted from the line itself (goal, span, key decisions, to-dos), edited by the person.
+    setSheet(t('wrapHead'), `<p>${esc(t('wrapP'))}</p><textarea id="wrap-text" class="wrap-text">${esc(wrapDraft(getThread(S.wrapLine)))}</textarea>
+      <div class="d-actions"><button class="btn btn-primary" data-wrap-save>${esc(t('wrapSave'))}</button><button class="btn" data-wrap-skip>${esc(t('wrapSkip'))}</button></div>`);
   } else if (kind === 'ap-send') {
     setSheet(t('apSendTitle'), `<p>${esc(t('apSendP', S.apSend.name))}</p><div class="l-cmd"><code>${esc(S.apSend.prompt)}</code><button class="btn" data-ap-copy>${esc(t('copy2'))}</button></div>`);
   } else if (kind === 'sync') {
@@ -3528,6 +3539,16 @@ const goalOf = th => {
   if (th.goal != null) return String(th.goal).trim();
   return String(th.note || '').split('\n').map(l => l.trim()).filter(l => l && !SYSTEM_NOTE.test(l)).join('\n');
 };
+// The draft wrap-up of a line: what it set out to do, how long and how much, its latest decisions and its to-dos.
+function wrapDraft(th) {
+  const cs = (byThread().get(th.id) || []).slice().sort((a, b) => a.ts - b.ts), todos = cs.filter(isTodo);
+  const day = ts => new Date(ts).toLocaleDateString(LANG === 'zh' ? 'zh-CN' : undefined);
+  const dec = cs.filter(c => c.kind === 'decision').slice(-6).map(c => `- ${c.title}`);
+  const open = todos.filter(c => !c.done).map(c => `- ${c.title}`);
+  return [goalOf(th) && `${t('wrapGoal')}${goalOf(th)}`, cs.length && t('wrapSpan', day(cs[0].ts), day(Date.now()), cs.length, new Set(cs.map(c => c.session).filter(Boolean)).size),
+    dec.length && `${t('wrapDec')}\n${dec.join('\n')}`, todos.length && t('wrapTodos', todos.length - open.length, todos.length), open.length && `${t('wrapOpen')}\n${open.join('\n')}`,
+    t('wrapOut')].filter(Boolean).join('\n\n');
+}
 function renderGoals() {
   const by = byThread();
   const groups = viewLines(() => true).map(th => {
@@ -3641,6 +3662,9 @@ sheetBody.addEventListener('click', e => {
   if (e.target.closest('[data-sync-now]')) { closeSheet(); syncNow(); return; }
   if (e.target.closest('[data-ap-go]')) { ls.set('tc.apIntro', true); closeSheet(); runAutopilot(S.apLine); return; }
   if (e.target.closest('[data-ap-cancel]')) { closeSheet(); return; }
+  // The wrap-up goes on first: a record on a folded line would unfold it again.
+  if (e.target.closest('[data-wrap-save]')) { const v = $('#wrap-text').value.trim(); if (v) addCommit({ thread: S.wrapLine, kind: 'note', title: t('wrapRec', getThread(S.wrapLine).name), body: v }); patchDoc('threads', S.wrapLine, { status: 'done' }, 0); closeSheet(); return; }
+  if (e.target.closest('[data-wrap-skip]')) { patchDoc('threads', S.wrapLine, { status: 'done' }, 0); closeSheet(); return; }
   if (e.target.closest('[data-ap-copy]')) { copyText(S.apSend.prompt); return; }
   const apP = e.target.closest('[data-ap-profile]'); if (apP) { e.preventDefault(); closeSheet(); select({ type: 'commit', id: apP.dataset.apProfile }); return; }
   if (S.sheet !== 'goals') return;

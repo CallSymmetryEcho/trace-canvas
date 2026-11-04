@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **`trace-canvas doctor`, and Common questions.** One command (also **More → Check setup**) checks Node, the hooks, MCP server and skill, the page server and whether it starts with the computer, the version, sync and other machines, and phone access, with one line on how to fix each problem; it also notices hooks that start a Node which has since been removed. [docs/faq.md](docs/faq.md) answers the questions people actually ran into, including how to start the page with the computer.
 - **A failed sync shows, quietly.** When the last sync failed, or another machine has not updated in over a day, More and its sync item get a small dot; opening the item then says what is wrong and offers **Sync now** (without trouble it syncs straight away, as before). `trace-canvas sync` no longer reports a sync whose commits did not reach the remote as fine, and exits 1 then.
 - **Shortcuts and help reads cleanly.** Each key sits in its own column.
 - **Fold a group from the canvas.** Each group's label has a switch: ▾ folds the group into a small chip, ▸ on the chip unfolds it.

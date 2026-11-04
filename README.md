@@ -386,6 +386,10 @@ Setup (--user for every project, --project DIR for one)
   trace-canvas update [--check] Get the newest version (git pull in the clone) and restart the page server; --check only looks
 ```
 
+## Common questions
+
+Something not working? Run `trace-canvas doctor` (or **More → Check setup** on the page): it checks the setup and says how to fix each problem. The questions people actually ran into, from a page that is gone after a restart to records that did not sync, are in [docs/faq.md](docs/faq.md).
+
 ## How it works
 
 ![Architecture](docs/architecture.svg)

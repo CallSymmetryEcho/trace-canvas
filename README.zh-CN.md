@@ -386,6 +386,10 @@ node bin/trace-canvas.mjs log "文献对比表完成" \
   trace-canvas update [--check] 更新到最新版（在仓库里 git pull）并重启画布服务；--check 只看有没有新版
 ```
 
+## 常见问题
+
+遇到问题，先运行 `trace-canvas doctor`，或者在页面上点「更多 → 检查设置」。它会检查各项设置，每个有问题的项都附一句怎么修。用户真实遇到过的问题都整理在 [docs/faq.zh-CN.md](docs/faq.zh-CN.md) 里，比如电脑重启后页面打不开、记录没同步过来。
+
 ## 实现
 
 ![架构图](docs/architecture.zh-CN.svg)

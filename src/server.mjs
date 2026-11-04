@@ -18,6 +18,7 @@ import { focusScript, openTerminal, terminalCommand } from './agents.mjs';
 import { otherMachines, remoteLive } from './remote.mjs';
 import { commitDiff, commitInfo } from './git-view.mjs';
 import { runSync, syncSoon, syncStatus } from './sync.mjs';
+import { doctor } from './doctor.mjs';
 import { desktopSessions } from './desktop.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -170,6 +171,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
       }
       // Update: trace-canvas update pulls the newest version and restarts this server; the page reloads after it.
       if (req.method === 'POST' && p === '/api/update') { spawn(process.execPath, [CLI, 'update'], { detached: true, stdio: 'ignore' }).unref(); return send(res, 200, { ok: true }); }
+      if (req.method === 'GET' && p === '/api/doctor') return send(res, 200, { checks: remote ? [] : doctor() });
       if (req.method === 'POST' && p === '/api/sync') { const r = runSync(); broadcast('change'); return send(res, 200, r); }
       if (req.method === 'POST' && p === '/api/bind') {
         const body = JSON.parse(await readBody(req));

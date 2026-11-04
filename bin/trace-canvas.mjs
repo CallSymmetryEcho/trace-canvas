@@ -10,6 +10,7 @@ import { handleHook, python3, readStdin } from '../src/hook.mjs';
 import { agentFiles, allowSafeTools, codexHooks, codexWritable, geminiHooks, hookCommand, install, installAgentMcp, installMcp, installSkill, linkCommand, onPath, settingsPath, uninstall } from '../src/install.mjs';
 import { normalize } from '../src/agents.mjs';
 import { systemdUnit } from '../src/live.mjs';
+import { doctor, tailscaleSelf } from '../src/doctor.mjs';
 import os from 'node:os';
 import crypto from 'node:crypto';
 
@@ -23,17 +24,6 @@ function whoami(map) {
   try { return py && fs.existsSync(py) ? python3([py, '--whoami'], { encoding: 'utf8', timeout: 5000 }).trim() : ''; } catch { return ''; }
 }
 const SKILL_DIR = path.join(path.dirname(SELF), '..', 'skill');
-// This computer on Tailscale, or null when Tailscale is not running: { dns, ip }.
-function tailscaleSelf() {
-  for (const bin of ['tailscale', '/Applications/Tailscale.app/Contents/MacOS/Tailscale']) {
-    try {
-      const s = JSON.parse(execFileSync(bin, ['status', '--json'], { encoding: 'utf8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'] }));
-      const self = s.Self || {}, ip = (self.TailscaleIPs || []).find(a => a.includes('.'));
-      return s.BackendState === 'Running' && self.DNSName && ip ? { dns: self.DNSName.replace(/\.$/, ''), ip } : null;
-    } catch {}
-  }
-  return null;
-}
 // A QR code for the terminal, black on white whatever the terminal's colours, from the page's own encoder.
 function terminalQr(text) {
   const src = fs.readFileSync(path.join(path.dirname(SELF), '..', 'app', 'index.html'), 'utf8');
@@ -132,6 +122,7 @@ Setup (pass --user for every project, or --project dir for one)
                                Open the canvas on your phone over Tailscale (docs/phone.md)
   trace-canvas where <words> [--machine M]   Look things up in the location map (~/agent-map)
   trace-canvas sync             Sync the canvas with your other machines through the location map
+  trace-canvas doctor           Check the setup: Node, hooks, page server, start with the computer, version, sync, phone
   trace-canvas update [--check] Get the newest version (git pull in this clone) and restart the page server;
                                --check only says whether there is one (the page also offers it under More)
   (setup also takes --machine NAME and --map DIR: this computer's name and the map repository)
@@ -645,6 +636,14 @@ async function main() {
       if (r.busy) { console.log('Another sync is running.'); break; }
       console.log(`${r.machine}: ${r.imported} change${r.imported === 1 ? '' : 's'} from other machines, ${r.changed} here${r.moved ? `; ${r.moved} lines got stable ids` : ''}. ${r.offline ? 'Offline: pushes next time.' : r.unpushed ? `${r.unpushed} commit${r.unpushed === 1 ? '' : 's'} not pushed yet: the other machines do not have them.` : r.pushed ? 'Pushed.' : r.committed ? 'Committed.' : 'Up to date.'}`);
       if (r.offline || r.unpushed) process.exitCode = 1;
+      break;
+    }
+    case 'doctor': {
+      const rows = doctor();
+      for (const r of rows) console.log(`${r.ok === true ? '✓' : r.ok === 'warn' ? '!' : '✗'} ${r.detail}${r.fix ? `\n    → ${r.fix}` : ''}`);
+      const bad = rows.filter(r => r.ok === false).length;
+      console.log(bad ? `\n${bad} problem${bad === 1 ? '' : 's'}. Common questions: docs/faq.md` : '\nAll good.');
+      if (bad) process.exitCode = 1;
       break;
     }
     case 'help': case '--help': case '-h': console.log(HELP); break;

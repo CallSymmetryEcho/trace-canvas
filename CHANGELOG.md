@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.3.3 (2026-11-04)
+
+See what is wrong at a glance: `trace-canvas doctor` and Common questions, a dot when sync fails, commits from other machines that open, parked lines that fold away, and agents that open in a tab.
 
 - **Agents open in a tab, not a pile of windows.** On macOS, dispatch and Start open agents in a new iTerm2 tab when iTerm2 is installed, and in a new Terminal window otherwise; `trace-canvas terminal iterm|terminal` picks one. On Linux, konsole, gnome-terminal and xfce4-terminal open a new tab; other terminals still open a window.
 - **A hand-off prompt is not a new to-do.** The prompts that dispatch, `hand` and the page write to start an agent on a line restate its to-dos; the hooks no longer log them as another to-do that stays open after the real one is ticked.

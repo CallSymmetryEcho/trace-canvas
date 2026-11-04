@@ -145,3 +145,33 @@ test('a to-do assigned to an agent goes to that agent\'s session, keeps its assi
   ]);
   assert.equal(d.commits[v25.id].assignee, 'claude');
 });
+
+test('Autopilot hands every open to-do on a line to its agent with the decision profile, and its summary ends it', async () => {
+  const { startAutopilot, stopAutopilot, listTasks } = await import('../src/ops.mjs');
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-autopilot-'));
+  const env = { ...process.env, TRACE_CANVAS_HOME: path.join(tmp, 'home'), TRACE_CANVAS_DESKTOP_DIR: path.join(tmp, 'desk'), TRACE_CANVAS_LANG: 'en', TRACE_CANVAS_MACHINE: machineName() };
+  const d = emptyData(), now = Date.now();
+  const app = createThread(d, { name: 'App' }).id, rules = createThread(d, { name: 'Rules' }).id;
+  d.sessions.s1 = { id: 's1', thread: app, agent: 'Claude Code', cwd: tmp, last: now - 7e6 };
+  addCommit(d, { thread: app, kind: 'agent', title: 'Worked here', agent: 'Claude Code', ts: now - 7e6, extra: { session: 's1' } });
+  const a = addCommit(d, { thread: app, kind: 'task', title: 'Fix the login bug', ts: now - 6e5 });
+  const b = addCommit(d, { thread: app, kind: 'task', title: 'Its own to-do', agent: 'Claude Code', ts: now - 5e5, extra: { fromSession: 's1' } });
+  assert.throws(() => startAutopilot(d, { thread: 'Rules' }, env), /no open to-dos/);
+  const p = addCommit(d, { thread: rules, kind: 'decision', title: 'Autopilot decision profile v0', ts: now - 1e5 });
+  addCommit(d, { thread: rules, kind: 'decision', title: 'Decision profile v0, addition: H5', ts: now - 5e4 }); // adds to it, is not it
+  addCommit(d, { thread: rules, kind: 'decision', title: 'Fixed the decision profile numbering', ts: now - 4e4 });
+
+  const [row] = startAutopilot(d, { thread: 'App' }, env);
+  assert.deepEqual(row.todos.map(c => c.id).sort(), [a.id, b.id].sort()); // every open one, its own agent's too
+  assert.equal(row.action, 'resume');
+  assert.match(row.command, /^cd .* && claude --resume s1 'Autopilot \(beta\) on the Trace Canvas line "App"/);
+  assert.match(row.prompt, new RegExp(`decision profile, record ${p.id}`));
+  assert.match(row.prompt, /Never send email[^.]*push, publish/);
+  assert.equal(listTasks(d, { thread: app })[0].autopilot, true);
+  // The agent's summary turns it off; so does Stop.
+  addCommit(d, { thread: app, kind: 'note', title: 'Autopilot summary: 2 done', ts: now });
+  assert.equal(d.threads[app].autopilot, undefined);
+  d.threads[app].autopilot = { at: now };
+  stopAutopilot(d, { thread: 'App' });
+  assert.equal(d.threads[app].autopilot, undefined);
+});

@@ -150,7 +150,7 @@ const LIVE_EVENTS = [...LOG_EVENTS, 'SessionStart', 'PreToolUse', 'Notification'
 // The openings of the prompts Trace Canvas itself writes to hand a line over (src/ops.mjs, app/index.html).
 // Keystrokes typed into the session rather than asked of it (":q", "login", "ok"): never a to-do.
 export const notTask = prompt => { const p = String(prompt || '').trim(); return p.length < 3 || (!/\s/.test(p) && (/^:/.test(p) || /^(login|logout|exit|quit|clear|yes|no|ok|okay)$/i.test(p))); };
-export const HANDOFF = /^(You are taking over the Trace Canvas line|New to-dos on the Trace Canvas line|Read the Trace Canvas line|读 Trace Canvas 上的线)/;
+export const HANDOFF = /^(Autopilot \(beta\) on the Trace Canvas line|You are taking over the Trace Canvas line|New to-dos on the Trace Canvas line|Read the Trace Canvas line|读 Trace Canvas 上的线)/;
 
 export function handleHook(input, env = process.env) {
   if (!input || typeof input !== 'object') return { skipped: 'no input' };

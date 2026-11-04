@@ -87,6 +87,8 @@ Goals and to-dos
                                                    Tick a to-do by id or title (--undo reopens it)
   trace-canvas hand <to-do|thread> --to claude|codex|gemini
                                                    Assign it and print the command that starts the agent on it
+  trace-canvas autopilot <line> [--stop] [--print]   Autopilot (beta): one round, the line's agent works every open
+                                                   to-do by the decision profile and asks only what it must
   trace-canvas dispatch [line|to-do...] [--on machine] [--all] [--print] [--json]
                                                    Hand each line's new to-dos (or the to-dos named) to the agent working on it and wake it
                                                    (resume or start in a new terminal window; --print only prints)
@@ -129,6 +131,26 @@ Setup (pass --user for every project, or --project dir for one)
   (setup also takes --machine NAME and --map DIR: this computer's name and the map repository)
 
 Data: ${dataFile()}`;
+
+// Opens the terminals a dispatch (or Autopilot) needs and says what happened to each line, or prints the rows as JSON.
+async function runRows(rows, { run, json }) {
+  const { AGENTS, openTerminal } = await import('../src/agents.mjs');
+  // Each window is waited for, so a terminal that did not open is reported, not taken for a started agent.
+  for (const r of rows) if (r.command && run && r.action !== 'busy') r.failed = await openTerminal(r.command);
+  if (rows.some(r => r.failed)) process.exitCode = 1;
+  if (json) { console.log(JSON.stringify(rows, null, 2)); return; }
+  if (!rows.length) { console.log('Nothing new to dispatch: every open to-do has an agent, or was logged by the agent working on its line (--all takes those too).'); return; }
+  for (const r of rows) {
+    const who = AGENTS[r.agent].name, s = r.session, name = s && `"${s.title.slice(0, 50) || s.id.slice(0, 8)}"`;
+    console.log(`\n${r.thread.name}: ${r.todos.length} to-do${r.todos.length === 1 ? '' : 's'} for ${who}${r.on ? ` on ${r.on}` : ''}`);
+    for (const c of r.todos) console.log(`  □ ${c.title}  [${c.id}]`);
+    if (r.action === 'self') console.log('  → Your own line: they are yours.');
+    else if (r.action === 'message') console.log(`  → Running session ${name} (${s.status}${s.name ? `, messaged as ${s.name}` : ''}${s.desktopId ? `, ${s.desktopId}` : ''}): send it this message:\n    ${r.prompt}`);
+    else if (r.action === 'busy') console.log(`  → ${who} session ${name} is busy. Choose:\n    A) paste this into it when it stops:\n       ${r.prompt}\n    B) or start a new session for them:\n       ${r.command}`);
+    else if (r.failed) console.log(`  → No terminal window opened: ${r.failed}\n    Run it yourself:\n    ${r.command}`);
+    else console.log(`  → ${r.action === 'start' ? `A new ${who} session` : `Session ${name} resumed`}${run ? ' in a new terminal window' : '; run'}:\n    ${r.command}`);
+  }
+}
 
 async function main() {
   switch (cmd) {
@@ -288,26 +310,26 @@ async function main() {
       // new session, each in a new terminal window (macOS, or a Linux desktop); a running Claude Code session is messaged by the agent
       // that called this (the skill), since only an agent can reach it.
       const { dispatch } = await import('../src/ops.mjs');
-      const { AGENTS, openTerminal, terminalCommand } = await import('../src/agents.mjs');
+      const { terminalCommand } = await import('../src/agents.mjs');
       const on = str(flag('on', '')), all = !!flag('all', false), json = !!flag('json', false), print = !!flag('print', false), run = !print && !!terminalCommand('');
       // --print only shows what would happen: nothing is assigned or saved.
       let rows = [];
       mutate(d => { rows = dispatch(d, { refs: argv.filter(Boolean), all, on, self: process.env.CLAUDE_CODE_SESSION_ID || null }); return print ? false : rows; });
-      // Each window is waited for, so a terminal that did not open is reported, not taken for a started agent.
-      for (const r of rows) if (r.command && run && r.action !== 'busy') r.failed = await openTerminal(r.command);
-      if (rows.some(r => r.failed)) process.exitCode = 1;
-      if (json) { console.log(JSON.stringify(rows, null, 2)); break; }
-      if (!rows.length) { console.log('Nothing new to dispatch: every open to-do has an agent, or was logged by the agent working on its line (--all takes those too).'); break; }
-      for (const r of rows) {
-        const who = AGENTS[r.agent].name, s = r.session, name = s && `"${s.title.slice(0, 50) || s.id.slice(0, 8)}"`;
-        console.log(`\n${r.thread.name}: ${r.todos.length} to-do${r.todos.length === 1 ? '' : 's'} for ${who}${r.on ? ` on ${r.on}` : ''}`);
-        for (const c of r.todos) console.log(`  □ ${c.title}  [${c.id}]`);
-        if (r.action === 'self') console.log('  → Your own line: they are yours.');
-        else if (r.action === 'message') console.log(`  → Running session ${name} (${s.status}${s.name ? `, messaged as ${s.name}` : ''}${s.desktopId ? `, ${s.desktopId}` : ''}): send it this message:\n    ${r.prompt}`);
-        else if (r.action === 'busy') console.log(`  → ${who} session ${name} is busy. Choose:\n    A) paste this into it when it stops:\n       ${r.prompt}\n    B) or start a new session for them:\n       ${r.command}`);
-        else if (r.failed) console.log(`  → No terminal window opened: ${r.failed}\n    Run it yourself:\n    ${r.command}`);
-        else console.log(`  → ${r.action === 'start' ? `A new ${who} session` : `Session ${name} resumed`}${run ? ' in a new terminal window' : '; run'}:\n    ${r.command}`);
-      }
+      await runRows(rows, { run, json });
+      break;
+    }
+    case 'autopilot': {
+      // Autopilot (beta): one round on one line. Every open to-do goes to the line's agent with the decision profile;
+      // the agent checks the switch before each to-do and turns it off with its summary. --stop turns it off now.
+      const { startAutopilot, stopAutopilot } = await import('../src/ops.mjs');
+      const { terminalCommand } = await import('../src/agents.mjs');
+      const stop = !!flag('stop', false), json = !!flag('json', false), print = !!flag('print', false), ref = argv.join(' ').trim();
+      if (!ref) { console.error('Usage: trace-canvas autopilot <line> [--stop] [--print] [--json]'); process.exit(1); }
+      if (stop) { const th = mutate(d => stopAutopilot(d, { thread: ref })); console.log(`Autopilot is off on "${th.name}"; its agent stops before the next to-do.`); break; }
+      let rows = [];
+      mutate(d => { rows = startAutopilot(d, { thread: ref, self: process.env.CLAUDE_CODE_SESSION_ID || null }); return print ? false : rows; });
+      await runRows(rows, { run: !print && !!terminalCommand(''), json });
+      if (!json && !print) console.log('\nAutopilot is on until the agent logs its summary; stop it with trace-canvas autopilot <line> --stop.');
       break;
     }
     case 'history': {

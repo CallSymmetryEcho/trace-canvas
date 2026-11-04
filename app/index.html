@@ -225,6 +225,9 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .chip { flex: none; font-size: 11px; font-weight: 500; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--rule); color: var(--muted); white-space: nowrap; }
 .chip-active { border-color: var(--accent); color: var(--accent); }
 .chip-parked { border-style: dashed; }
+.chip-auto { color: var(--ok); border-color: var(--ok); animation: ap-pulse 1.6s ease-in-out infinite; }
+@keyframes ap-pulse { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .chip-auto { animation: none; } }
 .chip-done { background: var(--surface-2); }
 .chip-merged { background: var(--surface-2); }
 .strip { list-style: none; margin: 0; padding: 2px 10px 4px 4px; position: relative; }
@@ -946,6 +949,13 @@ const I18N = {
     retroStats: (r, tok) => `${r.rounds} rounds · ${r.minutes} min · ${tok} tokens · ${r.corrections} correction${r.corrections === 1 ? '' : 's'} · ${r.sessions} session${r.sessions === 1 ? '' : 's'} · difficulty ${r.difficulty}`,
     retroStuck: 'Stuck on', retroSinceLast: d => `By default: since the last retro (${d}) up to now`, retroNoLast: 'No retro on this line yet: from the start up to now', retroFrom: 'From', retroTo: 'To (empty: now)', retroAll: 'Everything', retroStart: 'Start the retro', retroRange: (a, b) => `${a} → ${b}`, retroStartOfLine: 'the start', retroClear: 'Made clear by', retroRule: 'Rule', retroApply: 'Write', retroApplied: l => `Written: ${l}`,
     retroLayers: { project: 'Project rules (CLAUDE.md, AGENTS.md)', line: 'This line', memory: 'Long-term memory' }, tRetroApplied: w => `Written to ${w}`,
+apBtn: 'Autopilot (beta)', apStop: 'Stop Autopilot', apTitle: 'Autopilot (beta)', apGo: 'Start this round', apCancel: 'Not now',
+    apIntro: 'One round on this line: its agent works through every open to-do by your decision profile, and logs each decision with the rule it rests on.',
+    apNever: 'It never sends email or messages to people, pushes, publishes anything, or changes permissions or credentials: it gets those ready and asks you.',
+    apAsk: 'It stops and asks you when something touches security, no rule covers it, or the rule is still swinging.',
+    apEnd: 'While it runs the line shows Autopilot and this button turns into Stop; the round ends with a summary record on the line.',
+    apProfile: 'The decision profile it follows', apNoProfile: 'No decision profile yet: it follows four basic rules (do the core first; a hand-over counts once the other session starts; ask before anything risky; ask about what no rule covers).', apDiagram: 'How it decides (diagram)',
+    tApStarted: n => `Autopilot is on: "${n}"'s agent has its to-dos`, tApStopped: 'Autopilot stops before the next to-do', apSendTitle: 'Send this to the running session', apSendP: n => `"${n}" is open right now, so only you or another agent can give it the round: paste this into it (or ask an agent to message it).`, copy2: 'Copy',
     agentAsk: 'Prompt for an agent', agentPromptTitle: 'Copy a prompt that sends an agent to read this line and carry on', tAgentPrompt: 'Prompt copied: paste it to an agent, for example in the Claude app on your phone',
     agentPromptText: (name, id) => `Read the Trace Canvas line "${name}" (thread ${id}): use trace_read_thread and trace_tasks for its goal and open to-dos, carry on with them, and tick each one with trace_task_done when it is done.`, tSyncing: 'Syncing…', tSyncBusy: 'A sync is already running', tSyncFailed: e => `Sync failed: ${e}`,
     syncFailedAt: (when, why) => `Failed ${when}: ${why}`, syncOkAt: when => `Last good sync ${when}`, syncNowBtn: 'Sync now', syncStale: (m, when) => `${m} last updated ${when}`, tSynced: (n, off) => `Synced: ${n} change${n === 1 ? '' : 's'} from other machines${off ? ' (offline; pushes next time)' : ''}`, onMachine: m => `On ${m}`, latestOn: m => `${m} · latest`,
@@ -1121,6 +1131,13 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     retroStats: (r, tok) => `${r.rounds} 轮 · ${r.minutes} 分钟 · ${tok} token · 纠正 ${r.corrections} 次 · ${r.sessions} 个会话 · 难度 ${r.difficulty}`,
     retroStuck: '卡在', retroSinceLast: d => `默认：从上次复盘（${d}）到现在`, retroNoLast: '这条线还没复盘过：从头到现在', retroFrom: '从', retroTo: '到（空着就是现在）', retroAll: '全部', retroStart: '开始复盘', retroRange: (a, b) => `${a} → ${b}`, retroStartOfLine: '开头', retroClear: '说清楚的那句', retroRule: '规矩', retroApply: '写入', retroApplied: l => `已写入：${l}`,
     retroLayers: { project: '项目规矩（CLAUDE.md、AGENTS.md）', line: '这条线', memory: '长期记忆' }, tRetroApplied: w => `已写入 ${w}`,
+apBtn: 'Autopilot（beta）', apStop: '停止 Autopilot', apTitle: 'Autopilot（beta）', apGo: '开始这一轮', apCancel: '先不了',
+    apIntro: '在这条线上跑一轮：这条线的 agent 按你的决策画像，把所有没做完的待办一条条做下去，每个决定都在线上写明依据哪条规则。',
+    apNever: '它绝不做：发邮件或给人发消息、推送、对外发布、改权限或凭据。这些事它只准备好，然后问你。',
+    apAsk: '遇到安全相关的事、没有规则覆盖的事、或者规则还在摇摆的事，它会停下来问你。',
+    apEnd: '跑的时候线上会亮起 Autopilot，这个按钮变成「停止」；一轮结束时，它在线上写一条小结。',
+    apProfile: '它照着的决策画像', apNoProfile: '还没有决策画像：它照四条基本规则做（先做核心；对方会话开工才算交出去；有风险的事先问；规则没覆盖的先问）。', apDiagram: '它怎么做决定（架构图）',
+    tApStarted: n => `Autopilot 已开始：「${n}」的 agent 拿到了待办`, tApStopped: 'Autopilot 会在下一条待办之前停下', apSendTitle: '发给正在运行的会话', apSendP: n => `「${n}」现在开着，只有你或别的 agent 能把这一轮交给它：把下面这段粘贴进去（或者让一个 agent 给它发消息）。`, copy2: '复制',
     agentAsk: '给 agent 的提示', agentPromptTitle: '复制一段提示，让 agent 去读这条线并接着做', tAgentPrompt: '提示已复制：粘贴给 agent，比如手机 Claude app 里的会话',
     agentPromptText: (name, id) => `读 Trace Canvas 上的线「${name}」（thread ${id}）：用 trace_read_thread 和 trace_tasks 看它的目标和未完成的待办，接着做，每做完一项就用 trace_task_done 勾掉。`, tSyncing: '正在同步…', tSyncBusy: '已经有一个同步在进行', tSyncFailed: e => `同步失败：${e}`,
     syncFailedAt: (when, why) => `${when}失败：${why}`, syncOkAt: when => `上次成功同步：${when}`, syncNowBtn: '立即同步', syncStale: (m, when) => `${m} 最后更新：${when}`, tSynced: (n, off) => `已同步：从其他电脑收到 ${n} 处改动${off ? '（离线，下次再推送）' : ''}`, onMachine: m => `在 ${m} 上`, latestOn: m => `${m} 最新`,
@@ -2346,7 +2363,7 @@ function cardHTML(th, cs, selT) {
     ? recent.map(c => `<li data-cid="${esc(c.id)}" class="${c.id === selC ? 'is-sel' : ''} ${filtering() && matches(c) ? 'hit' : ''}">${mini(c.kind, stationColor(c, th), c.done)}<span class="s-title">${esc(c.title)}</span><time class="s-time">${fmtShort(c.ts)}</time></li>`).join('')
       + (more > 0 ? `<li class="s-more"><span></span><span>${esc(t('moreEarlier', more))}</span><span></span></li>` : '')
     : `<li class="s-empty"><span></span><span>${esc(isInbox ? t('inboxEmpty') : t('noRecords'))}</span><span></span></li>`;
-  const chip = isInbox ? `<span class="chip">${esc(t('unsorted'))}</span>` : `<span class="chip chip-${th.status || 'active'}">${esc(statusLabel(th.status))}</span>`;
+  const chip = (th.autopilot ? `<span class="chip chip-auto" title="${esc(t('apTitle'))}">Autopilot</span>` : '') + (isInbox ? `<span class="chip">${esc(t('unsorted'))}</span>` : `<span class="chip chip-${th.status || 'active'}">${esc(statusLabel(th.status))}</span>`);
   const agents = cs.filter(c => c.kind === 'agent').length;
   return `<div class="${cls}" data-tid="${esc(th.id)}" style="left:${th.x || 0}px;top:${th.y || 0}px;--c:${th.color}">
     <div class="card-head">${shut ? `<span class="grp-tog" data-park-tog="1" title="${esc(t('unpark'))}">▸</span>` : ''}<span class="roundel"></span><span class="card-name">${esc(th.name)}</span>${liveBadge(th.id)}${chip}</div>
@@ -3027,6 +3044,7 @@ function threadDetail(th) {
       <div class="d-actions">
         <button class="btn btn-primary" data-act="capture-here">${esc(t('captureHere'))}</button>
         ${!isInbox && S.start && th.status !== 'merged' ? `<button class="btn" data-act="start" title="${esc(t('startTitle'))}">${esc(t('start'))}</button>` : ''}
+        ${!isInbox && SERVER && !S.remote && th.status !== 'merged' ? `<button class="btn${th.autopilot ? ' btn-primary' : ''}" data-act="autopilot">${esc(t(th.autopilot ? 'apStop' : 'apBtn'))}</button>` : ''}
         ${!isInbox ? `<button class="btn" data-act="agent-prompt" title="${esc(t('agentPromptTitle'))}">${esc(t('agentAsk'))}</button>` : ''}
         ${!isInbox && SERVER && !S.remote ? (S.ui.retro ? retroRangeForm(th.id) : `<button class="btn" data-act="retro" title="${esc(t('retroTitle'))}" ${S.retroBusy ? 'disabled' : ''}>${esc(S.retroBusy === th.id ? t('retroRunning') : t('retro'))}</button>`) : ''}
         ${!isInbox && th.status !== 'merged' ? (S.ui.merge
@@ -3121,6 +3139,11 @@ detail.addEventListener('click', e => {
     case 'goto-thread': select({ type: 'thread', id: b.dataset.tid }); break;
     case 'detach': detachThread(s.id); break;
     case 'start': startOn({ thread: s.id }); break;
+    case 'autopilot':
+      if (getThread(s.id).autopilot) postJSON('/api/autopilot', { thread: s.id, stop: true }).then(r => toast(r.error || t('tApStopped')));
+      else if (ls.get('tc.apIntro', false)) runAutopilot(s.id);
+      else { S.apLine = s.id; openSheet('autopilot'); }
+      break;
     case 'retro': S.ui = { retro: true }; render(); break;
     case 'retro-all': $('#rt-since').value = ''; $('#rt-until').value = ''; break;
     case 'retro-go': {
@@ -3423,6 +3446,16 @@ function openSheet(kind) {
       const rows = checks.map(c => `<div class="ai-item doc-item"><span class="doc-${c.ok === true ? 'ok' : c.ok === 'warn' ? 'warn' : 'bad'}">${c.ok === true ? '✓' : c.ok === 'warn' ? '!' : '✗'}</span><span>${esc(c.detail)}${c.fix ? `<span class="why">→ ${esc(c.fix)}</span>` : ''}</span></div>`).join('');
       setSheet(t('menuDoctor'), `<div class="ai-list">${rows}</div><p>${checks.some(c => c.ok === false) ? '' : esc(t('doctorAllGood'))} <a href="https://github.com/CallSymmetryEcho/trace-canvas/blob/main/docs/faq${LANG === 'zh' ? '.zh-CN' : ''}.md" target="_blank" rel="noopener">${esc(t('doctorFaq'))}</a></p>`);
     }).catch(e => toast(String(e)));
+  } else if (kind === 'autopilot') {
+    // Shown before the first round: what it does, what it never does, when it asks; the profile and the diagram.
+    const pv = c => c.kind === 'decision' || c.kind === 'note' ? Number(((c.title || '').match(/(?:决策画像|decision profile)\s*v(\d+)/i) || [])[1] ?? -1) : -1; // as decisionProfile in src/ops.mjs
+    const p = [...S.commits.values()].filter(c => pv(c) >= 0).sort((a, b) => pv(b) - pv(a) || a.ts - b.ts)[0];
+    const svg = `https://github.com/CallSymmetryEcho/trace-canvas/blob/main/docs/autopilot${LANG === 'zh' ? '.zh-CN' : ''}.svg`;
+    setSheet(t('apTitle'), `<p>${esc(t('apIntro'))}</p><p>${esc(t('apNever'))}</p><p>${esc(t('apAsk'))}</p><p>${esc(t('apEnd'))}</p>
+      <p>${p ? `<a href="#" data-ap-profile="${esc(p.id)}">${esc(t('apProfile'))}: ${esc(p.title)}</a>` : esc(t('apNoProfile'))} · <a href="${svg}" target="_blank" rel="noopener">${esc(t('apDiagram'))}</a></p>
+      <div class="d-actions"><button class="btn btn-primary" data-ap-go>${esc(t('apGo'))}</button><button class="btn" data-ap-cancel>${esc(t('apCancel'))}</button></div>`);
+  } else if (kind === 'ap-send') {
+    setSheet(t('apSendTitle'), `<p>${esc(t('apSendP', S.apSend.name))}</p><div class="l-cmd"><code>${esc(S.apSend.prompt)}</code><button class="btn" data-ap-copy>${esc(t('copy2'))}</button></div>`);
   } else if (kind === 'sync') {
     setSheet(t('menuSync'), `${syncTrouble().map(l => `<p class="sync-bad">${esc(l)}</p>`).join('')}${S.sync && S.sync.lastOk ? `<p>${esc(t('syncOkAt', fmtRel(S.sync.lastOk)))}</p>` : ''}<button class="btn btn-primary" data-sync-now>${esc(t('syncNowBtn'))}</button>`);
   } else if (kind === 'phone') {
@@ -3589,6 +3622,10 @@ sheetBody.addEventListener('keydown', e => {
 sheetBody.addEventListener('click', e => {
   if (e.target.closest('[data-copy-phone]')) { copyText(S.phoneUrl); return; }
   if (e.target.closest('[data-sync-now]')) { closeSheet(); syncNow(); return; }
+  if (e.target.closest('[data-ap-go]')) { ls.set('tc.apIntro', true); closeSheet(); runAutopilot(S.apLine); return; }
+  if (e.target.closest('[data-ap-cancel]')) { closeSheet(); return; }
+  if (e.target.closest('[data-ap-copy]')) { copyText(S.apSend.prompt); return; }
+  const apP = e.target.closest('[data-ap-profile]'); if (apP) { e.preventDefault(); closeSheet(); select({ type: 'commit', id: apP.dataset.apProfile }); return; }
   if (S.sheet !== 'goals') return;
   if (e.target.id === 'gl-tip-hide') { try { localStorage.setItem('tc.goalsTipHidden', '1'); } catch {} renderGoals(); return; }
   const open = e.target.closest('[data-hand-open]');
@@ -3623,6 +3660,17 @@ sheetBody.addEventListener('click', e => {
 });
 // ▶ Start (/api/start): a Claude Code session on the line on the computer, with Remote Control on, so it
 // shows in the Claude app; a line that already has one running points at that session instead.
+// Autopilot (beta): starts a round on the line. A session that is open right now gets the prompt from the person.
+function runAutopilot(tid) {
+  postJSON('/api/autopilot', { thread: tid }).then(r => {
+    if (r.error) return toast(r.error);
+    const r0 = (r.rows || [])[0];
+    if (!r0) return;
+    if (r0.failed) return toast(r0.failed);
+    if (r0.action === 'message' || r0.action === 'busy') { S.apSend = { name: (r0.session && (r0.session.name || r0.session.title)) || '', prompt: r0.prompt }; openSheet('ap-send'); return; }
+    toast(t('tApStarted', getThread(tid).name));
+  });
+}
 function startOn(ref) {
   fetch('/api/start', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Trace-Canvas': '1' }, body: JSON.stringify(ref) })
     .then(r => r.json()).catch(() => ({ error: t('syncOfflineTitle') }))

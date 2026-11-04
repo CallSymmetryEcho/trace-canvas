@@ -74,10 +74,19 @@ Call `trace_tasks` (it answers for the line this session works on; pass `thread`
 
 ## dispatch [lines or to-dos…]: hand new to-dos to each line's agent and wake it
 
-1. Run `node <this skill's folder>/../bin/trace-canvas.mjs dispatch` (`trace-canvas dispatch` if it is on the PATH) with the lines the user named, or none for every line; when they name particular to-dos, pass each one's id (find it with `trace_tasks`) and only those go out, whoever logged them; add `--all` if they also want the to-dos a line's agent logged itself; when they say which machine to do them on, add `--on <machine>` (the machine names the canvas uses), and each line's to-dos go to that machine's latest session on the line, or a new one there. It gives each line's new to-dos (the user's own, or logged by another session) to the agent that last worked on that line, and on macOS it resumes stopped sessions and starts new ones in new Terminal windows by itself.
+1. Run `node <this skill's folder>/../bin/trace-canvas.mjs dispatch` (`trace-canvas dispatch` if it is on the PATH) with the lines the user named, or none for every line; when they name particular to-dos, pass each one's id (find it with `trace_tasks`) and only those go out, whoever logged them; add `--all` if they also want the to-dos a line's agent logged itself; when they say which machine to do them on, add `--on <machine>` (the machine names the canvas uses), and each line's to-dos go to that machine's latest session on the line, or a new one there. It gives each line's new to-dos (the user's own, or logged by another session) to the agent that last worked on that line, and on macOS and a Linux desktop it resumes stopped sessions and starts new ones in a new terminal tab or window by itself.
 2. Where it says **send it this message**, send that message to the running session with your messaging tool if you have one (in Claude Code: SendMessage to the name it prints after **messaged as**, or to the `local_…` id, or to the session's name from ListAgents). Otherwise give the user the session and the message.
 3. **Your own line** means those to-dos are yours: do them after the others are handed out. Where a session **is busy**, ask the user which they want, in these words: **A** paste the message into it when it stops, or **B** start a new session with the command it prints. Never pick for them, and never say a session got the to-dos when it did not.
 4. Report one row per line: which agent got which to-dos and how it was woken. Only to-dos are handed out; if the user's new items are ideas, say so and offer to make them to-dos.
+
+## autopilot <thread>: one Autopilot (beta) round on a line
+
+Only when the user asks for it by name. It hands every open to-do on the line to the line's agent with the decision profile: that agent works through them, logs each decision with the rule it rests on, never sends email or messages to people, pushes, publishes or changes permissions, stops to ask about anything risky or not covered, and ends with a record titled "Autopilot summary".
+
+1. Run `node <this skill's folder>/../bin/trace-canvas.mjs autopilot "<thread>"` (`trace-canvas autopilot` if it is on the PATH). Its rows read like dispatch's; handle them the same way (step 2 and 3 of dispatch): send the message to a running session, ask A or B for a busy one.
+2. A hand-over counts only when that session has started: check `trace_live` (it shows working on the line) or its first record, and say so if it has not.
+3. To stop a round: `… autopilot "<thread>" --stop`. The agent stops before its next to-do.
+4. If you are the agent that got an Autopilot prompt: before each to-do call `trace_tasks`; when the line no longer shows `autopilot: true`, stop and write the summary.
 
 ## retro <thread>: which work took the most back-and-forth, and what to keep
 

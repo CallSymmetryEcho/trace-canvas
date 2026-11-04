@@ -222,6 +222,38 @@ agent 用的是同一份清单：开工时用 `trace_tasks` 读目标和待办�
 
 **安静了的线。** 一条线超过它平时间隔的 3 倍（至少 3 天）没有动静、也没有会话在做，「目标」上会出现一个小圆点，清单顶部「安静了」那一行多一个小标签，不会弹窗。点开标签是一句话和三个选项：没有未完成待办的线问它是不是做完了（完成、搁置、还在做），还有待办的问要不要先搁置。点「还在做」算一次活动，要再安静一个周期才会再问。
 
+## Autopilot（beta）：照你的规则，把一条线上的待办做完
+
+在线的面板里点 **Autopilot（beta）**，就跑一轮。也可以用 `trace-canvas autopilot <线>`，或者在会话里输入 `/trace-canvas autopilot <线>`。
+
+**它做什么**
+- 这条线的 agent 按你的**决策画像**，把所有没做完的待办一条条做下去。
+- 每个决定都在线上写成「做了什么 · 依据哪条规则」，你在线上就能跟着看。
+
+**它绝不做什么**
+- 不发邮件，也不给人发消息；
+- 不推送，不对外发布；
+- 不改权限或凭据。
+
+这些事它只准备好，然后问你。
+
+**什么时候停下来问你**
+- 碰到安全相关的事；
+- 没有规则覆盖的事；
+- 规则还在摇摆的事。
+
+**决策画像是什么**
+- 任意一条线上，标题里写着名字加版本号的决定或笔记记录，比如「决策画像 v1」或 "decision profile v1"，就是决策画像；有好几版时用版本号最高的；同一版本后来补的记录算是对它的补充。
+- 内容包括：你定的硬规矩；从你以往决定里看得出来的稳定规则；还在摇摆的事；不算规则的个例。
+- 还没有决策画像时，Autopilot 照四条基本规则做。
+
+**跑的时候**
+- 一轮跑着时，线上亮着 **Autopilot**，按钮变成**停止 Autopilot**。
+- 一轮结束时，它写一条「Autopilot 小结」。
+- 没有常开的总开关，也不会定时自己跑：点一次只跑一轮。
+
+![Autopilot 怎么做决定](docs/autopilot.zh-CN.svg)
+
 ## 一台机器上多个 agent 分工：Claude Code、Codex、Gemini CLI
 
 Claude Code、Codex 和 Gemini CLI 可以共用同一张画布，通过待办分工：
@@ -385,6 +417,7 @@ node bin/trace-canvas.mjs log "文献对比表完成" \
   trace-canvas mcp              以 stdio 运行 MCP 服务（由 Claude Code 启动）
   trace-canvas lang <en|zh>     hooks 写入记录的语言
   trace-canvas terminal [iterm|terminal]   macOS：agent 开在 iTerm2 标签页，还是「终端」新窗口（默认：装了 iTerm2 就用它）
+  trace-canvas autopilot <线> [--stop]   Autopilot（beta）：按决策画像在这条线上跑一轮
   trace-canvas doctor           检查设置，逐项告诉你怎么修（页面上是「更多 → 检查设置」）
   trace-canvas where            显示数据存放位置
   trace-canvas phone            在手机上打开画布（Tailscale 扫码，见 docs/phone.zh-CN.md）

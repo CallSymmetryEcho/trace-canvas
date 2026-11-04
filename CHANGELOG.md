@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Autopilot (beta).** One round on a line, from its panel or `trace-canvas autopilot <line>`: the line's agent works through every open to-do by your decision profile, logs each decision with the rule it rests on, never sends email or messages to people, pushes, publishes or changes permissions, and stops to ask about anything risky or not covered. The first click explains all this; while it runs the line shows **Autopilot** and the button stops it; the round ends with a summary record. [docs/autopilot.svg](docs/autopilot.svg) shows how it decides.
 - **A stray keystroke is not a to-do.** Input typed into a session rather than asked of it, such as `:q`, `login` or `ok` (under three characters, a single word starting with `:`, or a lone command word), is no longer logged as a to-do.
 
 ## 0.3.3 (2026-11-04)

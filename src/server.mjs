@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { COLS, dataFile, home, mutate, readConfig, readData, toArrays, writeConfig } from './store.mjs';
 import { demoData } from './demo.mjs';
 import { liveDir, readLive } from './live.mjs';
-import { bindLiveSession, findThreadLoose, handTo, liveSessions, sessionList } from './ops.mjs';
+import { bindLiveSession, findThreadLoose, handTo, liveSessions, sessionList, startAutopilot, stopAutopilot } from './ops.mjs';
 import { applyRetro, askAgent, retroRecord, runRetro } from './retro.mjs';
 import { focusScript, openTerminal, terminalCommand } from './agents.mjs';
 import { otherMachines, remoteLive } from './remote.mjs';
@@ -104,7 +104,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         if (!phone || !phone.token || !(same(cookie, phone.token) || same(k, phone.token))) return send(res, 403, { error: 'Open the address trace-canvas phone printed' });
         if (same(k, phone.token) && !same(cookie, phone.token)) res.setHeader('Set-Cookie', `tc_k=${phone.token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000`);
         // These act on the computer itself (a terminal, git pushes, the claude CLI, the whole data set).
-        if (['/api/hand', '/api/focus', '/api/sync', '/api/ai', '/api/demo', '/api/retro', '/api/retro/apply', '/api/update'].includes(p)) return send(res, 403, { error: 'Only on the computer itself' });
+        if (['/api/hand', '/api/focus', '/api/sync', '/api/ai', '/api/demo', '/api/retro', '/api/retro/apply', '/api/update', '/api/autopilot'].includes(p)) return send(res, 403, { error: 'Only on the computer itself' });
       }
       const write = req.method !== 'GET' && req.method !== 'HEAD';
       if (write && req.headers['x-trace-canvas'] !== '1') return send(res, 403, { error: 'missing header' });
@@ -147,6 +147,18 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         const failed = await openTerminal(r.command);
         broadcast('change');
         return send(res, 200, failed ? { error: failed, command: r.command } : { ok: true, command: r.command });
+      }
+      // Autopilot (beta): one round on a line (trace-canvas autopilot). A stopped or new session opens in a terminal tab;
+      // a running one takes the prompt only from the person or another agent, so it comes back to be copied.
+      if (req.method === 'POST' && p === '/api/autopilot') {
+        const body = JSON.parse(await readBody(req)), thread = String(body.thread || '');
+        try {
+          if (body.stop) { mutate(d => stopAutopilot(d, { thread })); broadcast('change'); return send(res, 200, { ok: true }); }
+          const rows = mutate(d => startAutopilot(d, { thread }));
+          for (const r of rows) if (r.command && r.action !== 'busy') r.failed = await openTerminal(r.command);
+          broadcast('change');
+          return send(res, 200, { rows });
+        } catch (e) { return send(res, 200, { error: e.message }); }
       }
       // Go to the terminal: brings a live session's Terminal or iTerm2 tab to the front, found by its tty.
       if (req.method === 'POST' && p === '/api/focus') {

@@ -205,6 +205,8 @@ export function ensureThread(d, name) {
   return t ? t.id : findThreadByName(d, name) || createThread(d, { name: String(name).trim() }).id;
 }
 
+// The record an Autopilot round ends with (src/ops.mjs autopilotPrompt).
+export const AUTOPILOT_END = /^Autopilot (summary|小结)/i;
 export function addCommit(d, { thread, kind = 'idea', title, body = '', links = [], agent = '', ts = Date.now(), parents, extra = {} }) {
   const tid = thread === INBOX ? INBOX : (threadById(d, thread) || { id: INBOX }).id;
   const prev = lastCommit(d, tid);
@@ -217,6 +219,7 @@ export function addCommit(d, { thread, kind = 'idea', title, body = '', links = 
   d.commits[c.id] = c;
   const t = d.threads[tid];
   if (t && t.status === 'parked' && kind !== 'merge') t.status = 'active';
+  if (t && t.autopilot && AUTOPILOT_END.test(c.title)) delete t.autopilot; // the round's summary ends it
   return c;
 }
 

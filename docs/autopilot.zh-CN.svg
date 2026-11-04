@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1270 820" width="1270" height="820" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans CJK SC', 'Microsoft YaHei', sans-serif">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="#B8C0CA"/></marker>
+<marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="#7C98C4"/></marker></defs>
+<rect width="1270" height="820" fill="#FFFFFF"/>
+<text x="36" y="42" font-size="20" font-weight="600" fill="#3A4450">Autopilot（beta）：它怎么做决定</text>
+<text x="36" y="64" font-size="12.5" font-weight="400" fill="#7A8591">三个来源汇成一份决策画像；每一轮都照它判断，用户推翻的、新定的，再回到画像里。</text>
+<rect x="40" y="90" width="340" height="96" rx="8" fill="#FFFFFF" stroke="#DFE3E8" stroke-width="1"/>
+<text x="56" y="116" font-size="14" font-weight="600" fill="#3A4450">线上的决定</text>
+<text x="56" y="138" font-size="12" font-weight="400" fill="#7A8591">按话题归组、数次数</text>
+<text x="56" y="156" font-size="12" font-weight="400" fill="#7A8591">多次出现的才算规则</text>
+<path d="M210 186 L470 244" stroke="#B8C0CA" stroke-width="1" fill="none" marker-end="url(#a)"/>
+<rect x="420" y="90" width="340" height="96" rx="8" fill="#FFFFFF" stroke="#DFE3E8" stroke-width="1"/>
+<text x="436" y="116" font-size="14" font-weight="600" fill="#3A4450">用户当面定的</text>
+<text x="436" y="138" font-size="12" font-weight="400" fill="#7A8591">硬规矩 H1–H7</text>
+<text x="436" y="156" font-size="12" font-weight="400" fill="#7A8591">永远排在最前</text>
+<path d="M590 186 L590 244" stroke="#B8C0CA" stroke-width="1" fill="none" marker-end="url(#a)"/>
+<rect x="800" y="90" width="340" height="96" rx="8" fill="#FFFFFF" stroke="#DFE3E8" stroke-width="1"/>
+<text x="816" y="116" font-size="14" font-weight="600" fill="#3A4450">复盘提炼的规则</text>
+<text x="816" y="138" font-size="12" font-weight="400" fill="#7A8591">复盘给出建议</text>
+<text x="816" y="156" font-size="12" font-weight="400" fill="#7A8591">用户点头才进</text>
+<path d="M970 186 L710 244" stroke="#B8C0CA" stroke-width="1" fill="none" marker-end="url(#a)"/>
+<rect x="240" y="248" width="700" height="112" rx="8" fill="#F7F8FA" stroke="#DFE3E8" stroke-width="1"/>
+<text x="256" y="274" font-size="14" font-weight="600" fill="#3A4450">决策画像</text>
+<rect x="254" y="290" width="158" height="56" rx="6" fill="#FFFFFF" stroke="#DFE3E8"/>
+<text x="266" y="312" font-size="12.5" font-weight="600" fill="#3A4450">H · 硬规矩</text>
+<text x="264" y="332" font-size="12" font-weight="400" fill="#7A8591">一律照做</text>
+<rect x="424" y="290" width="158" height="56" rx="6" fill="#FFFFFF" stroke="#DFE3E8"/>
+<text x="436" y="312" font-size="12.5" font-weight="600" fill="#3A4450">R · 稳定规则</text>
+<text x="434" y="332" font-size="12" font-weight="400" fill="#7A8591">支持多次</text>
+<rect x="594" y="290" width="158" height="56" rx="6" fill="#FFFFFF" stroke="#DFE3E8"/>
+<text x="606" y="312" font-size="12.5" font-weight="600" fill="#3A4450">摇摆</text>
+<text x="604" y="332" font-size="12" font-weight="400" fill="#7A8591">一律先问</text>
+<rect x="764" y="290" width="158" height="56" rx="6" fill="#FFFFFF" stroke="#DFE3E8"/>
+<text x="776" y="312" font-size="12.5" font-weight="600" fill="#3A4450">个例</text>
+<text x="774" y="332" font-size="12" font-weight="400" fill="#7A8591">不当规则</text>
+<path d="M590 360 L590 404" stroke="#B8C0CA" stroke-width="1" fill="none" marker-end="url(#a)"/>
+<rect x="240" y="408" width="700" height="76" rx="8" fill="#FFFFFF" stroke="#7C98C4" stroke-width="1"/>
+<text x="256" y="434" font-size="14" font-weight="600" fill="#3A4450">Autopilot：按一次跑一轮</text>
+<text x="256" y="456" font-size="12" font-weight="400" fill="#7A8591">这条线上所有没做完的待办，一条条做；每个决定点都对照画像判断</text>
+<path d="M470 484 L210 532" stroke="#B8C0CA" stroke-width="1" fill="none" marker-end="url(#a)"/>
+<rect x="40" y="536" width="340" height="96" rx="8" fill="#FFFFFF" stroke="#DFE3E8" stroke-width="1"/>
+<text x="56" y="562" font-size="14" font-weight="600" fill="#3A4450">照做，记依据</text>
+<text x="56" y="584" font-size="12" font-weight="400" fill="#7A8591">规则覆盖到的，或者</text>
+<text x="56" y="602" font-size="12" font-weight="400" fill="#7A8591">按一致能推出来的</text>
+<path d="M210 632 L470 684" stroke="#B8C0CA" stroke-width="1" fill="none" marker-end="url(#a)"/>
+<path d="M590 484 L590 532" stroke="#B8C0CA" stroke-width="1" fill="none" marker-end="url(#a)"/>
+<rect x="420" y="536" width="340" height="96" rx="8" fill="#FFFFFF" stroke="#DFE3E8" stroke-width="1"/>
+<text x="436" y="562" font-size="14" font-weight="600" fill="#3A4450">先给拆分方案</text>
+<text x="436" y="584" font-size="12" font-weight="400" fill="#7A8591">能并行的活</text>
+<text x="436" y="602" font-size="12" font-weight="400" fill="#7A8591">（H5、H6：效率和省 token）</text>
+<path d="M590 632 L590 684" stroke="#B8C0CA" stroke-width="1" fill="none" marker-end="url(#a)"/>
+<path d="M710 484 L970 532" stroke="#B8C0CA" stroke-width="1" fill="none" marker-end="url(#a)"/>
+<rect x="800" y="536" width="340" height="96" rx="8" fill="#FFFFFF" stroke="#DFE3E8" stroke-width="1"/>
+<text x="816" y="562" font-size="14" font-weight="600" fill="#3A4450">停下问用户</text>
+<text x="816" y="584" font-size="12" font-weight="400" fill="#7A8591">安全、推送、对外发布、</text>
+<text x="816" y="602" font-size="12" font-weight="400" fill="#7A8591">没覆盖到的、摇摆的</text>
+<path d="M970 632 L710 684" stroke="#B8C0CA" stroke-width="1" fill="none" marker-end="url(#a)"/>
+<rect x="240" y="688" width="700" height="92" rx="8" fill="#F7F8FA" stroke="#DFE3E8" stroke-width="1"/>
+<text x="256" y="714" font-size="14" font-weight="600" fill="#3A4450">线上记录和小结</text>
+<text x="256" y="736" font-size="12" font-weight="400" fill="#7A8591">每个决定写成「做了什么 · 依据哪条规则」；一轮结束写一条 Autopilot 小结</text>
+<text x="256" y="754" font-size="12" font-weight="400" fill="#7A8591">用户推翻的规则降为「要问」；用户的新决定进画像</text>
+<path d="M940 734 C1215 734 1215 304 944 304" stroke="#7C98C4" stroke-width="1" stroke-dasharray="4 4" fill="none" marker-end="url(#ao)"/>
+<text x="1206" y="500" font-size="18" font-weight="400" fill="#7C98C4" text-anchor="middle">↻</text>
+<text x="1206" y="524" font-size="12" font-weight="400" fill="#7C98C4" text-anchor="middle">回到</text>
+<text x="1206" y="541" font-size="12" font-weight="400" fill="#7C98C4" text-anchor="middle">决策画像</text>
+</svg>

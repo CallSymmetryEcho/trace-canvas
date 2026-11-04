@@ -9,6 +9,8 @@ import { readConfig } from './store.mjs';
 
 export const q = s => `'${String(s).replace(/'/g, `'\\''`)}'`; // POSIX shell quoting
 
+const qoderBin = () => '"$(command -v qoder || command -v qodercli)"';
+
 export const AGENTS = {
   // remote: Remote Control on, named after the line, so the session shows in the Claude app (▶ Start).
   // wake: resume the session with a first message (Dispatch).
@@ -18,9 +20,9 @@ export const AGENTS = {
   gemini: { name: 'Gemini CLI', resume: id => `gemini --resume ${id}`, wake: (id, p) => `gemini --resume ${id} -i ${q(p)}`, launch: p => `gemini -i ${q(p)}` },
   // iFlow CLI (Alibaba): Claude Code's hook events and payload, Claude Code-format transcripts in ~/.iflow/projects.
   iflow: { name: 'iFlow CLI', resume: id => `iflow -r ${id}`, wake: (id, p) => `iflow -r ${id} -i ${q(p)}`, launch: p => `iflow -i ${q(p)}` },
-  // Experimental, from their docs and source, not yet run here. ponytail: TRAE documents no resume flag, so its is a guess.
+  // Experimental, from their docs and source; TRAE's resume subcommand is documented.
   qwen: { name: 'Qwen Code', experimental: true, resume: id => `qwen --resume ${id}`, wake: (id, p) => `qwen --resume ${id} -i ${q(p)}`, launch: p => `qwen -i ${q(p)}` },
-  qoder: { name: 'Qoder CLI', experimental: true, resume: id => `qodercli -r ${id}`, wake: (id, p) => `qodercli -r ${id} ${q(p)}`, launch: p => `qodercli ${q(p)}` },
+  qoder: { name: 'Qoder CLI', experimental: true, resume: id => `${qoderBin()} -r ${id}`, wake: (id, p) => `${qoderBin()} -r ${id} -i ${q(p)}`, launch: p => `${qoderBin()} -i ${q(p)}` },
   trae: { name: 'TRAE CLI', experimental: true, resume: id => `traecli resume ${id}`, wake: (id, p) => `traecli resume ${id} ${q(p)}`, launch: p => `traecli ${q(p)}` },
   // Kimi Code takes no first message in its terminal UI: a message runs as one non-interactive turn (-p).
   kimi: { name: 'Kimi Code', experimental: true, resume: id => `kimi --session ${id}`, wake: (id, p) => `kimi --session ${id} -p ${q(p)}`, launch: p => `kimi -p ${q(p)}` },
@@ -30,10 +32,14 @@ export const AGENTS = {
 };
 // Claude Code pointed at another model's Anthropic-compatible API (ANTHROPIC_BASE_URL): whose model it runs.
 const PROVIDERS = [[/deepseek/i, 'DeepSeek'], [/moonshot|kimi/i, 'Kimi'], [/dashscope|aliyuncs|qwen/i, 'Qwen'], [/minimax/i, 'MiniMax'], [/bigmodel|zhipu|z\.ai/i, 'GLM'], [/volces|volcengine|ark\.cn/i, 'Doubao'], [/siliconflow/i, 'SiliconFlow'], [/openrouter/i, 'OpenRouter']];
-export function modelProvider(env = process.env) {
-  const url = String(env.ANTHROPIC_BASE_URL || '');
-  if (!url || /anthropic\.com/i.test(url)) return '';
-  return (PROVIDERS.find(([re]) => re.test(url)) || [])[1] || '';
+export function modelProvider(env = process.env, model = '') {
+  let host = '';
+  try { host = new URL(env.ANTHROPIC_BASE_URL).hostname; } catch {}
+  if (host === 'anthropic.com' || host.endsWith('.anthropic.com')) return '';
+  const provider = (PROVIDERS.find(([re]) => re.test(host)) || [])[1] || '';
+  if (provider && !['SiliconFlow', 'OpenRouter'].includes(provider)) return provider;
+  const name = String(model || env.ANTHROPIC_MODEL || '');
+  return ([[/deepseek/i, 'DeepSeek'], [/kimi|moonshot/i, 'Kimi'], [/qwen/i, 'Qwen'], [/minimax/i, 'MiniMax'], [/glm/i, 'GLM'], [/doubao|seed-/i, 'Doubao']].find(([re]) => re.test(name)) || [])[1] || provider;
 }
 export const agentOf = key => AGENTS[key] || AGENTS.claude;
 // AppleScript that runs cmd in a new Terminal window and brings it forward (macOS, "Open in Terminal").
@@ -126,6 +132,17 @@ export function normalize(key, input) {
   const k = AGENTS[key] ? key : 'claude';
   const out = { ...input, _agent: k };
   if (k === 'claude') return out;
+  // iFlow 0.4.11 reports a basename-only project directory, but saves under the encoded full cwd.
+  // Resolve only the same session filename within that projects folder; never guess another session.
+  if (k === 'iflow' && input.transcript_path && !fs.existsSync(input.transcript_path)) {
+    const projects = path.dirname(path.dirname(input.transcript_path)), name = path.basename(input.transcript_path);
+    if (path.basename(projects) === 'projects' && name === `${input.session_id}.jsonl`) {
+      try {
+        const matches = fs.readdirSync(projects).map(dir => path.join(projects, dir, name)).filter(file => fs.existsSync(file));
+        if (matches.length === 1) out.transcript_path = matches[0];
+      } catch {}
+    }
+  }
   let ev = input.hook_event_name;
   if (k === 'gemini') {
     ev = GEMINI_EVENTS[ev] || ev;
@@ -134,7 +151,7 @@ export function normalize(key, input) {
   }
   // Codex, Kimi Code and MiniMax Code have no Notification event: a PermissionRequest is what "needs you" looks like.
   // Our hook prints nothing for it, so the CLI asks the person as usual. Interrupt ends a turn in place of Stop.
-  if (k === 'codex' || k === 'kimi' || k === 'minimax') {
+  if (['codex', 'kimi', 'minimax', 'qwen', 'qoder'].includes(k)) {
     if (ev === 'PermissionRequest') { ev = 'Notification'; out.notification_type = 'permission_prompt'; out.message = input.message || `${input.tool_name || 'A tool'} needs your permission`; }
     if (ev === 'Interrupt') ev = 'Stop';
   }
@@ -158,7 +175,7 @@ export function normalize(key, input) {
   }
   if (typeof out.tool_response === 'string') out.tool_response = { stdout: out.tool_response };
   // A CLI that does not hand the reply to its Stop hook (iFlow): the last thing the agent said, from its transcript.
-  if (ev === 'Stop' && !out.last_assistant_message && input.transcript_path) out.last_assistant_message = lastReply(input.transcript_path);
+  if ((ev === 'Stop' || (k === 'iflow' && ['UserPromptSubmit', 'SessionEnd'].includes(ev))) && !out.last_assistant_message && out.transcript_path) out.last_assistant_message = lastReply(out.transcript_path);
   return out;
 }
 
@@ -169,8 +186,12 @@ export function lastReply(file) {
     fs.readSync(fd, buf, 0, n, size - n); fs.closeSync(fd);
     for (const line of buf.toString('utf8').split('\n').reverse()) {
       let j; try { j = JSON.parse(line); } catch { continue; }
+      if (j.type === 'user' && j.message) {
+        const content = j.message.content;
+        if (typeof content === 'string' ? content.trim() : Array.isArray(content) && content.some(b => b && (b.type === 'text' || b.type == null) && b.text)) return '';
+      }
       if (j.type !== 'assistant' || !j.message) continue;
-      const c = j.message.content, text = typeof c === 'string' ? c : (c || []).filter(b => b && b.type === 'text').map(b => b.text).join('\n');
+      const c = j.message.content, text = typeof c === 'string' ? c : (c || []).filter(b => b && (b.type === 'text' || b.type == null) && typeof b.text === 'string').map(b => b.text).join('\n');
       if (text.trim()) return text.trim();
     }
   } catch {}

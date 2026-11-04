@@ -85,7 +85,7 @@ Goals and to-dos
   trace-canvas tasks [--thread T] [--all]          Each thread's goal and open to-dos (--all: finished too)
   trace-canvas done <task> [--thread T] [--agent A] [--undo]
                                                    Tick a to-do by id or title (--undo reopens it)
-  trace-canvas hand <to-do|thread> --to claude|codex|gemini|iflow|qwen|qoder|trae|kimi|dsh
+  trace-canvas hand <to-do|thread> --to claude|codex|gemini|iflow|qwen|qoder|trae|kimi|dsh|minimax
                                                    Assign it and print the command that starts the agent on it
   trace-canvas autopilot <line> [--stop] [--print]   Autopilot (beta): one round, the line's agent works every open
                                                    to-do by the decision profile and asks only what it must
@@ -205,6 +205,8 @@ async function main() {
       process.exit(0);
     }
     case 'mcp': {
+      const agent = str(flag('agent', ''));
+      if (agent) { if (!AGENTS[agent]) throw new Error(`Unknown agent ${agent}`); process.env.TRACE_CANVAS_AGENT = agent; }
       const { runMcp } = await import('../src/mcp.mjs');
       runMcp();
       break;
@@ -599,7 +601,7 @@ async function main() {
       // --agents claude,codex,gemini,iflow,qwen,qoder,trae,kimi,dsh,minimax also wires the other CLIs (user scope only); missing ones are skipped.
       const others = str(flag('agents', '')).split(',').map(x => x.trim()).filter(x => AGENT_SETUP[x]);
       for (const a of s.user ? others : []) {
-        if (!onPath(AGENT_SETUP[a].bin)) { console.log(`   ${a}: not found on PATH, skipped${a === 'gemini' ? ' (install a current @google/gemini-cli, then run setup again)' : ''}`); continue; }
+        if (!(Array.isArray(AGENT_SETUP[a].bin) ? AGENT_SETUP[a].bin : [AGENT_SETUP[a].bin]).some(bin => onPath(bin))) { console.log(`   ${a}: not found on PATH, skipped${a === 'gemini' ? ' (install a current @google/gemini-cli, then run setup again)' : ''}`); continue; }
         if (AGENT_SETUP[a].setup) { console.log(`   ${a}: ${AGENT_SETUP[a].setup(SELF, home())} (experimental: built from its docs, not yet run here)`); continue; }
         const f = agentFiles(os.homedir())[a], cmd = hookCommand(SELF, a);
         install(f, cmd, AGENT_SETUP[a].hooks(cmd));

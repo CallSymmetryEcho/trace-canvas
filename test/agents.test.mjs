@@ -234,7 +234,8 @@ test('the experimental CLIs: Claude-shaped hooks for Qwen Code, Qoder and TRAE',
   assert.equal(agentFiles(home).trae, path.join(home, '.trae-cn', 'hooks.json')); // the Chinese edition's folder when it is there
   assert.equal(installAgentMcp('qwen', '/x/cli.mjs', home).ok, true);
   assert.deepEqual(JSON.parse(fs.readFileSync(agentFiles(home).qwen, 'utf8')).mcpServers['trace-canvas'].env, { TRACE_CANVAS_AGENT: 'qwen' });
-  assert.match(installAgentMcp('qoder', '/x/cli.mjs', home).hint, /^qodercli mcp add trace-canvas -- /);
+  assert.equal(installAgentMcp('qoder', '/x/cli.mjs', home).ok, true);
+  assert.equal(JSON.parse(fs.readFileSync(agentFiles(home).qoder, 'utf8')).mcpServers['trace-canvas'].env.TRACE_CANVAS_AGENT, 'qoder');
 });
 
 test('a Kimi Code session, its payloads as Kimi Code builds them, is recorded as Kimi Code', () => {
@@ -297,7 +298,7 @@ test('DeepSeek Harness gets a Claude Code hooks file for its bridge plugin and a
   assert.deepEqual(Object.values(readData(s.env).commits).sort((a, b) => a.ts - b.ts).map(c => c.title), ['Speed up the parser', 'Commit 9f8e7d6: Faster parser']);
 });
 
-test('MiniMax Code gets a local plugin in Claude Code\'s plugin format: hooks, and the MCP server in its manifest', async () => {
+test('MiniMax Code installs MCP only and removes just its own legacy hooks on upgrade', async () => {
   const { installMinimax } = await import('../src/install.mjs');
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-mm-'));
   const root = installMinimax(home, '/x/bin/trace-canvas.mjs', {});
@@ -305,11 +306,124 @@ test('MiniMax Code gets a local plugin in Claude Code\'s plugin format: hooks, a
   const manifest = JSON.parse(fs.readFileSync(path.join(root, '.claude-plugin', 'plugin.json'), 'utf8'));
   assert.equal(manifest.name, 'trace-canvas'); // the folder's name
   assert.deepEqual(manifest.mcpServers['trace-canvas'].args, ['/x/bin/trace-canvas.mjs', 'mcp']);
-  const hooks = JSON.parse(fs.readFileSync(path.join(root, 'hooks', 'hooks.json'), 'utf8')).hooks;
-  assert.deepEqual(Object.keys(hooks), ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PermissionRequest', 'PostToolUse', 'SubagentStart', 'SubagentStop', 'Stop', 'SessionEnd']);
-  assert.match(hooks.PreToolUse[0].hooks[0].command, /--agent minimax$/);
+  const hooksFile = path.join(root, 'hooks', 'hooks.json');
+  assert.equal(fs.existsSync(hooksFile), false);
+  fs.mkdirSync(path.dirname(hooksFile), { recursive: true });
+  fs.writeFileSync(hooksFile, JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: 'other-hook' }] }, { hooks: [{ type: 'command', command: '"node" "/x/bin/trace-canvas.mjs" hook --agent minimax' }] }] } }));
+  installMinimax(home, '/x/bin/trace-canvas.mjs', {});
+  const hooks = JSON.parse(fs.readFileSync(hooksFile, 'utf8')).hooks;
+  assert.equal(hooks.Stop.length, 1);
+  assert.equal(hooks.Stop[0].hooks[0].command, 'other-hook');
+  assert.ok(fs.readFileSync(hooksFile + '.bak', 'utf8').includes('--agent minimax'));
   assert.equal(installMinimax(home, '/x/bin/trace-canvas.mjs', { MINIMAX_DATA_DIR: path.join(home, 'mm') }), path.join(home, 'mm', 'plugins', 'trace-canvas'));
   fs.mkdirSync(path.join(home, 'old', '.mavis'), { recursive: true }); // only the legacy folder there
   assert.equal(installMinimax(path.join(home, 'old'), '/x/bin/trace-canvas.mjs', {}), path.join(home, 'old', '.mavis', 'plugins', 'trace-canvas'));
   assert.equal(normalize('minimax', { hook_event_name: 'PermissionRequest', tool_name: 'Bash' }).notification_type, 'permission_prompt');
+});
+
+
+test('real iFlow 0.4.11 replies have no text type and its hook can report the wrong project directory', async () => {
+  const { lastReply } = await import('../src/agents.mjs');
+  const { parseTranscript } = await import('../src/transcript.mjs');
+  const s = sandbox(), projects = path.join(s.root, '.iflow', 'projects');
+  const actual = path.join(projects, '-encoded-full-path', 'session-real-iflow.jsonl');
+  fs.mkdirSync(path.dirname(actual), { recursive: true });
+  // Shape captured from the installed CLI against a local test server, with paths/ids anonymised.
+  const fixture = fs.readFileSync(new URL('./fixtures/iflow/session.jsonl', import.meta.url), 'utf8');
+  fs.writeFileSync(actual, fixture);
+  const out = normalize('iflow', { hook_event_name: 'Stop', session_id: 'session-real-iflow', transcript_path: path.join(projects, 'tripsplit', 'session-real-iflow.jsonl'), cwd: s.repo });
+  assert.equal(out.transcript_path, actual);
+  assert.equal(lastReply(actual), 'TC_IFLOW_OK');
+  assert.equal(out.last_assistant_message, 'TC_IFLOW_OK');
+  assert.equal(parseTranscript(actual).turns[0].text, 'TC_IFLOW_OK');
+  // Two files with the same session filename are ambiguous; neither is guessed.
+  const duplicate = path.join(projects, '-another-project', path.basename(actual));
+  fs.mkdirSync(path.dirname(duplicate)); fs.writeFileSync(duplicate, fixture);
+  assert.equal(normalize('iflow', { hook_event_name: 'Stop', session_id: 'session-real-iflow', transcript_path: path.join(projects, 'missing', path.basename(actual)) }).last_assistant_message, '');
+});
+
+test('page hand-off commands cover every selectable agent and safely quote the prompt', async () => {
+  const vm = await import('node:vm');
+  const { AGENTS } = await import('../src/agents.mjs');
+  const html = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
+  const source = html.match(/const AGENT_LAUNCH = .*;\nconst shq = .*;/)[0];
+  const commands = vm.runInNewContext(source + '\nAGENT_LAUNCH');
+  const prompt = `Fix user's notes; $(do-not-run) and \`literal\``;
+  for (const [key, agent] of Object.entries(AGENTS)) assert.equal(commands[key](prompt), agent.launch(prompt), key);
+});
+
+test('model labels cover compatible proxies and stay with the underlying Claude agent in dispatch', async () => {
+  const { modelProvider } = await import('../src/agents.mjs');
+  const { dispatch } = await import('../src/ops.mjs');
+  assert.equal(modelProvider({ ANTHROPIC_BASE_URL: 'http://localhost:4000', ANTHROPIC_MODEL: 'deepseek-v3' }), 'DeepSeek');
+  assert.equal(modelProvider({ ANTHROPIC_BASE_URL: 'https://openrouter.ai/api' }, 'moonshot/kimi-k2'), 'Kimi');
+  assert.equal(modelProvider({ ANTHROPIC_BASE_URL: 'https://api.anthropic.com' }, 'claude-sonnet'), '');
+  const s = sandbox(), d = emptyData(), th = createThread(d, { name: 'Parser', note: s.repo });
+  d.sessions.ds = { id: 'ds', thread: th.id, agent: 'Claude Code · DeepSeek', agentKey: 'claude', cwd: s.repo, last: Date.now() - 1000 };
+  addCommit(d, { thread: th.id, kind: 'agent', title: 'Parser updated', agent: 'Claude Code · DeepSeek', extra: { session: 'ds' } });
+  const todo = addCommit(d, { thread: th.id, kind: 'task', title: 'Check parser', extra: { assignee: 'claude' } });
+  const rows = dispatch(d, { refs: [todo.id] }, s.env);
+  assert.equal(rows[0].session.id, 'ds');
+  assert.match(rows[0].command, /claude --resume ds/);
+});
+
+test('sessions known only from records keep their Chinese CLI resume command', async () => {
+  const { AGENTS } = await import('../src/agents.mjs');
+  const { sessionList } = await import('../src/ops.mjs');
+  for (const key of ['iflow', 'qwen', 'qoder', 'trae', 'kimi', 'minimax', 'dsh']) {
+    const d = emptyData(), th = createThread(d, { name: key });
+    addCommit(d, { thread: th.id, kind: 'agent', title: 'Result', agent: AGENTS[key].name, links: [AGENTS[key].resume('abc')], extra: { session: 'abc' } });
+    assert.equal(sessionList(d)[0].resume, AGENTS[key].resume('abc'), key);
+  }
+});
+
+
+test('TRAE CLI 2 MCP preserves existing TOML and refuses to replace an unmanaged server', async () => {
+  const { installTraeMcp } = await import('../src/install.mjs');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-trae-')), file = path.join(dir, '.trae', 'traecli.toml');
+  fs.mkdirSync(path.dirname(file));
+  const original = 'model = "my-model"\n\n[mcp_servers.notes]\ncommand = "other-server"\n';
+  fs.writeFileSync(file, original);
+  assert.equal(installTraeMcp(dir, '/x y/trace-canvas.mjs').ok, true);
+  assert.equal(installTraeMcp(dir, '/x y/trace-canvas.mjs').ok, true);
+  const raw = fs.readFileSync(file, 'utf8');
+  assert.ok(raw.startsWith(original.trimEnd()));
+  assert.equal((raw.match(/\[mcp_servers.trace-canvas\]/g) || []).length, 1);
+  assert.match(raw, /"mcp","--agent","trae"/);
+  fs.writeFileSync(file, '[mcp_servers.trace-canvas]\ncommand = "my-server"\n');
+  assert.equal(installTraeMcp(dir, '/x/cli.mjs').ok, false);
+  assert.ok(fs.readFileSync(file, 'utf8').includes('my-server'));
+});
+
+
+test('iFlow replies persisted after Stop finish on the next prompt or SessionEnd, once per turn', () => {
+  const s = sandbox(), env = { ...s.env, TRACE_CANVAS_TURNS: 'all' }, transcript = path.join(s.root, 'session-late.jsonl');
+  const user = text => ({ type: 'user', message: { role: 'user', content: text } });
+  const reply = text => ({ type: 'assistant', message: { role: 'assistant', content: [{ text }] } });
+  const write = (rows) => fs.writeFileSync(transcript, rows.map(JSON.stringify).join('\n') + '\n');
+  const fire = (event, extra = {}) => handleHook(normalize('iflow', { hook_event_name: event, session_id: 'session-late', transcript_path: transcript, cwd: s.repo, ...extra }), env);
+  fire('UserPromptSubmit', { prompt: 'First request' });
+  fire('PostToolUse', { tool_name: 'write_file', tool_input: { file_path: path.join(s.repo, 'notes.txt'), content: 'ok' } });
+  write([user('First request')]); fire('Stop');
+  assert.equal(Object.values(readData(env).commits).filter(c => c.kind === 'agent').length, 0);
+  write([user('First request'), reply('First done.')]);
+  fire('UserPromptSubmit', { prompt: 'Second request' });
+  write([user('First request'), reply('First done.'), user('Second request')]); fire('Stop');
+  write([user('First request'), reply('First done.'), user('Second request'), reply('Second done.')]); fire('SessionEnd');
+  const records = Object.values(readData(env).commits).filter(c => c.kind === 'agent');
+  assert.deepEqual(records.map(c => c.title), ['First done.', 'Second done.']);
+  assert.deepEqual(records[0].files, ['notes.txt']);
+});
+
+
+test('Qoder hand-off commands run with either current or legacy executable names', async () => {
+  const { AGENTS } = await import('../src/agents.mjs');
+  for (const bin of ['qoder', 'qodercli']) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-qoder-bin-'));
+    fs.writeFileSync(path.join(dir, bin), '#!/bin/sh\nprintf \'%s\\n\' "$@"\n');
+    fs.chmodSync(path.join(dir, bin), 0o755);
+    const prompt = "Keep user's notes and $(literal)";
+    const out = execFileSync('/bin/sh', ['-c', AGENTS.qoder.launch(prompt)], { env: { ...process.env, PATH: dir + ':/usr/bin:/bin' }, encoding: 'utf8' });
+    assert.deepEqual(out.trim().split('\n'), ['-i', prompt]);
+  }
 });

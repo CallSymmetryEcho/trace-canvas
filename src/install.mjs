@@ -96,21 +96,20 @@ export function installDsh(dir, cli) {
 `);
   return patch;
 }
-// MiniMax Code: a local plugin, in the Claude Code plugin format it also reads (hooks/hooks.json, MCP servers in the
-// manifest), in its data folder's plugins/ (the local marketplace). It has no Notification event.
+// MiniMax Code: an MCP-only local plugin. Upgrading removes only our old hooks, preserving other hooks and a backup.
 export function installMinimax(home, cli, env = process.env) {
   const data = env.MINIMAX_DATA_DIR || env.MAVIS_DATA_DIR || [path.join(home, '.minimax'), path.join(home, '.mavis')].find(d => fs.existsSync(d)) || path.join(home, '.minimax');
-  const root = path.join(data, 'plugins', 'trace-canvas'), cmd = hookCommand(cli, 'minimax');
+  const root = path.join(data, 'plugins', 'trace-canvas');
   fs.mkdirSync(path.join(root, '.claude-plugin'), { recursive: true });
-  fs.writeFileSync(path.join(root, '.claude-plugin', 'plugin.json'), JSON.stringify({ name: 'trace-canvas', version: '1.0.0', description: 'Trace Canvas: records this session on the canvas and gives the agent its trace_* tools.', mcpServers: { 'trace-canvas': { command: NODE, args: [cli, 'mcp'], env: { TRACE_CANVAS_AGENT: 'minimax' } } } }, null, 2) + '\n');
-  install(path.join(root, 'hooks', 'hooks.json'), cmd, plainHooks(['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PermissionRequest', 'PostToolUse', 'SubagentStart', 'SubagentStop', 'Stop', 'SessionEnd'])(cmd));
+  fs.writeFileSync(path.join(root, '.claude-plugin', 'plugin.json'), JSON.stringify({ name: 'trace-canvas', version: '1.0.0', description: 'Trace Canvas MCP tools (no automatic hooks).', mcpServers: { 'trace-canvas': { command: NODE, args: [cli, 'mcp'], env: { TRACE_CANVAS_AGENT: 'minimax' } } } }, null, 2) + '\n');
+  uninstall(path.join(root, 'hooks', 'hooks.json'));
   return root;
 }
 // Each other CLI: its hooks and the command that must be on the PATH for setup to wire it, or its own setup, which
 // returns what to tell the person.
 export const AGENT_SETUP = {
   codex: { hooks: codexHooks, bin: 'codex' }, gemini: { hooks: geminiHooks, bin: 'gemini' }, iflow: { hooks: iflowHooks, bin: 'iflow' },
-  qwen: { hooks: plainHooks(CLAUDE_LIKE), bin: 'qwen' }, qoder: { hooks: plainHooks(CLAUDE_LIKE), bin: 'qodercli' }, trae: { hooks: plainHooks(['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Notification', 'Stop']), bin: 'traecli' },
+  qwen: { hooks: plainHooks(CLAUDE_LIKE), bin: 'qwen' }, qoder: { hooks: plainHooks(CLAUDE_LIKE), bin: ['qoder', 'qodercli'] }, trae: { hooks: plainHooks(['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Notification', 'Stop']), bin: 'traecli' },
   kimi: { bin: 'kimi', setup: (cli, dir, home = os.homedir()) => {
     const f = path.join(home, '.kimi-code', 'config.toml');
     installKimi(f, hookCommand(cli, 'kimi'));
@@ -121,8 +120,8 @@ export const AGENT_SETUP = {
       then start it with: dsh web --patch ${installDsh(dir, cli)}  (or copy that file's entries into ~/.dsh/profiles/web/cordis.patch.yml)` },
   minimax: { bin: 'mcode', setup: (cli, dir, home = os.homedir()) => {
     const root = installMinimax(home, cli);
-    try { execFileSync('mcode', ['plugin', 'enable', 'trace-canvas@local'], { stdio: 'ignore', timeout: 20000 }); return `plugin at ${root}, enabled`; }
-    catch { return `plugin at ${root}; turn it on with: mcode plugin enable trace-canvas@local`; }
+    try { execFileSync('mcode', ['plugin', 'enable', 'trace-canvas@local'], { stdio: 'ignore', timeout: 20000 }); return `MCP-only plugin at ${root}, enabled (no automatic hooks)`; }
+    catch { return `MCP-only plugin at ${root}; turn it on with: mcode plugin enable trace-canvas@local`; }
   } },
 };
 
@@ -188,15 +187,29 @@ export function installMcp({ user, project }, cli) {
   return { ok: true, where: file };
 }
 
+// TRAE CLI 2 uses TOML for MCP; its old hooks.json is retained only for CLI 1 compatibility.
+export function installTraeMcp(home, cli) {
+  const file = path.join(home, '.trae', 'traecli.toml');
+  const raw = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+  const kept = raw.replace(/\n*# >>> trace-canvas MCP >>>[\s\S]*?# <<< trace-canvas MCP <<<\n?/g, '').trimEnd();
+  if (/^\s*\[mcp_servers\.(?:trace-canvas|"trace-canvas"|'trace-canvas')\]/m.test(kept)) return { ok: false, hint: `update the existing mcp_servers.trace-canvas in ${file}; it is not managed by Trace Canvas` };
+  if (raw) fs.writeFileSync(file + '.bak', raw);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const block = `# >>> trace-canvas MCP >>>\n[mcp_servers.trace-canvas]\ncommand = ${JSON.stringify(NODE)}\nargs = ${JSON.stringify([cli, 'mcp', '--agent', 'trae'])}\n# <<< trace-canvas MCP <<<\n`;
+  fs.writeFileSync(file, (kept ? kept + '\n\n' : '') + block);
+  return { ok: true };
+}
+
 // MCP for Codex and Gemini, with TRACE_CANVAS_AGENT so the server knows who is calling.
 export function installAgentMcp(agent, cli, home = os.homedir()) {
+  if (agent === 'trae') return installTraeMcp(home, cli);
   if (agent === 'codex') {
     try { execFileSync('codex', ['mcp', 'remove', 'trace-canvas'], { stdio: 'ignore' }); } catch {}
     try { execFileSync('codex', ['mcp', 'add', 'trace-canvas', '--env', 'TRACE_CANVAS_AGENT=codex', '--', NODE, cli, 'mcp'], { stdio: 'pipe' }); return { ok: true }; }
     catch (e) { return { ok: false, hint: `codex mcp add trace-canvas --env TRACE_CANVAS_AGENT=codex -- "${NODE}" "${cli}" mcp` }; }
   }
   // Gemini CLI, iFlow CLI and Qwen Code: mcpServers in their settings.json; Kimi Code: in its mcp.json. The others by hand.
-  const file = agent === 'kimi' ? path.join(home, '.kimi-code', 'mcp.json') : ['gemini', 'iflow', 'qwen'].includes(agent) && agentFiles(home)[agent];
+  const file = agent === 'kimi' ? path.join(home, '.kimi-code', 'mcp.json') : ['gemini', 'iflow', 'qwen', 'qoder'].includes(agent) && agentFiles(home)[agent];
   if (!file) return { ok: false, hint: agent === 'qoder' ? `qodercli mcp add trace-canvas -- "${NODE}" "${cli}" mcp` : `add an MCP server running "${NODE}" "${cli}" mcp with TRACE_CANVAS_AGENT=${agent}` };
   const s = fs.existsSync(file) && fs.readFileSync(file, 'utf8').trim() ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
   s.mcpServers = { ...(s.mcpServers || {}), 'trace-canvas': { command: NODE, args: [cli, 'mcp'], env: { TRACE_CANVAS_AGENT: agent } } };
@@ -232,7 +245,7 @@ export function codexWritable(file, dir) {
  */
 export function withUserBins(PATH = '', home = os.homedir()) {
   const have = PATH.split(path.delimiter).filter(Boolean);
-  const more = [path.join(home, '.local', 'bin'), path.join(home, '.claude', 'local'), path.join(home, '.npm-global', 'bin'), path.join(home, '.bun', 'bin'), '/opt/homebrew/bin', '/usr/local/bin']
+  const more = [path.join(home, '.local', 'bin'), path.join(home, '.claude', 'local'), path.join(home, '.npm-global', 'bin'), path.join(home, '.bun', 'bin'), path.join(home, '.kimi-code', 'bin'), path.join(home, '.minimax-code', 'bin'), path.join(home, '.qoder', 'bin'), '/opt/homebrew/bin', '/usr/local/bin']
     .filter(d => !have.includes(d) && fs.existsSync(d));
   return [...have, ...more].join(path.delimiter);
 }

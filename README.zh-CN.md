@@ -289,13 +289,15 @@ Codex 没有通知事件，所以用权限请求来表示"等你"。这些已经
 | **Claude Code 接 DeepSeek、Kimi、千问、MiniMax、GLM 或豆包** | 全部功能 | 它就是 Claude Code（把 `ANTHROPIC_BASE_URL` 指向它们兼容 Anthropic 的接口）；记录会写明用的是谁的模型，比如「Claude Code · DeepSeek」 | 已验证 |
 | **Kimi Code**（月之暗面） | 自动留痕、实时栏、「等你处理」、MCP 工具、恢复会话（`kimi --session`） | `~/.kimi-code/config.toml` 里的 `[[hooks]]` 表，MCP 写在 `~/.kimi-code/mcp.json` | 实验性：按它源码里的数据格式回放过 |
 | **DeepSeek Harness**（`dsh`） | 自动留痕、实时栏、MCP 工具、给会话发消息（`dsh headless --session-id`） | 它的 `dsh-hooks-claude-code` 插件运行 setup 写好的 hooks 文件；setup 还会写一个 patch，挂上这个插件和 `dsh-mcp-client`：先装一次这两个插件，再用 `dsh web --patch ~/.trace-canvas/dsh.patch.yml` 启动（setup 会打印这两行） | 实验性：按它桥接插件的数据格式回放过 |
-| **MiniMax Code**（`mcode`） | 自动留痕、实时栏、「等你处理」、MCP 工具、恢复会话（`mcode --session`） | 一个 Claude Code 插件格式的本地插件，放在 `~/.minimax/plugins/trace-canvas`，用 `mcode plugin enable trace-canvas@local` 打开 | 实验性：照源码做 |
+| **MiniMax Code**（`mcode`） | 仅 MCP 工具 | `~/.minimax/plugins/trace-canvas` 的纯 MCP 本地插件；`mcode plugin enable trace-canvas@local` | 已核验配置与 MCP；不安装自动留痕 hooks |
 | **Qwen Code**（千问） | 自动留痕、实时栏、MCP 工具 | `~/.qwen/settings.json` | 实验性：照文档做 |
-| **Qoder CLI** | 自动留痕、实时栏（MCP：`qodercli mcp add`，setup 会打印） | `~/.qoder/settings.json` | 实验性：照文档做 |
-| **TRAE CLI**（字节） | 自动留痕、实时栏（MCP 手动加） | `~/.trae/hooks.json`（国内版是 `~/.trae-cn`） | 实验性：照文档做 |
-| **iFlow CLI**（阿里，即将停用） | 自动留痕、实时栏、MCP 工具、恢复会话（`iflow -r`）、导入历史、复盘 | hooks 和 MCP 写在 `~/.iflow/settings.json`；它的对话记录和 Claude Code 同格式，在 `~/.iflow/projects` | 按 iFlow 0.4 的数据格式回放过 |
+| **Qoder CLI** | 自动留痕、实时栏、MCP 工具、恢复 | `~/.qoder/settings.json`；新版 `qoder` 或旧版 `qodercli` | 实验性：官方 hooks 格式 |
+| **TRAE CLI**（字节） | MCP 工具；旧版 CLI 1 hooks 实验性兼容 | CLI 2 MCP 写入 `~/.trae/traecli.toml`；旧版 hooks 在 `~/.trae/hooks.json`（或 `.trae-cn`） | 已对照官方 MCP 格式；CLI 2 自动 hooks 未验证 |
+| **iFlow CLI**（已停服） | 自动留痕、实时栏、MCP、恢复、历史和复盘 | `~/.iflow/settings.json`，历史在 `~/.iflow/projects` | 真实 0.4.11 CLI＋本地测试服务验收；官方云服务已于 2026-04-17 停止 |
 
 各家的工具名不一样（`run_shell_command`、`RunCommand`、`write_file`……），所以命令和改动按工具输入的样子认，不按名字认。Kimi Code 和 DeepSeek Harness 不把 agent 的回复交给 Stop hook，所以它们每一轮显示的是改了哪些文件，而不是 agent 说了什么。
+
+[验证范围与官方参考](docs/chinese-clis.md)。
 
 ## 多台电脑，同一张画布
 

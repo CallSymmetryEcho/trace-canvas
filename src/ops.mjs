@@ -10,6 +10,8 @@ import { desktopSessions } from './desktop.mjs';
 import { remoteLiveSync } from './remote.mjs';
 import { tr } from './i18n.mjs';
 
+const sessionAgent = s => AGENTS[s.agentKey] ? s.agentKey : Object.keys(AGENTS).find(k => s.agent === AGENTS[k].name || String(s.agent || '').startsWith(AGENTS[k].name + ' · ')) || 'claude';
+
 const norm = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
 // A line by id or name, or else by a part of its name that matches exactly one line; several
@@ -163,7 +165,7 @@ export function dispatch(d, { refs = [], all = false, self = null, on = '', away
     // another's (whose messages do not reach it yet); then this machine's latest; then the latest anywhere.
     // A to-do assigned to an agent goes only to that agent's sessions (or a new one of it).
     const pick = (machine, agent) => {
-      const pool = ranked.filter(id => (!machine || machineOf(id) === machine) && (!agent || known.get(id).agent === AGENTS[agent].name)), own = pool.filter(onLine), c = own.length ? own : pool;
+      const pool = ranked.filter(id => (!machine || machineOf(id) === machine) && (!agent || sessionAgent(known.get(id)) === agent)), own = pool.filter(onLine), c = own.length ? own : pool;
       return c.find(id => machineOf(id) === me && runOf(id)) || c.find(id => runOf(id)) || c.find(id => machineOf(id) === me) || c[0];
     };
     // The line's open to-dos nobody has, in one group per machine they are for (dispatch's `on`, else the to-do's own).
@@ -178,7 +180,7 @@ export function dispatch(d, { refs = [], all = false, self = null, on = '', away
       if (!todos.length) continue;
       const away = s ? (s.machine && s.machine !== me ? s.machine : '') : (machine && machine !== me ? machine : '');
       const run = sid && runOf(sid);
-      const key = agent || (s ? Object.keys(AGENTS).find(k => AGENTS[k].name === s.agent) || 'claude' : 'claude');
+      const key = agent || (s ? sessionAgent(s) : 'claude');
       for (const c of todos) c.assignee ||= key; // an assignee someone set stays
       const row = { thread: { id: tid, name: th.name }, agent: key, todos: todos.map(c => ({ id: c.id, title: c.title })), ...(machine ? { on: machine } : {}) };
       if (!s) {
@@ -234,7 +236,6 @@ const oneLine = s => String(s).replace(/[\x00-\x1f\x7f]+/g, ' ');
 const sessionThreadOf = (d, s, env) => sessionThread(d, s, env).threadId;
 // The folder a line works in: the repository path the hooks keep in its note.
 export const lineDir = th => { const n = String((th && th.note) || '').trim(); return /^\/\S*$/.test(n) && fs.existsSync(n) ? n : ''; };
-const RESUME = /^(claude --resume|codex resume|gemini --resume) \S+$/;
 
 /**
  * Every session the canvas knows, newest first, each on the line it stays on: the session table,
@@ -248,7 +249,7 @@ export function sessionList(d, tid = null) {
     const r = rec.get(c.session) || { last: 0, at: Infinity };
     if (c.ts > r.last) Object.assign(r, { last: c.ts, thread: threadIdOf(d, c), agent: c.agent || r.agent, machine: c.machine || r.machine });
     if (c.kind === 'task' && c.ts < r.at) Object.assign(r, { at: c.ts, title: c.title });
-    const link = (c.links || []).find(l => RESUME.test(l));
+    const link = (c.links || []).find(l => Object.values(AGENTS).some(ag => ag.resume(c.session) === l));
     if (link) r.resume = link;
     rec.set(c.session, r);
   }
@@ -256,7 +257,7 @@ export function sessionList(d, tid = null) {
   const all = [...new Set([...Object.keys(table), ...rec.keys()])].map(id => {
     const r = rec.get(id) || {}, e = table[id] || {};
     const th = table[id] ? threadById(d, e.thread) : d.threads[r.thread] || null;
-    const cwd = e.cwd || lineDir(th), resume = e.resume || r.resume || resumeLink(id);
+    const cwd = e.cwd || lineDir(th), resume = e.resume || r.resume || (e.agent || r.agent ? AGENTS[sessionAgent({ ...r, ...e })].resume(id) : resumeLink(id));
     return { id, thread: th ? th.id : null, agent: e.agent || r.agent || AGENT, title: e.title || r.title || '', bound: !!e.bound, last: Math.max(e.last || 0, r.last || 0), machine: e.machine || r.machine || '', cwd, resume, command: `${cwd ? `cd ${q(cwd)} && ` : ''}${resume}` };
   }).sort((a, b) => b.last - a.last);
   return tid ? all.filter(s => s.thread === tid) : all;

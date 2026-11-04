@@ -164,7 +164,7 @@ export function terminalOf(env = process.env, pid = process.pid) {
   for (let p = pid, n = 0; procs.has(p) && p > 1 && n < 8 && !(tty && agent); p = procs.get(p).ppid, n++) {
     const { tty: t, comm } = procs.get(p);
     if (!tty && /^(ttys?\d+|pts\/\d+)$/.test(t)) tty = '/dev/' + t;
-    if (!agent && /^(claude|codex|gemini)(\s|$)/i.test(path.basename(comm))) agent = p; // "claude bg-spare" for a claude --bg session
+    if (!agent && /^(claude|codex|gemini|iflow|qwen|qoder|qodercli|traecli|kimi|mcode|dsh)(\s|$)/i.test(path.basename(comm))) agent = p; // "claude bg-spare" for a claude --bg session
   }
   return { tty, term: String(env.TERM_PROGRAM || ''), pid: agent }; // pid 0: not found, the 12-hour rule applies
 }

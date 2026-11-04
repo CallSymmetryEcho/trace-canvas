@@ -91,7 +91,7 @@ export function findTranscript({ sessionId, projectDir, transcriptPath }, env = 
 
 const isNoise = text => /^\s*<(command-name|command-message|command-args|local-command-stdout|local-command-caveat|bash-input|bash-stdout|bash-stderr|user-memory-input)\b/.test(text)
   || /^\s*\[Request interrupted/.test(text) || /^\s*Caveat: The messages below/.test(text);
-const textOf = c => typeof c === 'string' ? c : Array.isArray(c) ? c.filter(b => b && b.type === 'text').map(b => b.text).join('\n') : '';
+const textOf = c => typeof c === 'string' ? c : Array.isArray(c) ? c.filter(b => b && (b.type === 'text' || b.type == null) && typeof b.text === 'string').map(b => b.text).join('\n') : '';
 const toolResultText = b => typeof b.content === 'string' ? b.content : Array.isArray(b.content) ? b.content.filter(x => x && x.type === 'text').map(x => x.text).join('\n') : '';
 
 // Parses a transcript into turns. Each turn starts with something the person typed.
@@ -137,7 +137,7 @@ export function parseTranscript(file) {
       const u = j.message.usage;
       if (u && !counted.has(j.message.id)) { counted.add(j.message.id); turn.tokens += (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.output_tokens || 0); }
       for (const b of content) {
-        if (b.type === 'text' && b.text && b.text.trim()) { turn.text = b.text.trim(); turn.textTs = ts; }
+        if ((b.type === 'text' || b.type == null) && typeof b.text === 'string' && b.text.trim()) { turn.text = b.text.trim(); turn.textTs = ts; }
         else if (b.type === 'tool_use') {
           const input = b.input || {};
           pending.set(b.id, { name: b.name, input });

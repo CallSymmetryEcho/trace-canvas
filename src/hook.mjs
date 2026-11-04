@@ -167,7 +167,7 @@ export function handleHook(input, env = process.env) {
   const cfg = readConfig(env);
   const cwd = input.cwd || process.cwd();
   // normalize() sets _agent for the other CLIs; plain input is Claude Code, named after the model when it runs another's.
-  const base = agentOf(input._agent), provider = !input._agent || input._agent === 'claude' ? modelProvider(env) : '';
+  const base = agentOf(input._agent), provider = !input._agent || input._agent === 'claude' ? modelProvider(env, input.model) : '';
   const ag = provider ? { ...base, name: `${base.name} · ${provider}` } : base;
   // git calls happen outside the lock so parallel sessions don't wait on each other.
   // PreToolUse and Notification fire on every tool call, so they reuse what the live file already knows.
@@ -201,6 +201,15 @@ export function handleHook(input, env = process.env) {
       const t = (s.bound && threadById(d, s.thread)) || resolveThread(d, info, { cfg, sid, prevThreadId: s.thread, promptForName: prompt || state.lastPrompt, agent: ag.name, cwd });
       s.thread = t.id; touch(); return t;
     };
+
+    if (input._agent === 'iflow' && state.pendingReply && ['UserPromptSubmit', 'SessionEnd'].includes(ev)) {
+      const pending = state.pendingReply, reply = String(input.last_assistant_message || '').trim(), t = threadById(d, s.thread);
+      if (t && (reply || pending.files.length)) {
+        addCommit(d, { thread: t.id, kind: 'agent', title: headline(reply) || tr(cfg.lang, 'turnChanged', pending.files.length), body: turnBody(cfg.lang, reply, pending.files, pending.todos), agent: ag.name, links: [ag.resume(sid)], extra: { session: sid, files: pending.files.slice(0, 50) } });
+        changed = true;
+      }
+      state.pendingReply = null;
+    }
 
     if (ev === 'UserPromptSubmit') {
       const prompt = cleanPrompt(input.prompt);
@@ -251,10 +260,12 @@ export function handleHook(input, env = process.env) {
       const log = cfg.turns === 'all' ? !!(msg || acted) : cfg.turns === 'changes' ? acted : false;
       // A turn with no reply (Kimi Code and DeepSeek Harness hand their Stop hook none) whose only action was a
       // commit, already on the line, adds nothing.
-      if (log && (msg || files.length)) {
+      if (log && (msg || files.length) && !(input._agent === 'iflow' && !msg)) {
         const t = thread(state.lastPrompt);
         addCommit(d, { thread: t.id, kind: 'agent', title: headline(msg) || tr(cfg.lang, 'turnChanged', files.length), body: turnBody(cfg.lang, msg, files, todos), agent: ag.name, links: [ag.resume(sid)], extra: { session: sid, files: files.slice(0, 50) } });
       }
+      // iFlow writes its assistant reply after Stop; retain that turn until the next prompt or SessionEnd can read it.
+      if (input._agent === 'iflow') state.pendingReply = !msg && (cfg.turns === 'all' || (cfg.turns === 'changes' && acted)) ? { files, todos } : null;
       state.turnFiles = []; state.turnTodos = []; state.turnActions = 0;
     } else if (ev === 'SessionEnd') {
       const th = threadById(d, s.thread), tid = th ? th.id : null;

@@ -260,13 +260,15 @@ Codex has no notification event, so a permission request stands in for "needs yo
 | **Claude Code on DeepSeek, Kimi, Qwen, MiniMax, GLM or Doubao** | everything | it is Claude Code (`ANTHROPIC_BASE_URL` set to their Anthropic-compatible API); records say whose model, e.g. *Claude Code · DeepSeek* | yes |
 | **Kimi Code** (Moonshot) | hooks, live bar, "needs you", MCP tools, resume (`kimi --session`) | `[[hooks]]` tables in `~/.kimi-code/config.toml`, MCP in `~/.kimi-code/mcp.json` | experimental: payloads replayed as its source builds them |
 | **DeepSeek Harness** (`dsh`) | hooks, live bar, MCP tools, a message to a session (`dsh headless --session-id`) | its `dsh-hooks-claude-code` plugin runs a hooks file setup writes; setup also writes a patch that mounts it and `dsh-mcp-client`: add the two plugins once, then `dsh web --patch ~/.trace-canvas/dsh.patch.yml` (setup prints both lines) | experimental: payloads replayed as its bridge builds them |
-| **MiniMax Code** (`mcode`) | hooks, live bar, "needs you", MCP tools, resume (`mcode --session`) | a local plugin in Claude Code's plugin format in `~/.minimax/plugins/trace-canvas`, turned on with `mcode plugin enable trace-canvas@local` | experimental: from its source |
+| **MiniMax Code** (`mcode`) | MCP tools only | MCP-only local plugin in `~/.minimax/plugins/trace-canvas`; `mcode plugin enable trace-canvas@local` | Configuration/MCP verified; no automatic hooks |
 | **Qwen Code** | hooks, live bar, MCP tools | `~/.qwen/settings.json` | experimental: from its docs |
-| **Qoder CLI** | hooks, live bar (MCP: `qodercli mcp add`, printed by setup) | `~/.qoder/settings.json` | experimental: from its docs |
-| **TRAE CLI** (ByteDance) | hooks, live bar (MCP by hand) | `~/.trae/hooks.json` (`~/.trae-cn` for the Chinese edition) | experimental: from its docs |
-| **iFlow CLI** (Alibaba, being discontinued) | hooks, live bar, MCP tools, resume (`iflow -r`), history import, Retro | hooks and MCP in `~/.iflow/settings.json`; its Claude Code-format transcripts in `~/.iflow/projects` | payloads replayed as iFlow 0.4 builds them |
+| **Qoder CLI** | Hooks, live status, MCP tools, resume | `~/.qoder/settings.json`; current `qoder` or legacy `qodercli` | Experimental: official hook schema |
+| **TRAE CLI** | MCP tools; experimental legacy CLI 1 hooks | CLI 2 MCP in `~/.trae/traecli.toml`; legacy hooks in `~/.trae/hooks.json` (or `.trae-cn`) | Official MCP schema; CLI 2 automatic hooks unverified |
+| **iFlow CLI** (retired) | Hooks, live status, MCP tools, resume, history and Retro | `~/.iflow/settings.json`, transcripts in `~/.iflow/projects` | Real 0.4.11 CLI against a local test server; official hosted service retired 2026-04-17 |
 
 Tool names differ between them (`run_shell_command`, `RunCommand`, `write_file`…), so commands and edits are recognised by the shape of a tool's input, not its name. Kimi Code and DeepSeek Harness do not hand the agent's reply to their Stop hook, so their turns show the files they changed rather than what the agent said.
+
+[Verification scope and primary references](docs/chinese-clis.md).
 
 ## Several machines, one canvas
 

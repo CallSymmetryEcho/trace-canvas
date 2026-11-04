@@ -1,10 +1,29 @@
 # Changelog
 
-## Unreleased
+## 0.3.4 (2026-11-04)
 
-- **Go to its terminal on Linux.** A session running in GNOME Terminal or Konsole gets **Go to its terminal** too: the hook notes its tab, the page server selects it over D-Bus and, on an X11 desktop, raises its window with `wmctrl` (KDE does not let an app raise itself over another). Checked on KDE Plasma (X11).
-- **Autopilot (beta).** One round on a line, from a switch in its panel (under Status) or `trace-canvas autopilot <line>`: the line's agent works through every open to-do by your decision profile, logs each decision with the rule it rests on, never sends email or messages to people, pushes, publishes or changes permissions, and stops to ask about anything risky or not covered. The first time, the switch explains all this; turning it on plays one short sweep over the line (none when the system asks for less motion); while it runs the line shows **Autopilot** and turning the switch off stops it; the round ends with a summary record. [docs/autopilot.svg](docs/autopilot.svg) shows how it decides.
-- **A stray keystroke is not a to-do.** Input typed into a session rather than asked of it, such as `:q`, `login` or `ok` (under three characters, a single word starting with `:`, or a lone command word), is no longer logged as a to-do.
+Autopilot you can see, a History wall for finished projects with the lessons they leave, and records that read well.
+
+### New
+
+- **Autopilot (beta).** One round on a line, from the slider under Status in its panel or `trace-canvas autopilot <line>`: the line's agent works through every open to-do by your decision profile, logs each decision with the rule it rests on, never sends email or messages to people, pushes, publishes or changes permissions, and stops to ask about anything risky or not covered. The slider has three steps (off · asked · running): it shows running only once the agent's hook has taken the prompt, so a prompt that never reached a session does not look like work. While a round runs, a light goes round the card and the line panel, a ticker names the to-do in hand, and the track fills with racing pixels; none of it when the system asks for less motion. The round ends with a summary record. [docs/autopilot.svg](docs/autopilot.svg) shows how it decides.
+- **The History wall.** A finished project is archived from its group's panel: its lines leave the workspace and it gets a frosted plaque on the History wall (its own button, between Goals and More), with its line map, outputs and wins from the wrap-ups. **Replay** grows the map from the first station to the last, with play, pause and drag; **Restore** puts the project back. The wall has its own quiet palette.
+- **Lessons from a finished project.** On a plaque, **Draw lessons** asks the local claude for 3–8 lessons from the project's decisions and wrap-ups; only the ones you tick are kept, in Theatrum. A new line's first sessions are handed up to three that fit it, and Autopilot looks there, and at archived projects' decisions, before it asks you. Rules a retro already kept are not drawn again.
+- **Done lines fold, with a wrap-up.** Marking a line done opens a wrap-up drafted from the line, saved as its last station; the line folds like a parked one, in the done colour with a check.
+- **Records that read well.** A record's details read as Markdown (headings, lists, tables, code); **Edit** turns them back into text, and the box grows with it. **Read** opens long details, or a `.md` report a record links, in a wide reader. Long titles wrap; titles in the line panel get two lines, and a card's rows show the full title on hover.
+- **Go to its terminal, for more sessions.** GNOME Terminal and Konsole tabs on Linux, selected over D-Bus (on X11 the window is raised with `wmctrl`); Codex sessions in a terminal, found from their `codex resume` process.
+- **Open on claude.ai.** A session with Remote Control on gets **Open on claude.ai** beside Go to its terminal: the same session, also from the phone. A background session copies `claude attach`, not `--resume`.
+
+### Changed
+
+- **Arrange lays a group out as a tree.** A fork sits right of its line and later forks below, so fork links never cross.
+
+### Fixed
+
+- **A stray keystroke is not a to-do.** Input typed into a session rather than asked of it (`:q`, `login`, `ok`, a lone command word) is no longer logged.
+- **Pasted prompts are recognised.** A message that is one paste, or a paste with a few words of your own, counts as the Autopilot or hand-off prompt it carries.
+- **Long agent commands reach macOS terminals whole.** Past the terminal's 1024-byte line limit, a self-deleting script holds the command.
+- **Goals keep their place.** A redraw keeps the list where it was, and adding a to-do no longer scrolls it.
 
 ## 0.3.3 (2026-11-04)
 

@@ -685,6 +685,9 @@ body.sheet-open .top { z-index: 80; }
 .gl-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .gl-head b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gl-prog { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+button.gl-prog { padding: 1px 7px; border: 1px solid var(--rule-soft); border-radius: 999px; background: none; cursor: pointer; }
+button.gl-prog:hover { color: var(--ink); border-color: var(--rule); }
+button.gl-prog[aria-pressed="true"] { color: var(--ink); background: var(--surface-2); border-color: var(--rule); }
 .gl-head .linkish { margin-left: auto; font-size: 12px; white-space: nowrap; }
 .gl-goal { font-size: 13px; color: var(--ink); }
 .gl-goal.none { color: var(--faint); }
@@ -1315,7 +1318,7 @@ const S = {
   captureKind: 'idea', captureThread: ls.get('tc.captureThread', INBOX),
   mode: 'loading', readOnly: false, offline: false, got: new Set(), dragId: null,
   ai: null, sheet: null,
-  live: [], liveOthers: [], sessions: [], machine: '', goalsShowDone: false, multiGroup: '', dragMembers: null, focusGroup: ls.get('tc.focusGroup', null), folded: ls.get('tc.folded', []), platform: '',
+  live: [], liveOthers: [], sessions: [], machine: '', goalsShowDone: false, glDone: ls.get('tc.glDone', []), multiGroup: '', dragMembers: null, focusGroup: ls.get('tc.focusGroup', null), folded: ls.get('tc.folded', []), platform: '',
 };
 
 // Sync trouble (it failed, or another machine has been quiet for over a day) is only a dot: on More and on the
@@ -3498,10 +3501,10 @@ function renderGoals() {
     + quietStrip()
     + `<div class="gl-bar-top"><span>${esc(t('goalsSummary', totalOpen, groups.filter(g => g.open.length).length))}</span><label class="check"><input type="checkbox" id="gl-show-done" ${S.goalsShowDone ? 'checked' : ''}>${esc(t('goalsShowDone'))}</label></div>`
     + (groups.length ? groups.map(({ th, tasks, open, goal }) => {
-      const shown = S.goalsShowDone ? tasks : open;
+      const showDone = S.goalsShowDone || S.glDone.includes(th.id), shown = showDone ? tasks : open;
       const pct = tasks.length ? Math.round(100 * (tasks.length - open.length) / tasks.length) : 0;
       return `<section class="gl-group" style="--c:${th.color}">
-        <div class="gl-head"><span class="roundel" style="--c:${th.color}"></span><b>${esc(th.name)}</b><span class="gl-prog">${tasks.length - open.length}/${tasks.length}</span>${liveBadge(th.id)}<button class="linkish" data-goto="${esc(th.id)}">${esc(t('goalsOpenLine'))}</button></div>
+        <div class="gl-head"><span class="roundel" style="--c:${th.color}"></span><b>${esc(th.name)}</b>${tasks.length > open.length ? `<button class="gl-prog" data-gl-done="${esc(th.id)}" aria-pressed="${showDone}" title="${esc(t('goalsShowDone'))}">✓ ${tasks.length - open.length}/${tasks.length}</button>` : `<span class="gl-prog">${tasks.length - open.length}/${tasks.length}</span>`}${liveBadge(th.id)}<button class="linkish" data-goto="${esc(th.id)}">${esc(t('goalsOpenLine'))}</button></div>
         ${th.id === INBOX ? '' : S.glEdit === 'goal:' + th.id ? `<textarea class="gl-goal-in" data-goal="${esc(th.id)}" rows="${Math.min(6, Math.max(2, Math.ceil(goal.length / 22)))}" placeholder="${esc(t('threadGoalPh'))}">${esc(goal)}</textarea>` : `<div class="gl-goal ${goal ? '' : 'none'}" data-goal-edit="${esc(th.id)}" title="${esc(t('goalsEdit'))}">${esc(goal || t('goalsNoGoal'))}</div>`}
         ${tasks.length ? `<div class="gl-meter"><i style="width:${pct}%"></i></div>` : ''}
         ${shown.length ? `<ul class="gl-tasks">${shown.map(row).join('')}</ul>` : ''}
@@ -3609,6 +3612,9 @@ sheetBody.addEventListener('click', e => {
     if (box) { box.focus(); box.setSelectionRange(box.value.length, box.value.length); }
     return;
   }
+  // One card's finished to-dos, shown or hidden on their own (kept per browser, like folding); Show done above still shows all.
+  const gd = e.target.closest('[data-gl-done]');
+  if (gd) { const id = gd.dataset.glDone; S.glDone = S.glDone.includes(id) ? S.glDone.filter(x => x !== id) : [...S.glDone, id]; ls.set('tc.glDone', S.glDone); renderGoals(); return; }
   const go = e.target.closest('[data-goto]'), rec = e.target.closest('.gl-t'), view = e.target.closest('[data-view-rec]');
   // On a phone the Goals page stays under the line or record page, so ← comes back to it; a title opens its row.
   if (PHONE.matches && rec) { S.glOpen = S.glOpen === rec.dataset.cid ? null : rec.dataset.cid; renderGoals(); return; }

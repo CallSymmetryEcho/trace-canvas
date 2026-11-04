@@ -2348,8 +2348,7 @@ function drawGroups() {
 }
 // <arrange>
 // Positions for lines laid out by group: one block per group (by name), lines without a group last;
-// inside a block depth-first along forks (a line, then the lines forked from it, oldest first), up to
-// perCol cards a column. Folded groups take no block: they are shelved after the last one, one chip each
+// inside a block as a tree along forks (see tree below), up to perCol rows a column of trees. Folded groups take no block: they are shelved after the last one, one chip each
 // stacked shelf apart (a chip sits where its lines start), so unfolding one shows it there.
 // Pure: test/group.test.mjs runs this very function out of this file.
 function arrange(lines, { colW = 290, rowH = 230, perCol = 4, gap = 70, top = 260, folded = [], shelf = 56 } = {}) {
@@ -2367,11 +2366,29 @@ function arrange(lines, { colW = 290, rowH = 230, perCol = 4, gap = 70, top = 26
     return out;
   };
   const place = (ths, x0, y0) => ths.forEach((th, i) => pos.set(th.id, { x: x0 + Math.floor(i / perCol) * colW, y: y0 + (i % perCol) * rowH }));
+  // A group as a tree, like a branch graph: a line's fork depth is its column, its first fork carries on along its row
+  // and later forks go below, so each subtree keeps to its own rows and fork links run right without crossing.
+  // Subtrees stack down a column of trees until perCol rows, then the next ones start a column to the right.
+  const tree = g => {
+    const ths = order(g), ids = new Set(ths.map(th => th.id)), kids = new Map(), roots = [];
+    for (const th of ths) { const p = ids.has(th.parent) && th.parent !== th.id ? th.parent : ''; if (p) { if (!kids.has(p)) kids.set(p, []); kids.get(p).push(th); } else roots.push(th); }
+    const seen = new Set(), subs = [];
+    const grow = r => { const cells = []; let row = 0;
+      const walk = (th, d) => { if (seen.has(th.id)) return; seen.add(th.id); cells.push({ th, d, r: row }); const ks = (kids.get(th.id) || []).filter(k => !seen.has(k.id)); if (!ks.length) { row++; return; } for (const k of ks) walk(k, d + 1); };
+      walk(r, 0); return { cells, rows: row, cols: 1 + Math.max(...cells.map(c => c.d)) }; };
+    for (const r of roots) subs.push(grow(r));
+    for (const th of ths) if (!seen.has(th.id)) subs.push(grow(th)); // forks in a loop
+    return subs;
+  };
   let x = 0;
   for (const g of names.filter(g => !folded.includes(g))) {
-    const ths = order(g);
-    place(ths, x, top);
-    x += Math.ceil(ths.length / perCol) * colW + gap;
+    let sx = 0, sw = 0, used = 0;
+    for (const t of tree(g)) {
+      if (used && used + t.rows > perCol) { sx += sw; sw = 0; used = 0; }
+      for (const c of t.cells) pos.set(c.th.id, { x: x + (sx + c.d) * colW, y: top + (used + c.r) * rowH });
+      used += t.rows; sw = Math.max(sw, t.cols);
+    }
+    x += (sx + sw) * colW + gap;
   }
   names.filter(g => folded.includes(g)).forEach((g, k) => place(order(g), x, top + k * shelf));
   return pos;

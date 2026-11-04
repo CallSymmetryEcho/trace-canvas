@@ -27,8 +27,9 @@ test('arrange puts each group in its own block, forks right after their line, li
   const span = ids => [Math.min(...ids.map(col)), Math.max(...ids.map(col))];
   const [loop, prop, video, rest] = [span(['x', 'y']), span(['proposal', 'p2', 'p3', 'p4', 'p5']), span(['video', 'promo', 'video-short']), span(['loose'])];
   assert.ok(loop[1] < prop[0] && prop[1] < video[0] && video[1] < rest[0]);
-  // Inside a block: depth-first along forks, up to 4 a column.
-  assert.deepEqual(['video', 'video-short', 'promo'].map(row), [260, 490, 720]);
+  // Inside a block: a tree along forks. A fork sits right of its line on the same row; the next line goes below.
+  assert.deepEqual(['video', 'video-short', 'promo'].map(row), [260, 260, 490]);
+  assert.equal(col('video-short'), col('video') + 290);
   assert.equal(col('p5'), col('proposal') + 290);
   assert.deepEqual(arrange(lines), pos);
 
@@ -38,6 +39,25 @@ test('arrange puts each group in its own block, forks right after their line, li
   const shelfX = Math.max(f.get('loose').x, f.get('video').x) + 290 + 70;
   assert.deepEqual([f.get('x'), f.get('proposal')].map(p => [p.x, p.y]), [[shelfX, 260], [shelfX, 316]]);
   assert.equal(perColFor(lines, 1200, 800, { folded: ['Proposal', 'Loop', 'Video', ''] }), 4);
+});
+
+test('arranged as a tree, fork links never cross: each line\'s forks keep to rows below it, in order', () => {
+  const L = (id, createdAt, parent = null) => ({ id, createdAt, group: 'G', parent });
+  // a ── b ── d      a has forks b and c; b has d and e; f is a second root.
+  //      └── e
+  // └── c
+  // f
+  const lines = [L('a', 1), L('b', 2, 'a'), L('c', 3, 'a'), L('d', 4, 'b'), L('e', 5, 'b'), L('f', 6)];
+  const pos = arrange(lines, { perCol: 8 });
+  const at = id => [pos.get(id).x / 290, (pos.get(id).y - 260) / 230];
+  assert.deepEqual(['a', 'b', 'd', 'e', 'c', 'f'].map(at), [[0, 0], [1, 0], [2, 0], [2, 1], [1, 2], [0, 3]]);
+  // No two fork links cross: links from the same column never interleave their rows.
+  const links = lines.filter(l => l.parent).map(l => [at(l.parent), at(l.id)]);
+  for (const [p1, c1] of links) for (const [p2, c2] of links) if (p1[0] === p2[0] && p1[1] < p2[1]) assert.ok(c1[1] < c2[1]);
+  // Too many rows for a column: the next tree starts a column to the right of the widest one.
+  const wrap = arrange(lines, { perCol: 3 });
+  assert.equal(wrap.get('f').x, 3 * 290);
+  assert.equal(wrap.get('f').y, 260);
 });
 
 test('a fork joins the group of the line it came from, also a branch line made by the hooks', () => {

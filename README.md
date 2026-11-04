@@ -59,7 +59,7 @@ A transit map of your work. When you work with AI agents, ideas and tasks run in
 
 - A **thread** is one piece of work in progress, like a git branch. It is drawn as a line.
 - A **record** is a station on that line, like a commit: an idea ○, a task □, agent output ◆, a decision ◉ or a note •.
-- **Fork** a new thread from any record and **merge** it back when it is done. Forks and merges are drawn as interchanges.
+- **Fork** a new thread from any record and **merge** it back when it is done. Forks and merges are drawn as interchanges. A fork that turned into work of its own can be **made its own line** (in its panel, or `trace-canvas detach`).
 - The **inbox** holds loose ideas until you file them.
 
 **One entry point for your agents.** Agents can read the same map: through the MCP tools `trace_list_threads` and `trace_read_thread`, a new Claude Code session catches up on all your projects in seconds instead of rereading old chats. Hooks and the `/trace-canvas` skill keep the map up to date while you work.
@@ -161,6 +161,7 @@ Capturing is safe to repeat: records already on the canvas are skipped. If the h
 | `trace_read_thread` | Returns the records on one thread |
 | `trace_merge` | Merges any number of threads, in `merge` or `combine` mode (below) |
 | `trace_fork` | Branches a new thread off a record or a thread's newest record; `bind: true` puts the calling session on it |
+| `trace_detach` | Makes a forked thread a line of its own; `take` moves the record that started it over as its first |
 | `trace_log` | Adds one record |
 | `trace_import_data` | Merges another data set: an export, `data.json` from another computer, or JSON lines |
 | `trace_live` | Lists the sessions running now, with status, activity and thread |
@@ -339,7 +340,7 @@ Which messages: by default those since the line's last retro, up to now, so each
 
 ## AI tidy-up
 
-If the `claude` command is installed, **AI tidy-up** in the header asks Claude to file inbox records into threads, suggest links between threads and point out threads that look stalled. Nothing changes until you tick the suggestions and apply them. It runs `claude -p` on your own account; the hooks are switched off for that call.
+If the `claude` command is installed, **More → AI tidy-up** has Claude read every line with its recent records and open to-dos and suggest three kinds of change: lines that are really the same work (**Merge** one into the other), lines ready to wrap up (**Mark done**, or **Park** when work is left over; never a line a session is running on), and open to-dos that later records show are already done (**Tick off**). Each suggestion says why, quoting the record it rests on, and has its own button; nothing happens until you click it, and every one can be undone from the same row. It runs `claude -p` on your own account; the hooks are switched off for that call.
 
 ## Commands
 

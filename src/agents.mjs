@@ -2,7 +2,7 @@
 // Code shape the rest of the code reads. Codex hooks are nearly Claude's (no Notification event:
 // a PermissionRequest is what "needs you" looks like); Gemini CLI names its events differently.
 // Tools are recognised by the shape of their input, since each CLI names them its own way.
-import { spawn } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -51,12 +51,24 @@ export function terminalCommand(cmd, env = process.env, platform = process.platf
   const lead = { 'gnome-terminal': ['--'], 'xfce4-terminal': ['-x'], wezterm: ['start', '--'] }[term[0]] || ['-e'];
   return [term[1], [...lead, ...run], shown];
 }
-/** Runs cmd in a new terminal window; false when there is none to open. */
+/**
+ * Runs cmd in a new terminal window. Resolves to null once the window is open, or to why it is not.
+ * macOS waits for Terminal's answer: an Automation prompt left unanswered times out after 2 minutes, and a
+ * denied one (error -1743) fails at once, so nobody is told an agent started when no window opened.
+ */
 export function openTerminal(cmd, env = process.env) {
   const t = terminalCommand(cmd, env);
-  if (!t) return false;
-  spawn(t[0], t[1], { stdio: 'ignore', detached: true, env: t[2] }).unref();
-  return true;
+  if (!t) return Promise.resolve('no terminal to open on this machine');
+  if (t[0] === 'osascript') return new Promise(done => execFile(t[0], t[1], { env: t[2], timeout: 150e3 }, (err, out, errOut) => {
+    if (!err) return done(null);
+    const why = String(errOut || err.message).trim();
+    done(/-1743|not allowed|Not authorized/i.test(why) ? `macOS did not allow this app to control Terminal (System Settings → Privacy & Security → Automation): ${why}`
+      : /-1712|timed out/i.test(why) || err.killed ? `Terminal did not answer in time; an Automation prompt may be waiting for an answer: ${why}` : why);
+  }));
+  return new Promise(done => {
+    const c = spawn(t[0], t[1], { stdio: 'ignore', detached: true, env: t[2] });
+    c.on('error', e => done(e.message)).on('spawn', () => { c.unref(); done(null); });
+  });
 }
 // AppleScript that brings the Terminal or iTerm2 tab with this tty to the front and prints "ok",
 // or nothing when no tab has it (Go to the terminal). null for other terminals.

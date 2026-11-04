@@ -83,11 +83,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .sync[data-mode="offline"]::before { background: var(--danger); }
 .brand-sub:empty { display: none; }
 /* Language: both choices always visible, the current one filled, like the view tabs */
-.lang-switch { display: inline-flex; align-items: center; gap: 2px; padding: 2px; background: var(--surface-2); border: 1px solid var(--rule); border-radius: var(--r); flex: none; }
-.lang-switch svg { width: 15px; height: 15px; margin: 0 2px 0 6px; color: var(--muted); flex: none; }
-.lang-switch button { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; line-height: 1; padding: 6px 9px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
-.lang-switch button:hover { color: var(--ink); }
-.lang-switch button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+.menu .k b { font-weight: 400; }
+.menu .k b.lang-on { font-weight: 700; color: var(--ink); }
 .sync[data-mode="local"]::before { background: #E0A100; }
 .sync[data-mode="ro"]::before { background: var(--inbox); }
 .tabs { display: flex; gap: 2px; padding: 2px; background: var(--surface-2); border: 1px solid var(--rule); border-radius: var(--r); }
@@ -471,6 +468,12 @@ body.sheet-open .top { z-index: 80; }
 .ai-list { display: grid; gap: 6px; }
 .ai-item { display: grid; grid-template-columns: 20px 1fr; gap: 8px; align-items: start; padding: 8px 10px; border: 1px solid var(--rule-soft); border-radius: 8px; cursor: pointer; }
 .ai-item input { margin-top: 3px; }
+.ai-row { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border: 1px solid var(--rule-soft); border-radius: 8px; }
+.ai-row > div:first-child { flex: 1; min-width: 0; }
+.ai-row .why { display: block; font-size: 12px; color: var(--faint); margin-top: 2px; }
+.ai-row.is-done > div:first-child { opacity: .55; }
+.ai-acts { flex: none; display: flex; align-items: center; gap: 6px; }
+.ai-done { font-size: 12px; color: var(--ok); }
 .ai-item .why { display: block; font-size: 12px; color: var(--faint); margin-top: 2px; }
 .ai-thinking { display: flex; align-items: center; gap: 10px; color: var(--muted); }
 .pulse { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); animation: pulse 1.1s ease-in-out infinite; }
@@ -547,8 +550,6 @@ body.sheet-open .top { z-index: 80; }
 @media (max-width: 480px) {
   .brand-name { display: none; }
   .top { gap: 8px 10px; }
-  .lang-switch svg { display: none; }
-  .lang-switch button { padding: 6px 7px; }
   /* The second header row is full on a phone: no spacer, and the search box gives way first */
   .top > .spacer { display: none; }
   .search { flex: 1 1 80px; min-width: 80px; }
@@ -746,20 +747,16 @@ body.sheet-open .top { z-index: 80; }
       <input id="q" type="search" data-i18n-ph="searchPh" autocomplete="off">
     </label>
     <button class="btn" id="goals-btn" data-i18n="goalsBtn" data-i18n-title="goalsBtnTitle">Goals</button>
-    <button class="btn btn-accent" id="ai-btn" hidden data-i18n="aiBtn" data-i18n-title="aiBtnTitle">AI tidy-up</button>
-    <div class="lang-switch" id="lang-switch" role="group" data-i18n-aria="langGroup">
-      <svg viewBox="0 0 16 16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6.3"/><path d="M1.7 8h12.6M8 1.7c1.8 1.7 2.8 3.9 2.8 6.3S9.8 12.6 8 14.3C6.2 12.6 5.2 10.4 5.2 8S6.2 3.4 8 1.7z"/></g></svg>
-      <button type="button" data-set-lang="en" lang="en" aria-pressed="true">EN</button>
-      <button type="button" data-set-lang="zh" lang="zh-CN" aria-pressed="false">中文</button>
-    </div>
     <div class="menu-wrap">
       <button class="btn" id="more-btn" aria-haspopup="true" aria-expanded="false" data-i18n="more">More</button>
       <div class="menu" id="menu" hidden>
+        <button data-menu="ai" id="ai-item" hidden data-i18n-title="aiBtnTitle"><span data-i18n="aiBtn">AI tidy-up</span></button>
         <button data-menu="new-thread"><span data-i18n="menuNewThread">New thread</span> <span class="k">N</span></button>
         <button data-menu="toggle-done"><span id="toggle-done-label"></span></button>
         <button data-menu="toggle-merged"><span id="toggle-merged-label"></span></button>
         <button data-menu="focus" data-i18n="menuFocus">Focus on a group…</button>
         <button data-menu="theme"><span id="theme-label"></span></button>
+        <button data-menu="lang" lang="en"><span>Language · 语言</span> <span class="k"><b id="lang-en">EN</b> · <b id="lang-zh" lang="zh-CN">中文</b></span></button>
         <hr>
         <button data-menu="agent" data-i18n="menuAgent">Connect an AI agent</button>
         <button data-menu="io" data-i18n="menuIO">Import / export</button>
@@ -909,7 +906,7 @@ const I18N = {
     syncLocalTitle: 'Not connected to any storage; data stays in this browser only',
     syncRoTitle: 'You can view but not change this page', syncOfflineTitle: 'Lost the local server. Start it again with trace-canvas serve.',
     exChip: 'Example data', exClear: 'Clear', exChipTitle: 'Records added to show how the views work',
-    searchPh: 'Search records…', aiBtn: 'AI tidy-up', aiBtnTitle: 'Ask Claude to sort the inbox and find links between threads',
+    searchPh: 'Search records…', aiBtn: 'AI tidy-up', aiBtnTitle: 'Claude reads every line and suggests merges, lines to wrap up and to-dos already done; you click each one',
     langGroup: 'Language', more: 'More',
     menuNewThread: 'New thread', menuHideDone: 'Hide finished threads', menuShowDone: 'Show finished threads', quietLabel: 'Gone quiet', quietDays: n => `${n}d`, quietDot: n => `${n} line${n === 1 ? ' has' : 's have'} gone quiet`, quietAsk: (n, u) => `Nothing for ${n} days, where it usually moves every ${u === 1 ? 'day' : `${u} days`}. Finished?`, quietAskOpen: (n, k) => `Nothing for ${n} days, with ${k} to-do${k === 1 ? '' : 's'} still open. Park it for now?`, quietStill: 'Still on it', menuShowMerged: 'Show merged threads', menuHideMerged: 'Fold merged threads', mergedInCount: n => ` · ${n} merged in`, mergedInLabel: 'Merged in',
     arrange: 'Arrange', arrangeTitle: 'Lay the lines out by group, forks next to the lines they came from', tArranged: 'Arranged', tUndo: 'Undo',
@@ -977,7 +974,7 @@ const I18N = {
     threadLabel: 'Thread', threadName: 'Thread name', threadStatus: 'Status', threadColor: 'Line color', colorAria: c => `Color ${c}`,
     threadGoal: 'Goal and context', threadGoalPh: 'What should this line achieve? When is it done?',
     createdAt: d => `Created ${d}`, lastUpdate: r => ` · last update ${r}`,
-    forkedFromThread: 'Forked from', of: 'at', mergedInto: 'Merged into', stations: 'Stations', noRecordsYet: 'No records yet.',
+    forkedFromThread: 'Forked from', of: 'at', detach: 'Make it its own line', detachTitle: 'No longer drawn as a branch of that line', tDetached: n => `“${n}” is a line of its own now`, mergedInto: 'Merged into', stations: 'Stations', noRecordsYet: 'No records yet.',
     only40: 'Showing the latest 40. The full history is in the Branches view.',
     captureHere: 'Log on this line', mergeTo: 'Merge into…', merge: 'Merge', delThreadQ: 'Delete thread? Its records move to the inbox', delThread: 'Delete thread',
     edgeHead: 'Link', edgeRel: 'Relationship', edgeRelPh: 'depends on, references…', flip: 'Reverse direction', delEdgeQ: 'Delete this link?',
@@ -990,7 +987,6 @@ const I18N = {
     tMoved: n => `Moved to “${n}”`, tLogged: n => `Logged to “${n}”`, tImported: n => `Imported ${n} record${n === 1 ? '' : 's'}`,
     tDeleted: 'Deleted', tCopied: 'Copied', tCopyFail: 'This page can’t write to the clipboard. The text below is selected: copy it from here.',
     tSaved: 'Saved', tCopiedAll: 'Copied all data', tSaveFallback: 'Saving didn’t work here, so the JSON is on your clipboard instead',
-    tApplied: n => `Applied ${n} suggestion${n === 1 ? '' : 's'}`, tNoneChecked: 'No suggestions were selected',
     tImportFail: 'Nothing to import. Use an exported JSON file, or one {"title": …} record per line.', tDemoLoaded: 'Example data loaded',
     agentTitle: 'Connect an AI agent',
     agentIntro: 'Every agent session can log its key progress here, so when several lines run in parallel you can see who got where.',
@@ -1027,7 +1023,7 @@ const I18N = {
     aiTitle: 'AI tidy-up', aiNeedClaude: 'Open this page on claude.ai to let Claude tidy it up.',
     aiNeedClaudeLocal: 'Install Claude Code (the claude command) on this computer and restart Trace Canvas to turn this on.',
     aiNothing: 'Nothing to tidy yet. Log a few ideas or start a thread or two first.',
-    aiThinking: 'Claude is reading your threads and inbox. This usually takes 10–30 seconds…', aiStop: 'Stop',
+    aiThinking: 'Claude is reading every line and its to-dos. This usually takes 10–30 seconds…', aiStop: 'Stop',
     aiErr: {
       not_granted: 'This page isn’t allowed to use Claude. You can turn it back on in the page’s permissions.',
       sampling_disabled: 'This account can’t use Claude from a page.',
@@ -1037,8 +1033,10 @@ const I18N = {
       local: 'The local claude command failed. Check that Claude Code is signed in, then try again.',
     },
     aiErrDefault: 'That didn’t work. Try again later.', aiRetry: 'Try again',
-    aiInbox: 'Sort the inbox', aiRelations: 'Links between threads', aiStale: 'Possibly stalled', aiStaleItem: n => `Mark <b>${n}</b> as parked`, aiNew: ' (new)',
-    aiNoChanges: 'Nothing needs changing.', aiCancel: 'Not now', aiClose: 'Close', aiApply: 'Apply selected',
+    aiMerge: 'Same work, two lines', aiWrap: 'Ready to wrap up', aiTodos: 'To-dos already done',
+    aiMergeItem: (a, b) => `Merge <b>${a}</b> into <b>${b}</b>`, aiDoneItem: n => `<b>${n}</b> looks finished`, aiParkItem: n => `<b>${n}</b> has stopped with work left`, aiTodoItem: (x, n) => `“${x}” <span class="why">${n}</span>`,
+    aiMergeBtn: 'Merge', aiDoneBtn: 'Mark done', aiParkBtn: 'Park', aiTodoBtn: 'Tick off', aiDid: 'Done', aiUndo: 'Undo',
+    aiNoChanges: 'Nothing needs changing.', aiClose: 'Close',
     aiLangName: 'English',
     liveLabel: 'Live', liveCount: (n, w) => `${n} running${w ? ` · ${w} need${w === 1 ? 's' : ''} you` : ''}`,
     stWorking: 'Working', stWaiting: 'Needs you', stIdle: 'Idle',
@@ -1083,7 +1081,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     syncLocalTitle: '没有连上任何存储，数据只保存在当前浏览器',
     syncRoTitle: '你可以查看，但不能修改', syncOfflineTitle: '和本地服务断开了。用 trace-canvas serve 重新启动。',
     exChip: '示例数据', exClear: '清除', exChipTitle: '这些是演示各个视图用的示例数据',
-    searchPh: '搜索记录…', aiBtn: 'AI 梳理', aiBtnTitle: '让 Claude 归类收件箱并找出线程间的关联',
+    searchPh: '搜索记录…', aiBtn: 'AI 梳理', aiBtnTitle: 'Claude 通看所有线路，建议合并、收尾和勾掉已做完的待办，每条由你点了才做',
     langGroup: '语言', more: '更多',
     menuNewThread: '新建线程', menuHideDone: '隐藏已完成的线程', menuShowDone: '显示已完成的线程', quietLabel: '安静了', quietDays: n => `${n} 天`, quietDot: n => `${n} 条线安静了`, quietAsk: (n, u) => `${n} 天没动静，平时${u === 1 ? '每天' : ` ${u} 天`}一更。做完了吗？`, quietAskOpen: (n, k) => `${n} 天没动静，还有 ${k} 项待办。先搁置？`, quietStill: '还在做', menuShowMerged: '显示已合并的线程', menuHideMerged: '收起已合并的线程', mergedInCount: n => ` · 已并入 ${n} 条`, mergedInLabel: '已并入',
     arrange: '整理', arrangeTitle: '按分组排好线程，分叉排在原线旁边', tArranged: '已整理', tUndo: '撤销',
@@ -1150,7 +1148,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     threadLabel: '线程', threadName: '线程名称', threadStatus: '状态', threadColor: '线路颜色', colorAria: c => `颜色 ${c}`,
     threadGoal: '目标与背景', threadGoalPh: '这条线要达成什么？做到什么程度算完成？',
     createdAt: d => `创建于 ${d}`, lastUpdate: r => ` · 最近更新 ${r}`,
-    forkedFromThread: '分叉自', of: '的', mergedInto: '已合并到', stations: '站点', noRecordsYet: '还没有记录。',
+    forkedFromThread: '分叉自', of: '的', detach: '独立成线', detachTitle: '不再画成那条线的分支', tDetached: n => `「${n}」已独立成线`, mergedInto: '已合并到', stations: '站点', noRecordsYet: '还没有记录。',
     only40: '只列出最近 40 条，完整历史在「分支」视图里。',
     captureHere: '在这条线上记录', mergeTo: '合并到…', merge: '合并', delThreadQ: '删除线程？记录会移回收件箱', delThread: '删除线程',
     edgeHead: '关联', edgeRel: '关系', edgeRelPh: '依赖、参考、衍生…', flip: '反转方向', delEdgeQ: '删除这条关联？',
@@ -1163,7 +1161,6 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     tMoved: n => `已移到「${n}」`, tLogged: n => `已记到「${n}」`, tImported: n => `已导入 ${n} 条记录`,
     tDeleted: '已删除', tCopied: '已复制', tCopyFail: '这个页面没法直接写入剪贴板。下面的文字已经选中，在这里复制即可。',
     tSaved: '已保存', tCopiedAll: '已复制全部数据', tSaveFallback: '这里不能直接保存文件，已把 JSON 复制到剪贴板',
-    tApplied: n => `已应用 ${n} 条建议`, tNoneChecked: '没有勾选任何建议',
     tImportFail: '没有识别到可导入的内容：需要导出的 JSON，或每行一个 {"title": …} 的记录', tDemoLoaded: '已载入示例数据',
     agentTitle: '接入 AI agent',
     agentIntro: '每个 agent 会话都可以把关键进展写进来，几条线并行推进时也能一眼看清谁做到了哪一步。',
@@ -1200,7 +1197,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     aiTitle: 'AI 梳理', aiNeedClaude: '需要在 claude.ai 里打开这个页面才能让 Claude 帮你梳理。',
     aiNeedClaudeLocal: '在这台电脑上安装 Claude Code（claude 命令）并重启 Trace Canvas 后即可使用。',
     aiNothing: '还没有可以梳理的内容。先记几条想法，或建一两条线程再来。',
-    aiThinking: 'Claude 正在通读你的线程和收件箱，通常需要十几秒…', aiStop: '停止',
+    aiThinking: 'Claude 正在通读每条线和它的待办，通常需要十几到三十秒…', aiStop: '停止',
     aiErr: {
       not_granted: '你没有允许这个页面使用 Claude。可以在页面的权限设置里重新打开。',
       sampling_disabled: '当前账号无法在页面里使用 Claude。',
@@ -1210,8 +1207,10 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
       local: '本机的 claude 命令运行失败。确认 Claude Code 已登录后再试。',
     },
     aiErrDefault: '这次没有成功，稍后再试。', aiRetry: '再试一次',
-    aiInbox: '收件箱归类', aiRelations: '线程关联', aiStale: '可能停滞', aiStaleItem: n => `把 <b>${n}</b> 标为搁置`, aiNew: '（新建）',
-    aiNoChanges: '没有需要调整的地方。', aiCancel: '先不改', aiClose: '关闭', aiApply: '应用勾选的建议',
+    aiMerge: '其实是同一件事', aiWrap: '可以收尾了', aiTodos: '其实已经做完的待办',
+    aiMergeItem: (a, b) => `把 <b>${a}</b> 合并进 <b>${b}</b>`, aiDoneItem: n => `<b>${n}</b> 看起来做完了`, aiParkItem: n => `<b>${n}</b> 停下了，还有没做完的`, aiTodoItem: (x, n) => `「${x}」<span class="why">${n}</span>`,
+    aiMergeBtn: '合并', aiDoneBtn: '标记完成', aiParkBtn: '搁置', aiTodoBtn: '勾掉', aiDid: '已完成', aiUndo: '撤销',
+    aiNoChanges: '没有需要调整的地方。', aiClose: '关闭',
     aiLangName: 'Simplified Chinese',
     liveLabel: '实时', liveCount: (n, w) => `${n} 个运行中${w ? ` · ${w} 个等你` : ''}`,
     stWorking: '工作中', stWaiting: '等你', stIdle: '空闲',
@@ -1252,10 +1251,12 @@ kind 可选 agent / idea / task / decision / note；thread 用简短的中文名
 function initLang() {
   let l = null;
   try { l = new URLSearchParams(location.search).get('lang'); } catch {}
-  l = l || ls.get('tc.lang', null) || (SERVER && SERVER.lang) || 'en';
+  l = l || ls.get('tc.lang', null) || (SERVER && SERVER.langSet && SERVER.lang) || ((navigator.languages || [navigator.language]).find(x => /^(zh|en)/i.test(x || '')) || 'en').slice(0, 2).toLowerCase();
   return l === 'zh' ? 'zh' : 'en';
 }
 let LANG = initLang();
+// Nobody has chosen yet: keep what the browser said, so the records the hooks write use the same language.
+if (SERVER && !SERVER.langSet && !ls.get('tc.lang', null)) fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Trace-Canvas': '1' }, body: JSON.stringify({ lang: LANG }) }).catch(() => {});
 function t(key, ...args) {
   const v = I18N[LANG][key] !== undefined ? I18N[LANG][key] : I18N.en[key];
   return typeof v === 'function' ? v(...args) : (v === undefined ? key : v);
@@ -1268,7 +1269,7 @@ function applyStatic() {
   $$('[data-i18n-ph]').forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
   $$('[data-i18n-title]').forEach(el => { el.title = t(el.dataset.i18nTitle); });
   $$('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', t(el.dataset.i18nAria)); });
-  $$('#lang-switch [data-set-lang]').forEach(b => { b.setAttribute('aria-pressed', String(b.dataset.setLang === LANG)); });
+  for (const l of ['en', 'zh']) $(`#lang-${l}`).classList.toggle('lang-on', l === LANG);
 }
 function setLang(l) {
   LANG = l === 'zh' ? 'zh' : 'en';
@@ -2261,6 +2262,19 @@ function doArrange(only) {
 }
 $('#arrange-btn').onclick = () => doArrange(S.focusGroup || undefined);
 $('#focus-banner').addEventListener('click', e => { if (e.target.id === 'focus-off') setFocus(null); else if (e.target.id === 'focus-pick') openSheet('focus'); else if (e.target.id === 'fold-open-all') setFold(null, false); });
+// A forked line becomes a line of its own: its fork record goes, and nothing on it points back at the line it came from
+// (but a merge). The command line's detach can also move the request that started it over (--take).
+function detachThread(tid) {
+  const th = getThread(tid), old = th.parent, on = c => tidOf(c) === tid;
+  for (const c of [...S.commits.values()].filter(c => c.kind === 'fork' && on(c))) {
+    for (const x of S.commits.values()) if (on(x) && (x.parents || []).includes(c.id)) patchDoc('commits', x.id, { parents: x.parents.filter(p => p !== c.id) }, 0);
+    removeDoc('commits', c.id);
+  }
+  for (const x of [...S.commits.values()]) if (on(x) && x.kind !== 'merge' && (x.parents || []).some(p => S.commits.has(p) && tidOf(S.commits.get(p)) === old))
+    patchDoc('commits', x.id, { parents: x.parents.filter(p => !S.commits.has(p) || tidOf(S.commits.get(p)) !== old) }, 0);
+  patchDoc('threads', tid, { parent: null, forkOf: null }, 0);
+  toast(t('tDetached', th.name));
+}
 function setGroup(ids, name) { for (const id of ids) patchDoc('threads', id, { group: name }, 0); }
 function groupDetail(name) {
   const ths = orderedThreads().filter(th => th.group === name);
@@ -2961,7 +2975,7 @@ function threadDetail(th) {
       <label class="fld"><span>${esc(t('threadGroup'))}</span><input id="t-group" list="group-list" value="${esc(th.group || '')}" placeholder="${esc(t('threadGroupPh'))}"></label>
       <div class="meta">
         <span>${esc(t('createdAt', fmtAbs(th.createdAt || Date.now())))}${cs[0] ? esc(t('lastUpdate', fmtRel(cs[0].ts))) : ''}</span>
-        ${th.parent ? `<span>${esc(t('forkedFromThread'))} <button class="linkish" data-act="goto-thread" data-tid="${esc(th.parent)}">${esc(getThread(th.parent).name)}</button>${forkC ? ` ${esc(t('of'))} <button class="linkish" data-act="goto-commit" data-cid="${esc(forkC.id)}">${esc(forkC.title.slice(0, 40))}</button>` : ''}</span>` : ''}
+        ${th.parent ? `<span>${esc(t('forkedFromThread'))} <button class="linkish" data-act="goto-thread" data-tid="${esc(th.parent)}">${esc(getThread(th.parent).name)}</button>${forkC ? ` ${esc(t('of'))} <button class="linkish" data-act="goto-commit" data-cid="${esc(forkC.id)}">${esc(forkC.title.slice(0, 40))}</button>` : ''} · <button class="linkish" data-act="detach" title="${esc(t('detachTitle'))}">${esc(t('detach'))}</button></span>` : ''}
         ${mergedIn(th.id).length ? `<span>${esc(t('mergedInLabel'))} ${mergedIn(th.id).map(x => `<button class="linkish" data-act="goto-thread" data-tid="${esc(x.id)}">${esc(x.name)}</button>`).join('、')}</span>` : ''}
         ${th.mergedInto ? `<span>${esc(t('mergedInto'))} <button class="linkish" data-act="goto-thread" data-tid="${esc(th.mergedInto)}">${esc(getThread(th.mergedInto).name)}</button></span>` : ''}
       </div>`}
@@ -3056,7 +3070,7 @@ detail.addEventListener('keydown', e => {
 detail.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
   const act = b.dataset.act, s = S.sel;
-  const writeActs = ['fork-open', 'fork-create', 'del-open', 'del-confirm', 'status', 'color', 'merge-open', 'merge', 'label', 'flip', 'g-arrange', 'g-ungroup'];
+  const writeActs = ['detach', 'fork-open', 'fork-create', 'del-open', 'del-confirm', 'status', 'color', 'merge-open', 'merge', 'label', 'flip', 'g-arrange', 'g-ungroup'];
   if (writeActs.includes(act) && !canWrite()) return;
   switch (act) {
     case 'close': select(null); break;
@@ -3064,6 +3078,7 @@ detail.addEventListener('click', e => {
     case 'gx-file': { const k = b.dataset.dk; if (GX.open.has(k)) GX.open.delete(k); else GX.open.add(k); render(); break; }
     case 'gx-more': GX.more.add(b.dataset.key); render(); break;
     case 'goto-thread': select({ type: 'thread', id: b.dataset.tid }); break;
+    case 'detach': detachThread(s.id); break;
     case 'start': startOn({ thread: s.id }); break;
     case 'retro': S.ui = { retro: true }; render(); break;
     case 'retro-all': $('#rt-since').value = ''; $('#rt-until').value = ''; break;
@@ -3203,7 +3218,6 @@ function markTabs() {
 }
 let qTimer = 0;
 $('#q').addEventListener('input', e => { clearTimeout(qTimer); qTimer = setTimeout(() => { S.q = e.target.value.trim(); render(); }, 120); });
-$$('#lang-switch [data-set-lang]').forEach(b => { b.onclick = () => { if (b.dataset.setLang !== LANG) setLang(b.dataset.setLang); }; });
 
 const menu = $('#menu'), moreBtn = $('#more-btn');
 function closeMenu() { menu.hidden = true; moreBtn.setAttribute('aria-expanded', 'false'); }
@@ -3219,6 +3233,8 @@ menu.addEventListener('click', e => {
   const b = e.target.closest('[data-menu]'); if (!b) return;
   closeMenu();
   const k = b.dataset.menu;
+  if (k === 'lang') { setLang(LANG === 'zh' ? 'en' : 'zh'); menu.hidden = false; return; }
+  if (k === 'ai') { menu.hidden = true; openSheet('ai'); return; }
   if (k === 'theme') { ls.set('tc.theme', THEMES[(THEMES.indexOf(themeNow()) + 1) % THEMES.length]); applyTheme(); render(); menu.hidden = false; return; }
   if (k === 'new-thread') { setView('canvas'); createThreadAndEdit(); }
   else if (k === 'toggle-done') { S.hideDone = !S.hideDone; ls.set('tc.hideDone', S.hideDone); render(); }
@@ -3391,9 +3407,8 @@ async function initSample() {
   if (!SERVER) {
     try { sampleFn = window.claude && window.claude.use ? await window.claude.use('sample') : null; } catch { sampleFn = null; }
   }
-  $('#ai-btn').hidden = !aiAvailable();
+  $('#ai-item').hidden = !aiAvailable();
 }
-$('#ai-btn').onclick = () => openSheet('ai');
 $('#goals-btn').onclick = () => openSheet('goals');
 
 /* ---- goals and to-dos: a sheet, so the main page stays as it is ---- */
@@ -3577,39 +3592,38 @@ async function askAI(prompt, signal) {
 function buildAIPrompt() {
   const by = byThread(), now = Date.now();
   const threads = orderedThreads().filter(th => th.status !== 'merged').map(th => {
-    const cs = by.get(th.id) || [];
-    const last = cs[cs.length - 1];
-    return { id: th.id, name: th.name, status: th.status || 'active', goal: goalOf(th).slice(0, 160), idleDays: last ? Math.floor((now - last.ts) / 864e5) : null, recent: cs.slice(-6).map(c => `[${c.kind}] ${c.title.slice(0, 70)}`) };
+    const cs = by.get(th.id) || [], last = cs[cs.length - 1];
+    return {
+      id: th.id, name: th.name, status: th.status || 'active', group: th.group || '', goal: goalOf(th).slice(0, 200),
+      idleDays: last ? Math.floor((now - last.ts) / DAY) : null, running: liveOn(th.id).length,
+      recent: cs.filter(c => !isTodo(c)).slice(-8).map(c => `[${c.kind}] ${c.title.slice(0, 90)}`),
+      openTodos: cs.filter(c => isTodo(c) && !c.done).slice(-25).map(c => ({ id: c.id, title: c.title.slice(0, 100) })),
+    };
   });
-  const inbox = (by.get(INBOX) || []).slice(-60).map(c => ({ id: c.id, kind: c.kind, title: c.title.slice(0, 120), body: (c.body || '').slice(0, 160) }));
-  const edges = [...S.edges.values()].map(e => ({ from: e.from, to: e.to, label: e.label }));
   const d = new Date();
-  return `You are helping someone who works with AI agents tidy up the trace of their scattered work. A "thread" is like a git branch: one piece of work moving forward in parallel with others. The "inbox" holds ideas and records that haven't been filed yet. Today is ${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}.
+  return `You are helping someone who works with many AI agents keep their map of parallel work tidy. A "thread" is one line of work, like a git branch; its records are like commits; to-dos are next steps. Today is ${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}.
 
-Reply with only one JSON object:
-{"summary": "...", "assign": [], "relations": [], "stale": []}
-- summary: 2-3 sentences on what the main work is now, what has been left aside, and what could be wrapped up.
-- assign: where inbox records belong. For an existing thread: {"commit": "record id", "thread": "thread id", "why": "one-line reason"}. For a new thread: {"commit": "record id", "newThread": "short thread name", "why": "…"}; several records may point to the same new thread name.
-- relations: links between threads worth drawing on the canvas: {"from": "thread id", "to": "thread id", "label": "a 1-3 word relationship such as depends on, references, derived from, conflicts", "why": "…"}. Don't repeat existing links.
-- stale: active threads that look stalled and should be marked parked: {"thread": "thread id", "why": "…"}.
-Leave out anything you're unsure about; arrays may be empty. Use the ids exactly as given. Write summary, newThread, label and why in ${t('aiLangName')}.
+Read every thread and suggest only these three kinds of change. The person decides on each one; nothing happens unless they click it.
+- merge: two threads that are really the same piece of work (for example a thread named after a session id or folder that belongs to a named thread, or two threads with the same goal). {"from": "thread id", "into": "thread id", "why": "…"}. "into" is the one to keep.
+- wrap: an active thread whose work looks finished (its last records say it was done, sent, published, merged) → {"thread": "id", "status": "done", "why": "…"}; or one that has stopped with work left over → {"thread": "id", "status": "parked", "why": "…"}. Never a thread with running > 0.
+- todos: an open to-do that later records show is already done or no longer needed: {"task": "to-do id", "why": "…"}.
 
-Threads: ${JSON.stringify(threads)}
-Existing links: ${JSON.stringify(edges)}
-Inbox: ${JSON.stringify(inbox)}`;
+Reply with only one JSON object: {"summary": "…", "merge": [], "wrap": [], "todos": []}
+summary: 1-2 sentences on the state of the work. Each why is one short sentence that names the evidence (quote a record when you can). Leave out anything you are not sure about; empty arrays are fine and better than guesses. Use the ids exactly as given. Write summary and why in ${t('aiLangName')}.
+
+Threads: ${JSON.stringify(threads)}`;
 }
 async function runAI() {
   if (!aiAvailable()) { setSheet(t('aiTitle'), `<p>${esc(SERVER ? t('aiNeedClaudeLocal') : t('aiNeedClaude'))}</p>`); return; }
-  const by = byThread();
-  if (!S.threads.size && !(by.get(INBOX) || []).length) { setSheet(t('aiTitle'), `<p>${esc(t('aiNothing'))}</p>`); return; }
+  if (!S.threads.size) { setSheet(t('aiTitle'), `<p>${esc(t('aiNothing'))}</p>`); return; }
   const ctl = new AbortController();
   S.ai = { status: 'thinking', ctl };
   setSheet(t('aiTitle'), `<div class="ai-thinking"><span class="pulse"></span>${esc(t('aiThinking'))}</div>`, `<button class="btn" id="ai-stop">${esc(t('aiStop'))}</button>`);
   $('#ai-stop').onclick = () => ctl.abort();
   try {
     const res = await askAI(buildAIPrompt(), ctl.signal);
-    S.ai = { status: 'done', res };
-    if (S.sheet === 'ai') renderAI(res);
+    S.ai = { status: 'done', res, undo: new Map() };
+    if (S.sheet === 'ai') renderAI();
   } catch (e) {
     S.ai = { status: 'error' };
     if (S.sheet !== 'ai') return;
@@ -3620,49 +3634,61 @@ async function runAI() {
     const r = $('#ai-retry'); if (r) r.onclick = runAI;
   }
 }
-function renderAI(res) {
-  res = res && typeof res === 'object' ? res : {};
-  const tName = id => id === INBOX ? t('inbox') : (S.threads.get(id) || {}).name;
-  const assign = (Array.isArray(res.assign) ? res.assign : []).filter(a => a && S.commits.has(a.commit) && ((a.thread && S.threads.has(a.thread)) || (a.newThread && String(a.newThread).trim())));
-  const rels = (Array.isArray(res.relations) ? res.relations : []).filter(r => r && S.threads.has(r.from) && S.threads.has(r.to) && r.from !== r.to && ![...S.edges.values()].some(e => e.from === r.from && e.to === r.to));
-  const stale = (Array.isArray(res.stale) ? res.stale : []).filter(s => s && S.threads.has(s.thread) && S.threads.get(s.thread).status === 'active');
-  const item = (attrs, html, why) => `<label class="ai-item"><input type="checkbox" checked ${attrs}><span>${html}${why ? `<span class="why">${esc(why)}</span>` : ''}</span></label>`;
+// Each suggestion is one row with one button; once done it offers Undo. Nothing is applied in bulk.
+function aiSuggestions(res) {
+  const arr = k => (Array.isArray(res[k]) ? res[k] : []).filter(x => x && typeof x === 'object');
+  const active = id => S.threads.has(id) && !['merged'].includes(S.threads.get(id).status);
+  return [
+    ...arr('merge').filter(m => m.from !== m.into && active(m.from) && active(m.into)).map(m => ({ key: `m:${m.from}`, type: 'merge', from: m.from, into: m.into, why: m.why })),
+    ...arr('wrap').filter(w => ['done', 'parked'].includes(w.status) && active(w.thread) && S.threads.get(w.thread).status === 'active' && !liveOn(w.thread).length).map(w => ({ key: `w:${w.thread}`, type: 'wrap', thread: w.thread, status: w.status, why: w.why })),
+    ...arr('todos').filter(x => S.commits.has(x.task) && isTodo(S.commits.get(x.task)) && !S.commits.get(x.task).done).map(x => ({ key: `t:${x.task}`, type: 'todo', task: x.task, why: x.why })),
+  ];
+}
+function renderAI() {
+  const res = S.ai && S.ai.res && typeof S.ai.res === 'object' ? S.ai.res : {};
+  if (!S.ai.list) S.ai.list = aiSuggestions(res); // fixed once, so a row stays put after it is done
+  const name = id => esc(getThread(id).name);
+  const row = g => {
+    const done = S.ai.undo.has(g.key);
+    const what = g.type === 'merge' ? t('aiMergeItem', name(g.from), name(g.into))
+      : g.type === 'wrap' ? t(g.status === 'done' ? 'aiDoneItem' : 'aiParkItem', name(g.thread))
+      : t('aiTodoItem', esc(S.commits.get(g.task).title.slice(0, 80)), name(tidOf(S.commits.get(g.task))));
+    const btn = done ? `<span class="ai-done">${esc(t('aiDid'))}</span><button class="btn btn-quiet" data-ai-undo="${esc(g.key)}">${esc(t('aiUndo'))}</button>`
+      : `<button class="btn btn-primary" data-ai-do="${esc(g.key)}">${esc(t(g.type === 'merge' ? 'aiMergeBtn' : g.type === 'todo' ? 'aiTodoBtn' : g.status === 'done' ? 'aiDoneBtn' : 'aiParkBtn'))}</button>`;
+    return `<div class="ai-row ${done ? 'is-done' : ''}"><div><div>${what}</div>${g.why ? `<span class="why">${esc(g.why)}</span>` : ''}</div><div class="ai-acts">${btn}</div></div>`;
+  };
+  const sec = (type, label) => { const xs = S.ai.list.filter(g => g.type === type); return xs.length ? `<div class="sec-label">${esc(t(label))}</div><div class="ai-list">${xs.map(row).join('')}</div>` : ''; };
   let body = res.summary ? `<p class="ai-summary">${esc(res.summary)}</p>` : '';
-  if (assign.length) body += `<div class="sec-label">${esc(t('aiInbox'))}</div><div class="ai-list">${assign.map(a => {
-    const existing = a.thread && S.threads.has(a.thread);
-    const target = existing ? tName(a.thread) : String(a.newThread).trim();
-    return item(`data-type="assign" data-commit="${esc(a.commit)}" ${existing ? `data-thread="${esc(a.thread)}"` : `data-new-thread="${esc(target)}"`}`,
-      `“${esc(S.commits.get(a.commit).title.slice(0, 40))}” → <b>${esc(target)}</b>${existing ? '' : esc(t('aiNew'))}`, a.why);
-  }).join('')}</div>`;
-  if (rels.length) body += `<div class="sec-label">${esc(t('aiRelations'))}</div><div class="ai-list">${rels.map(r => {
-    const label = String(r.label || t('edgeRelated')).slice(0, 24);
-    return item(`data-type="rel" data-from="${esc(r.from)}" data-to="${esc(r.to)}" data-label="${esc(label)}"`,
-      `<b>${esc(tName(r.from))}</b> —${esc(label)}→ <b>${esc(tName(r.to))}</b>`, r.why);
-  }).join('')}</div>`;
-  if (stale.length) body += `<div class="sec-label">${esc(t('aiStale'))}</div><div class="ai-list">${stale.map(s =>
-    item(`data-type="stale" data-thread="${esc(s.thread)}"`, t('aiStaleItem', esc(tName(s.thread))), s.why)).join('')}</div>`;
-  const any = assign.length || rels.length || stale.length;
-  if (!any) body += `<p>${esc(t('aiNoChanges'))}</p>`;
-  setSheet(t('aiTitle'), body, any ? `<button class="btn" id="ai-cancel">${esc(t('aiCancel'))}</button><button class="btn btn-primary" id="ai-apply">${esc(t('aiApply'))}</button>` : `<button class="btn" id="ai-cancel">${esc(t('aiClose'))}</button>`);
+  body += sec('merge', 'aiMerge') + sec('wrap', 'aiWrap') + sec('todo', 'aiTodos');
+  if (!S.ai.list.length) body += `<p>${esc(t('aiNoChanges'))}</p>`;
+  setSheet(t('aiTitle'), body, `<button class="btn" id="ai-cancel">${esc(t('aiClose'))}</button>`);
   $('#ai-cancel').onclick = closeSheet;
-  const ap = $('#ai-apply'); if (ap) ap.onclick = applyAI;
 }
-function applyAI() {
+function aiDo(g) {
   if (!canWrite()) return;
-  const created = new Map();
-  let n = 0;
-  for (const box of $$('#sheet-body input[type=checkbox]:checked')) {
-    const d = box.dataset;
-    if (d.type === 'assign' && S.commits.has(d.commit)) {
-      let tid = d.thread;
-      if (!tid) { const name = d.newThread; if (!created.has(name)) created.set(name, ensureThread(name)); tid = created.get(name); }
-      patchDoc('commits', d.commit, { thread: tid }, 0); n++;
-    } else if (d.type === 'rel') { putDoc('edges', { id: uid('e'), from: d.from, to: d.to, label: d.label, createdAt: Date.now(), byAI: true }, 0); n++; }
-    else if (d.type === 'stale') { patchDoc('threads', d.thread, { status: 'parked' }, 0); n++; }
+  if (g.type === 'merge') {
+    const s = S.threads.get(g.from), prev = { status: s.status, mergedInto: s.mergedInto || null };
+    const sTip = lastCommit(g.from), tTip = lastCommit(g.into);
+    const m = addCommit({ thread: g.into, kind: 'merge', title: t('mergeTitle', s.name), parents: [tTip && tTip.id, sTip && sTip.id].filter(Boolean), ts: Math.max(Date.now(), sTip ? sTip.ts + 1 : 0), extra: { mergeOf: g.from } });
+    patchDoc('threads', g.from, { status: 'merged', mergedInto: g.into }, 0);
+    S.ai.undo.set(g.key, () => { removeDoc('commits', m.id); patchDoc('threads', g.from, prev, 0); });
+  } else if (g.type === 'wrap') {
+    const prev = S.threads.get(g.thread).status;
+    patchDoc('threads', g.thread, { status: g.status }, 0);
+    S.ai.undo.set(g.key, () => patchDoc('threads', g.thread, { status: prev }, 0));
+  } else {
+    patchDoc('commits', g.task, { done: true, doneBy: 'human', doneAt: Date.now() }, 0);
+    S.ai.undo.set(g.key, () => patchDoc('commits', g.task, { done: false, doneBy: null, doneAt: null }, 0));
   }
-  closeSheet();
-  toast(n ? t('tApplied', n) : t('tNoneChecked'));
 }
+sheetBody.addEventListener('click', e => {
+  if (S.sheet !== 'ai' || !S.ai || !S.ai.list) return;
+  const d = e.target.closest('[data-ai-do]'), u = e.target.closest('[data-ai-undo]');
+  const g = S.ai.list.find(x => x.key === (d ? d.dataset.aiDo : u ? u.dataset.aiUndo : ''));
+  if (!g) return;
+  if (d) aiDo(g); else { S.ai.undo.get(g.key)(); S.ai.undo.delete(g.key); }
+  renderAI();
+});
 
 /* ================= toast & boot ================= */
 let toastT = 0;

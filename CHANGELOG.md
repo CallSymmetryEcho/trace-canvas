@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.2 (2026-11-04)
+
+Open sessions stay on the map, dispatch says what it did, a fork can become its own line, and AI tidy-up suggests instead of acting.
+
+- **Make a fork its own line.** A forked line that turned into separate work can stand alone: **Make it its own line** in its panel, `trace-canvas detach <line> [--take <record>]`, or the MCP tool `trace_detach`. The fork record goes and nothing on the line points back at the one it came from; `--take` moves the request that started it over as its first record, and the old line closes the gap.
+- **Sessions that sat quiet are found again.** The canvas also reads Claude Code's own register of running sessions, so a session open in the desktop app or with `claude --bg` counts as running (with its real process) even when it has been quiet for days, and dispatch prints the name to message it by.
+- **Dispatch says plainly what happened.** A Terminal window that did not open (a macOS Automation prompt denied or left unanswered) is reported, with the command to run yourself, instead of being taken for a started agent. A line nobody is on any more goes to the session that last worked on it, which may still be open. When that session is busy, dispatch prints both choices: paste the message into it when it stops, or start a new session with the command shown.
+- **An open terminal stays on the map.** A session counts as running while its Claude Code or Codex process runs, however long it sits quiet (a lid closed overnight used to drop it after 12 hours), and it leaves as soon as the window is closed. Sessions whose process can't be found keep the 12-hour rule.
+- **AI tidy-up suggests, you click.** It now reads every line with its recent records and open to-dos and suggests three things: two lines that are the same work (**Merge**), lines ready to wrap up (**Mark done**, or **Park** when work is left over; never a line a session is running on), and open to-dos that later records show are done (**Tick off**). Each suggestion quotes its evidence and has its own button and **Undo**; nothing is applied in bulk. Filing the inbox, drawing links between lines and the old "stalled" list are gone (Gone quiet covers stalled lines).
+- **A quieter header.** AI tidy-up and the language moved into **More**. The language item reads "Language · 语言" in both languages, with the current one in bold, so it can be found from either.
+- **The page starts in your language.** Until a language is chosen (on the page, in the config, or `?lang=`), the page follows the browser: Chinese if the browser lists Chinese before English, otherwise English. The first visit saves it, so the records the hooks write use the same language.
+
 ## 0.3.1 (2026-10-30)
 
 Two fixes: dispatch respects who a to-do is for, and quiet commits get their station and diff.

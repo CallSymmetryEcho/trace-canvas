@@ -168,8 +168,8 @@ export function handleHook(input, env = process.env) {
   const quick = ['PreToolUse', 'Notification', 'SubagentStart', 'SubagentStop'].includes(ev);
   const known = ev !== 'SessionEnd' && readLive(sid, env);
   const info = ev !== 'SessionEnd' && relevantTool && !(quick && known) ? repoInfo(cwd) : null;
-  // The session's terminal tab, looked up once (Go to the terminal on the page).
-  const terminal = ev !== 'SessionEnd' && !(known && 'tty' in known) ? terminalOf(env) : null;
+  // The session's terminal tab and agent process, looked up until the process is found (Go to the terminal; live while it runs).
+  const terminal = ev !== 'SessionEnd' && !(known && 'pid' in known) ? terminalOf(env) : null;
   // The repository a commit landed in, which is often not cwd's (`cd other && git commit`).
   const bashCmd = ev === 'PostToolUse' && input.tool_name === 'Bash' ? String((input.tool_input || {}).command || '') : '';
   const commitRepo = GIT_COMMIT.test(bashCmd) ? gitRoot(commandDir(bashCmd, cwd)) : null;

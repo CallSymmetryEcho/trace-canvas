@@ -153,3 +153,13 @@ test('the user\'s own bin folders join a bare PATH (a server started over ssh), 
   assert.equal(withUserBins(withUserBins(bare, home), home), withUserBins(bare, home)); // once
   assert.ok(!withUserBins(bare, home).includes(path.join(home, '.bun', 'bin'))); // only folders that exist
 });
+
+test('opening a terminal reports why it did not open, instead of saying an agent started', { skip: process.platform !== 'darwin' }, async () => {
+  const { openTerminal } = await import('../src/agents.mjs');
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-osa-')), osa = path.join(bin, 'osascript');
+  const env = code => ({ ...process.env, PATH: `${bin}:${process.env.PATH}`, OSA: code });
+  // A stand-in for osascript: fails the way a denied Automation permission does, or succeeds.
+  fs.writeFileSync(osa, '#!/bin/sh\n[ "$OSA" = ok ] && exit 0\necho "execution error: Not authorized to send Apple events to Terminal. (-1743)" >&2; exit 1\n', { mode: 0o755 });
+  assert.match(await openTerminal('claude hi', env('denied')), /Automation/);
+  assert.equal(await openTerminal('claude hi', env('ok')), null);
+});

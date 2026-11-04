@@ -188,3 +188,20 @@ test('a Codex session whose rollout ended the turn is idle, even when its Stop h
   fs.appendFileSync(rollout, turn('task_complete') + '\n' + JSON.stringify({ type: 'event_msg', payload: { type: 'token_count' } }) + '\n');
   assert.equal(listLive(env)[0].status, 'idle');
 });
+
+test('a session whose agent process is known stays live while it runs, however long it is quiet, and drops when it ends', () => {
+  const s = sandbox(), now = Date.now();
+  const dead = execFileSync('sh', ['-c', 'sh -c "echo \\$\\$" ']).toString().trim(); // a pid that has exited
+  updateLive({ session_id: 'open', hook_event_name: 'Stop' }, { env: s.env, now, terminal: { tty: '', term: '', pid: process.pid } });
+  updateLive({ session_id: 'closed', hook_event_name: 'Stop' }, { env: s.env, now, terminal: { tty: '', term: '', pid: +dead } });
+  assert.deepEqual(listLive(s.env, now + 2 * STALE_MS).map(x => x.id), ['open']);
+});
+
+test('Claude Code\'s session register gives the pid of a session quiet since before its live file noted one', () => {
+  const s = sandbox(), now = Date.now(), cfg = path.join(s.root, 'claude'), env = { ...s.env, CLAUDE_CONFIG_DIR: cfg };
+  fs.mkdirSync(path.join(cfg, 'sessions'), { recursive: true });
+  fs.writeFileSync(path.join(cfg, 'sessions', `${process.pid}.json`), JSON.stringify({ pid: process.pid, sessionId: 'old', kind: 'bg', name: 'lianbin-x' }));
+  updateLive({ session_id: 'old', hook_event_name: 'Stop' }, { env, now });
+  const [x] = listLive(env, now + 2 * STALE_MS);
+  assert.deepEqual([x.id, x.pid, x.kind, x.name], ['old', process.pid, 'bg', 'lianbin-x']);
+});

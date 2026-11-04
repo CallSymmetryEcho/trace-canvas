@@ -82,6 +82,7 @@ Records
   trace-canvas merge <thread>... --into <thread> [--combine]
                                                    Merge threads (combine folds them into one line)
   trace-canvas fork <record|thread> [--name N] [--bind] [--session id]
+  trace-canvas detach <thread> [--take <record>]   a forked line becomes a line of its own
                                                    Branch a new thread off a record or a thread's tip
   trace-canvas import <file|->                     Merge an export, another data.json, or JSON lines
   trace-canvas history [line...] [--all] [--off]   A repository's line takes in its history: the default branch's commits
@@ -235,6 +236,14 @@ async function main() {
       console.log(`Forked "${r.thread.name}"${sid ? ` and put session ${sid} on it` : ''}`);
       break;
     }
+    case 'detach': {
+      const { detachThread } = await import('../src/ops.mjs');
+      const take = str(flag('take', '')), ref = argv.join(' ').trim();
+      if (!ref) { console.error('Usage: trace-canvas detach <thread> [--take <record>]'); process.exit(1); }
+      const th = mutate(d => detachThread(d, { thread: ref, take }));
+      console.log(`"${th.name}" is a line of its own now${take ? `, starting with ${take}` : ''}`);
+      break;
+    }
     case 'merge': {
       const { mergeThreads } = await import('../src/ops.mjs');
       const into = str(flag('into', '')), name = str(flag('name', '')), combine = !!flag('combine', false);
@@ -290,7 +299,9 @@ async function main() {
       // --print only shows what would happen: nothing is assigned or saved.
       let rows = [];
       mutate(d => { rows = dispatch(d, { refs: argv.filter(Boolean), all, on, self: process.env.CLAUDE_CODE_SESSION_ID || null }); return print ? false : rows; });
-      for (const r of rows) if (r.command && run) openTerminal(r.command);
+      // Each window is waited for, so a terminal that did not open is reported, not taken for a started agent.
+      for (const r of rows) if (r.command && run && r.action !== 'busy') r.failed = await openTerminal(r.command);
+      if (rows.some(r => r.failed)) process.exitCode = 1;
       if (json) { console.log(JSON.stringify(rows, null, 2)); break; }
       if (!rows.length) { console.log('Nothing new to dispatch: every open to-do has an agent, or was logged by the agent working on its line (--all takes those too).'); break; }
       for (const r of rows) {
@@ -298,8 +309,9 @@ async function main() {
         console.log(`\n${r.thread.name}: ${r.todos.length} to-do${r.todos.length === 1 ? '' : 's'} for ${who}${r.on ? ` on ${r.on}` : ''}`);
         for (const c of r.todos) console.log(`  □ ${c.title}  [${c.id}]`);
         if (r.action === 'self') console.log('  → Your own line: they are yours.');
-        else if (r.action === 'message') console.log(`  → Running session ${name} (${s.status}${s.desktopId ? `, ${s.desktopId}` : ''}): send it this message:\n    ${r.prompt}`);
-        else if (r.action === 'busy') console.log(`  → ${who} session ${name} is working: send it this when it stops:\n    ${r.prompt}`);
+        else if (r.action === 'message') console.log(`  → Running session ${name} (${s.status}${s.name ? `, messaged as ${s.name}` : ''}${s.desktopId ? `, ${s.desktopId}` : ''}): send it this message:\n    ${r.prompt}`);
+        else if (r.action === 'busy') console.log(`  → ${who} session ${name} is busy. Choose:\n    A) paste this into it when it stops:\n       ${r.prompt}\n    B) or start a new session for them:\n       ${r.command}`);
+        else if (r.failed) console.log(`  → No terminal window opened: ${r.failed}\n    Run it yourself:\n    ${r.command}`);
         else console.log(`  → ${r.action === 'start' ? `A new ${who} session` : `Session ${name} resumed`}${run ? ' in a new terminal window' : '; run'}:\n    ${r.command}`);
       }
       break;

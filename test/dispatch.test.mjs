@@ -60,7 +60,9 @@ test('dispatch hands each line\'s new to-dos to the agent working on it, and say
   assert.deepEqual(dispatch(d, {}, env), []); // handed out once
   running('c1', 'Codex', 'codex', 'working');
   todo(scripts, 'Add a lint step');
-  assert.deepEqual(dispatch(d, { refs: ['Scripts'] }, env).map(r => r.action), ['busy']);
+  const [busy] = dispatch(d, { refs: ['Scripts'] }, env);
+  assert.equal(busy.action, 'busy');
+  assert.match(busy.command, /TRACE_CANVAS_THREAD=.* codex /); // B: a new session, when the person would rather not wait
   assert.deepEqual(dispatch(d, { refs: ['Thesis'], all: true }, env)[0].todos.map(c => c.title), ['Its own to-do', 'An older agent to-do']);
   // A to-do named goes to its line's agent, even one that agent logged itself.
   assert.deepEqual(dispatch(d, { refs: ['Its own to-do'] }, env).map(r => [r.thread.name, r.session.id, r.todos.map(c => c.title)]), [['Thesis', 's1', ['Its own to-do']]]);
@@ -90,6 +92,12 @@ test('dispatch hands each line\'s new to-dos to the agent working on it, and say
   addCommit(d, { thread: kit, kind: 'agent', title: 'Found the old exporter', agent: 'Claude Code', ts: now - 1e5, extra: { fromSession: 'b' } });
   todo(kit, 'Write the import docs');
   assert.deepEqual(dispatch(d, { refs: ['Kit'] }, env).map(r => [r.session.id, r.todos.map(c => c.title)]), [['k', ['Write the import docs']]]);
+
+  // A line nobody is on any more goes to the session that last worked there, though it moved to another line since.
+  const left = createThread(d, { name: 'Left' }).id;
+  addCommit(d, { thread: left, kind: 'agent', title: 'Drafted the intro', agent: 'Claude Code', ts: now - 4e5, extra: { session: 'b' } });
+  todo(left, 'Polish the intro');
+  assert.deepEqual(dispatch(d, { refs: ['Left'] }, env).map(r => [r.session && r.session.id, r.action]), [['b', 'resume']]);
 
   // Worked on from two machines: none running, this machine's session; the other machine's when it is running there.
   const two = createThread(d, { name: 'Two' }).id, here = env.TRACE_CANVAS_MACHINE;

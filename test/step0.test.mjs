@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { emptyData, addCommit, createThread } from '../src/store.mjs';
-import { forkThread, goalOf, bindLiveSession } from '../src/ops.mjs';
+import { forkThread, detachThread, goalOf, bindLiveSession, listThreads } from '../src/ops.mjs';
 import { sessionThread } from '../src/hook.mjs';
 import { currentSessionId, encodeProjectDir } from '../src/transcript.mjs';
 
@@ -53,4 +53,27 @@ test('the goal has its own field; old notes keep only the lines that are not sys
   assert.equal(goalOf({ note: '由 trace-canvas 合并而来' }), '');
   assert.equal(goalOf({ note: 'Cut the promo under a minute\nCombined from A, B' }), 'Cut the promo under a minute');
   assert.equal(goalOf({ goal: '', note: 'old text' }), ''); // cleared on purpose
+});
+
+test('detach makes a forked line a line of its own, optionally taking the request that started it', () => {
+  const env = { ...process.env, TRACE_CANVAS_HOME: fs.mkdtempSync(path.join(os.tmpdir(), 'tc-detach-')), TRACE_CANVAS_LANG: 'en' };
+  const d = emptyData(), main = createThread(d, { name: 'Canvas test' }).id;
+  addCommit(d, { thread: main, kind: 'agent', title: 'Before', ts: 1000 });
+  const ask = addCommit(d, { thread: main, kind: 'task', title: 'Look into photonic tweezers', ts: 2000 });
+  const after = addCommit(d, { thread: main, kind: 'agent', title: 'After', ts: 3000 });
+  const { thread, record } = forkThread(d, { from: ask.id, name: 'Tweezers' }, env);
+  const r1 = addCommit(d, { thread: thread.id, kind: 'agent', title: 'Read three papers', ts: Date.now() + 1 });
+  assert.deepEqual(r1.parents, [record.id]);
+  assert.throws(() => detachThread(d, { thread: main }), /not a fork/);
+
+  detachThread(d, { thread: 'Tweezers', take: ask.id });
+  const t = listThreads(d).find(x => x.id === thread.id);
+  assert.equal(t.forkedFrom, undefined);
+  assert.equal(d.commits[record.id], undefined); // the fork record is gone
+  assert.equal(d.commits[ask.id].thread, thread.id); // the request moved over and starts the line
+  assert.deepEqual(d.commits[ask.id].parents, []);
+  assert.deepEqual(r1.parents, [ask.id]);
+  assert.deepEqual(d.commits[after.id].parents.map(p => d.commits[p].title), ['Before']); // the old line closes the gap
+  for (const c of Object.values(d.commits)) for (const p of c.parents || []) assert.equal(d.commits[p].thread === thread.id, c.thread === thread.id, c.title);
+  assert.throws(() => detachThread(d, { thread: 'Tweezers' }), /line of its own already/);
 });

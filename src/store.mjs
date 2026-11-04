@@ -84,6 +84,7 @@ export function readConfig(env = process.env) {
   try { file = JSON.parse(fs.readFileSync(configFile(env), 'utf8')); } catch {}
   return {
     lang: env.TRACE_CANVAS_LANG || file.lang || 'en',
+    langSet: !!(env.TRACE_CANVAS_LANG || file.lang), // chosen, not the default
     group: env.TRACE_CANVAS_GROUP || file.group || 'branch',
     prompts: env.TRACE_CANVAS_PROMPTS || file.prompts || 'first',
     turns: env.TRACE_CANVAS_TURNS || file.turns || 'changes',

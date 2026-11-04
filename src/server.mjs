@@ -31,7 +31,7 @@ function claudeAvailable() {
 
 function page(cfg, ai) {
   const body = fs.readFileSync(APP, 'utf8');
-  const boot = JSON.stringify({ version: VERSION, ai, lang: cfg.lang, dataFile: dataFile(), cli: CLI });
+  const boot = JSON.stringify({ version: VERSION, ai, lang: cfg.lang, langSet: cfg.langSet, dataFile: dataFile(), cli: CLI });
   return `<!doctype html><html lang="${cfg.lang === 'zh' ? 'zh-CN' : 'en'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}body{margin:0;font:14px system-ui}img{max-width:100%}[hidden]{display:none!important}</style><script>window.TRACE_CANVAS_SERVER=${boot.replace(/</g, '\\u003c')}</script></head><body>${body}</body></html>`;
 }
 
@@ -143,9 +143,9 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         if (!terminalCommand('')) return send(res, 200, { error: 'No terminal to open on this machine (macOS, or a Linux desktop); copy the command instead' });
         const body = JSON.parse(await readBody(req));
         const r = mutate(d => handTo(d, { ref: String(body.todo || ''), to: String(body.to || '') }));
-        openTerminal(r.command);
+        const failed = await openTerminal(r.command);
         broadcast('change');
-        return send(res, 200, { ok: true, command: r.command });
+        return send(res, 200, failed ? { error: failed, command: r.command } : { ok: true, command: r.command });
       }
       // Go to the terminal: brings a live session's Terminal or iTerm2 tab to the front, found by its tty.
       if (req.method === 'POST' && p === '/api/focus') {
@@ -164,9 +164,9 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         const busy = handTo(readData(), args).live[0];
         if (busy) return send(res, 200, { busy: { id: busy.id, title: busy.title || '', status: busy.status || '' } });
         const r = mutate(d => handTo(d, args));
-        openTerminal(r.command);
+        const failed = await openTerminal(r.command);
         broadcast('change');
-        return send(res, 200, { ok: true, name: r.thread.name });
+        return send(res, 200, failed ? { error: failed, command: r.command } : { ok: true, name: r.thread.name });
       }
       // Update: trace-canvas update pulls the newest version and restarts this server; the page reloads after it.
       if (req.method === 'POST' && p === '/api/update') { spawn(process.execPath, [CLI, 'update'], { detached: true, stdio: 'ignore' }).unref(); return send(res, 200, { ok: true }); }

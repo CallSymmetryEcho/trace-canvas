@@ -10,7 +10,7 @@ Trace Canvas shows work as a transit map. A **thread** is one piece of work in p
 
 In Claude Code, invoke `/trace-canvas` (arguments: `$ARGUMENTS`). In Codex, invoke `$trace-canvas` and read the action from the user's request.
 
-Actions: `capture`, `all`, `sessions`, `tasks`, `pick`, `dispatch [lines or to-dos…]`, `retro <thread>`, `sync`, `live`, `bind <thread>`, `fork <thread>`, `merge <threads…>`, `open`, `log <text>`.
+Actions: `capture`, `all`, `sessions`, `tasks`, `pick`, `dispatch [lines or to-dos…]`, `retro <thread>`, `sync`, `live`, `bind <thread>`, `fork <thread>`, `detach <thread>`, `merge <threads…>`, `open`, `log <text>`.
 
 Pick the matching action below. With no arguments, capture the current session.
 
@@ -49,6 +49,10 @@ Call `trace_list_sessions` and show a short table: when, title, prompts, files c
 
 Call `trace_fork` with `from` (the thread or record the user named) and `name`. Pass `bind: true` when this session should work on the new line. Report the new thread's name in one line.
 
+## detach <thread>: make a forked line a line of its own
+
+When the user wants a forked line to stand on its own (no longer drawn as a branch of the line it came from), call `trace_detach` with `thread`. If they want the request that started it to move over too, find that record on the parent line with `trace_read_thread` and pass its id as `take`. Never edit the data file by hand for this. Report it in one line.
+
 ## merge: combine sessions or threads
 
 1. Call `trace_list_threads` and identify the threads the user means. If it is unclear, show the candidates and ask.
@@ -71,8 +75,8 @@ Call `trace_tasks` (it answers for the line this session works on; pass `thread`
 ## dispatch [lines or to-dos…]: hand new to-dos to each line's agent and wake it
 
 1. Run `node <this skill's folder>/../bin/trace-canvas.mjs dispatch` (`trace-canvas dispatch` if it is on the PATH) with the lines the user named, or none for every line; when they name particular to-dos, pass each one's id (find it with `trace_tasks`) and only those go out, whoever logged them; add `--all` if they also want the to-dos a line's agent logged itself; when they say which machine to do them on, add `--on <machine>` (the machine names the canvas uses), and each line's to-dos go to that machine's latest session on the line, or a new one there. It gives each line's new to-dos (the user's own, or logged by another session) to the agent that last worked on that line, and on macOS it resumes stopped sessions and starts new ones in new Terminal windows by itself.
-2. Where it says **send it this message**, send that message to the running session with your messaging tool if you have one (in Claude Code: SendMessage to the `local_…` id it prints, or to the session's name from ListAgents). Otherwise give the user the session and the message.
-3. **Your own line** means those to-dos are yours: do them after the others are handed out. An agent that is **working** and not Claude Code takes its message only when it stops: tell the user.
+2. Where it says **send it this message**, send that message to the running session with your messaging tool if you have one (in Claude Code: SendMessage to the name it prints after **messaged as**, or to the `local_…` id, or to the session's name from ListAgents). Otherwise give the user the session and the message.
+3. **Your own line** means those to-dos are yours: do them after the others are handed out. Where a session **is busy**, ask the user which they want, in these words: **A** paste the message into it when it stops, or **B** start a new session with the command it prints. Never pick for them, and never say a session got the to-dos when it did not.
 4. Report one row per line: which agent got which to-dos and how it was woken. Only to-dos are handed out; if the user's new items are ideas, say so and offer to make them to-dos.
 
 ## retro <thread>: which work took the most back-and-forth, and what to keep

@@ -1684,6 +1684,8 @@ function jumpTo(s, cls, text) {
   const a = (href, key) => `<a class="${cls}" href="${esc(href)}" title="${esc(t(key))}">${text || esc(t(key))}</a>`;
   if (s.desktopId) return a(chatHref(s.desktopId), 'openChat');
   if (s.tty && !S.remote && ['Apple_Terminal', 'iTerm.app'].includes(s.term)) return `<button class="${cls}" data-act="focus-term" data-sid="${esc(s.id)}" title="${esc(t('goTerm'))}">${text || esc(t('goTerm'))}</button>`;
+  // Remote Control on (▶ Start, claude --bg --remote-control): the same session's chat on claude.ai, also from the phone.
+  if (s.rc && /^https:\/\/claude\.ai\//.test(s.rc)) return `<a class="${cls}" href="${esc(s.rc)}" target="_blank" rel="noopener" title="${esc(t('openChat'))}">${text || esc(t('openChat'))}</a>`;
   if (!s.tty && (s.agentKey === 'codex' || /^codex /.test(s.resume || ''))) return a(`codex://threads/${encodeURIComponent(s.id)}`, 'openChat');
   return '';
 }
@@ -1695,7 +1697,8 @@ function liveList(list) {
   return `<ul class="l-list">${list.map(s => `<li class="st-${esc(s.status)}" data-act="goto-live" data-sid="${esc(s.id)}"><span class="ldot"></span><span>${esc(liveTitle(s))}</span>${s.activity ? `<span class="act">${esc(s.activity)}</span>` : ''}</li>`).join('')}</ul>`;
 }
 function liveDetail(s) {
-  const here = s.resume || `claude --resume ${s.id}`;
+  // A background session (claude --bg) is joined with attach; --resume would start a second copy of it.
+  const here = s.kind === 'bg' ? `claude attach ${s.id}` : s.resume || `claude --resume ${s.id}`;
   // On another machine: resumed there over ssh, in its login shell; its chat, terminal and line are that machine's.
   const cmd = s.away ? `ssh -t ${s.machine} ${shq(`exec "$SHELL" -lc ${shq(`${s.cwd ? `cd ${shq(s.cwd)} && ` : ''}${here}`)}`)}` : here;
   const opts = `<option value="">${esc(t('liveAuto'))}</option>` + orderedThreads().filter(th => (th.status !== 'merged' && inFocus(th)) || th.id === s.threadId)

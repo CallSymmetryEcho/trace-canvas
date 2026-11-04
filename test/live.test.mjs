@@ -200,10 +200,11 @@ test('a session whose agent process is known stays live while it runs, however l
 test('Claude Code\'s session register gives the pid of a session quiet since before its live file noted one', () => {
   const s = sandbox(), now = Date.now(), cfg = path.join(s.root, 'claude'), env = { ...s.env, CLAUDE_CONFIG_DIR: cfg };
   fs.mkdirSync(path.join(cfg, 'sessions'), { recursive: true });
-  fs.writeFileSync(path.join(cfg, 'sessions', `${process.pid}.json`), JSON.stringify({ pid: process.pid, sessionId: 'old', kind: 'bg', name: 'lianbin-x' }));
+  fs.writeFileSync(path.join(cfg, 'sessions', `${process.pid}.json`), JSON.stringify({ pid: process.pid, sessionId: 'old', kind: 'bg', name: 'lianbin-x', bridgeSessionId: 'session_01abc' }));
   updateLive({ session_id: 'old', hook_event_name: 'Stop' }, { env, now });
   const [x] = listLive(env, now + 2 * STALE_MS);
   assert.deepEqual([x.id, x.pid, x.kind, x.name], ['old', process.pid, 'bg', 'lianbin-x']);
+  assert.equal(x.rc, 'https://claude.ai/code/session_01abc'); // Remote Control: the chat link the panel opens
 });
 
 test('systemdUnit: a user service, a system service, and a terminal scope', async () => {

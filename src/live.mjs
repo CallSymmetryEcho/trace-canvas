@@ -83,7 +83,7 @@ export function listLive(env, now = Date.now()) {
   }
   const reg = claudeSessions(env);
   return names.filter(n => !n.includes('.agent-')).map(n => readJson(path.join(liveDir(env), n)))
-    .map(s => { const r = s && reg.get(s.id); return r ? { ...s, pid: r.pid, kind: r.kind || '', name: r.name || '' } : s; })
+    .map(s => { const r = s && reg.get(s.id); return r ? { ...s, pid: r.pid, kind: r.kind || '', name: r.name || '', rc: r.bridgeSessionId ? `https://claude.ai/code/${r.bridgeSessionId}` : '' } : s; })
     .filter(s => s && s.id && isLive(s, now))
     .map(s => (s.status === 'working' && s.agentKey === 'codex' && codexTurnOver(s.transcript) ? { ...s, status: 'idle' } : s))
     .map(s => ({ ...s, agents: (agents.get(s.id) || []).sort((a, b) => a.startedAt - b.startedAt).slice(-MAX_AGENTS)

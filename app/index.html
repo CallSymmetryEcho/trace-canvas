@@ -230,38 +230,45 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .chip { flex: none; font-size: 11px; font-weight: 500; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--rule); color: var(--muted); white-space: nowrap; }
 .chip-active { border-color: var(--accent); color: var(--accent); }
 .chip-parked { border-style: dashed; }
-.chip-auto { border-color: #9b6bff; color: transparent; background: var(--ap-rb); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; animation: ap-rainbow 3s linear infinite; }
+.chip-auto { color: #8b5cf6; border-color: color-mix(in srgb, #8b5cf6 55%, transparent); background: color-mix(in srgb, #8b5cf6 8%, transparent); }
 /* Autopilot row in the line panel. When a round is taken up, one short sweep plays over the row and the card. */
 .ap-row { flex: none; display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid var(--rule); border-radius: 10px; position: relative; }
 .ap-row > span { flex: 1; font-size: 13px; font-weight: 500; }
 .ap-row > span small { display: block; font-size: 11.5px; font-weight: 400; color: var(--muted); }
-/* Three steps, like an effort picker: off · asked · running. A thumb slides under the step the line is on;
-   running gets the rainbow (the name, the thumb, the light round the card), like an ultra mode. */
-.ap-seg { flex: none; position: relative; display: grid; grid-template-columns: repeat(3, 1fr); padding: 2px; border: 1px solid var(--rule); border-radius: 999px; background: var(--surface-2); }
-.ap-seg::before { content: ''; position: absolute; top: 2px; bottom: 2px; left: 2px; width: calc((100% - 4px) / 3); border-radius: 999px; background: var(--ink); transform: translateX(calc(var(--i) * 100%)); transition: transform .25s cubic-bezier(.3,1.3,.5,1), background .2s; }
-.ap-seg button { position: relative; z-index: 1; border: 0; background: none; padding: 4px 11px; font-size: 12px; color: var(--muted); cursor: pointer; border-radius: 999px; white-space: nowrap; }
-.ap-seg button[aria-pressed="true"] { color: var(--surface); font-weight: 600; }
-.ap-seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.ap-row.is-wait .ap-seg::before { background: color-mix(in srgb, var(--ok) 55%, var(--rule)); animation: ap-wait 1.4s ease-in-out infinite; }
-.ap-row.is-run { border-color: transparent; background: linear-gradient(var(--surface), var(--surface)) padding-box, var(--ap-rb) border-box; background-size: 100%, 200% 100%; animation: ap-rainbow2 4s linear infinite; }
-.ap-row.is-run .ap-seg::before, .ap-row.is-run b { background: var(--ap-rb); background-size: 200% 100%; animation: ap-rainbow 3s linear infinite; }
-.ap-row.is-run b { -webkit-background-clip: text; background-clip: text; color: transparent; }
-.ap-row b { font-weight: 600; }
-:root { --ap-rb: linear-gradient(90deg, #ff5f6d, #ffb347, #f4e04d, #3ddc84, #3fa9ff, #9b6bff, #ff5f6d); }
-@keyframes ap-rainbow { to { background-position: 200% 0; } }
-@keyframes ap-rainbow2 { to { background-position: 0 0, 200% 0; } }
+/* Three steps on a slider track, like an effort picker: off · asked · running. A white knob sits on the step the line is on;
+   the track fills up to it: green while asked, a slate-to-violet night sky with twinkling stars while running. */
+.ap-row { flex-wrap: wrap; row-gap: 8px; --ap-v: #8b5cf6; }
+.ap-row > span b { font-weight: 600; }
+.ap-row > span em { font-style: normal; font-weight: 600; margin-left: 6px; color: var(--muted); }
+.ap-row.is-wait > span em { color: var(--ok); } .ap-row.is-run > span em { color: var(--ap-v); }
+.ap-row.is-run { border-color: color-mix(in srgb, var(--ap-v) 35%, var(--rule)); background: color-mix(in srgb, var(--ap-v) 4%, var(--surface)); }
+.ap-track { flex: 1 0 100%; position: relative; height: 26px; border-radius: 999px; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--rule-soft); --k: 26px; }
+.ap-fill { position: absolute; inset: 0 auto 0 0; width: calc(var(--i) * (100% - var(--k)) / 2 + var(--k)); border-radius: inherit; overflow: hidden; opacity: 0; transition: width .35s cubic-bezier(.3,1.2,.5,1), opacity .2s; }
+.is-wait .ap-fill { opacity: 1; background: color-mix(in srgb, var(--ok) 78%, #fff); }
+.is-run .ap-fill { opacity: 1; background: linear-gradient(90deg, #8fa1b3, #b7a6ee 38%, #9b5cf6 72%, #6c4ac0); }
+.is-run .ap-fill::before, .is-run .ap-fill::after { content: ''; position: absolute; inset: 0; animation: ap-twinkle 2.6s ease-in-out infinite alternate;
+  background: radial-gradient(1.2px 1.2px at 8% 70%, #fff, transparent), radial-gradient(1.6px 1.6px at 21% 28%, #fff, transparent), radial-gradient(1px 1px at 37% 62%, #fff, transparent), radial-gradient(1.4px 1.4px at 52% 36%, #fff, transparent), radial-gradient(1px 1px at 66% 74%, #fff, transparent), radial-gradient(1.6px 1.6px at 79% 30%, #fff, transparent); }
+.is-run .ap-fill::after { animation-delay: -1.3s; transform: translateX(6%); background: radial-gradient(1px 1px at 14% 40%, #fff, transparent), radial-gradient(1.4px 1.4px at 30% 80%, #fff, transparent), radial-gradient(1.2px 1.2px at 45% 22%, #fff, transparent), radial-gradient(1.6px 1.6px at 60% 58%, #fff, transparent), radial-gradient(1px 1px at 73% 18%, #fff, transparent); }
+@keyframes ap-twinkle { from { opacity: .25; } to { opacity: 1; } }
+.ap-dot { position: absolute; top: 50%; left: calc(var(--d) * (100% - var(--k)) / 2 + var(--k) / 2); width: 5px; height: 5px; margin: -2.5px; border-radius: 50%; background: var(--muted); opacity: .55; }
+.ap-knob { position: absolute; top: -2px; left: calc(var(--i) * (100% - var(--k)) / 2 - 2px); width: calc(var(--k) + 4px); height: calc(var(--k) + 4px); border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.22), 0 0 0 .5px rgba(0,0,0,.06); transition: left .35s cubic-bezier(.3,1.2,.5,1); pointer-events: none; }
+.is-wait .ap-knob { animation: ap-halo 1.6s ease-in-out infinite; }
+@keyframes ap-halo { 50% { box-shadow: 0 1px 4px rgba(0,0,0,.22), 0 0 0 5px color-mix(in srgb, var(--ok) 25%, transparent); } }
+.ap-track button { position: absolute; top: 0; bottom: 0; width: 33.34%; left: calc(var(--b) * 33.33%); border: 0; padding: 0; background: none; cursor: pointer; border-radius: 999px; z-index: 1; }
+.ap-track button[aria-pressed="true"] { cursor: default; }
+.ap-track button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .ap-burst::before { content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit; z-index: 1;
   background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--ok) 28%, transparent) 50%, transparent 70%) no-repeat;
   background-size: 250% 100%; animation: ap-sweep .9s ease-out var(--apd, 0s) forwards; box-shadow: inset 0 0 0 1px var(--ok); }
 @keyframes ap-sweep { from { background-position: 120% 0; } to { background-position: -20% 0; opacity: 0; } }
 /* While a round runs: a light runs round the card's border, a ticker under its head names the to-do in hand,
-   and the name and the selector's thumb run in rainbow. Compositor-friendly (one rotating angle, one translate); off when motion is reduced. */
+   and stars twinkle on the selector's track. Compositor-friendly (one rotating angle, one translate); off when motion is reduced. */
 @property --ap-a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
 .card.ap-on::after, .detail.ap-on::after { content: ''; position: absolute; inset: -1px; padding: 2px; border-radius: inherit; pointer-events: none; z-index: 2;
-  background: conic-gradient(from var(--ap-a), #ff5f6d, #ffb347, #f4e04d, #3ddc84, #3fa9ff, #9b6bff, #ff5f6d);
+  background: conic-gradient(from var(--ap-a), transparent 0 50%, color-mix(in srgb, #8b5cf6 35%, transparent) 72%, #a78bfa 88%, #8b5cf6 92%, transparent 97%);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: ap-run 3.2s linear infinite; }
 @keyframes ap-run { to { --ap-a: 360deg; } }
-.card.ap-on { box-shadow: 0 0 18px -4px color-mix(in srgb, #9b6bff 45%, transparent); }
+.card.ap-on { box-shadow: 0 0 16px -6px color-mix(in srgb, #8b5cf6 50%, transparent); }
 /* The line panel of a running line: the same light, slower and softer, just inside its border (the panel clips overflow). */
 .detail.ap-on::after { inset: 0; padding: 1.5px; z-index: 5; opacity: .8; animation-duration: 6s; }
 .ap-tick { overflow: hidden; margin: -2px 12px 6px; height: 18px; border-radius: 999px; background: color-mix(in srgb, var(--ok) 9%, transparent); font-size: 11.5px; line-height: 18px; color: var(--ok); white-space: nowrap;
@@ -269,10 +276,9 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .ap-tick span { display: inline-block; padding-left: 100%; animation: ap-tick 14s linear infinite; }
 @keyframes ap-tick { to { transform: translateX(-100%); } }
 .chip-wait { color: var(--ok); border: 1px dashed var(--ok); opacity: .75; }
-/* Asked, not taken up yet: the thumb sits on the middle step, dimmed, until the agent's hook says it runs. */
 @keyframes ap-wait { 50% { opacity: .55; } }
-@media (prefers-reduced-motion: reduce) { .chip-auto { animation: none; } .ap-burst::before { animation: none; display: none; } .ap-seg::before { transition: none; }
-  .card.ap-on::after, .detail.ap-on::after, .ap-row.is-run, .ap-row.is-run b, .ap-seg::before { animation: none !important; } .ap-tick span { animation: none; padding-left: 8px; } }
+@media (prefers-reduced-motion: reduce) { .chip-auto { animation: none; } .ap-burst::before { animation: none; display: none; } .ap-fill, .ap-knob { transition: none; }
+  .card.ap-on::after, .detail.ap-on::after, .is-run .ap-fill::before, .is-run .ap-fill::after, .is-wait .ap-knob { animation: none; } .ap-tick span { animation: none; padding-left: 8px; } }
 .chip-done { background: var(--surface-2); }
 .chip-merged { background: var(--surface-2); }
 .strip { list-style: none; margin: 0; padding: 2px 10px 4px 4px; position: relative; }
@@ -3081,7 +3087,8 @@ function threadDetail(th) {
       <label class="fld"><span>${esc(t('threadName'))}</span><input id="t-name" class="big-input" value="${esc(th.name)}"></label>
       <div class="fld"><span>${esc(t('threadStatus'))}</span><div class="seg">${['active', 'parked', 'done'].map(s => `<button data-act="status" data-status="${s}" aria-pressed="${th.status === s}">${esc(statusLabel(s))}</button>`).join('')}${th.status === 'merged' ? `<button aria-pressed="true" disabled>${esc(statusLabel('merged'))}</button>` : ''}</div></div>
       ${SERVER && !S.remote && th.status !== 'merged' ? (() => { const k = apRun(th) ? 'run' : apWait(th) ? 'wait' : 'off', i = ['off', 'wait', 'run'].indexOf(k);
-        return `<div class="ap-row is-${k}${apD(th.id) != null ? ` ap-burst" style="--apd:${apD(th.id)}ms` : ''}"><span><b>${esc(t('apTitle'))}</b><small>${esc(t(k === 'run' ? 'apOn' : k === 'wait' ? 'apWait' : 'apOff'))}</small></span><div class="ap-seg" role="group" aria-label="${esc(t('apTitle'))}" style="--i:${i}">${['off', 'wait', 'run'].map(x => `<button data-act="autopilot" data-ap="${x}" aria-pressed="${x === k}">${esc(t('apSeg_' + x))}</button>`).join('')}</div></div>`; })() : ''}
+        return `<div class="ap-row is-${k}${apD(th.id) != null ? ` ap-burst" style="--apd:${apD(th.id)}ms` : ''}"><span><b>${esc(t('apTitle'))}</b><em>${esc(t('apSeg_' + k))}</em><small>${esc(t(k === 'run' ? 'apOn' : k === 'wait' ? 'apWait' : 'apOff'))}</small></span>
+          <div class="ap-track" role="group" aria-label="${esc(t('apTitle'))}" style="--i:${i}"><i class="ap-fill"></i>${[1, 2].filter(d => d > i).map(d => `<i class="ap-dot" style="--d:${d}"></i>`).join('')}<i class="ap-knob"></i>${['off', 'wait', 'run'].map((x, n) => `<button data-act="autopilot" data-ap="${x}" style="--b:${n}" aria-pressed="${x === k}" aria-label="${esc(t('apSeg_' + x))}" title="${esc(t('apSeg_' + x))}"></button>`).join('')}</div></div>`; })() : ''}
       <div class="fld"><span>${esc(t('threadColor'))}</span><div class="swatches">${LINE_COLORS.map(c => `<button class="swatch" data-act="color" data-color="${c}" style="--c:${c}" aria-pressed="${th.color === c}" aria-label="${esc(t('colorAria', c))}"></button>`).join('')}</div></div>
       <label class="fld"><span>${esc(t('threadGoal'))}</span><textarea id="t-goal" rows="3" placeholder="${esc(t('threadGoalPh'))}">${esc(goalOf(th))}</textarea></label>
       <label class="fld"><span>${esc(t('threadGroup'))}</span><input id="t-group" list="group-list" value="${esc(th.group || '')}" placeholder="${esc(t('threadGroupPh'))}"></label>

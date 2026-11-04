@@ -1199,7 +1199,7 @@ apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent 
     stWorking: 'Working', stWaiting: 'Needs you', stIdle: 'Idle',
     liveHead: 'Running session', liveUntitled: 'Untitled session', liveStarted: x => `Started ${x}`, liveSeen: x => ` · last activity ${x}`,
     livePrompt: 'Latest instruction', liveThread: 'Thread', liveAuto: 'Automatic (repository and branch)', liveNow: 'Now on',
-    liveResume: 'Resume in a terminal', openChat: 'Open the chat', goTerm: 'Go to its terminal', tNoTerm: 'Its terminal tab is no longer open', liveRunning: 'Running now', lineSessions: 'Sessions on this line', loggedIn: 'Logged in',
+    liveResume: 'Resume in a terminal', openChat: 'Open the chat', openChatWeb: 'Open on claude.ai', goTerm: 'Go to its terminal', tNoTerm: 'Its terminal tab is no longer open', liveRunning: 'Running now', lineSessions: 'Sessions on this line', loggedIn: 'Logged in',
     gxChanges: 'Changes', gxLoading: 'Reading from git…', gxNoRepo: 'This repository is not on this computer.', gxNoRepoOn: m => `This repository is on ${m}, not on this computer.`, gxNoCommit: 'This commit is no longer in its repository (rewritten or cleaned up).',
     gxFiles: n => `${n} file${n === 1 ? '' : 's'}`, gxMore: n => `${n} more`, gxQuiet: n => `${n} binary or generated`, gxBinary: 'binary',
     gxCompare: 'Compare with', gxThisOnly: 'this commit only', gxOtherRepo: 'That station is in another repository.', gxTruncated: 'Cut at 200 KB.',
@@ -1380,7 +1380,7 @@ apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的
     stWorking: '工作中', stWaiting: '等你', stIdle: '空闲',
     liveHead: '运行中的会话', liveUntitled: '未命名会话', liveStarted: x => `开始于 ${x}`, liveSeen: x => ` · 最近活动 ${x}`,
     livePrompt: '最近的指令', liveThread: '所属线', liveAuto: '自动（按仓库和分支）', liveNow: '当前在',
-    liveResume: '在终端里恢复', openChat: '打开对话', goTerm: '跳到终端', tNoTerm: '它的终端标签页已经关了', liveRunning: '正在运行', lineSessions: '这条线上的会话', loggedIn: '记在这个会话里',
+    liveResume: '在终端里恢复', openChat: '打开对话', openChatWeb: '在 claude.ai 打开', goTerm: '跳到终端', tNoTerm: '它的终端标签页已经关了', liveRunning: '正在运行', lineSessions: '这条线上的会话', loggedIn: '记在这个会话里',
     gxChanges: '改动', gxLoading: '正在从 git 读取…', gxNoRepo: '这台电脑上没有这个仓库。', gxNoRepoOn: m => `这个仓库在 ${m} 上，这台电脑上没有。`, gxNoCommit: '仓库里已经没有这个提交，可能被改写或清理了。',
     gxFiles: n => `${n} 个文件`, gxMore: n => `还有 ${n} 个`, gxQuiet: n => `${n} 个二进制或生成文件`, gxBinary: '二进制',
     gxCompare: '对比', gxThisOnly: '只看这次提交', gxOtherRepo: '那个站点不在同一个仓库。', gxTruncated: '超过 200 KB，已截断。',
@@ -1817,6 +1817,8 @@ function jumpTo(s, cls, text) {
   if (!s.tty && (s.agentKey === 'codex' || /^codex /.test(s.resume || ''))) return a(`codex://threads/${encodeURIComponent(s.id)}`, 'openChat');
   return '';
 }
+// The same session's chat on claude.ai (Remote Control), beside its terminal or app: also where the phone continues it.
+const rcLink = s => s.rc && /^https:\/\/claude\.ai\//.test(s.rc) ? `<a class="btn" href="${esc(s.rc)}" target="_blank" rel="noopener">${esc(t('openChatWeb'))}</a>` : '';
 async function focusTerm(sid) {
   const r = await fetch('/api/focus', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Trace-Canvas': '1' }, body: JSON.stringify({ session: sid }) }).then(x => x.json()).catch(() => ({}));
   if (!r.ok) toast(t('tNoTerm'));
@@ -1839,7 +1841,7 @@ function liveDetail(s) {
     <div class="d-scroll">
       <div class="l-title">${esc(liveTitle(s))}</div>
       <div class="l-status st-${esc(s.status)}"><span class="ldot"></span>${esc(stLabel(s.status))}${s.activity ? `<span class="act">${esc(s.activity)}</span>` : ''}</div>
-      ${s.away ? `<div class="meta"><span>${esc(t('onMachine', s.machine))}</span></div>` : jumpTo(s, 'btn btn-primary') ? `<div class="d-actions">${jumpTo(s, 'btn btn-primary')}</div>` : ''}
+      ${s.away ? `<div class="meta"><span>${esc(t('onMachine', s.machine))}</span></div>` : jumpTo(s, 'btn btn-primary') || rcLink(s) ? `<div class="d-actions">${jumpTo(s, 'btn btn-primary')}${jumpTo(s, 'x').includes(esc(s.rc || '\u0000')) ? '' : rcLink(s)}</div>` : ''}
       <div class="meta">
         ${where ? `<span>${esc(where)}</span>` : ''}
         ${s.cwd ? `<span class="mono">${esc(s.cwd)}</span>` : ''}

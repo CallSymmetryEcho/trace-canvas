@@ -11,7 +11,7 @@ import { execFile, spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { COLS, addCommit, dataFile, home, mutate, readConfig, readData, toArrays, writeConfig } from './store.mjs';
 import { demoData } from './demo.mjs';
-import { liveDir, readLive } from './live.mjs';
+import { liveDir, readLive, withCodexTerm } from './live.mjs';
 import { bindLiveSession, findThreadLoose, handTo, liveSessions, sessionList, startAutopilot, stopAutopilot } from './ops.mjs';
 import { applyRetro, askAgent, retroRecord, runRetro } from './retro.mjs';
 import { focusTab, openTerminal, terminalCommand } from './agents.mjs';
@@ -164,7 +164,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
       // Go to the terminal: brings a live session's tab to the front (Terminal or iTerm2, GNOME Terminal or Konsole).
       if (req.method === 'POST' && p === '/api/focus') {
         const body = JSON.parse(await readBody(req));
-        return send(res, 200, await focusTab(readLive(String(body.session || '')) || {}) ? { ok: true } : { error: 'not found' });
+        return send(res, 200, await focusTab(withCodexTerm()(readLive(String(body.session || ''))) || {}) ? { ok: true } : { error: 'not found' });
       }
       // ▶ Start: a Claude Code session on the line in a new Terminal window, with Remote Control on, so it
       // shows in the Claude app on the phone. Built from the line or to-do id like Open in Terminal; a line

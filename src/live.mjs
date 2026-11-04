@@ -72,6 +72,27 @@ function codexTurnOver(file) {
   }
   return false;
 }
+// A Codex session's hooks run under its app-server daemon, which has no terminal; the terminal is the one where
+// `codex resume <id>` runs, found by its command line, with its TERM_PROGRAM (ps -E). One scan, only when needed.
+// ponytail: a session started as plain `codex` has no id on its command line and stays without the button.
+export function codexTerminals(run = execFileSync) {
+  const m = new Map();
+  try {
+    for (const l of run('ps', ['-A', '-E', '-ww', '-o', 'tty=,command='], { encoding: 'utf8', timeout: 2000, maxBuffer: 32 << 20 }).split('\n')) {
+      const r = /^\s*(ttys?\d+|pts\/\d+)\s+\S*codex\s+resume\s+([\w-]{20,})/.exec(l);
+      if (r && !m.has(r[2])) m.set(r[2], { tty: '/dev/' + r[1], term: (/\sTERM_PROGRAM=(\S+)/.exec(l) || [])[1] || '' });
+    }
+  } catch {}
+  return m;
+}
+export function withCodexTerm(scan = codexTerminals) {
+  let found;
+  return s => {
+    if (!s || s.agentKey !== 'codex' || s.tty) return s;
+    const t = (found ||= scan()).get(s.id);
+    return t ? { ...s, ...t, tab: '' } : s;
+  };
+}
 // Running sessions, the ones that need you first, then the busiest. Each carries its subagents.
 export function listLive(env, now = Date.now()) {
   let names = [];
@@ -86,6 +107,7 @@ export function listLive(env, now = Date.now()) {
     .map(s => { const r = s && reg.get(s.id); return r ? { ...s, pid: r.pid, kind: r.kind || '', name: r.name || '', rc: r.bridgeSessionId ? `https://claude.ai/code/${r.bridgeSessionId}` : '' } : s; })
     .filter(s => s && s.id && isLive(s, now))
     .map(s => (s.status === 'working' && s.agentKey === 'codex' && codexTurnOver(s.transcript) ? { ...s, status: 'idle' } : s))
+    .map(withCodexTerm())
     .map(s => ({ ...s, agents: (agents.get(s.id) || []).sort((a, b) => a.startedAt - b.startedAt).slice(-MAX_AGENTS)
       // Claude Code writes the .meta.json just after SubagentStart, so a running subagent picks up its description here.
       .map(a => (a.description ? a : { ...a, description: metaOf(s.transcript, a.id).description || '' })) }))

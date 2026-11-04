@@ -215,3 +215,16 @@ test('systemdUnit: a user service, a system service, and a terminal scope', asyn
   assert.equal(systemdUnit(1, cg('0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-org.kde.konsole-123.scope\n')), null);
   assert.equal(systemdUnit(1, () => { throw new Error('ENOENT'); }), null);
 });
+
+test('a Codex session gets the terminal of its `codex resume` process; others are left alone', async () => {
+  const { codexTerminals, withCodexTerm } = await import('../src/live.mjs');
+  const ps = () => ['?? /x/codex app-server --listen unix://', 'ttys016 codex resume 01a17cb7-78a8-7e52-96ac-bba24c5b6922 TERM=xterm TERM_PROGRAM=iTerm.app HOME=/u', 'ttys002 vim notes'].join('\n');
+  const m = codexTerminals(ps);
+  assert.deepEqual([...m], [['01a17cb7-78a8-7e52-96ac-bba24c5b6922', { tty: '/dev/ttys016', term: 'iTerm.app' }]]);
+  let scans = 0;
+  const f = withCodexTerm(() => (scans++, m));
+  assert.equal(f({ id: '01a17cb7-78a8-7e52-96ac-bba24c5b6922', agentKey: 'codex', tty: '', term: 'tmux' }).tty, '/dev/ttys016');
+  assert.equal(f({ id: 'other', agentKey: 'codex', tty: '' }).tty, '');
+  assert.equal(f({ id: 'c', agentKey: 'claude', tty: '' }).tty, '');
+  assert.equal(scans, 1);
+});

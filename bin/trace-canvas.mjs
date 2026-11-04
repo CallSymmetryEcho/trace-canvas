@@ -329,7 +329,7 @@ async function main() {
       let rows = [];
       mutate(d => { rows = startAutopilot(d, { thread: ref, self: process.env.CLAUDE_CODE_SESSION_ID || null }); return print ? false : rows; });
       await runRows(rows, { run: !print && !!terminalCommand(''), json });
-      if (!json && !print) console.log('\nAutopilot is on until the agent logs its summary; stop it with trace-canvas autopilot <line> --stop.');
+      if (!json && !print) console.log('\nAutopilot is asked: it turns on when a session takes the prompt (its hook says so) and off with the agent\'s summary; stop it with trace-canvas autopilot <line> --stop.');
       break;
     }
     case 'history': {

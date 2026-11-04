@@ -208,6 +208,9 @@ export function handleHook(input, env = process.env) {
       // A hand-off prompt written by dispatch, hand or the page restates to-dos that are already on the line: not a new one.
       const handoff = HANDOFF.test(prompt);
       if (handoff) s.prompted = true;
+      // An Autopilot round counts as running only once its prompt reaches a session: the switch lights here, not on the click.
+      const ap = /^Autopilot \(beta\) on the Trace Canvas line .*?\(thread ([\w-]+)\)/.exec(prompt), apTh = ap && d.threads[ap[1]];
+      if (apTh && apTh.autopilot) { apTh.autopilot = { ...apTh.autopilot, session: sid, on: Date.now() }; changed = true; }
       const log = !isCommand && prompt && !handoff && !notTask(prompt) && (cfg.prompts === 'all' || (cfg.prompts === 'first' && !s.prompted) || (cfg.prompts === 'long' && prompt.length >= 60));
       if (log) {
         const t = thread(prompt);

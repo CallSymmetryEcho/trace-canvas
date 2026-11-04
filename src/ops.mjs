@@ -52,7 +52,7 @@ export function listTasks(d, { thread, includeDone = false, assignee } = {}) {
     const tasks = (by[id] || []).sort((a, b) => a.ts - b.ts);
     const open = tasks.filter(c => !c.done);
     return {
-      id, name: th.name, ...(th.group ? { group: th.group } : {}), goal: goalOf(th), status: th.status || 'active', ...(th.autopilot ? { autopilot: true } : {}), done: tasks.length - open.length, total: tasks.length,
+      id, name: th.name, ...(th.group ? { group: th.group } : {}), goal: goalOf(th), status: th.status || 'active', ...(th.autopilot && th.autopilot.session ? { autopilot: true } : {}), done: tasks.length - open.length, total: tasks.length,
       tasks: (includeDone ? tasks : open).map(c => ({ id: c.id, title: c.title, ...(c.assignee ? { assignee: c.assignee } : {}), ...(c.on ? { on: c.on } : {}), ...(c.done ? { done: true, doneBy: c.doneBy || null, doneAt: c.doneAt ? new Date(c.doneAt).toISOString() : null } : {}) })),
     };
   }).filter(r => r.total || r.goal).filter(r => only || !['done', 'merged'].includes(r.status) || r.total > r.done);
@@ -219,7 +219,7 @@ export function startAutopilot(d, { thread, self = null }, env = process.env) {
   const open = Object.values(d.commits).filter(c => isTodo(c) && !c.done && threadIdOf(d, c) === tid).map(c => c.id);
   if (!open.length) throw new Error(`"${th.name}" has no open to-dos for Autopilot`);
   const rows = dispatch(d, { refs: open, self, prompt: () => autopilotPrompt(d, th, tid) }, env);
-  th.autopilot = { at: Date.now() };
+  th.autopilot = { at: Date.now() }; // asked; it runs once a session's hook takes the prompt (src/hook.mjs)
   return rows;
 }
 export function stopAutopilot(d, { thread }) {

@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { handleHook, headline, redirectTargets, whereFind } from '../src/hook.mjs';
-import { readData } from '../src/store.mjs';
+import { readData, mutate, createThread } from '../src/store.mjs';
 
 function sandbox(lang = 'en') {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-test-'));
@@ -197,4 +197,15 @@ test('the location map still answers when the python3 first on PATH is broken', 
   process.env.PATH = `${path.join(dir, 'bin')}${path.delimiter}${PATH}`;
   try { assert.deepEqual(whereFind({ map: path.join(dir, 'map') }, 'nas').map(r => r.id), ['nas']); }
   finally { process.env.PATH = PATH; }
+});
+
+test('an Autopilot round lights only when its prompt reaches a session, and an ordinary prompt does not light it', () => {
+  const s = sandbox();
+  const tid = mutate(d => { const th = createThread(d, { name: 'App' }); th.autopilot = { at: Date.now() }; return th.id; }, s.env);
+  s.fire('UserPromptSubmit', { prompt: 'Fix the login bug please', prompt_id: 'p1' });
+  assert.equal(s.data().threads[tid].autopilot.session, undefined);
+  s.fire('UserPromptSubmit', { prompt: `Autopilot (beta) on the Trace Canvas line "App" (thread ${tid}): work through every open to-do`, prompt_id: 'p2' });
+  const ap = s.data().threads[tid].autopilot;
+  assert.equal(ap.session, 's1');
+  assert.ok(ap.on >= ap.at);
 });

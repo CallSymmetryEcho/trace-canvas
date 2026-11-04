@@ -167,6 +167,9 @@ test('Autopilot hands every open to-do on a line to its agent with the decision 
   assert.match(row.command, /^cd .* && claude --resume s1 'Autopilot \(beta\) on the Trace Canvas line "App"/);
   assert.match(row.prompt, new RegExp(`decision profile, record ${p.id}`));
   assert.match(row.prompt, /Never send email[^.]*push, publish/);
+  // Asked is not running: it shows only once a session's hook has taken the prompt (test/hook.test.mjs).
+  assert.equal(listTasks(d, { thread: app })[0].autopilot, undefined);
+  d.threads[app].autopilot.session = 's1';
   assert.equal(listTasks(d, { thread: app })[0].autopilot, true);
   // The agent's summary turns it off; so does Stop.
   addCommit(d, { thread: app, kind: 'note', title: 'Autopilot summary: 2 done', ts: now });

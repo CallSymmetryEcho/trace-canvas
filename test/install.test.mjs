@@ -141,6 +141,14 @@ test('a new terminal tab or window: iTerm2 tabs or Terminal windows on macOS; on
   assert.equal(mac({ TRACE_CANVAS_TERMINAL: 'terminal' }, () => true), 'terminal'); // chosen
   assert.match(terminalCommand('ls', { TRACE_CANVAS_TERMINAL: 'iterm' }, 'darwin')[1][1], /create tab with default profile/);
   assert.match(terminalCommand('ls', { TRACE_CANVAS_TERMINAL: 'terminal' }, 'darwin')[1][1], /do script "ls"/);
+  // A command past the tty's 1024-byte line limit is typed as a short line that sources a self-deleting script.
+  const { typeable } = await import('../src/agents.mjs');
+  const long = `claude 'x${'y'.repeat(1300)}'`, dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-type-')), short = typeable(long, dir);
+  assert.match(short, /^\. '.*trace-canvas-[\w-]+\.sh'$/);
+  const file = short.slice(3, -1);
+  assert.equal(fs.readFileSync(file, 'utf8'), `rm -f '${file}'\n${long}\n`);
+  assert.equal(fs.statSync(file).mode & 0o777, 0o600);
+  assert.equal(typeable('ls', dir), 'ls');
   const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-term-'));
   for (const t of ['konsole', 'gnome-terminal']) { fs.writeFileSync(path.join(bin, t), '#!/bin/sh\n'); fs.chmodSync(path.join(bin, t), 0o755); }
   const env = { PATH: bin, DISPLAY: ':0', SHELL: '/bin/bash' };

@@ -4,6 +4,8 @@
 // Tools are recognised by the shape of their input, since each CLI names them its own way.
 import { execFile, spawn } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { readConfig } from './store.mjs';
 
@@ -46,13 +48,22 @@ function desktopEnv(env) {
 }
 const which = (name, env) => (env.PATH || '').split(path.delimiter).map(d => path.join(d, name)).find(p => { try { fs.accessSync(p, fs.constants.X_OK); return true; } catch { return false; } });
 
+// macOS types cmd into the terminal, and a typed line stops at 1024 bytes (the tty's MAX_CANON): an Autopilot or
+// dispatch prompt was cut off mid-sentence. A longer cmd goes into a one-off script (only this user can read it) that
+// deletes itself and runs cmd in the same shell, and the short line that sources it is what gets typed.
+export function typeable(cmd, dir = os.tmpdir()) {
+  if (Buffer.byteLength(String(cmd)) < 1000) return cmd;
+  const file = path.join(dir, `trace-canvas-${crypto.randomUUID()}.sh`);
+  fs.writeFileSync(file, `rm -f ${q(file)}\n${cmd}\n`, { mode: 0o600, flag: 'wx' });
+  return `. ${q(file)}`;
+}
 /**
  * How to run cmd in a new terminal window ("Open in Terminal", ▶ Start, dispatch): [program, args, env], or null when
  * this machine has no terminal to open. macOS: Terminal. Linux: $TERMINAL, then the usual ones, on the desktop's
  * display; the window stays open in a login shell once cmd is done. Going to an existing tab is macOS only.
  */
 export function terminalCommand(cmd, env = process.env, platform = process.platform) {
-  if (platform === 'darwin') return ['osascript', ['-e', (macTerminal(env) === 'iterm' ? itermScript : terminalScript)(cmd)], env];
+  if (platform === 'darwin') return ['osascript', ['-e', (macTerminal(env) === 'iterm' ? itermScript : terminalScript)(typeable(cmd))], env];
   if (platform !== 'linux') return null;
   const shown = desktopEnv(env);
   const term = shown && [env.TERMINAL, 'x-terminal-emulator', 'konsole', 'gnome-terminal', 'xfce4-terminal', 'kitty', 'alacritty', 'wezterm', 'xterm'].filter(Boolean).map(t => [path.basename(t), which(t, env) || (path.isAbsolute(t) && t)]).find(([, p]) => p);

@@ -213,6 +213,11 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .card.is-dim { opacity: .35; }
 .card.is-inbox { border-style: dashed; background: var(--surface-2); }
 .card.st-done, .card.st-merged { opacity: .72; }
+/* A parked line is folded: its head only, like a folded group's chip; ▸ makes it active again. */
+.card.is-shut { width: auto; max-width: 252px; border-style: dashed; opacity: .75; }
+.card.is-shut .strip, .card.is-shut .card-foot { display: none; }
+.card.is-shut .card-head { padding-bottom: 10px; }
+.card .grp-tog { --c: var(--rule); }
 .card.dragging { box-shadow: var(--shadow); cursor: grabbing; z-index: 3; }
 .card-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px 6px; }
 .roundel { flex: none; width: 15px; height: 15px; border-radius: 50%; border: 4px solid var(--c); background: var(--surface); }
@@ -918,7 +923,7 @@ const I18N = {
     langGroup: 'Language', more: 'More',
     menuNewThread: 'New thread', menuHideDone: 'Hide finished threads', menuShowDone: 'Show finished threads', quietLabel: 'Gone quiet', quietDays: n => `${n}d`, quietDot: n => `${n} line${n === 1 ? ' has' : 's have'} gone quiet`, quietAsk: (n, u) => `Nothing for ${n} days, where it usually moves every ${u === 1 ? 'day' : `${u} days`}. Finished?`, quietAskOpen: (n, k) => `Nothing for ${n} days, with ${k} to-do${k === 1 ? '' : 's'} still open. Park it for now?`, quietStill: 'Still on it', menuShowMerged: 'Show merged threads', menuHideMerged: 'Fold merged threads', mergedInCount: n => ` · ${n} merged in`, mergedInLabel: 'Merged in',
     arrange: 'Arrange', arrangeTitle: 'Lay the lines out by group, forks next to the lines they came from', tArranged: 'Arranged', tUndo: 'Undo',
-    groupLabel: 'Group', groupName: 'Name', groupLines: 'Lines in this group', groupCount: n => `${n} line${n === 1 ? '' : 's'}`, groupArrange: 'Arrange this group', groupFocus: 'Focus on this group', menuFocus: 'Focus on a group…', menuTheme: n => `Theme: ${n}`, theme_auto: 'match the system', theme_light: 'light', theme_dark: 'dark', theme_mist: 'mist', focusTitle: 'Focus on a group', focusLabel: 'Focus', focusPick: 'Change', focusExit: 'Leave focus', groupFold: 'Fold this group', foldedLabel: 'Folded', foldOpenAll: 'Unfold all', foldOpen: 'Unfold', foldedChip: n => `${n} line${n === 1 ? '' : 's'} · folded`, fromMachines: ms => `from ${ms.join(', ')}`, fromTitle: (m, n) => `${n} record${n === 1 ? '' : 's'} written on ${m}`, foldTitle: 'Fold groups', foldIntro: 'Folded groups stay out of every view (the canvas keeps a small chip for each) until you unfold them. Focus still works on any group.', foldShown: 'Shown', tFolded: g => `Folded "${g}"`,
+    groupLabel: 'Group', groupName: 'Name', groupLines: 'Lines in this group', groupCount: n => `${n} line${n === 1 ? '' : 's'}`, groupArrange: 'Arrange this group', groupFocus: 'Focus on this group', menuFocus: 'Focus on a group…', menuTheme: n => `Theme: ${n}`, theme_auto: 'match the system', theme_light: 'light', theme_dark: 'dark', theme_mist: 'mist', focusTitle: 'Focus on a group', focusLabel: 'Focus', focusPick: 'Change', focusExit: 'Leave focus', groupFold: 'Fold this group', foldedLabel: 'Folded', foldOpenAll: 'Unfold all', foldOpen: 'Unfold', foldedChip: n => `${n} line${n === 1 ? '' : 's'} · folded`, fromMachines: ms => `from ${ms.join(', ')}`, fromTitle: (m, n) => `${n} record${n === 1 ? '' : 's'} written on ${m}`, foldTitle: 'Fold groups', foldIntro: 'Folded groups stay out of every view (the canvas keeps a small chip for each) until you unfold them. Focus still works on any group.', foldShown: 'Shown', tFolded: g => `Folded "${g}"`, unpark: 'Unfold: make it active again', tUnparked: n => `"${n}" is active again`,
     focusIntro: 'Every view then shows only the lines of the group you pick: the canvas, the branches, the timeline and the goals. It stays on, also after a reload, until you leave it.',
     focusNoGroups: 'No groups yet. Select lines on the canvas and press Group, or fill in a group in a line\'s panel.', groupUngroup: 'Ungroup',
     threadGroup: 'Group', threadGroupPh: 'None', multiGroup: 'Group', multiGroupPh: 'Group name', tGroupNeedName: 'Type a group name first',
@@ -1093,7 +1098,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     langGroup: '语言', more: '更多',
     menuNewThread: '新建线程', menuHideDone: '隐藏已完成的线程', menuShowDone: '显示已完成的线程', quietLabel: '安静了', quietDays: n => `${n} 天`, quietDot: n => `${n} 条线安静了`, quietAsk: (n, u) => `${n} 天没动静，平时${u === 1 ? '每天' : ` ${u} 天`}一更。做完了吗？`, quietAskOpen: (n, k) => `${n} 天没动静，还有 ${k} 项待办。先搁置？`, quietStill: '还在做', menuShowMerged: '显示已合并的线程', menuHideMerged: '收起已合并的线程', mergedInCount: n => ` · 已并入 ${n} 条`, mergedInLabel: '已并入',
     arrange: '整理', arrangeTitle: '按分组排好线程，分叉排在原线旁边', tArranged: '已整理', tUndo: '撤销',
-    groupLabel: '分组', groupName: '名称', groupLines: '组里的线', groupCount: n => `${n} 条线`, groupArrange: '整理这一组', groupFocus: '专注这一组', menuFocus: '专注某个分组…', menuTheme: n => `主题：${n}`, theme_auto: '跟随系统', theme_light: '浅色', theme_dark: '深色', theme_mist: '雾蓝', focusTitle: '专注模式', focusLabel: '专注', focusPick: '换一个', focusExit: '退出专注', groupFold: '折叠这一组', foldedLabel: '已折叠', foldOpenAll: '全部展开', foldOpen: '展开', foldedChip: n => `${n} 条线 · 已折叠`, fromMachines: ms => `来自 ${ms.join('、')}`, fromTitle: (m, n) => `${n} 条记录写在 ${m} 上`, foldTitle: '折叠分组', foldIntro: '折叠的分组不会出现在任何视图里（画布上只留一个小条），直到你展开。专注仍然可以选任何分组。', foldShown: '显示中', tFolded: g => `已折叠「${g}」`,
+    groupLabel: '分组', groupName: '名称', groupLines: '组里的线', groupCount: n => `${n} 条线`, groupArrange: '整理这一组', groupFocus: '专注这一组', menuFocus: '专注某个分组…', menuTheme: n => `主题：${n}`, theme_auto: '跟随系统', theme_light: '浅色', theme_dark: '深色', theme_mist: '雾蓝', focusTitle: '专注模式', focusLabel: '专注', focusPick: '换一个', focusExit: '退出专注', groupFold: '折叠这一组', foldedLabel: '已折叠', foldOpenAll: '全部展开', foldOpen: '展开', foldedChip: n => `${n} 条线 · 已折叠`, fromMachines: ms => `来自 ${ms.join('、')}`, fromTitle: (m, n) => `${n} 条记录写在 ${m} 上`, foldTitle: '折叠分组', foldIntro: '折叠的分组不会出现在任何视图里（画布上只留一个小条），直到你展开。专注仍然可以选任何分组。', foldShown: '显示中', tFolded: g => `已折叠「${g}」`, unpark: '展开：恢复为进行中', tUnparked: n => `「${n}」恢复为进行中`,
     focusIntro: '选一个分组后，画布、分支、时间线和目标都只显示这个组里的线。刷新后也保持，直到你退出。',
     focusNoGroups: '还没有分组。在画布上选中几条线点「编组」，或者在线面板里填写分组。', groupUngroup: '解散分组',
     threadGroup: '分组', threadGroupPh: '无', multiGroup: '编组', multiGroupPh: '分组名称', tGroupNeedName: '先填分组名称',
@@ -1373,6 +1378,8 @@ const mergedIn = id => orderedThreads().filter(x => x.status === 'merged' && x.m
 // What every view shows: in focus mode one group's lines; otherwise every line but those of folded groups.
 function inFocus(th) { return S.focusGroup ? th.group === S.focusGroup : !(th.group && S.folded.includes(th.group)); }
 // The lines a view shows: the inbox and every line in view, or in focus mode the group's lines only.
+// A parked line is folded, like a folded group: a chip on the canvas, out of the branch view and the timeline.
+const isFolded = th => th.status === 'parked';
 function viewLines(keep = th => !isHidden(th)) { return [...(S.focusGroup ? [] : [inboxThread()]), ...orderedThreads().filter(th => inFocus(th) && keep(th))]; }
 // Folding keeps groups you rarely use out of the way, in every view, until you unfold them (per browser, like focus).
 function setFold(g, on) {
@@ -2324,7 +2331,8 @@ function cardHTML(th, cs, selT) {
   const last = cs[cs.length - 1];
   const anyHit = !filtering() || cs.some(matches);
   const selC = S.sel && S.sel.type === 'commit' ? S.sel.id : null;
-  const cls = ['card', isInbox ? 'is-inbox' : `st-${th.status || 'active'}`, selT === th.id ? 'is-sel' : '', filtering() && !anyHit ? 'is-dim' : '', S.connect && S.connect.from === th.id ? 'is-from' : '', S.multi.has(th.id) ? 'is-multi' : '', S.multi.has(th.id) && th.id === S.multiTarget ? 'is-multi-target' : ''].filter(Boolean).join(' ');
+  const shut = isFolded(th);
+  const cls = ['card', isInbox ? 'is-inbox' : `st-${th.status || 'active'}`, shut ? 'is-shut' : '', selT === th.id ? 'is-sel' : '', filtering() && !anyHit ? 'is-dim' : '', S.connect && S.connect.from === th.id ? 'is-from' : '', S.multi.has(th.id) ? 'is-multi' : '', S.multi.has(th.id) && th.id === S.multiTarget ? 'is-multi-target' : ''].filter(Boolean).join(' ');
   const items = recent.length
     ? recent.map(c => `<li data-cid="${esc(c.id)}" class="${c.id === selC ? 'is-sel' : ''} ${filtering() && matches(c) ? 'hit' : ''}">${mini(c.kind, stationColor(c, th), c.done)}<span class="s-title">${esc(c.title)}</span><time class="s-time">${fmtShort(c.ts)}</time></li>`).join('')
       + (more > 0 ? `<li class="s-more"><span></span><span>${esc(t('moreEarlier', more))}</span><span></span></li>` : '')
@@ -2332,7 +2340,7 @@ function cardHTML(th, cs, selT) {
   const chip = isInbox ? `<span class="chip">${esc(t('unsorted'))}</span>` : `<span class="chip chip-${th.status || 'active'}">${esc(statusLabel(th.status))}</span>`;
   const agents = cs.filter(c => c.kind === 'agent').length;
   return `<div class="${cls}" data-tid="${esc(th.id)}" style="left:${th.x || 0}px;top:${th.y || 0}px;--c:${th.color}">
-    <div class="card-head"><span class="roundel"></span><span class="card-name">${esc(th.name)}</span>${liveBadge(th.id)}${chip}</div>
+    <div class="card-head">${shut ? `<span class="grp-tog" data-park-tog="1" title="${esc(t('unpark'))}">▸</span>` : ''}<span class="roundel"></span><span class="card-name">${esc(th.name)}</span>${liveBadge(th.id)}${chip}</div>
     <ol class="strip">${items}</ol>
     <div class="card-foot"><span>${esc(t('countRecords', cs.length))}${agents ? esc(t('countAgent', agents)) : ''}${mergedIn(th.id).length && !S.showMerged ? esc(t('mergedInCount', mergedIn(th.id).length)) : ''}</span><span>${last ? esc(t('updated', fmtRel(last.ts))) : ''}</span></div>
   </div>`;
@@ -2485,6 +2493,7 @@ function endPointer(e) {
       return;
     }
     if (S.connect) { connectTap(g.id); return; }
+    if (g.target.closest && g.target.closest('[data-park-tog]')) { patchDoc('threads', g.id, { status: 'active' }, 0); toast(t('tUnparked', getThread(g.id).name)); return; }
     if ((g.multiKey || S.selectMode) && g.id !== INBOX) { toggleMulti(g.id); return; }
     const li = g.target.closest && g.target.closest('li[data-cid]');
     if (li) select({ type: 'commit', id: li.dataset.cid });
@@ -2530,7 +2539,7 @@ function createThreadAndEdit() {
 const machineTag = m => (m && S.machine && m !== S.machine ? `<span class="agent-tag m-tag" title="${esc(t('onMachine', m))}">${esc(m)}</span>` : '');
 function renderGit() {
   const by = byThread();
-  const visible = new Set(viewLines(th => !isHidden(th) || (th.status === 'merged' && !S.hideDone)).map(th => th.id));
+  const visible = new Set(viewLines(th => !isFolded(th) && (!isHidden(th) || (th.status === 'merged' && !S.hideDone))).map(th => th.id));
   // The kind filter drops rows here (forks and merges stay so lines keep their shape); search only dims.
   const kindOk = c => !S.kinds.size || S.kinds.has(c.kind) || c.kind === 'fork' || c.kind === 'merge';
   const list = [...S.commits.values()].filter(c => visible.has(tidOf(c)) && kindOk(c)).sort((a, b) => b.ts - a.ts);
@@ -2691,7 +2700,7 @@ function renderTimeline() {
   const wrap = $('#tl-scroll'), inner = $('#tl-inner');
   $$('#tl-zoom button').forEach(b => b.setAttribute('aria-pressed', b.dataset.z === S.tlZoom ? 'true' : 'false'));
   const by = byThread();
-  const ids = viewLines().map(th => th.id).filter(id => by.has(id));
+  const ids = viewLines(th => !isHidden(th) && !isFolded(th)).map(th => th.id).filter(id => by.has(id));
   if (!ids.length) { inner.innerHTML = ''; return; }
   const H = 3600e3, pph = TLZ[S.tlZoom] || 9, now = Date.now();
   let min = Infinity, max = -Infinity;

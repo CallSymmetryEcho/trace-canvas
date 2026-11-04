@@ -156,6 +156,9 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .grp { position: absolute; border: 1.5px dashed color-mix(in srgb, var(--c) 55%, transparent); border-radius: 14px; background: color-mix(in srgb, var(--c) 7%, transparent); }
 .grp-label { position: absolute; padding: 2px 10px; border: 0; border-radius: 999px; background: color-mix(in srgb, var(--c) 18%, var(--surface)); color: var(--ink); font: 600 12.5px var(--f-display); letter-spacing: .03em; cursor: grab; white-space: nowrap; }
 .grp-label:hover { background: color-mix(in srgb, var(--c) 30%, var(--surface)); }
+/* The fold switch on a group's label: ▾ shown (click folds), ▸ folded (click unfolds). */
+.grp-tog { display: inline-block; width: 1.3em; margin: 0 2px 0 -5px; border-radius: 50%; text-align: center; cursor: pointer; color: var(--muted); }
+.grp-tog:hover { background: color-mix(in srgb, var(--c) 40%, var(--surface)); color: var(--ink); }
 .grp-from { font-weight: 500; color: var(--muted); letter-spacing: 0; }
 .grp-folded { cursor: pointer; border: 1.5px dashed color-mix(in srgb, var(--c) 55%, transparent); padding: 5px 12px; color: var(--muted); }
 .phone-qr { display: grid; place-items: center; padding: 8px 0; }
@@ -2190,12 +2193,12 @@ function drawGroups() {
   // Labels go in their own layer above every frame: frames overlap while lines are scattered, and a
   // later frame would otherwise cover an earlier group's label (a click there would hit the frame).
   groupsEl.innerHTML = [...box].map(([, b]) => `<div class="grp" style="left:${b.x0 - pad}px;top:${b.y0 - pad - label}px;width:${b.x1 - b.x0 + 2 * pad}px;height:${b.y1 - b.y0 + 2 * pad + label}px;--c:${b.color}"></div>`).join('')
-    + [...box].map(([g, b]) => `<button class="grp-label" data-group="${esc(g)}" style="left:${b.x0 - pad + 10}px;top:${b.y0 - pad - label + 5}px;--c:${b.color}">${esc(g)} · ${b.n}${from(g)}</button>`).join('')
+    + [...box].map(([g, b]) => `<button class="grp-label" data-group="${esc(g)}" style="left:${b.x0 - pad + 10}px;top:${b.y0 - pad - label + 5}px;--c:${b.color}">${S.focusGroup ? '' : `<span class="grp-tog" title="${esc(t('groupFold'))}">▾</span>`}${esc(g)} · ${b.n}${from(g)}</button>`).join('')
     + (S.focusGroup ? '' : S.folded.map(g => {
       const ths = orderedThreads().filter(th => th.group === g && !isHidden(th));
       if (!ths.length) return '';
       const x = Math.min(...ths.map(th => th.x || 0)), y = Math.min(...ths.map(th => th.y || 0));
-      return `<button class="grp-label grp-folded" data-group="${esc(g)}" data-unfold="1" title="${esc(t('foldOpen'))}" style="left:${x}px;top:${y}px;--c:${ths[0].color}">▸ ${esc(g)} · ${esc(t('foldedChip', ths.length))}${from(g)}</button>`;
+      return `<button class="grp-label grp-folded" data-group="${esc(g)}" data-unfold="1" title="${esc(t('foldOpen'))}" style="left:${x}px;top:${y}px;--c:${ths[0].color}"><span class="grp-tog">▸</span>${esc(g)} · ${esc(t('foldedChip', ths.length))}${from(g)}</button>`;
     }).join(''));
 }
 // <arrange>
@@ -2396,7 +2399,7 @@ vp.addEventListener('pointerdown', e => {
   const lab = e.target.closest('.grp-label');
   if (lab) {
     const name = lab.dataset.group;
-    gesture = { type: 'group', name, folded: !!lab.dataset.unfold, sx: e.clientX, sy: e.clientY, moved: false, members: orderedThreads().filter(th => th.group === name).map(th => ({ id: th.id, ox: th.x || 0, oy: th.y || 0 })) };
+    gesture = { type: 'group', name, folded: !!lab.dataset.unfold, tog: !!e.target.closest('.grp-tog'), sx: e.clientX, sy: e.clientY, moved: false, members: orderedThreads().filter(th => th.group === name).map(th => ({ id: th.id, ox: th.x || 0, oy: th.y || 0 })) };
   } else if (card) {
     const th = getThread(card.dataset.tid);
     gesture = { type: 'card', id: card.dataset.tid, sx: e.clientX, sy: e.clientY, ox: th.x || 0, oy: th.y || 0, moved: false, el: card, target: e.target, multiKey: e.shiftKey || e.metaKey || e.ctrlKey };
@@ -2455,6 +2458,7 @@ function endPointer(e) {
   if (g.type === 'group') {
     if (g.moved) { for (const m of g.members) persist('threads', m.id, 0); S.dragMembers = null; render(); }
     else if (g.folded) setFold(g.name, false);
+    else if (g.tog) { setFold(g.name, true); toast(t('tFolded', g.name)); }
     else select({ type: 'group', id: g.name });
     return;
   }

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Fold a group from the canvas.** Each group's label has a switch: ▾ folds the group into a small chip, ▸ on the chip unfolds it.
 - **A commit made on another machine shows its changes here.** This machine's clone of the same repository is used, in whatever folder; without one, the changes are read on the machine the commit was made on, over ssh (the same machine names as the live bar). **More → Other machines' changes** turns the ssh reading off; then the panel says which computer the repository is on.
 - **Update works with a systemd service.** When the page server is a systemd service's main process, `trace-canvas update` restarts it with `systemctl` instead of starting a second server that took the port from it. `serve` exits when its port is taken, so a service manager no longer keeps an idle copy running.
 

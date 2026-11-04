@@ -4,6 +4,7 @@
 // Each subagent gets a file of its own (<session>.agent-<id>.json): parallel subagents start
 // at the same moment, and separate files mean none of them overwrites another.
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { home } from './store.mjs';
@@ -15,8 +16,25 @@ const fileOf = (sid, env) => path.join(liveDir(env), safe(sid) + '.json');
 const agentFile = (sid, id, env) => path.join(liveDir(env), `${safe(sid)}.agent-${safe(id)}.json`);
 // ponytail: the newest 20 subagents per session are shown; older ones drop off the live view.
 const MAX_AGENTS = 20;
-// ponytail: a session silent this long counts as gone (killed without SessionEnd); a heartbeat is the upgrade.
+// A session silent this long counts as gone (killed without SessionEnd), unless its agent's process is known:
+// then it is live exactly while that process runs, so a terminal left open overnight (or a closed lid) stays on.
 export const STALE_MS = 12 * 3600e3;
+// A session last seen before the machine booted is gone, whatever process now holds its old pid.
+// ponytail: kill(pid, 0) trusts the pid within one boot; check the process's command too if reuse ever shows up.
+const running = pid => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
+// A sandbox may deny the boot time (os.uptime throws EPERM in Codex's): then only the pid is checked.
+const bootedAt = () => { try { return Date.now() - os.uptime() * 1000; } catch { return 0; } };
+const isLive = (s, now) => (s.pid ? (s.lastSeen || 0) > bootedAt() && running(s.pid) : now - (s.lastSeen || 0) < STALE_MS);
+// Claude Code's own register of running sessions: <config>/sessions/<pid>.json with sessionId, pid, kind
+// (interactive or bg) and the name other sessions message it by. It knows the pid of a session that has been
+// quiet since before its live file noted one, and the real one of a --bg session (whose hooks run under a daemon).
+export function claudeSessions(env = process.env) {
+  const dir = path.join(env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude'), 'sessions'), out = new Map();
+  let names = [];
+  try { names = fs.readdirSync(dir).filter(n => /^\d+\.json$/.test(n)); } catch {}
+  for (const n of names) { const r = readJson(path.join(dir, n)); if (r && r.sessionId && r.pid) out.set(r.sessionId, r); }
+  return out;
+}
 const RANK = { waiting: 0, working: 1, idle: 2 };
 // Tools that stop and wait for the person, so the session needs you while they run.
 const ASKS = new Set(['AskUserQuestion', 'ExitPlanMode']);
@@ -63,8 +81,10 @@ export function listLive(env, now = Date.now()) {
     const a = readJson(path.join(liveDir(env), n));
     if (a && a.session && now - (a.lastSeen || 0) < STALE_MS) { if (!agents.has(a.session)) agents.set(a.session, []); agents.get(a.session).push(a); }
   }
+  const reg = claudeSessions(env);
   return names.filter(n => !n.includes('.agent-')).map(n => readJson(path.join(liveDir(env), n)))
-    .filter(s => s && s.id && now - (s.lastSeen || 0) < STALE_MS)
+    .map(s => { const r = s && reg.get(s.id); return r ? { ...s, pid: r.pid, kind: r.kind || '', name: r.name || '', rc: r.bridgeSessionId ? `https://claude.ai/code/${r.bridgeSessionId}` : '' } : s; })
+    .filter(s => s && s.id && isLive(s, now))
     .map(s => (s.status === 'working' && s.agentKey === 'codex' && codexTurnOver(s.transcript) ? { ...s, status: 'idle' } : s))
     .map(s => ({ ...s, agents: (agents.get(s.id) || []).sort((a, b) => a.startedAt - b.startedAt).slice(-MAX_AGENTS)
       // Claude Code writes the .meta.json just after SubagentStart, so a running subagent picks up its description here.
@@ -135,17 +155,18 @@ export function activityOf(rawTool, input = {}) {
 export function terminalOf(env = process.env, pid = process.pid) {
   const procs = new Map();
   try {
-    for (const l of execFileSync('ps', ['-A', '-o', 'pid=,ppid=,tty='], { encoding: 'utf8', timeout: 2000 }).split('\n')) {
-      const [p, pp, t] = l.trim().split(/\s+/);
-      if (p) procs.set(+p, { ppid: +pp, tty: t });
+    for (const l of execFileSync('ps', ['-A', '-o', 'pid=,ppid=,tty=,comm='], { encoding: 'utf8', timeout: 2000 }).split('\n')) {
+      const [p, pp, t, ...c] = l.trim().split(/\s+/);
+      if (p) procs.set(+p, { ppid: +pp, tty: t, comm: c.join(' ') });
     }
   } catch {}
-  let tty = '';
-  for (let p = pid, n = 0; procs.has(p) && p > 1 && n < 8 && !tty; p = procs.get(p).ppid, n++) {
-    const t = procs.get(p).tty;
-    if (/^(ttys?\d+|pts\/\d+)$/.test(t)) tty = '/dev/' + t;
+  let tty = '', agent = +env.CLAUDE_PID || 0; // Claude Code names its own process; others are found by name
+  for (let p = pid, n = 0; procs.has(p) && p > 1 && n < 8 && !(tty && agent); p = procs.get(p).ppid, n++) {
+    const { tty: t, comm } = procs.get(p);
+    if (!tty && /^(ttys?\d+|pts\/\d+)$/.test(t)) tty = '/dev/' + t;
+    if (!agent && /^(claude|codex|gemini)(\s|$)/i.test(path.basename(comm))) agent = p; // "claude bg-spare" for a claude --bg session
   }
-  return { tty, term: String(env.TERM_PROGRAM || '') };
+  return { tty, term: String(env.TERM_PROGRAM || ''), pid: agent }; // pid 0: not found, the 12-hour rule applies
 }
 
 /**
@@ -190,4 +211,13 @@ export function updateLive(input, { info = null, key = null, env = process.env, 
   if (status && now >= (prev.ts || 0)) { doc.status = status; doc.ts = now; if (activity !== null) doc.activity = activity; }
   writeJson(fileOf(sid, env), doc, env);
   return doc;
+}
+
+// The systemd service a process runs in (Linux), from its cgroup: { name, user } or null.
+export function systemdUnit(pid, read = f => fs.readFileSync(f, 'utf8')) {
+  let cg = '';
+  try { cg = read(`/proc/${pid}/cgroup`); } catch { return null; }
+  const parts = (cg.split('\n').find(l => l.startsWith('0::')) || cg.split('\n')[0] || '').split('/');
+  const name = [...parts].reverse().find(x => x.endsWith('.service') && !/^user@\d+\.service$/.test(x));
+  return name ? { name, user: parts.some(x => /^user@\d+\.service$/.test(x)) } : null;
 }

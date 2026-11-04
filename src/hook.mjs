@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { home, mutate, readConfig, readData, createThread, addCommit, lastCommit, goalOf, hashId, threadById, threadByKey } from './store.mjs';
-import { gitEvents, redirectTargets, BASH_WRITES, EDIT_TOOLS, GIT_COMMIT, commandDir, headline, firstLine, cleanPrompt } from './git-events.mjs';
+import { gitEvents, redirectTargets, BASH_WRITES, EDIT_TOOLS, GIT_COMMIT, commandDir, commitMessage, headline, firstLine, cleanPrompt } from './git-events.mjs';
 import { tr } from './i18n.mjs';
 const threadIdOfLocal = (d, c) => (c && c.thread && d.threads[c.thread] ? c.thread : 'inbox');
 import { dropLive, readLive, terminalOf, updateLive, listLive as listLiveLocal } from './live.mjs';
@@ -147,6 +147,11 @@ const LOG_EVENTS = ['UserPromptSubmit', 'PostToolUse', 'Stop', 'SessionEnd'];
 const APP_PROMPT = /^\s*This is an app-generated request/;
 const LIVE_EVENTS = [...LOG_EVENTS, 'SessionStart', 'PreToolUse', 'Notification', 'SubagentStart', 'SubagentStop'];
 
+// The openings of the prompts Trace Canvas itself writes to hand a line over (src/ops.mjs, app/index.html).
+// Keystrokes typed into the session rather than asked of it (":q", "login", "ok"): never a to-do.
+export const notTask = prompt => { const p = String(prompt || '').trim(); return p.length < 3 || (!/\s/.test(p) && (/^:/.test(p) || /^(login|logout|exit|quit|clear|yes|no|ok|okay)$/i.test(p))); };
+export const HANDOFF = /^(Autopilot \(beta\) on the Trace Canvas line|You are taking over the Trace Canvas line|New to-dos on the Trace Canvas line|Read the Trace Canvas line|读 Trace Canvas 上的线)/;
+
 export function handleHook(input, env = process.env) {
   if (!input || typeof input !== 'object') return { skipped: 'no input' };
   if (env.TRACE_CANVAS_DISABLE === '1') return { skipped: 'disabled' };
@@ -170,11 +175,14 @@ export function handleHook(input, env = process.env) {
   const quick = ['PreToolUse', 'Notification', 'SubagentStart', 'SubagentStop'].includes(ev);
   const known = ev !== 'SessionEnd' && readLive(sid, env);
   const info = ev !== 'SessionEnd' && relevantTool && !(quick && known) ? repoInfo(cwd) : null;
-  // The session's terminal tab, looked up once (Go to the terminal on the page).
-  const terminal = ev !== 'SessionEnd' && !(known && 'tty' in known) ? terminalOf(env) : null;
+  // The session's terminal tab and agent process, looked up until the process is found (Go to the terminal; live while it runs).
+  const terminal = ev !== 'SessionEnd' && !(known && 'pid' in known) ? terminalOf(env) : null;
   // The repository a commit landed in, which is often not cwd's (`cd other && git commit`).
   const bashCmd = ev === 'PostToolUse' && input.tool_name === 'Bash' ? String((input.tool_input || {}).command || '') : '';
   const commitRepo = GIT_COMMIT.test(bashCmd) ? gitRoot(commandDir(bashCmd, cwd)) : null;
+  // `git commit -q` (or output cut by `| tail`) prints no sha: then the commit is HEAD, if it was made just now.
+  const head = commitRepo ? git(commitRepo, ['log', '-1', '--format=%H%x09%ct%x09%s']).split('\t') : [];
+  const headNow = head.length === 3 && Date.now() - Number(head[1]) * 1000 < 120e3 ? { sha: head[0], subject: head[2] } : null;
   try { updateLive(input, { info, key: info ? threadKey(info, cfg, sid) : null, env, agent: ag.name, agentKey: input._agent || 'claude', resume: ag.resume(sid), machine: cfg.machine, terminal }); } catch {}
   if (!LOG_EVENTS.includes(ev)) return { live: ev };
 
@@ -199,7 +207,10 @@ export function handleHook(input, env = process.env) {
       state.prompts++;
       if (prompt && !prompt.startsWith('/')) state.lastPrompt = firstLine(prompt, 200);
       const isCommand = prompt.startsWith('/');
-      const log = !isCommand && prompt && (cfg.prompts === 'all' || (cfg.prompts === 'first' && !s.prompted) || (cfg.prompts === 'long' && prompt.length >= 60));
+      // A hand-off prompt written by dispatch, hand or the page restates to-dos that are already on the line: not a new one.
+      const handoff = HANDOFF.test(prompt);
+      if (handoff) s.prompted = true;
+      const log = !isCommand && prompt && !handoff && !notTask(prompt) && (cfg.prompts === 'all' || (cfg.prompts === 'first' && !s.prompted) || (cfg.prompts === 'long' && prompt.length >= 60));
       if (log) {
         const t = thread(prompt);
         addCommit(d, { thread: t.id, kind: 'task', title: firstLine(prompt, 120), body: prompt.slice(0, 3000), agent: ag.name, links: [ag.resume(sid)], extra: { session: sid, actor: 'human' } });
@@ -228,6 +239,9 @@ export function handleHook(input, env = process.env) {
         for (const f of targets) { pushUnique(state.turnFiles, f); pushUnique(state.files, f); }
         if (targets.length || BASH_WRITES.test(cmd)) state.turnActions = (state.turnActions || 0) + 1;
         const g = { ...gitEvents(cmd, out.stdout, out.stderr, out.gitOperation), repo: commitRepo };
+        // Only when the commit did not fail, HEAD carries the message the command gave, and it is not on the canvas yet.
+        const msg = commitMessage(cmd), failed = /\b(fatal|error):|nothing to commit|no changes added/i.test(`${out.stdout || ''}\n${out.stderr || ''}`);
+        if (!g.commits.length && headNow && !failed && !/--dry-run/.test(cmd) && (!msg || msg === headNow.subject) && !Object.values(d.commits).some(c => c.gitCommit === headNow.sha)) g.commits.push(headNow);
         if (logGitEvents(d, g, { info, cfg, sid, thread, state, agent: ag.name })) state.turnActions = (state.turnActions || 0) + 1;
       }
     } else if (ev === 'Stop') {

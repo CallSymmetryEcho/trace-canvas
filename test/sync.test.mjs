@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { handleHook, repoInfo } from '../src/hook.mjs';
-import { machineOwner, runSync, syncDocs, syncSoon } from '../src/sync.mjs';
+import { machineOwner, runSync, syncDocs, syncSoon, syncStatus } from '../src/sync.mjs';
 import { addCommit, canonicalize, createThread, emptyData, hashId, mutate, readData, threadById } from '../src/store.mjs';
 
 const git = (dir, ...a) => execFileSync('git', ['-C', dir, ...a], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -42,6 +42,9 @@ test('two machines share one canvas: new, changed and deleted records travel, pr
   assert.deepEqual([r1.error, r1.committed, r1.pushed, r1.offline], [null, true, true, false]);
   const r2 = b.sync();
   assert.equal(r2.imported, 4);
+  // The page reads how it went: no failure, and when the other machine's file last changed.
+  const st = syncStatus(b.env);
+  assert.deepEqual([st.failed, st.lastOk === st.at, Object.keys(st.others)], [null, true, ['mac']]);
   const bd = b.data();
   assert.equal(bd.threads[ids.th].name, 'receipt-ocr');
   assert.equal(bd.commits[ids.prompt].body, ''); // only the title travelled
@@ -93,6 +96,9 @@ test('a sync that cannot reach the server says offline and keeps the commit for 
   mutate(d => { createThread(d, { name: 'Offline line' }); }, a.env);
   const r = a.sync();
   assert.deepEqual([r.offline, r.committed, r.pushed, r.error], [true, true, false, null]);
+  const st = syncStatus(a.env);
+  assert.match(st.failed, /^could not pull: /);
+  assert.equal(st.lastOk, null);
 });
 
 test('lines with a key get the same id on every machine; the old id stays as an alias', () => {

@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1270 820" width="1270" height="820" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans CJK SC', 'Microsoft YaHei', sans-serif">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="#B8C0CA"/></marker>
+<marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="#7C98C4"/></marker></defs>
+<rect width="1270" height="820" fill="#FFFFFF"/>
+<text x="36" y="42" font-size="20" font-weight="600" fill="#3A4450">Autopilot (beta): how it decides</text>
+<text x="36" y="64" font-size="12.5" font-weight="400" fill="#7A8591">Three sources make one decision profile; each round follows it, and what the person overrides or adds goes back into it.</text>
+<rect x="40" y="90" width="340" height="96" rx="8" fill="#FFFFFF" stroke="#DFE3E8" stroke-width="1"/>
+<text x="56" y="116" font-size="14" font-weight="600" fill="#3A4450">Decisions on the lines</text>
+<text x="56" y="138" font-size="12" font-weight="400" fill="#7A8591">grouped by topic and counted</text>
+<text x="56" y="156" font-size="12" font-weight="400" fill="#7A8591">a rule needs repeat support</text>
+<path d="M210 186 L470 244" stroke="#B8C0CA" stroke-width="1" fill="none" marker-end="url(#a)"/>
+<rect x="420" y="90" width="340" height="96" rx="8" fill="#FFFFFF" stroke="#DFE3E8" stroke-width="1"/>
+<text x="436" y="116" font-size="14" font-weight="600" fill="#3A4450">What the person set</text>
+<text x="436" y="138" font-size="12" font-weight="400" fill="#7A8591">hard rules H1–H7</text>
+<text x="436" y="156" font-size="12" font-weight="400" fill="#7A8591">always above the rest</text>
+<path d="M590 186 L590 244" stroke="#B8C0CA" stroke-width="1" fill="none" marker-end="url(#a)"/>
+<rect x="800" y="90" width="340" height="96" rx="8" fill="#FFFFFF" stroke="#DFE3E8" stroke-width="1"/>
+<text x="816" y="116" font-size="14" font-weight="600" fill="#3A4450">Rules from retros</text>
+<text x="816" y="138" font-size="12" font-weight="400" fill="#7A8591">suggested by a retro</text>
+<text x="816" y="156" font-size="12" font-weight="400" fill="#7A8591">in only with a yes</text>
+<path d="M970 186 L710 244" stroke="#B8C0CA" stroke-width="1" fill="none" marker-end="url(#a)"/>
+<rect x="240" y="248" width="700" height="112" rx="8" fill="#F7F8FA" stroke="#DFE3E8" stroke-width="1"/>
+<text x="256" y="274" font-size="14" font-weight="600" fill="#3A4450">Decision profile</text>
+<rect x="254" y="290" width="158" height="56" rx="6" fill="#FFFFFF" stroke="#DFE3E8"/>
+<text x="266" y="312" font-size="12.5" font-weight="600" fill="#3A4450">H · hard rules</text>
+<text x="264" y="332" font-size="12" font-weight="400" fill="#7A8591">never broken</text>
+<rect x="424" y="290" width="158" height="56" rx="6" fill="#FFFFFF" stroke="#DFE3E8"/>
+<text x="436" y="312" font-size="12.5" font-weight="600" fill="#3A4450">R · stable rules</text>
+<text x="434" y="332" font-size="12" font-weight="400" fill="#7A8591">well supported</text>
+<rect x="594" y="290" width="158" height="56" rx="6" fill="#FFFFFF" stroke="#DFE3E8"/>
+<text x="606" y="312" font-size="12.5" font-weight="600" fill="#3A4450">Swinging</text>
+<text x="604" y="332" font-size="12" font-weight="400" fill="#7A8591">always ask</text>
+<rect x="764" y="290" width="158" height="56" rx="6" fill="#FFFFFF" stroke="#DFE3E8"/>
+<text x="776" y="312" font-size="12.5" font-weight="600" fill="#3A4450">One-offs</text>
+<text x="774" y="332" font-size="12" font-weight="400" fill="#7A8591">not a rule</text>
+<path d="M590 360 L590 404" stroke="#B8C0CA" stroke-width="1" fill="none" marker-end="url(#a)"/>
+<rect x="240" y="408" width="700" height="76" rx="8" fill="#FFFFFF" stroke="#7C98C4" stroke-width="1"/>
+<text x="256" y="434" font-size="14" font-weight="600" fill="#3A4450">Autopilot: one round per click</text>
+<text x="256" y="456" font-size="12" font-weight="400" fill="#7A8591">every open to-do on the line, one by one; at each decision point, check the profile</text>
+<path d="M470 484 L210 532" stroke="#B8C0CA" stroke-width="1" fill="none" marker-end="url(#a)"/>
+<rect x="40" y="536" width="340" height="96" rx="8" fill="#FFFFFF" stroke="#DFE3E8" stroke-width="1"/>
+<text x="56" y="562" font-size="14" font-weight="600" fill="#3A4450">Do it, log the rule</text>
+<text x="56" y="584" font-size="12" font-weight="400" fill="#7A8591">a rule covers it, or it follows</text>
+<text x="56" y="602" font-size="12" font-weight="400" fill="#7A8591">from what is already there</text>
+<path d="M210 632 L470 684" stroke="#B8C0CA" stroke-width="1" fill="none" marker-end="url(#a)"/>
+<path d="M590 484 L590 532" stroke="#B8C0CA" stroke-width="1" fill="none" marker-end="url(#a)"/>
+<rect x="420" y="536" width="340" height="96" rx="8" fill="#FFFFFF" stroke="#DFE3E8" stroke-width="1"/>
+<text x="436" y="562" font-size="14" font-weight="600" fill="#3A4450">Propose a split first</text>
+<text x="436" y="584" font-size="12" font-weight="400" fill="#7A8591">work that can run in parallel</text>
+<text x="436" y="602" font-size="12" font-weight="400" fill="#7A8591">(H5, H6: speed vs tokens)</text>
+<path d="M590 632 L590 684" stroke="#B8C0CA" stroke-width="1" fill="none" marker-end="url(#a)"/>
+<path d="M710 484 L970 532" stroke="#B8C0CA" stroke-width="1" fill="none" marker-end="url(#a)"/>
+<rect x="800" y="536" width="340" height="96" rx="8" fill="#FFFFFF" stroke="#DFE3E8" stroke-width="1"/>
+<text x="816" y="562" font-size="14" font-weight="600" fill="#3A4450">Stop and ask</text>
+<text x="816" y="584" font-size="12" font-weight="400" fill="#7A8591">security, pushing, publishing,</text>
+<text x="816" y="602" font-size="12" font-weight="400" fill="#7A8591">not covered, or swinging</text>
+<path d="M970 632 L710 684" stroke="#B8C0CA" stroke-width="1" fill="none" marker-end="url(#a)"/>
+<rect x="240" y="688" width="700" height="92" rx="8" fill="#F7F8FA" stroke="#DFE3E8" stroke-width="1"/>
+<text x="256" y="714" font-size="14" font-weight="600" fill="#3A4450">Records on the line, and the summary</text>
+<text x="256" y="736" font-size="12" font-weight="400" fill="#7A8591">each decision as "what · which rule"; the round ends with an Autopilot summary</text>
+<text x="256" y="754" font-size="12" font-weight="400" fill="#7A8591">what the person overrides drops to "ask"; what they decide joins the profile</text>
+<path d="M940 734 C1215 734 1215 304 944 304" stroke="#7C98C4" stroke-width="1" stroke-dasharray="4 4" fill="none" marker-end="url(#ao)"/>
+<text x="1206" y="500" font-size="18" font-weight="400" fill="#7C98C4" text-anchor="middle">↻</text>
+<text x="1206" y="524" font-size="12" font-weight="400" fill="#7C98C4" text-anchor="middle">back into</text>
+<text x="1206" y="541" font-size="12" font-weight="400" fill="#7C98C4" text-anchor="middle">the profile</text>
+</svg>

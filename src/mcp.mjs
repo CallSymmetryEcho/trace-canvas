@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { addCommit, dataFile, ensureThread, importText, INBOX, mutate, readConfig, readData, threadById, threadIdOf } from './store.mjs';
 import { sessionThread, whereFind } from './hook.mjs';
 import { AGENTS, agentKey, agentOf } from './agents.mjs';
-import { bindLiveSession, captureSession, forkThread, listTasks, listThreads, liveSessions, mergeDataset, mergeThreads, readThread, setTaskDone } from './ops.mjs';
+import { bindLiveSession, captureSession, detachThread, forkThread, listTasks, listThreads, liveSessions, mergeDataset, mergeThreads, readThread, setTaskDone } from './ops.mjs';
 import { currentSessionId, describeSession, findTranscript, findTranscripts, parseTranscript } from './transcript.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -21,7 +21,7 @@ const INSTRUCTIONS = `Trace Canvas keeps a trace of parallel work as threads (li
 Use trace_capture_session to put the current Claude Code session on the canvas; write 2-6 highlights (decisions, outcomes, next steps) and a short summary yourself, in the user's language.
 Use trace_tasks at the start of work to read the goals and open to-dos of the thread you work on, and trace_task_done when you finish one, so the person can follow progress without asking. When the person gives a new goal, idea or next step, add it right away as a to-do: trace_log with kind "task" on the thread you work on.
 Use trace_live to see which sessions are running now and whether one waits for the user; trace_bind puts a session on a thread.
-Use trace_list_threads before trace_merge, and confirm with the user which threads to merge and how: "merge" keeps every line and draws merges; "combine" folds them into one line and removes the others.`;
+Use trace_list_threads before trace_merge, and confirm with the user which threads to merge and how: use "merge" (keeps every line and its records, draws the merge, and the canvas folds the merged line into the target); "combine" deletes the source lines, so use it only when the person explicitly asks for that.`;
 
 const KIND = { type: 'string', enum: ['idea', 'task', 'agent', 'decision', 'note'] };
 const TOOLS = [
@@ -99,6 +99,13 @@ const TOOLS = [
     title: 'Fork a thread',
     description: 'Starts a new thread that branches off an existing one, drawn as a fork in the Branches view. from is a record id, or a thread id or name (then it forks from that thread\'s newest record). bind: true also puts the calling session on the new thread, so its records land there.',
     inputSchema: { type: 'object', properties: { from: { type: 'string', description: 'Record id, or thread id or name.' }, name: { type: 'string', description: 'Name of the new thread.' }, bind: { type: 'boolean' }, session_id: { type: 'string', description: 'Session to bind instead of the calling one.' } }, required: ['from'] },
+    annotations: { readOnlyHint: false, destructiveHint: false },
+  },
+  {
+    name: 'trace_detach',
+    title: 'Detach a forked thread',
+    description: 'Makes a forked thread a line of its own: no parent line, no fork point, its fork record removed. take: a record on another line (the request that started this one, say) that moves over as its first record. Only when the person asks for it.',
+    inputSchema: { type: 'object', properties: { thread: { type: 'string', description: 'Thread id or name.' }, take: { type: 'string', description: 'Record id to move over as the first record.' } }, required: ['thread'] },
     annotations: { readOnlyHint: false, destructiveHint: false },
   },
   {
@@ -242,6 +249,10 @@ async function callTool(name, a = {}) {
       if (a.bind && !sessionId) throw new Error('No session to bind; pass session_id');
       const r = mutate(d => { const f = forkThread(d, { from: a.from, name: a.name, agent: agentOf(agentKey()).name }); if (sessionId) bindLiveSession(d, { sessionId, thread: f.thread.id, agent: agentKey() }); return f; });
       return { text: `Forked "${r.thread.name}"${sessionId ? `; session ${sessionId} is on it now` : ''}.`, data: { thread: { id: r.thread.id, name: r.thread.name }, forkOf: r.thread.forkOf, record: r.record.id, sessionId } };
+    }
+    case 'trace_detach': {
+      const th = mutate(d => detachThread(d, { thread: a.thread, take: a.take || '' }));
+      return { text: `"${th.name}" is a line of its own now.`, data: { thread: { id: th.id, name: th.name } } };
     }
     case 'trace_tasks': {
       const d = readData();

@@ -59,7 +59,7 @@ node ~/trace-canvas/bin/trace-canvas.mjs setup --user   # hooks、MCP 工具和 
 
 - **线程**：一件在推进的事，相当于 git 分支，画成一条线路。
 - **记录**：线路上的站点，相当于提交：想法 ○、任务 □、Agent 产出 ◆、决策 ◉、笔记 •。
-- 可以从任意记录**分叉**出新线程，做完再**合并**回去，分叉与合并画成换乘站。
+- 可以从任意记录**分叉**出新线程，做完再**合并**回去，分叉与合并画成换乘站。分出来的线如果成了一件独立的事，可以**独立成线**（在它的面板里，或用 `trace-canvas detach`）。
 - **收件箱**放还没归类的零碎想法。
 
 **agent 的统一入口。** 这张图 agent 也能读：通过 MCP 工具 `trace_list_threads` 和 `trace_read_thread`，新开的 Claude Code 会话几秒钟就能了解你手上所有项目的进展，不用再翻旧聊天记录。工作时，hooks 和 `/trace-canvas` skill 会自动更新这张图。
@@ -73,6 +73,8 @@ node ~/trace-canvas/bin/trace-canvas.mjs setup --user   # hooks、MCP 工具和 
 ![分支视图：实时线头、批准、你的决定和 agent 的产出](docs/gif-branches.zh.gif)
 
 *分支视图：正在运行的会话以线头显示在各自线路的顶端。橙色的在等你；批准后变绿，你的决定显示为深色，agent 的产出用线路的颜色。虚构数据。*
+
+分支视图里，线路图例旁的「只看」可以只留你选的类型（比如决策和笔记）：其余记录不显示，线路保持完整，命中的站点带一圈光；画布和时间线则把其余的变淡。图例里的线路排成一行（点「全部 N」展开）。点一条线或它的按钮，这条线会突出显示并打开它的面板，再点一次取消。列像 `git log --graph` 一样复用：结束了的线把列让给后来的线，分叉出来的线紧挨着它的来源线。
 
 同一份数据，四个视图：
 
@@ -159,6 +161,7 @@ node bin/trace-canvas.mjs setup --user
 | `trace_read_thread` | 读取一条线程上的记录 |
 | `trace_merge` | 合并任意多条线程，`merge` 或 `combine` 两种方式（见下） |
 | `trace_fork` | 从一条记录或一条线最新的记录分出新线；`bind: true` 时把调用它的会话放到新线上 |
+| `trace_detach` | 让分出来的线独立成线；`take` 把开启它的那条记录挪过来作为第一条 |
 | `trace_log` | 记一条 |
 | `trace_import_data` | 合并另一份数据：导出文件、另一台电脑的 `data.json`、或 JSON 行 |
 | `trace_live` | 列出正在运行的会话：状态、当前动作、所属线 |
@@ -217,6 +220,40 @@ agent 用的是同一份清单：开工时用 `trace_tasks` 读目标和待办�
 
 *agent 在共用的清单上勾掉待办：一项由 Claude Code 勾选，一项由 Codex 勾选，这条线的进度条随之前进。虚构数据。*
 
+**安静了的线。** 一条线超过它平时间隔的 3 倍（至少 3 天）没有动静、也没有会话在做，「目标」上会出现一个小圆点，清单顶部「安静了」那一行多一个小标签，不会弹窗。点开标签是一句话和三个选项：没有未完成待办的线问它是不是做完了（完成、搁置、还在做），还有待办的问要不要先搁置。点「还在做」算一次活动，要再安静一个周期才会再问。
+
+## Autopilot（beta）：照你的规则，把一条线上的待办做完
+
+在线的面板里点 **Autopilot（beta）**，就跑一轮。也可以用 `trace-canvas autopilot <线>`，或者在会话里输入 `/trace-canvas autopilot <线>`。
+
+**它做什么**
+- 这条线的 agent 按你的**决策画像**，把所有没做完的待办一条条做下去。
+- 每个决定都在线上写成「做了什么 · 依据哪条规则」，你在线上就能跟着看。
+
+**它绝不做什么**
+- 不发邮件，也不给人发消息；
+- 不推送，不对外发布；
+- 不改权限或凭据。
+
+这些事它只准备好，然后问你。
+
+**什么时候停下来问你**
+- 碰到安全相关的事；
+- 没有规则覆盖的事；
+- 规则还在摇摆的事。
+
+**决策画像是什么**
+- 任意一条线上，标题里写着名字加版本号的决定或笔记记录，比如「决策画像 v1」或 "decision profile v1"，就是决策画像；有好几版时用版本号最高的；同一版本后来补的记录算是对它的补充。
+- 内容包括：你定的硬规矩；从你以往决定里看得出来的稳定规则；还在摇摆的事；不算规则的个例。
+- 还没有决策画像时，Autopilot 照四条基本规则做。
+
+**跑的时候**
+- 一轮跑着时，线上亮着 **Autopilot**，按钮变成**停止 Autopilot**。
+- 一轮结束时，它写一条「Autopilot 小结」。
+- 没有常开的总开关，也不会定时自己跑：点一次只跑一轮。
+
+![Autopilot 怎么做决定](docs/autopilot.zh-CN.svg)
+
 ## 一台机器上多个 agent 分工：Claude Code、Codex、Gemini CLI
 
 Claude Code、Codex 和 Gemini CLI 可以共用同一张画布，通过待办分工：
@@ -230,8 +267,13 @@ node bin/trace-canvas.mjs setup --user --agents codex,gemini
 对于 Codex，setup 还会把 skill 链接到 `~/.agents/skills/trace-canvas`。用 `$trace-canvas` 调用，例如 `$trace-canvas tasks`。已有安装只补 skill 时，运行 `node bin/trace-canvas.mjs install-skill --user --agents codex`；换成 `--project <目录>` 就装到该目录的 `.agents/skills/trace-canvas`。skill 链接到这份仓库，后续拉取更新也会同步生效。
 
 - **谁做什么**：**目标**清单里每项待办都能选"由谁做"（Claude Code、Codex、Gemini CLI 或任何人）。agent 用 `trace_tasks`（`mine: true`）读分给自己的待办，做完用 `trace_task_done` 勾上，清单会标出是谁勾的。
-- **交出去**：已指定的待办旁边有**交给它**按钮，会复制一条命令；`trace-canvas hand "<待办>" --to codex` 也能打印同样的命令。这条命令在这条线的目录里启动那个 agent，并设置 `TRACE_CANVAS_THREAD`，新会话一开始就落在这条线上。在 macOS 和 Linux 桌面上，旁边的**在终端打开**会直接在新的终端窗口里运行这条命令（macOS 用「终端」；Linux 用 `$TERMINAL`，没有就找 Konsole、GNOME Terminal、kitty 等，服务即使是通过 ssh 启动的，也会开在桌面上）。agent 也可以自己领下一条待办：`/trace-canvas pick`（Codex 里是 `$trace-canvas pick`）。
-- **分派**：对一个 agent 说「分派」（`/trace-canvas dispatch`，在手机上的 Claude app 里也行），每条线上新记的待办就交给正在做这条线的 agent，也就是最后在这条线上干过活的那个会话（只是在这里结束、只是从别的线给它记待办、或者之后已经绑到别的线的会话，都不算；从别的线在这里记过结果的会话，只有这条线自己的会话都没在这里干过活时才算）。几台机器都做过这条线时，先给正在运行的会话（本机的优先），再给本机最新的，最后是哪台都算的最新的。指定了机器的待办（`trace-canvas dispatch --on bsuperstation`，或者记待办时带 `on`）交给那台机器上这条线最新的会话，那边没有就通过 ssh 在那边新开一个。正在运行的 Claude Code 会话由这个 agent 发消息过去；已经停了的会话带着待办恢复；没人做的线新开一个会话（Claude Code 会打开 Remote Control，在 Claude app 里看得到）。在 macOS 和 Linux 桌面上，每个都在新的终端窗口里打开。「新」是指还没人认领、那个 agent 也还不知道的待办：你自己记的（在页面、手机或命令行上），或者别的会话替这条线记的。分出去的待办就有了主人，不会再分一次（`--all` 连这条线的 agent 自己记的也分）。点名一条待办（而不是一条线），就只分这一条，不管是谁记的。命令行：`trace-canvas dispatch [线|待办…]`，加 `--print` 只打印命令。
+- **交出去**：已指定的待办旁边有**交给它**按钮，会复制一条命令；`trace-canvas hand "<待办>" --to codex` 也能打印同样的命令。这条命令在这条线的目录里启动那个 agent，并设置 `TRACE_CANVAS_THREAD`，新会话一开始就落在这条线上。在 macOS 和 Linux 桌面上，旁边的**在终端打开**会在新的终端标签页或窗口里运行这条命令。
+  - macOS：装了 iTerm2 就开在 iTerm2 的新标签页里，没装就开「终端」的新窗口。用 `trace-canvas terminal iterm` 或 `terminal` 可以指定用哪个。
+  - Linux：用 `$TERMINAL`，没有就找 Konsole、GNOME Terminal、kitty 等。Konsole、GNOME Terminal 和 Xfce Terminal 会开新标签页。即使服务是通过 ssh 启动的，窗口也会开在桌面上。
+  - 第一次用时，macOS 会问是否允许页面控制终端，点允许即可。之后可以在「系统设置 → 隐私与安全性 → 自动化」里改。
+
+  agent 也可以自己领下一条待办：`/trace-canvas pick`（Codex 里是 `$trace-canvas pick`）。
+- **分派**：对一个 agent 说「分派」（`/trace-canvas dispatch`，在手机上的 Claude app 里也行），每条线上新记的待办就交给正在做这条线的 agent，也就是最后在这条线上干过活的那个会话（只是在这里结束、只是从别的线给它记待办、或者之后已经绑到别的线的会话，都不算；从别的线在这里记过结果的会话，只有这条线自己的会话都没在这里干过活时才算）。几台机器都做过这条线时，先给正在运行的会话（本机的优先），再给本机最新的，最后是哪台都算的最新的。指定了机器的待办（`trace-canvas dispatch --on bsuperstation`，或者记待办时带 `on`）交给那台机器上这条线最新的会话，那边没有就通过 ssh 在那边新开一个。正在运行的 Claude Code 会话由这个 agent 发消息过去；已经停了的会话带着待办恢复；没人做的线新开一个会话（Claude Code 会打开 Remote Control，在 Claude app 里看得到）。在 macOS 和 Linux 桌面上，每个都在新的终端标签页或窗口里打开，规则同上。「新」是指还没人认领、那个 agent 也还不知道的待办：你自己记的（在页面、手机或命令行上），或者别的会话替这条线记的。分出去的待办就有了主人，不会再分一次（`--all` 连这条线的 agent 自己记的也分）。点名一条待办（而不是一条线），就只分这一条，不管是谁记的。指定给某个 agent（Claude Code、Codex 或 Gemini CLI）的待办，只交给这条线上那个 agent 的会话，没有就新开一个，指定人不会被改掉；Codex 的 `<heartbeat>` 这类自动会话不算这条线上干活的人。命令行：`trace-canvas dispatch [线|待办…]`，加 `--print` 只打印命令（不指定、不保存）。
 - **回到那次对话**：agent 记下的每条记录都保存了是在哪个会话里记的。记录面板里**记在这个会话里**一栏可以打开那次对话或复制恢复命令，`trace_read_thread` 里是 `from`。
 - **开局就知道情况**：三个 agent 无论哪个开新会话，hook 都会告诉它：在哪条线上、线的目标、分给它的待办、还有谁在这条线上，以及（配好位置地图时）本机上的东西在哪里。
 - 记录、实时线头和 Agent 视图都会标出是哪个 agent 做的。每个会话都有自己的恢复命令：`claude --resume`、`codex resume` 或 `gemini --resume`。
@@ -293,12 +335,12 @@ node bin/trace-canvas.mjs sync
 
 同一件事的多次会话可以并成一条线，有两种方式：
 
-- **合并（merge）**：保留每条来源线路，标为已合并，像 git 一样画出合并到目标的曲线，历史都还看得见。
-- **并成一条（combine）**：把所有记录按时间移到目标线程上，删除来源线程，指向它们的关联改为指向目标。
+- **合并（merge，推荐）**：保留每条来源线路，标为已合并，像 git 一样画出合并到目标的曲线，什么都不丢，也能撤销。合并后的线会收进目标线：画布上只剩目标线的卡片，显示「已并入 N 条」，它的面板里能点开每条被并入的线，「分支」视图仍画出它的历史（「更多 → 显示已合并的线程」可以全部摊开）。
+- **并成一条（combine）**：把所有记录按时间移到目标线程上，删除来源线程，它的名字、颜色、目标都不再保留，也不能撤销；指向它们的关联改为指向目标。画布上不再提供这个按钮，agent 只在你点名要它时才用，命令行仍保留 `--combine`。
 
 目标可以是已有线程，也可以新建。三个地方都能做：
 
-- **画布上**：Shift+点击卡片（触屏上可以先打开工具栏的「多选」）。横栏列出选中的线，默认保留第一条，其余并进它（点另一条就改为保留那条，也可以在「合并到」里选别的线或新线程），按钮下面一行写明谁并进谁。然后点「合并」或「并成一条」。
+- **画布上**：Shift+点击卡片（触屏上可以先打开工具栏的「多选」）。横栏列出选中的线，默认保留第一条，其余并进它（点另一条就改为保留那条，也可以在「合并到」里选别的线或新线程），按钮下面一行写明谁并进谁。然后点「合并」。
 - **Claude Code 里**：`/trace-canvas merge`，或直接说。
 - **命令行**：`trace-canvas merge "问卷 A" "问卷 B" --into "问卷分析" --combine`。
 
@@ -352,7 +394,7 @@ node bin/trace-canvas.mjs log "文献对比表完成" \
 
 ## AI 梳理
 
-本机装了 `claude` 命令时，顶栏的 **AI 梳理** 会让 Claude 把收件箱里的记录归到线程、建议线程之间的关联、指出看起来停滞的线程。勾选并点应用之前不会改动任何东西。它用你自己的账号运行 `claude -p`，这次调用不会触发留痕 hooks。
+本机装了 `claude` 命令时，**更多 → AI 梳理** 会让 Claude 通读每条线的近期记录和未完成的待办，给出三类建议：其实是同一件事的两条线（**合并**）、可以收尾的线（**标记完成**；还有没做完的就**搁置**；有会话正在做的线不会被建议）、后面的记录显示其实已经做完的待办（**勾掉**）。每条建议都写明理由，尽量引用它依据的那条记录，各有一个按钮；你点了才会改，每条都能在原处撤销。它用你自己的账号运行 `claude -p`，这次调用不会触发留痕 hooks。
 
 ## 命令
 
@@ -391,12 +433,19 @@ node bin/trace-canvas.mjs log "文献对比表完成" \
   trace-canvas install-hooks | install-mcp | install-skill | uninstall-hooks
   trace-canvas mcp              以 stdio 运行 MCP 服务（由 Claude Code 启动）
   trace-canvas lang <en|zh>     hooks 写入记录的语言
+  trace-canvas terminal [iterm|terminal]   macOS：agent 开在 iTerm2 标签页，还是「终端」新窗口（默认：装了 iTerm2 就用它）
+  trace-canvas autopilot <线> [--stop]   Autopilot（beta）：按决策画像在这条线上跑一轮
+  trace-canvas doctor           检查设置，逐项告诉你怎么修（页面上是「更多 → 检查设置」）
   trace-canvas where            显示数据存放位置
   trace-canvas phone            在手机上打开画布（Tailscale 扫码，见 docs/phone.zh-CN.md）
   trace-canvas where <关键词> [--machine 机器]   在位置地图（~/agent-map）里查东西
   trace-canvas sync             通过位置地图仓库和其他机器同步画布
   trace-canvas update [--check] 更新到最新版（在仓库里 git pull）并重启画布服务；--check 只看有没有新版
 ```
+
+## 常见问题
+
+遇到问题，先运行 `trace-canvas doctor`，或者在页面上点「更多 → 检查设置」。它会检查各项设置，每个有问题的项都附一句怎么修。用户真实遇到过的问题都整理在 [docs/faq.zh-CN.md](docs/faq.zh-CN.md) 里，比如电脑重启后页面打不开、记录没同步过来。
 
 ## 实现
 

@@ -2,9 +2,10 @@
 // Code shape the rest of the code reads. Codex hooks are nearly Claude's (no Notification event:
 // a PermissionRequest is what "needs you" looks like); Gemini CLI names its events differently.
 // Tools are recognised by the shape of their input, since each CLI names them its own way.
-import { spawn } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { readConfig } from './store.mjs';
 
 export const q = s => `'${String(s).replace(/'/g, `'\\''`)}'`; // POSIX shell quoting
 
@@ -36,7 +37,16 @@ export function modelProvider(env = process.env) {
 }
 export const agentOf = key => AGENTS[key] || AGENTS.claude;
 // AppleScript that runs cmd in a new Terminal window and brings it forward (macOS, "Open in Terminal").
-export const terminalScript = cmd => `tell application "Terminal"\n  do script "${String(cmd).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"\n  activate\nend tell`;
+const asText = cmd => `"${String(cmd).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+export const terminalScript = cmd => `tell application "Terminal"\n  do script ${asText(cmd)}\n  activate\nend tell`;
+// iTerm2 opens a new tab in its front window (a window when it has none), so agents do not pile up as windows.
+export const itermScript = cmd => `tell application "iTerm"\n  activate\n  if (count of windows) = 0 then\n    create window with default profile\n  else\n    tell current window to create tab with default profile\n  end if\n  tell current session of current window to write text ${asText(cmd)}\nend tell`;
+// Which macOS terminal opens agents: the one chosen (trace-canvas terminal iterm|terminal), else iTerm2 when installed.
+export const macTerminal = (env = process.env, has = p => fs.existsSync(p)) => {
+  const pick = env.TRACE_CANVAS_TERMINAL || readConfig(env).terminal;
+  if (pick === 'iterm' || pick === 'terminal') return pick;
+  return ['/Applications/iTerm.app', path.join(env.HOME || '', 'Applications', 'iTerm.app')].some(has) ? 'iterm' : 'terminal';
+};
 
 // The desktop session's display, for a server started over ssh, which has none: borrowed from the desktop shell's own
 // environment (this user's processes only). env itself when it has a display; null when there is no desktop.
@@ -60,21 +70,34 @@ const which = (name, env) => (env.PATH || '').split(path.delimiter).map(d => pat
  * display; the window stays open in a login shell once cmd is done. Going to an existing tab is macOS only.
  */
 export function terminalCommand(cmd, env = process.env, platform = process.platform) {
-  if (platform === 'darwin') return ['osascript', ['-e', terminalScript(cmd)], env];
+  if (platform === 'darwin') return ['osascript', ['-e', (macTerminal(env) === 'iterm' ? itermScript : terminalScript)(cmd)], env];
   if (platform !== 'linux') return null;
   const shown = desktopEnv(env);
   const term = shown && [env.TERMINAL, 'x-terminal-emulator', 'konsole', 'gnome-terminal', 'xfce4-terminal', 'kitty', 'alacritty', 'wezterm', 'xterm'].filter(Boolean).map(t => [path.basename(t), which(t, env) || (path.isAbsolute(t) && t)]).find(([, p]) => p);
   if (!term) return null;
   const sh = env.SHELL || '/bin/sh', run = [sh, '-lc', `${cmd}; exec ${q(sh)} -l`];
-  const lead = { 'gnome-terminal': ['--'], 'xfce4-terminal': ['-x'], wezterm: ['start', '--'] }[term[0]] || ['-e'];
+  // A new tab where the terminal has a flag for it; a new window everywhere else.
+  const lead = { konsole: ['--new-tab', '-e'], 'gnome-terminal': ['--tab', '--'], 'xfce4-terminal': ['--tab', '-x'], wezterm: ['start', '--'] }[term[0]] || ['-e'];
   return [term[1], [...lead, ...run], shown];
 }
-/** Runs cmd in a new terminal window; false when there is none to open. */
+/**
+ * Runs cmd in a new terminal window. Resolves to null once the window is open, or to why it is not.
+ * macOS waits for Terminal's answer: an Automation prompt left unanswered times out after 2 minutes, and a
+ * denied one (error -1743) fails at once, so nobody is told an agent started when no window opened.
+ */
 export function openTerminal(cmd, env = process.env) {
   const t = terminalCommand(cmd, env);
-  if (!t) return false;
-  spawn(t[0], t[1], { stdio: 'ignore', detached: true, env: t[2] }).unref();
-  return true;
+  if (!t) return Promise.resolve('no terminal to open on this machine');
+  if (t[0] === 'osascript') return new Promise(done => execFile(t[0], t[1], { env: t[2], timeout: 150e3 }, (err, out, errOut) => {
+    if (!err) return done(null);
+    const why = String(errOut || err.message).trim();
+    done(/-1743|not allowed|Not authorized/i.test(why) ? `macOS did not allow this app to control the terminal (System Settings → Privacy & Security → Automation): ${why}`
+      : /-1712|timed out/i.test(why) || err.killed ? `Terminal did not answer in time; an Automation prompt may be waiting for an answer: ${why}` : why);
+  }));
+  return new Promise(done => {
+    const c = spawn(t[0], t[1], { stdio: 'ignore', detached: true, env: t[2] });
+    c.on('error', e => done(e.message)).on('spawn', () => { c.unref(); done(null); });
+  });
 }
 // AppleScript that brings the Terminal or iTerm2 tab with this tty to the front and prints "ok",
 // or nothing when no tab has it (Go to the terminal). null for other terminals.

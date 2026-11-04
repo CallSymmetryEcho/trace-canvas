@@ -59,7 +59,7 @@ A transit map of your work. When you work with AI agents, ideas and tasks run in
 
 - A **thread** is one piece of work in progress, like a git branch. It is drawn as a line.
 - A **record** is a station on that line, like a commit: an idea ○, a task □, agent output ◆, a decision ◉ or a note •.
-- **Fork** a new thread from any record and **merge** it back when it is done. Forks and merges are drawn as interchanges.
+- **Fork** a new thread from any record and **merge** it back when it is done. Forks and merges are drawn as interchanges. A fork that turned into work of its own can be **made its own line** (in its panel, or `trace-canvas detach`).
 - The **inbox** holds loose ideas until you file them.
 
 **One entry point for your agents.** Agents can read the same map: through the MCP tools `trace_list_threads` and `trace_read_thread`, a new Claude Code session catches up on all your projects in seconds instead of rereading old chats. Hooks and the `/trace-canvas` skill keep the map up to date while you work.
@@ -73,6 +73,8 @@ Promo site: [trace-canvas.bin-lian.com](https://trace-canvas.bin-lian.com) ([`si
 ![Branches view: live tips, an approval, your decision and the agent's result](docs/gif-branches.en.gif)
 
 *Branches: running sessions sit as live tips on top of their lines. The orange one waits for you; once approved it turns green, your decision appears dark and the agent's result in the line's colour. Made-up data.*
+
+In the Branches view, **Show** next to the lines' legend keeps only the kinds you pick (say decisions and notes): other records drop out, the lines stay whole and the matching stations get a halo; the canvas and the timeline dim the rest instead. The legend keeps the lines on one row (**All N** opens them). Click a line, or its chip, to bring it forward and open its panel; click it again to let go. Columns are reused the way `git log --graph` does it, so a line that has ended gives its column to a later one, and a fork sits next to the line it came from.
 
 Four views of the same data:
 
@@ -159,6 +161,7 @@ Capturing is safe to repeat: records already on the canvas are skipped. If the h
 | `trace_read_thread` | Returns the records on one thread |
 | `trace_merge` | Merges any number of threads, in `merge` or `combine` mode (below) |
 | `trace_fork` | Branches a new thread off a record or a thread's newest record; `bind: true` puts the calling session on it |
+| `trace_detach` | Makes a forked thread a line of its own; `take` moves the record that started it over as its first |
 | `trace_log` | Adds one record |
 | `trace_import_data` | Merges another data set: an export, `data.json` from another computer, or JSON lines |
 | `trace_live` | Lists the sessions running now, with status, activity and thread |
@@ -217,6 +220,16 @@ Agents use the same list. At the start of work they read the goal and the open t
 
 *Agents tick to-dos off on the shared list, one by Claude Code and one by Codex, and the line's progress bar moves forward. Made-up data.*
 
+**Lines that have gone quiet.** A line nobody has touched for three times its usual gap (at least three days), with no session on it, gets a small dot on **Goals** and a chip under **Gone quiet** at the top of the list; nothing pops up. Click the chip for one sentence and three answers: a line with no open to-dos is asked whether it is finished (**Done**, **Parked**, **Still on it**), one with open to-dos whether to park it. **Still on it** counts as activity, so it asks again only after another quiet spell.
+
+## Autopilot (beta): a line's to-dos, done by your rules
+
+**Autopilot (beta)** in a line's panel (or `trace-canvas autopilot <line>`, or `/trace-canvas autopilot <line>`) runs one round: the line's agent works through every open to-do by your **decision profile** and logs each decision as "what it did · the rule it rests on", so you can follow it on the line. It never sends email or messages to people, pushes, publishes anything or changes permissions or credentials: it gets those ready and asks you. It stops to ask when something touches security, no rule covers it, or the rule is still swinging.
+
+The decision profile is a decision or note on any line titled with its name and a version, such as "decision profile v1" or "决策画像 v1" (the highest version counts; later records with the same version add to it): your hard rules, the stable rules your past decisions show, what still swings, and one-offs that are not rules. Without one, Autopilot follows four basic rules. While a round runs the line shows **Autopilot** and the button reads **Stop Autopilot**; the round ends with an "Autopilot summary" record. There is no switch that keeps it on and nothing runs on a timer: each round is one click.
+
+![How Autopilot decides](docs/autopilot.svg)
+
 ## Several agents on one machine: Claude Code, Codex, Gemini CLI
 
 Claude Code, Codex and Gemini CLI can share the canvas and split the work through to-dos:
@@ -230,8 +243,8 @@ This adds the hooks to `~/.codex/hooks.json` and `~/.gemini/settings.json` (afte
 For Codex, setup also links the skill into `~/.agents/skills/trace-canvas`. Invoke it with `$trace-canvas`, for example `$trace-canvas tasks`. To add just the skill to an existing installation, run `node bin/trace-canvas.mjs install-skill --user --agents codex`. With `--project <dir>`, that command installs it into `<dir>/.agents/skills/trace-canvas`. The skill stays linked to this clone, so pulling updates refreshes it too.
 
 - **Who does what:** each to-do in **Goals** has a "who does it" choice (Claude Code, Codex, Gemini CLI or anyone). Agents read their own with `trace_tasks` (`mine: true`) and tick them with `trace_task_done`, and the list shows who ticked each one.
-- **Hand it over:** **Hand to it** next to an assigned to-do copies a command, and so does `trace-canvas hand "<to-do>" --to codex`. The command starts that agent in the line's folder with `TRACE_CANVAS_THREAD` set, so the new session lands on the line. On macOS and on a Linux desktop, **Open in Terminal** next to it runs the command in a new terminal window (Terminal on macOS; on Linux `$TERMINAL`, else Konsole, GNOME Terminal, kitty and the like, on the desktop's display even when the server was started over ssh). An agent can also take its next to-do by itself: `/trace-canvas pick` (`$trace-canvas pick` in Codex).
-- **Dispatch:** tell one agent to dispatch (`/trace-canvas dispatch`, also from the Claude app on your phone) and each line's new to-dos go to the agent working on that line: the session that last did work there (a session merely ending there, logging to-dos for it from another line, or bound to another line since does not count, and one that only logged a result there from another line counts only when the line's own sessions have not worked there). Worked on from several machines, a running session comes first (this machine's before another's), then this machine's latest, then the latest anywhere. A to-do for a particular machine (`trace-canvas dispatch --on bsuperstation`, or `on` when it is logged) goes to that machine's latest session on the line, or a new one started there over ssh. A running Claude Code session gets a message from that agent, a stopped session is resumed with its to-dos, and a line nobody works on gets a new session (Claude Code with Remote Control, so it shows in the Claude app); on macOS and on a Linux desktop each opens in a new terminal window. New means nobody has it and that agent does not know it yet: you logged it (on the page, the phone or the command line) or another session did. Once handed out, a to-do has its agent and is not handed out again (`--all` also takes the ones the line's agent logged itself). Name a to-do instead of a line to hand out just that one, whoever logged it. From the command line: `trace-canvas dispatch [line|to-do…]`, with `--print` to only print the commands.
+- **Hand it over:** **Hand to it** next to an assigned to-do copies a command, and so does `trace-canvas hand "<to-do>" --to codex`. The command starts that agent in the line's folder with `TRACE_CANVAS_THREAD` set, so the new session lands on the line. On macOS and on a Linux desktop, **Open in Terminal** next to it runs the command in a new terminal tab or window: on macOS a new iTerm2 tab when iTerm2 is installed, else a new Terminal window (`trace-canvas terminal iterm|terminal` picks one); on Linux `$TERMINAL`, else Konsole, GNOME Terminal, kitty and the like, with a new tab in Konsole, GNOME Terminal and Xfce Terminal, on the desktop's display even when the server was started over ssh. The first time, macOS asks whether the page may control the terminal: allow it (System Settings → Privacy & Security → Automation). An agent can also take its next to-do by itself: `/trace-canvas pick` (`$trace-canvas pick` in Codex).
+- **Dispatch:** tell one agent to dispatch (`/trace-canvas dispatch`, also from the Claude app on your phone) and each line's new to-dos go to the agent working on that line: the session that last did work there (a session merely ending there, logging to-dos for it from another line, or bound to another line since does not count, and one that only logged a result there from another line counts only when the line's own sessions have not worked there). Worked on from several machines, a running session comes first (this machine's before another's), then this machine's latest, then the latest anywhere. A to-do for a particular machine (`trace-canvas dispatch --on bsuperstation`, or `on` when it is logged) goes to that machine's latest session on the line, or a new one started there over ssh. A running Claude Code session gets a message from that agent, a stopped session is resumed with its to-dos, and a line nobody works on gets a new session (Claude Code with Remote Control, so it shows in the Claude app); on macOS and on a Linux desktop each opens in a new terminal tab or window, as above. New means nobody has it and that agent does not know it yet: you logged it (on the page, the phone or the command line) or another session did. Once handed out, a to-do has its agent and is not handed out again (`--all` also takes the ones the line's agent logged itself). Name a to-do instead of a line to hand out just that one, whoever logged it. A to-do assigned to an agent (Claude Code, Codex or Gemini CLI) goes only to that agent's sessions on the line, or a new one of it, and keeps its assignee; automated sessions such as a Codex `<heartbeat>` never count as the line's agent. From the command line: `trace-canvas dispatch [line|to-do…]`, with `--print` to only print the commands (nothing is assigned or saved).
 - **Back to the conversation:** a record an agent logs keeps the session it was logged in. Its panel shows it under **Logged in** (open the chat or copy the resume command), and `trace_read_thread` gives it as `from`.
 - **A head start:** when any of the three starts a session, the hook tells it which line it works on, the line's goal, the to-dos assigned to it, who else is working there, and (with the location map) where things are on this machine.
 - Records, live tips and the Agent view show which agent did what. Each session gets its own resume command: `claude --resume`, `codex resume` or `gemini --resume`.
@@ -293,12 +306,12 @@ Put lines that belong together in a group: select them (**Select**) and press **
 
 Several sessions about the same piece of work can become one line, in two ways:
 
-- **Merge** keeps every source line, marks it merged and draws the merge into the target, like git. History stays visible.
-- **Combine** moves every record onto the target in time order and removes the source threads. Links to them now point to the target.
+- **Merge** (the one to use) keeps every source line, marks it merged and draws the merge into the target, like git. Nothing is lost and it can be undone. A merged line then folds into its target: the canvas shows the target's card with **N merged in**, its panel links each merged line, and the Branches view still draws its history (More → Show merged threads lays them all out again).
+- **Combine** moves every record onto the target in time order and removes the source threads; their name, colour and goal are gone and it cannot be undone. Links to them now point to the target. The canvas no longer offers it; agents use it only when you ask for it by name, and the command line keeps `--combine`.
 
 The target can be an existing thread or a new one. Three places to do it:
 
-- **On the canvas**: Shift-click cards (or turn on **Select** in the toolbar, handy on touch screens). The bar lists the lines you picked; the first one is kept and the others go into it (click another to keep that one, or pick another line or a new one under **into**), and a line under the buttons says what goes where. Then **Merge** or **Combine**.
+- **On the canvas**: Shift-click cards (or turn on **Select** in the toolbar, handy on touch screens). The bar lists the lines you picked; the first one is kept and the others go into it (click another to keep that one, or pick another line or a new one under **into**), and a line under the buttons says what goes where. Then **Merge**.
 - **In Claude Code**: `/trace-canvas merge`, or ask in your own words.
 - **On the command line**: `trace-canvas merge "Survey A" "Survey B" --into "Survey analysis" --combine`.
 
@@ -352,7 +365,7 @@ Which messages: by default those since the line's last retro, up to now, so each
 
 ## AI tidy-up
 
-If the `claude` command is installed, **AI tidy-up** in the header asks Claude to file inbox records into threads, suggest links between threads and point out threads that look stalled. Nothing changes until you tick the suggestions and apply them. It runs `claude -p` on your own account; the hooks are switched off for that call.
+If the `claude` command is installed, **More → AI tidy-up** has Claude read every line with its recent records and open to-dos and suggest three kinds of change: lines that are really the same work (**Merge** one into the other), lines ready to wrap up (**Mark done**, or **Park** when work is left over; never a line a session is running on), and open to-dos that later records show are already done (**Tick off**). Each suggestion says why, quoting the record it rests on, and has its own button; nothing happens until you click it, and every one can be undone from the same row. It runs `claude -p` on your own account; the hooks are switched off for that call.
 
 ## Commands
 
@@ -391,12 +404,19 @@ Setup (--user for every project, --project DIR for one)
   trace-canvas install-hooks | install-mcp | install-skill | uninstall-hooks
   trace-canvas mcp              Run the MCP server on stdio (Claude Code starts this)
   trace-canvas lang <en|zh>     Language of records the hooks write
+  trace-canvas terminal [iterm|terminal]   macOS: open agents in iTerm2 tabs or Terminal windows (default: iTerm2 when installed)
+  trace-canvas autopilot <line> [--stop]   Autopilot (beta): one round on the line by your decision profile
+  trace-canvas doctor           Check the setup and say how to fix each problem (also More → Check setup)
   trace-canvas where            Show where the data is stored
   trace-canvas phone            Open the canvas on your phone (Tailscale and a QR code; see docs/phone.md)
   trace-canvas where <words> [--machine M]   Look things up in the location map (~/agent-map)
   trace-canvas sync             Sync the canvas with your other machines through the location map
   trace-canvas update [--check] Get the newest version (git pull in the clone) and restart the page server; --check only looks
 ```
+
+## Common questions
+
+Something not working? Run `trace-canvas doctor` (or **More → Check setup** on the page): it checks the setup and says how to fix each problem. The questions people actually ran into, from a page that is gone after a restart to records that did not sync, are in [docs/faq.md](docs/faq.md).
 
 ## How it works
 

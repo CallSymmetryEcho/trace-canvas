@@ -24,6 +24,7 @@ test('a commit record shows its files and diffs, compares with another, and says
   const r = repo(root, 'tripsplit');
   const one = r.commit({ 'split.js': 'a\nb\nc\n', 'package-lock.json': '{}\n', 'logo.png': Buffer.from([0, 1, 2, 0, 255]) }, 'Split the bill');
   const two = r.commit({ 'split.js': 'a\nB\nc\nd\n' }, 'Round to cents');
+  const three = r.commit({ 'notes.md': 'x\n' }, 'Notes');
   const big = r.commit({ 'big.txt': 'x'.repeat(120) + '\n'.repeat(1) + ('y'.repeat(99) + '\n').repeat(3000) }, 'A big file');
   const d = emptyData();
   const th = createThread(d, { name: 'tripsplit', key: 'tripsplit', note: r.dir });
@@ -32,7 +33,10 @@ test('a commit record shows its files and diffs, compares with another, and says
   rec('r2', { gitCommit: two }); // no repository recorded: found through the line's folder
   rec('r3', { gitCommit: big, repo: r.dir });
   rec('gone', { gitCommit: 'deadbee', repo: r.dir });
-  rec('elsewhere', { gitCommit: 'abcdef1', repo: path.join(root, 'not-here') });
+  rec('elsewhere', { gitCommit: 'abcdef1', repo: path.join(root, 'not-here'), machine: 'studio' });
+  // Made on another machine, in a folder that is not here: found in this machine's clone that another record names.
+  const away = createThread(d, { name: 'away' });
+  d.commits.abroad = { id: 'abroad', thread: away.id, kind: 'agent', title: 'abroad', ts: 9, gitCommit: three, repo: '/home/studio/tripsplit', machine: 'studio' };
 
   const i1 = await commitInfo(d, 'r1');
   assert.equal(i1.subject, 'Split the bill');
@@ -47,7 +51,8 @@ test('a commit record shows its files and diffs, compares with another, and says
 
   assert.equal((await commitDiff(d, 'r3', 'big.txt')).truncated, true);
   assert.equal((await commitInfo(d, 'gone')).missing, 'no-commit');
-  assert.equal((await commitInfo(d, 'elsewhere')).missing, 'no-repo');
+  assert.deepEqual([(await commitInfo(d, 'elsewhere')).missing, (await commitInfo(d, 'elsewhere')).machine], ['no-repo', 'studio']);
+  assert.equal((await commitInfo(d, 'abroad')).repo, r.dir);
   assert.equal((await commitInfo(d, 'nope')).error, 'No such record');
 });
 
@@ -92,5 +97,30 @@ test('the page reads a commit and a diff through the server', async () => {
   } finally {
     server.close();
     fs.unwatchFile(path.join(process.env.TRACE_CANVAS_HOME, 'data.json'));
+  }
+});
+
+test('a commit with no clone here is read on the machine it was made on, over ssh, unless that is off', async () => {
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'tc-gitaway-')));
+  const r = repo(root, 'studio-only'), sha = r.commit({ 'a.txt': 'one\n' }, 'Made on the studio');
+  // A stand-in ssh: drops the options and the machine, then runs the command here with /away/ taken out of its paths.
+  const bin = path.join(root, 'bin');
+  fs.mkdirSync(bin);
+  fs.writeFileSync(path.join(bin, 'ssh'), '#!/bin/sh\nwhile [ "$1" = "-o" ]; do shift 2; done\nshift\nexec sh -c "$(printf %s "$1" | sed s#/away/#/#)"\n', { mode: 0o755 });
+  const keep = { PATH: process.env.PATH, HOME_: process.env.TRACE_CANVAS_HOME, M: process.env.TRACE_CANVAS_MACHINE };
+  Object.assign(process.env, { PATH: `${bin}:${keep.PATH}`, TRACE_CANVAS_HOME: path.join(root, 'tc'), TRACE_CANVAS_MACHINE: 'mac' });
+  try {
+    const d = emptyData(), th = createThread(d, { name: 'studio' });
+    d.commits.s1 = { id: 's1', thread: th.id, kind: 'agent', title: 's1', ts: 1, gitCommit: sha, repo: path.join(root, 'away', 'studio-only'), machine: 'studio' };
+    fs.mkdirSync(path.join(root, 'tc'));
+    fs.writeFileSync(path.join(root, 'tc', 'config.json'), JSON.stringify({ awayGit: false }));
+    assert.deepEqual([(await commitInfo(d, 's1')).missing, (await commitInfo(d, 's1')).machine], ['no-repo', 'studio']);
+    fs.writeFileSync(path.join(root, 'tc', 'config.json'), '{}');
+    const i = await commitInfo(d, 's1');
+    assert.deepEqual([i.machine, i.subject, i.files.map(f => f.path)], ['studio', 'Made on the studio', ['a.txt']]);
+    assert.match((await commitDiff(d, 's1', 'a.txt')).diff, /^\+one$/m);
+  } finally {
+    process.env.PATH = keep.PATH;
+    for (const [k, v] of [['TRACE_CANVAS_HOME', keep.HOME_], ['TRACE_CANVAS_MACHINE', keep.M]]) if (v === undefined) delete process.env[k]; else process.env[k] = v;
   }
 });

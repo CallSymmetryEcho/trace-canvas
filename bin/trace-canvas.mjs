@@ -9,6 +9,8 @@ import { execFileSync } from 'node:child_process';
 import { handleHook, python3, readStdin } from '../src/hook.mjs';
 import { AGENT_SETUP, agentFiles, allowSafeTools, codexWritable, hookCommand, install, installAgentMcp, installMcp, installSkill, linkCommand, onPath, settingsPath, uninstall } from '../src/install.mjs';
 import { AGENTS, normalize } from '../src/agents.mjs';
+import { systemdUnit } from '../src/live.mjs';
+import { doctor, tailscaleSelf } from '../src/doctor.mjs';
 import os from 'node:os';
 import crypto from 'node:crypto';
 
@@ -22,17 +24,6 @@ function whoami(map) {
   try { return py && fs.existsSync(py) ? python3([py, '--whoami'], { encoding: 'utf8', timeout: 5000 }).trim() : ''; } catch { return ''; }
 }
 const SKILL_DIR = path.join(path.dirname(SELF), '..', 'skill');
-// This computer on Tailscale, or null when Tailscale is not running: { dns, ip }.
-function tailscaleSelf() {
-  for (const bin of ['tailscale', '/Applications/Tailscale.app/Contents/MacOS/Tailscale']) {
-    try {
-      const s = JSON.parse(execFileSync(bin, ['status', '--json'], { encoding: 'utf8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'] }));
-      const self = s.Self || {}, ip = (self.TailscaleIPs || []).find(a => a.includes('.'));
-      return s.BackendState === 'Running' && self.DNSName && ip ? { dns: self.DNSName.replace(/\.$/, ''), ip } : null;
-    } catch {}
-  }
-  return null;
-}
 // A QR code for the terminal, black on white whatever the terminal's colours, from the page's own encoder.
 function terminalQr(text) {
   const src = fs.readFileSync(path.join(path.dirname(SELF), '..', 'app', 'index.html'), 'utf8');
@@ -82,6 +73,7 @@ Records
   trace-canvas merge <thread>... --into <thread> [--combine]
                                                    Merge threads (combine folds them into one line)
   trace-canvas fork <record|thread> [--name N] [--bind] [--session id]
+  trace-canvas detach <thread> [--take <record>]   a forked line becomes a line of its own
                                                    Branch a new thread off a record or a thread's tip
   trace-canvas import <file|->                     Merge an export, another data.json, or JSON lines
   trace-canvas history [line...] [--all] [--off]   A repository's line takes in its history: the default branch's commits
@@ -95,6 +87,8 @@ Goals and to-dos
                                                    Tick a to-do by id or title (--undo reopens it)
   trace-canvas hand <to-do|thread> --to claude|codex|gemini|iflow|qwen|qoder|trae|kimi|dsh
                                                    Assign it and print the command that starts the agent on it
+  trace-canvas autopilot <line> [--stop] [--print]   Autopilot (beta): one round, the line's agent works every open
+                                                   to-do by the decision profile and asks only what it must
   trace-canvas dispatch [line|to-do...] [--on machine] [--all] [--print] [--json]
                                                    Hand each line's new to-dos (or the to-dos named) to the agent working on it and wake it
                                                    (resume or start in a new terminal window; --print only prints)
@@ -125,16 +119,38 @@ Setup (pass --user for every project, or --project dir for one)
   trace-canvas uninstall-hooks
   trace-canvas mcp              Run the MCP server on stdio (Claude Code starts this)
   trace-canvas lang <en|zh>     Language of records the hooks write
+  trace-canvas terminal [iterm|terminal]   macOS: open agents in iTerm2 tabs or in Terminal windows (default: iTerm2 when installed)
   trace-canvas where            Show where data is stored
   trace-canvas phone [--off] [--rotate] [--allow-start|--deny-start]
                                Open the canvas on your phone over Tailscale (docs/phone.md)
   trace-canvas where <words> [--machine M]   Look things up in the location map (~/agent-map)
   trace-canvas sync             Sync the canvas with your other machines through the location map
+  trace-canvas doctor           Check the setup: Node, hooks, page server, start with the computer, version, sync, phone
   trace-canvas update [--check] Get the newest version (git pull in this clone) and restart the page server;
                                --check only says whether there is one (the page also offers it under More)
   (setup also takes --machine NAME and --map DIR: this computer's name and the map repository)
 
 Data: ${dataFile()}`;
+
+// Opens the terminals a dispatch (or Autopilot) needs and says what happened to each line, or prints the rows as JSON.
+async function runRows(rows, { run, json }) {
+  const { AGENTS, openTerminal } = await import('../src/agents.mjs');
+  // Each window is waited for, so a terminal that did not open is reported, not taken for a started agent.
+  for (const r of rows) if (r.command && run && r.action !== 'busy') r.failed = await openTerminal(r.command);
+  if (rows.some(r => r.failed)) process.exitCode = 1;
+  if (json) { console.log(JSON.stringify(rows, null, 2)); return; }
+  if (!rows.length) { console.log('Nothing new to dispatch: every open to-do has an agent, or was logged by the agent working on its line (--all takes those too).'); return; }
+  for (const r of rows) {
+    const who = AGENTS[r.agent].name, s = r.session, name = s && `"${s.title.slice(0, 50) || s.id.slice(0, 8)}"`;
+    console.log(`\n${r.thread.name}: ${r.todos.length} to-do${r.todos.length === 1 ? '' : 's'} for ${who}${r.on ? ` on ${r.on}` : ''}`);
+    for (const c of r.todos) console.log(`  □ ${c.title}  [${c.id}]`);
+    if (r.action === 'self') console.log('  → Your own line: they are yours.');
+    else if (r.action === 'message') console.log(`  → Running session ${name} (${s.status}${s.name ? `, messaged as ${s.name}` : ''}${s.desktopId ? `, ${s.desktopId}` : ''}): send it this message:\n    ${r.prompt}`);
+    else if (r.action === 'busy') console.log(`  → ${who} session ${name} is busy. Choose:\n    A) paste this into it when it stops:\n       ${r.prompt}\n    B) or start a new session for them:\n       ${r.command}`);
+    else if (r.failed) console.log(`  → No terminal window opened: ${r.failed}\n    Run it yourself:\n    ${r.command}`);
+    else console.log(`  → ${r.action === 'start' ? `A new ${who} session` : `Session ${name} resumed`}${run ? ' in a new terminal window' : '; run'}:\n    ${r.command}`);
+  }
+}
 
 async function main() {
   switch (cmd) {
@@ -153,6 +169,7 @@ async function main() {
         if (e.code === 'EADDRINUSE') {
           console.log(`Port ${port} is in use; Trace Canvas may already be running at http://localhost:${port}/`);
           if (!noOpen) openBrowser(`http://localhost:${port}/`);
+          process.exit(1); // nothing to serve: never sit idle holding a service manager's slot
         } else throw e;
       }
       break;
@@ -235,6 +252,14 @@ async function main() {
       console.log(`Forked "${r.thread.name}"${sid ? ` and put session ${sid} on it` : ''}`);
       break;
     }
+    case 'detach': {
+      const { detachThread } = await import('../src/ops.mjs');
+      const take = str(flag('take', '')), ref = argv.join(' ').trim();
+      if (!ref) { console.error('Usage: trace-canvas detach <thread> [--take <record>]'); process.exit(1); }
+      const th = mutate(d => detachThread(d, { thread: ref, take }));
+      console.log(`"${th.name}" is a line of its own now${take ? `, starting with ${take}` : ''}`);
+      break;
+    }
     case 'merge': {
       const { mergeThreads } = await import('../src/ops.mjs');
       const into = str(flag('into', '')), name = str(flag('name', '')), combine = !!flag('combine', false);
@@ -285,21 +310,26 @@ async function main() {
       // new session, each in a new terminal window (macOS, or a Linux desktop); a running Claude Code session is messaged by the agent
       // that called this (the skill), since only an agent can reach it.
       const { dispatch } = await import('../src/ops.mjs');
-      const { AGENTS, openTerminal, terminalCommand } = await import('../src/agents.mjs');
-      const on = str(flag('on', '')), all = !!flag('all', false), json = !!flag('json', false), run = !flag('print', false) && !!terminalCommand('');
-      const rows = mutate(d => dispatch(d, { refs: argv.filter(Boolean), all, on, self: process.env.CLAUDE_CODE_SESSION_ID || null }));
-      for (const r of rows) if (r.command && run) openTerminal(r.command);
-      if (json) { console.log(JSON.stringify(rows, null, 2)); break; }
-      if (!rows.length) { console.log('Nothing new to dispatch: every open to-do has an agent, or was logged by the agent working on its line (--all takes those too).'); break; }
-      for (const r of rows) {
-        const who = AGENTS[r.agent].name, s = r.session, name = s && `"${s.title.slice(0, 50) || s.id.slice(0, 8)}"`;
-        console.log(`\n${r.thread.name}: ${r.todos.length} to-do${r.todos.length === 1 ? '' : 's'} for ${who}${r.on ? ` on ${r.on}` : ''}`);
-        for (const c of r.todos) console.log(`  □ ${c.title}  [${c.id}]`);
-        if (r.action === 'self') console.log('  → Your own line: they are yours.');
-        else if (r.action === 'message') console.log(`  → Running session ${name} (${s.status}${s.desktopId ? `, ${s.desktopId}` : ''}): send it this message:\n    ${r.prompt}`);
-        else if (r.action === 'busy') console.log(`  → ${who} session ${name} is working: send it this when it stops:\n    ${r.prompt}`);
-        else console.log(`  → ${r.action === 'start' ? `A new ${who} session` : `Session ${name} resumed`}${run ? ' in a new terminal window' : '; run'}:\n    ${r.command}`);
-      }
+      const { terminalCommand } = await import('../src/agents.mjs');
+      const on = str(flag('on', '')), all = !!flag('all', false), json = !!flag('json', false), print = !!flag('print', false), run = !print && !!terminalCommand('');
+      // --print only shows what would happen: nothing is assigned or saved.
+      let rows = [];
+      mutate(d => { rows = dispatch(d, { refs: argv.filter(Boolean), all, on, self: process.env.CLAUDE_CODE_SESSION_ID || null }); return print ? false : rows; });
+      await runRows(rows, { run, json });
+      break;
+    }
+    case 'autopilot': {
+      // Autopilot (beta): one round on one line. Every open to-do goes to the line's agent with the decision profile;
+      // the agent checks the switch before each to-do and turns it off with its summary. --stop turns it off now.
+      const { startAutopilot, stopAutopilot } = await import('../src/ops.mjs');
+      const { terminalCommand } = await import('../src/agents.mjs');
+      const stop = !!flag('stop', false), json = !!flag('json', false), print = !!flag('print', false), ref = argv.join(' ').trim();
+      if (!ref) { console.error('Usage: trace-canvas autopilot <line> [--stop] [--print] [--json]'); process.exit(1); }
+      if (stop) { const th = mutate(d => stopAutopilot(d, { thread: ref })); console.log(`Autopilot is off on "${th.name}"; its agent stops before the next to-do.`); break; }
+      let rows = [];
+      mutate(d => { rows = startAutopilot(d, { thread: ref, self: process.env.CLAUDE_CODE_SESSION_ID || null }); return print ? false : rows; });
+      await runRows(rows, { run: !print && !!terminalCommand(''), json });
+      if (!json && !print) console.log('\nAutopilot is on until the agent logs its summary; stop it with trace-canvas autopilot <line> --stop.');
       break;
     }
     case 'history': {
@@ -448,7 +478,17 @@ async function main() {
       // The page server, if one runs: stopped, then started again from this clone on the same port.
       let srv = null;
       try { srv = JSON.parse(fs.readFileSync(path.join(home(), 'server.json'), 'utf8')); process.kill(srv.pid, 0); } catch { srv = null; }
-      if (srv) {
+      // A systemd service restarts it itself; starting one here would take the port from it.
+      // Only when the server is that service's main process (a terminal's own service must never be restarted).
+      const sysctl = u => ['systemctl', ...(u.user ? ['--user'] : [])];
+      let unit = srv && systemdUnit(srv.pid);
+      try { if (unit && execFileSync(sysctl(unit)[0], [...sysctl(unit).slice(1), 'show', '-p', 'MainPID', '--value', unit.name], { encoding: 'utf8' }).trim() !== String(srv.pid)) unit = null; } catch { unit = null; }
+      if (unit) {
+        try {
+          execFileSync('systemctl', [...sysctl(unit).slice(1), '--no-block', 'restart', unit.name], { stdio: 'ignore' });
+          console.log(`Restarting the page server (systemd ${unit.name}); an open page reloads by itself.`);
+        } catch { console.log(`The page server runs as systemd ${unit.name}; restart it with: ${unit.user ? 'systemctl --user' : 'sudo systemctl'} restart ${unit.name}`); }
+      } else if (srv) {
         process.kill(srv.pid, 'SIGTERM');
         for (let i = 0; i < 50; i++) { try { process.kill(srv.pid, 0); await new Promise(r => setTimeout(r, 100)); } catch { break; } }
         const log = fs.openSync(path.join(home(), 'server.log'), 'a');
@@ -575,6 +615,14 @@ async function main() {
       console.log('Start a new Claude Code session, then type /trace-canvas to put it on the canvas.');
       break;
     }
+    case 'terminal': {
+      const { macTerminal } = await import('../src/agents.mjs');
+      const pick = argv[0];
+      if (pick && pick !== 'iterm' && pick !== 'terminal') { console.error('Usage: trace-canvas terminal [iterm|terminal]'); process.exit(1); }
+      if (pick) writeConfig({ terminal: pick });
+      console.log(macTerminal() === 'iterm' ? 'Agents open in a new iTerm2 tab.' : 'Agents open in a new Terminal window. With iTerm2 installed, trace-canvas terminal iterm opens them as tabs.');
+      break;
+    }
     case 'lang': {
       const lang = argv[0];
       if (lang !== 'en' && lang !== 'zh') { console.error('Usage: trace-canvas lang <en|zh>'); process.exit(1); }
@@ -618,7 +666,16 @@ async function main() {
       if (flag('quiet', false)) break;
       if (r.error) { console.error(`Sync failed: ${r.error}`); process.exit(1); }
       if (r.busy) { console.log('Another sync is running.'); break; }
-      console.log(`${r.machine}: ${r.imported} change${r.imported === 1 ? '' : 's'} from other machines, ${r.changed} here${r.moved ? `; ${r.moved} lines got stable ids` : ''}. ${r.offline ? 'Offline: pushes next time.' : r.pushed ? 'Pushed.' : r.committed ? 'Committed.' : 'Up to date.'}`);
+      console.log(`${r.machine}: ${r.imported} change${r.imported === 1 ? '' : 's'} from other machines, ${r.changed} here${r.moved ? `; ${r.moved} lines got stable ids` : ''}. ${r.offline ? 'Offline: pushes next time.' : r.unpushed ? `${r.unpushed} commit${r.unpushed === 1 ? '' : 's'} not pushed yet: the other machines do not have them.` : r.pushed ? 'Pushed.' : r.committed ? 'Committed.' : 'Up to date.'}`);
+      if (r.offline || r.unpushed) process.exitCode = 1;
+      break;
+    }
+    case 'doctor': {
+      const rows = doctor();
+      for (const r of rows) console.log(`${r.ok === true ? '✓' : r.ok === 'warn' ? '!' : '✗'} ${r.detail}${r.fix ? `\n    → ${r.fix}` : ''}`);
+      const bad = rows.filter(r => r.ok === false).length;
+      console.log(bad ? `\n${bad} problem${bad === 1 ? '' : 's'}. Common questions: docs/faq.md` : '\nAll good.');
+      if (bad) process.exitCode = 1;
       break;
     }
     case 'help': case '--help': case '-h': console.log(HELP); break;

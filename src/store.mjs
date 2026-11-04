@@ -84,6 +84,7 @@ export function readConfig(env = process.env) {
   try { file = JSON.parse(fs.readFileSync(configFile(env), 'utf8')); } catch {}
   return {
     lang: env.TRACE_CANVAS_LANG || file.lang || 'en',
+    langSet: !!(env.TRACE_CANVAS_LANG || file.lang), // chosen, not the default
     group: env.TRACE_CANVAS_GROUP || file.group || 'branch',
     prompts: env.TRACE_CANVAS_PROMPTS || file.prompts || 'first',
     turns: env.TRACE_CANVAS_TURNS || file.turns || 'changes',
@@ -95,6 +96,10 @@ export function readConfig(env = process.env) {
     phone: file.phone || null,
     // The live bar also shows other machines' running sessions, read over ssh (More → Other machines' sessions).
     awayLive: !!file.awayLive,
+    // macOS: the terminal agents open in, 'iterm' (a new tab) or 'terminal' (a new window); empty: iTerm2 when installed.
+    terminal: file.terminal || '',
+    // A commit made on another machine, with no clone here, is read from that machine over ssh (More → Other machines' changes).
+    awayGit: file.awayGit !== false,
   };
 }
 const machines = new Map(); // data folder → machine name; ponytail: read once per process
@@ -200,6 +205,8 @@ export function ensureThread(d, name) {
   return t ? t.id : findThreadByName(d, name) || createThread(d, { name: String(name).trim() }).id;
 }
 
+// The record an Autopilot round ends with (src/ops.mjs autopilotPrompt).
+export const AUTOPILOT_END = /^Autopilot (summary|小结)/i;
 export function addCommit(d, { thread, kind = 'idea', title, body = '', links = [], agent = '', ts = Date.now(), parents, extra = {} }) {
   const tid = thread === INBOX ? INBOX : (threadById(d, thread) || { id: INBOX }).id;
   const prev = lastCommit(d, tid);
@@ -212,6 +219,7 @@ export function addCommit(d, { thread, kind = 'idea', title, body = '', links = 
   d.commits[c.id] = c;
   const t = d.threads[tid];
   if (t && t.status === 'parked' && kind !== 'merge') t.status = 'active';
+  if (t && t.autopilot && AUTOPILOT_END.test(c.title)) delete t.autopilot; // the round's summary ends it
   return c;
 }
 

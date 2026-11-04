@@ -60,7 +60,9 @@ test('dispatch hands each line\'s new to-dos to the agent working on it, and say
   assert.deepEqual(dispatch(d, {}, env), []); // handed out once
   running('c1', 'Codex', 'codex', 'working');
   todo(scripts, 'Add a lint step');
-  assert.deepEqual(dispatch(d, { refs: ['Scripts'] }, env).map(r => r.action), ['busy']);
+  const [busy] = dispatch(d, { refs: ['Scripts'] }, env);
+  assert.equal(busy.action, 'busy');
+  assert.match(busy.command, /TRACE_CANVAS_THREAD=.* codex /); // B: a new session, when the person would rather not wait
   assert.deepEqual(dispatch(d, { refs: ['Thesis'], all: true }, env)[0].todos.map(c => c.title), ['Its own to-do', 'An older agent to-do']);
   // A to-do named goes to its line's agent, even one that agent logged itself.
   assert.deepEqual(dispatch(d, { refs: ['Its own to-do'] }, env).map(r => [r.thread.name, r.session.id, r.todos.map(c => c.title)]), [['Thesis', 's1', ['Its own to-do']]]);
@@ -91,6 +93,12 @@ test('dispatch hands each line\'s new to-dos to the agent working on it, and say
   todo(kit, 'Write the import docs');
   assert.deepEqual(dispatch(d, { refs: ['Kit'] }, env).map(r => [r.session.id, r.todos.map(c => c.title)]), [['k', ['Write the import docs']]]);
 
+  // A line nobody is on any more goes to the session that last worked there, though it moved to another line since.
+  const left = createThread(d, { name: 'Left' }).id;
+  addCommit(d, { thread: left, kind: 'agent', title: 'Drafted the intro', agent: 'Claude Code', ts: now - 4e5, extra: { session: 'b' } });
+  todo(left, 'Polish the intro');
+  assert.deepEqual(dispatch(d, { refs: ['Left'] }, env).map(r => [r.session && r.session.id, r.action]), [['b', 'resume']]);
+
   // Worked on from two machines: none running, this machine's session; the other machine's when it is running there.
   const two = createThread(d, { name: 'Two' }).id, here = env.TRACE_CANVAS_MACHINE;
   d.sessions.m1 = { id: 'm1', thread: two, agent: 'Claude Code', cwd: tmp, last: now - 9e5, machine: here };
@@ -113,4 +121,57 @@ test('dispatch hands each line\'s new to-dos to the agent working on it, and say
   assert.deepEqual([lab.action, lab.machine, lab.on], ['start', 'lab', 'lab']);
   assert.match(lab.command, /^ssh -t lab 'exec "\$SHELL" -lc .*TRACE_CANVAS_THREAD=/);
   assert.doesNotMatch(lab.command, /cd /); // this machine's folder means nothing there
+});
+
+test('a to-do assigned to an agent goes to that agent\'s session, keeps its assignee, and skips heartbeat sessions', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-dispatch-'));
+  const env = { ...process.env, TRACE_CANVAS_HOME: path.join(tmp, 'home'), TRACE_CANVAS_DESKTOP_DIR: path.join(tmp, 'desk'), TRACE_CANVAS_LANG: 'en', TRACE_CANVAS_MACHINE: machineName() };
+  const now = Date.now(), d = emptyData();
+  const videos = createThread(d, { name: 'Videos' }).id;
+  // A Claude Code session made the videos; a Codex heartbeat on the line worked there last.
+  d.sessions.cc = { id: 'cc', thread: videos, agent: 'Claude Code', cwd: tmp, last: now - 9e5, title: 'Make video 24' };
+  d.sessions.hb = { id: 'hb', thread: videos, agent: 'Codex', cwd: tmp, last: now - 1e5, title: '<heartbeat>' };
+  d.sessions.cx = { id: 'cx', thread: videos, agent: 'Codex', cwd: tmp, last: now - 8e5, title: 'Post video 23' };
+  addCommit(d, { thread: videos, kind: 'agent', title: 'Video 24 is ready', agent: 'Claude Code', ts: now - 9e5, extra: { session: 'cc' } });
+  addCommit(d, { thread: videos, kind: 'agent', title: 'Video 23 posted', agent: 'Codex', ts: now - 8e5, extra: { session: 'cx' } });
+  addCommit(d, { thread: videos, kind: 'agent', title: 'Heartbeat: nothing new', agent: 'Codex', ts: now - 1e5, extra: { session: 'hb' } });
+  const v25 = addCommit(d, { thread: videos, kind: 'task', title: 'Make video 25', agent: 'Claude Code', ts: now, extra: { assignee: 'claude' } });
+  const post = addCommit(d, { thread: videos, kind: 'task', title: 'Post video 25', ts: now });
+
+  const rows = dispatch(d, { refs: [v25.id, post.id] }, env);
+  assert.deepEqual(rows.map(r => [r.agent, r.session && r.session.id, r.todos.map(c => c.title)]).sort(), [
+    ['claude', 'cc', ['Make video 25']],
+    ['codex', 'cx', ['Post video 25']], // the latest real worker; the heartbeat does not count
+  ]);
+  assert.equal(d.commits[v25.id].assignee, 'claude');
+});
+
+test('Autopilot hands every open to-do on a line to its agent with the decision profile, and its summary ends it', async () => {
+  const { startAutopilot, stopAutopilot, listTasks } = await import('../src/ops.mjs');
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-autopilot-'));
+  const env = { ...process.env, TRACE_CANVAS_HOME: path.join(tmp, 'home'), TRACE_CANVAS_DESKTOP_DIR: path.join(tmp, 'desk'), TRACE_CANVAS_LANG: 'en', TRACE_CANVAS_MACHINE: machineName() };
+  const d = emptyData(), now = Date.now();
+  const app = createThread(d, { name: 'App' }).id, rules = createThread(d, { name: 'Rules' }).id;
+  d.sessions.s1 = { id: 's1', thread: app, agent: 'Claude Code', cwd: tmp, last: now - 7e6 };
+  addCommit(d, { thread: app, kind: 'agent', title: 'Worked here', agent: 'Claude Code', ts: now - 7e6, extra: { session: 's1' } });
+  const a = addCommit(d, { thread: app, kind: 'task', title: 'Fix the login bug', ts: now - 6e5 });
+  const b = addCommit(d, { thread: app, kind: 'task', title: 'Its own to-do', agent: 'Claude Code', ts: now - 5e5, extra: { fromSession: 's1' } });
+  assert.throws(() => startAutopilot(d, { thread: 'Rules' }, env), /no open to-dos/);
+  const p = addCommit(d, { thread: rules, kind: 'decision', title: 'Autopilot decision profile v0', ts: now - 1e5 });
+  addCommit(d, { thread: rules, kind: 'decision', title: 'Decision profile v0, addition: H5', ts: now - 5e4 }); // adds to it, is not it
+  addCommit(d, { thread: rules, kind: 'decision', title: 'Fixed the decision profile numbering', ts: now - 4e4 });
+
+  const [row] = startAutopilot(d, { thread: 'App' }, env);
+  assert.deepEqual(row.todos.map(c => c.id).sort(), [a.id, b.id].sort()); // every open one, its own agent's too
+  assert.equal(row.action, 'resume');
+  assert.match(row.command, /^cd .* && claude --resume s1 'Autopilot \(beta\) on the Trace Canvas line "App"/);
+  assert.match(row.prompt, new RegExp(`decision profile, record ${p.id}`));
+  assert.match(row.prompt, /Never send email[^.]*push, publish/);
+  assert.equal(listTasks(d, { thread: app })[0].autopilot, true);
+  // The agent's summary turns it off; so does Stop.
+  addCommit(d, { thread: app, kind: 'note', title: 'Autopilot summary: 2 done', ts: now });
+  assert.equal(d.threads[app].autopilot, undefined);
+  d.threads[app].autopilot = { at: now };
+  stopAutopilot(d, { thread: 'App' });
+  assert.equal(d.threads[app].autopilot, undefined);
 });

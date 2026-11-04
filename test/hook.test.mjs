@@ -158,6 +158,18 @@ test('files written from Bash count as changes, and structured commit data is us
   assert.deepEqual(s.commits()[2].files, ['timeline.md']);
 });
 
+test('a quiet commit (git commit -q, no sha in the output) is read from HEAD, once', () => {
+  const s = sandbox();
+  fs.writeFileSync(path.join(s.repo, 'b.md'), 'y');
+  s.git('add', '.'); s.git('commit', '-q', '-m', 'Quiet release');
+  const sha = s.git('rev-parse', 'HEAD').trim();
+  const quiet = { tool_name: 'Bash', tool_input: { command: `cd ${s.repo} && git commit -q -F - <<'EOF'\nQuiet release\nEOF` }, tool_response: { stdout: '', stderr: '' } };
+  s.fire('PostToolUse', { ...quiet, tool_use_id: 'u1' });
+  s.fire('PostToolUse', { ...quiet, tool_use_id: 'u2' }); // e.g. a second try that had nothing to commit
+  const found = s.commits().filter(c => c.gitCommit);
+  assert.deepEqual(found.map(c => [c.gitCommit, c.title]), [[sha, `Commit ${sha.slice(0, 7)}: Quiet release`]]);
+});
+
 test('redirectTargets ignores stream merges, /dev/null and arrows inside arguments', () => {
   assert.deepEqual(redirectTargets('echo hi > notes/a.md 2>&1'), ['notes/a.md']);
   assert.deepEqual(redirectTargets('cat <<EOF >> log.txt\nx\nEOF'), ['log.txt']);

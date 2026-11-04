@@ -12,12 +12,13 @@ import { fileURLToPath } from 'node:url';
 import { COLS, dataFile, home, mutate, readConfig, readData, toArrays, writeConfig } from './store.mjs';
 import { demoData } from './demo.mjs';
 import { liveDir, readLive } from './live.mjs';
-import { bindLiveSession, findThreadLoose, handTo, liveSessions, sessionList } from './ops.mjs';
+import { bindLiveSession, findThreadLoose, handTo, liveSessions, sessionList, startAutopilot, stopAutopilot } from './ops.mjs';
 import { applyRetro, askAgent, retroRecord, runRetro } from './retro.mjs';
 import { focusScript, openTerminal, terminalCommand } from './agents.mjs';
 import { otherMachines, remoteLive } from './remote.mjs';
 import { commitDiff, commitInfo } from './git-view.mjs';
-import { runSync, syncSoon } from './sync.mjs';
+import { runSync, syncSoon, syncStatus } from './sync.mjs';
+import { doctor } from './doctor.mjs';
 import { desktopSessions } from './desktop.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -31,7 +32,7 @@ function claudeAvailable() {
 
 function page(cfg, ai) {
   const body = fs.readFileSync(APP, 'utf8');
-  const boot = JSON.stringify({ version: VERSION, ai, lang: cfg.lang, dataFile: dataFile(), cli: CLI });
+  const boot = JSON.stringify({ version: VERSION, ai, lang: cfg.lang, langSet: cfg.langSet, dataFile: dataFile(), cli: CLI });
   return `<!doctype html><html lang="${cfg.lang === 'zh' ? 'zh-CN' : 'en'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}body{margin:0;font:14px system-ui}img{max-width:100%}[hidden]{display:none!important}</style><script>window.TRACE_CANVAS_SERVER=${boot.replace(/</g, '\\u003c')}</script></head><body>${body}</body></html>`;
 }
 
@@ -103,7 +104,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         if (!phone || !phone.token || !(same(cookie, phone.token) || same(k, phone.token))) return send(res, 403, { error: 'Open the address trace-canvas phone printed' });
         if (same(k, phone.token) && !same(cookie, phone.token)) res.setHeader('Set-Cookie', `tc_k=${phone.token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000`);
         // These act on the computer itself (a terminal, git pushes, the claude CLI, the whole data set).
-        if (['/api/hand', '/api/focus', '/api/sync', '/api/ai', '/api/demo', '/api/retro', '/api/retro/apply', '/api/update'].includes(p)) return send(res, 403, { error: 'Only on the computer itself' });
+        if (['/api/hand', '/api/focus', '/api/sync', '/api/ai', '/api/demo', '/api/retro', '/api/retro/apply', '/api/update', '/api/autopilot'].includes(p)) return send(res, 403, { error: 'Only on the computer itself' });
       }
       const write = req.method !== 'GET' && req.method !== 'HEAD';
       if (write && req.headers['x-trace-canvas'] !== '1') return send(res, 403, { error: 'missing header' });
@@ -113,7 +114,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
       if (req.method === 'GET' && p === '/api/data') {
         // desktopId: the Claude desktop app's id of a session, so the page can open its chat (claude://…).
         const d = readData(), desk = desktopSessions();
-        return send(res, 200, { ...toArrays(d), sessions: sessionList(d).map(s => ({ ...s, desktopId: (desk.get(s.id) || {}).desktopId || null })), machine: readConfig().machine, platform: process.platform, remote, update, start: canStart(remote), awayLive: readConfig().awayLive, machines: otherMachines(d) });
+        return send(res, 200, { ...toArrays(d), sessions: sessionList(d).map(s => ({ ...s, desktopId: (desk.get(s.id) || {}).desktopId || null })), machine: readConfig().machine, platform: process.platform, remote, update, start: canStart(remote), awayLive: readConfig().awayLive, awayGit: readConfig().awayGit, sync: syncStatus(), machines: otherMachines(d) });
       }
       if (req.method === 'GET' && p === '/api/live') return send(res, 200, { ...liveSessions(readData()), away });
       // What a commit record changed, read from git on demand (src/git-view.mjs).
@@ -143,9 +144,21 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         if (!terminalCommand('')) return send(res, 200, { error: 'No terminal to open on this machine (macOS, or a Linux desktop); copy the command instead' });
         const body = JSON.parse(await readBody(req));
         const r = mutate(d => handTo(d, { ref: String(body.todo || ''), to: String(body.to || '') }));
-        openTerminal(r.command);
+        const failed = await openTerminal(r.command);
         broadcast('change');
-        return send(res, 200, { ok: true, command: r.command });
+        return send(res, 200, failed ? { error: failed, command: r.command } : { ok: true, command: r.command });
+      }
+      // Autopilot (beta): one round on a line (trace-canvas autopilot). A stopped or new session opens in a terminal tab;
+      // a running one takes the prompt only from the person or another agent, so it comes back to be copied.
+      if (req.method === 'POST' && p === '/api/autopilot') {
+        const body = JSON.parse(await readBody(req)), thread = String(body.thread || '');
+        try {
+          if (body.stop) { mutate(d => stopAutopilot(d, { thread })); broadcast('change'); return send(res, 200, { ok: true }); }
+          const rows = mutate(d => startAutopilot(d, { thread }));
+          for (const r of rows) if (r.command && r.action !== 'busy') r.failed = await openTerminal(r.command);
+          broadcast('change');
+          return send(res, 200, { rows });
+        } catch (e) { return send(res, 200, { error: e.message }); }
       }
       // Go to the terminal: brings a live session's Terminal or iTerm2 tab to the front, found by its tty.
       if (req.method === 'POST' && p === '/api/focus') {
@@ -164,12 +177,13 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         const busy = handTo(readData(), args).live[0];
         if (busy) return send(res, 200, { busy: { id: busy.id, title: busy.title || '', status: busy.status || '' } });
         const r = mutate(d => handTo(d, args));
-        openTerminal(r.command);
+        const failed = await openTerminal(r.command);
         broadcast('change');
-        return send(res, 200, { ok: true, name: r.thread.name });
+        return send(res, 200, failed ? { error: failed, command: r.command } : { ok: true, name: r.thread.name });
       }
       // Update: trace-canvas update pulls the newest version and restarts this server; the page reloads after it.
       if (req.method === 'POST' && p === '/api/update') { spawn(process.execPath, [CLI, 'update'], { detached: true, stdio: 'ignore' }).unref(); return send(res, 200, { ok: true }); }
+      if (req.method === 'GET' && p === '/api/doctor') return send(res, 200, { checks: remote ? [] : doctor() });
       if (req.method === 'POST' && p === '/api/sync') { const r = runSync(); broadcast('change'); return send(res, 200, r); }
       if (req.method === 'POST' && p === '/api/bind') {
         const body = JSON.parse(await readBody(req));
@@ -182,6 +196,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         const patch = {};
         if (body.lang === 'en' || body.lang === 'zh') patch.lang = body.lang;
         if (typeof body.awayLive === 'boolean') patch.awayLive = body.awayLive;
+        if (typeof body.awayGit === 'boolean') patch.awayGit = body.awayGit;
         writeConfig(patch);
         if ('awayLive' in patch) pollAway();
         return send(res, 200, { ok: true });

@@ -52,7 +52,7 @@ export function listTasks(d, { thread, includeDone = false, assignee } = {}) {
     const tasks = (by[id] || []).sort((a, b) => a.ts - b.ts);
     const open = tasks.filter(c => !c.done);
     return {
-      id, name: th.name, ...(th.group ? { group: th.group } : {}), goal: goalOf(th), status: th.status || 'active', done: tasks.length - open.length, total: tasks.length,
+      id, name: th.name, ...(th.group ? { group: th.group } : {}), goal: goalOf(th), status: th.status || 'active', ...(th.autopilot ? { autopilot: true } : {}), done: tasks.length - open.length, total: tasks.length,
       tasks: (includeDone ? tasks : open).map(c => ({ id: c.id, title: c.title, ...(c.assignee ? { assignee: c.assignee } : {}), ...(c.on ? { on: c.on } : {}), ...(c.done ? { done: true, doneBy: c.doneBy || null, doneAt: c.doneAt ? new Date(c.doneAt).toISOString() : null } : {}) })),
     };
   }).filter(r => r.total || r.goal).filter(r => only || !['done', 'merged'].includes(r.status) || r.total > r.done);
@@ -88,7 +88,7 @@ export function setTaskDone(d, { task, thread, done = true, by = 'human' }) {
  * that starts that agent on the thread. TRACE_CANVAS_THREAD binds the new session through the
  * SessionStart hook; the prompt also asks for trace_bind in case the hook cannot see it.
  */
-export function handTo(d, { ref, to, thread, remote = false, here = true }, env = process.env) {
+export function handTo(d, { ref, to, thread, remote = false, here = true, prompt: own = null }, env = process.env) {
   const ag = AGENTS[to];
   if (!ag) throw new Error(`Hand to whom? One of ${Object.keys(AGENTS).join(', ')}`);
   let todo = null, tid = d.commits[ref] && d.commits[ref].kind !== 'task' ? null : resolveThreadRef(d, ref);
@@ -97,7 +97,7 @@ export function handTo(d, { ref, to, thread, remote = false, here = true }, env 
   if (!th) throw new Error('Put the to-do on a line first; the inbox has no folder or goal to hand over');
   const live = listLive(env).filter(s => sessionThreadOf(d, s, env) === tid).sort((a, b) => b.lastSeen - a.lastSeen);
   const dir = here ? lineDir(th) || (live[0] ? live[0].cwd : '') : ''; // here: false for a command run on another machine
-  const prompt = oneLine(`You are taking over the Trace Canvas line "${th.name}" (thread ${tid}). First call the MCP tool trace_bind with thread "${tid}". Then read the line with trace_read_thread (ideas logged on it are there) and call trace_tasks with mine: true for the goal and your to-dos, work through them, and tick each one with trace_task_done when it is done. Log decisions and results with trace_log.${todo ? ` Start with: ${todo.title}` : ''}`);
+  const prompt = own ? oneLine(own) : oneLine(`You are taking over the Trace Canvas line "${th.name}" (thread ${tid}). First call the MCP tool trace_bind with thread "${tid}". Then read the line with trace_read_thread (ideas logged on it are there) and call trace_tasks with mine: true for the goal and your to-dos, work through them, and tick each one with trace_task_done when it is done. Log decisions and results with trace_log.${todo ? ` Start with: ${todo.title}` : ''}`);
   const run = remote && ag.remote ? ag.remote(oneLine(th.name), prompt) : ag.launch(prompt);
   return { thread: th, todo, live, command: `${dir ? `cd ${q(dir)} && ` : ''}TRACE_CANVAS_THREAD=${tid} ${run}` };
 }
@@ -108,15 +108,17 @@ export function handTo(d, { ref, to, thread, remote = false, here = true }, env 
  * any idle session leaves, nor a to-do it hands over), else the session the line has. New means open, nobody has it, and that session does not know it: the person logged
  * it (on the page, the phone, the command line) or another session did. all: every open to-do nobody has. refs are
  * lines or to-dos (id or title): a to-do named goes to its line's agent whoever logged it. Assigns them. One row per line:
- *   message  a running Claude Code session here: send it `prompt` (desktopId is its address in the Claude app)
- *   busy     another agent working right now, or a session running on another machine: it takes the prompt only there
+ *   message  a running Claude Code session here: send it `prompt` (`name` is what other sessions message it by,
+ *            desktopId its address in the Claude app)
+ *   busy     another agent working right now, or a session running on another machine: it takes the prompt only there;
+ *            `command` starts a new session instead, so the person can choose: paste it there when it stops, or start anew
  *   resume   run `command`, which resumes the session with the prompt (over ssh for another machine's session)
  *   start    run `command`: a new session        self  the caller's own line: the to-dos are the caller's
  * on: the machine to do them on (a to-do can carry its own, `on`); they go to that machine's session, or a new one there.
  * Each row has the machine its to-dos are for (`on`) when there is one. awayLive(machine) gives another machine's running
  * sessions (over ssh by default).
  */
-export function dispatch(d, { refs = [], all = false, self = null, on = '', awayLive = remoteLiveSync } = {}, env = process.env) {
+export function dispatch(d, { refs = [], all = false, self = null, on = '', awayLive = remoteLiveSync, prompt: promptFor = null } = {}, env = process.env) {
   const me = readConfig(env).machine, lines = new Set(), named = new Set();
   for (const ref of refs) {
     const id = d.commits[ref] ? null : findThreadLoose(d, ref);
@@ -141,51 +143,92 @@ export function dispatch(d, { refs = [], all = false, self = null, on = '', away
   const rows = [];
   for (const tid of tids) {
     const th = d.threads[tid], cs = Object.values(d.commits).filter(c => threadIdOf(d, c) === tid);
-    const at = new Map(), worked = (id, ts) => { if (id && ts > (at.get(id) || 0)) at.set(id, ts); };
+    const at = new Map(), past = new Map(), worked = (id, ts, m = at) => { if (id && ts > (m.get(id) || 0)) m.set(id, ts); };
     // Work here: what a session did while on this line, or a result it logged here from another line. A to-do, idea or
     // decision it logs for this line from elsewhere hands work over, and a session bound to another line since has left.
     const onLine = id => known.has(id) && known.get(id).thread === tid;
     for (const c of cs) {
       const id = c.fromSession || (c.kind !== 'note' && c.session);
       if (id && (onLine(id) || (c.fromSession && c.kind === 'agent'))) worked(id, c.ts);
+      else if (id && c.kind !== 'note') worked(id, c.ts, past);
     }
-    // No session has worked here yet: the sessions the line has (bound to it, or there by their folder).
+    // No session has worked here yet: the sessions the line has (bound to it, or there by their folder), else one that
+    // worked here and moved to another line since: it may well still be open, and it knows the line.
     if (!at.size) for (const [id, e] of Object.entries(d.sessions || {})) if (e.thread === tid) worked(id, e.last || 1);
-    const ranked = [...at].sort((a, b) => b[1] - a[1]).map(([id]) => id).filter(id => known.has(id));
+    if (!at.size) for (const [id, ts] of past) worked(id, ts);
+    // Automated prompts (a Codex <heartbeat> and the like) are not anyone working on the line.
+    const ranked = [...at].sort((a, b) => b[1] - a[1]).map(([id]) => id).filter(id => known.has(id) && !/^<[\w-]+>/.test(String(known.get(id).title || '').trim()));
     // Which session, among those on one machine when the to-dos are for it: the line's own sessions first (one that only
     // logged a result here from its own line, when none has worked here); of those a running one, this machine's before
     // another's (whose messages do not reach it yet); then this machine's latest; then the latest anywhere.
-    const pick = machine => {
-      const pool = ranked.filter(id => !machine || machineOf(id) === machine), own = pool.filter(onLine), c = own.length ? own : pool;
+    // A to-do assigned to an agent goes only to that agent's sessions (or a new one of it).
+    const pick = (machine, agent) => {
+      const pool = ranked.filter(id => (!machine || machineOf(id) === machine) && (!agent || known.get(id).agent === AGENTS[agent].name)), own = pool.filter(onLine), c = own.length ? own : pool;
       return c.find(id => machineOf(id) === me && runOf(id)) || c.find(id => runOf(id)) || c.find(id => machineOf(id) === me) || c[0];
     };
     // The line's open to-dos nobody has, in one group per machine they are for (dispatch's `on`, else the to-do's own).
     const groups = new Map();
-    for (const c of cs) if (isTodo(c) && !c.done && (named.has(c.id) || (lines.has(tid) && !c.assignee))) { const m = on || c.on || ''; groups.set(m, [...(groups.get(m) || []), c]); }
-    for (const [machine, group] of groups) {
-      const sid = pick(machine), s = sid && known.get(sid);
+    for (const c of cs) if (isTodo(c) && !c.done && (named.has(c.id) || (lines.has(tid) && !c.assignee))) {
+      const g = `${on || c.on || ''}\t${AGENTS[c.assignee] ? c.assignee : ''}`;
+      groups.set(g, [...(groups.get(g) || []), c]);
+    }
+    for (const [g, group] of groups) {
+      const [machine, agent] = g.split('\t'), sid = pick(machine, agent), s = sid && known.get(sid);
       const todos = group.filter(c => named.has(c.id) || all || !s || !c.agent || (c.fromSession && c.fromSession !== sid)).sort((a, b) => a.ts - b.ts);
       if (!todos.length) continue;
       const away = s ? (s.machine && s.machine !== me ? s.machine : '') : (machine && machine !== me ? machine : '');
       const run = sid && runOf(sid);
-      const key = s ? Object.keys(AGENTS).find(k => AGENTS[k].name === s.agent) || 'claude' : 'claude';
-      for (const c of todos) c.assignee = key;
+      const key = agent || (s ? Object.keys(AGENTS).find(k => AGENTS[k].name === s.agent) || 'claude' : 'claude');
+      for (const c of todos) c.assignee ||= key; // an assignee someone set stays
       const row = { thread: { id: tid, name: th.name }, agent: key, todos: todos.map(c => ({ id: c.id, title: c.title })), ...(machine ? { on: machine } : {}) };
       if (!s) {
         // A new session; on another machine over ssh, from its home folder (the line's folder is this machine's).
-        const cmd = handTo(d, { ref: todos[0].id, to: key, remote: key === 'claude', here: !away }, env).command;
+        const cmd = handTo(d, { ref: todos[0].id, to: key, remote: key === 'claude', here: !away, prompt: promptFor && promptFor(th, tid, todos) }, env).command;
         rows.push({ ...row, action: 'start', ...(away ? { machine: away } : {}), command: away ? remote(away, cmd) : cmd });
         continue;
       }
-      const prompt = oneLine(`New to-dos on the Trace Canvas line "${th.name}" (thread ${tid}) are yours: ${todos.map((c, i) => `${i + 1}) ${c.title} [${c.id}]`).join('; ')}. Do them in order; read the line with trace_read_thread for context, tick each with trace_task_done when it is done, and log results with trace_log.`);
-      const session = { id: sid, title: s.title || (run && (run.title || run.prompt)) || '', status: run ? run.status : 'off', ...(away ? { machine: away } : {}), ...(run && run.desktopId ? { desktopId: run.desktopId } : {}) };
+      const prompt = promptFor ? oneLine(promptFor(th, tid, todos)) : oneLine(`New to-dos on the Trace Canvas line "${th.name}" (thread ${tid}) are yours: ${todos.map((c, i) => `${i + 1}) ${c.title} [${c.id}]`).join('; ')}. Do them in order; read the line with trace_read_thread for context, tick each with trace_task_done when it is done, and log results with trace_log.`);
+      const session = { id: sid, title: s.title || (run && (run.title || run.prompt)) || '', status: run ? run.status : 'off', ...(away ? { machine: away } : {}), ...(run && run.desktopId ? { desktopId: run.desktopId } : {}), ...(run && run.name ? { name: run.name } : {}) };
       const action = sid === self ? 'self' : away ? (run ? 'busy' : 'resume') : run && key === 'claude' ? 'message' : run && run.status === 'working' ? 'busy' : 'resume';
       const wake = `${s.cwd ? `cd ${q(s.cwd)} && ` : ''}${AGENTS[key].wake(sid, prompt)}`;
-      rows.push({ ...row, action, session, prompt, ...(action === 'resume' ? { command: away ? remote(away, wake) : wake } : {}) });
+      const fresh = () => { const cmd = handTo(d, { ref: todos[0].id, to: key, remote: key === 'claude', here: !away, prompt: promptFor && promptFor(th, tid, todos) }, env).command; return away ? remote(away, cmd) : cmd; };
+      rows.push({ ...row, action, session, prompt, ...(action === 'resume' ? { command: away ? remote(away, wake) : wake } : action === 'busy' ? { command: fresh() } : {}) });
     }
   }
   return rows;
 }
+// ---------- Autopilot (beta): one round on one line ----------
+// The decision profile: a decision or note titled with it and a version ("决策画像 v0", "decision profile v2"), on any line. null when there is none yet.
+export function decisionProfile(d) {
+  // The highest version wins; within a version the first record is the profile, later ones are its additions.
+  const v = c => (c.kind === 'decision' || c.kind === 'note' ? Number(((c.title || '').match(/(?:决策画像|decision profile)\s*v(\d+)/i) || [])[1] ?? -1) : -1);
+  return Object.values(d.commits).filter(c => v(c) >= 0).sort((a, b) => v(b) - v(a) || a.ts - b.ts)[0] || null;
+}
+// What the agent is told: work the line's open to-dos by the profile, log each decision with its rule, never do the
+// outward or risky things, check the switch before each to-do, and end with a summary record (which turns it off).
+export function autopilotPrompt(d, th, tid) {
+  const p = decisionProfile(d);
+  const rules = p ? `Follow the decision profile, record ${p.id} (read it with trace_read_thread on its line "${(d.threads[p.thread] || {}).name || p.thread}").`
+    : 'There is no decision profile yet, so follow these: H1 do the core first, nothing unasked; H2 a hand-over counts only when the other session has started on it; H3 ask before anything about permissions, credentials, start-up items, open ports, deleting, pushing or publishing; H4 ask about whatever these do not cover.';
+  return `Autopilot (beta) on the Trace Canvas line "${th.name}" (thread ${tid}): work through every open to-do on it, one at a time, as far as you can without the person. First call trace_bind with thread "${tid}", read the line with trace_read_thread and its to-dos with trace_tasks (thread "${tid}"). ${rules} For every decision, log it with trace_log as "what you did · the rule it rests on". Never send email or messages to people, push, publish anything outside, or change permissions or credentials: get those ready and ask. Stop and ask the person when something touches security, is not covered by a rule, or is listed as swinging. Before each to-do call trace_tasks; if the line no longer shows autopilot: true, the person stopped it: stop there. When you are done or stopped, log one record whose title starts with "Autopilot summary": what you did and on which rule, where you got stuck, and what needs the person's yes.`;
+}
+/** Starts a round: every open to-do on the line goes to its agent with the Autopilot prompt (rows as dispatch). */
+export function startAutopilot(d, { thread, self = null }, env = process.env) {
+  const tid = resolveThreadRef(d, thread), th = tid && tid !== INBOX && d.threads[tid];
+  if (!th) throw new Error(`No line "${thread}"`);
+  const open = Object.values(d.commits).filter(c => isTodo(c) && !c.done && threadIdOf(d, c) === tid).map(c => c.id);
+  if (!open.length) throw new Error(`"${th.name}" has no open to-dos for Autopilot`);
+  const rows = dispatch(d, { refs: open, self, prompt: () => autopilotPrompt(d, th, tid) }, env);
+  th.autopilot = { at: Date.now() };
+  return rows;
+}
+export function stopAutopilot(d, { thread }) {
+  const tid = resolveThreadRef(d, thread), th = tid && d.threads[tid];
+  if (!th) throw new Error(`No line "${thread}"`);
+  delete th.autopilot;
+  return th;
+}
+
 // The command is typed into a terminal, so a name or to-do with a line break must not end it early.
 const oneLine = s => String(s).replace(/[\x00-\x1f\x7f]+/g, ' ');
 const sessionThreadOf = (d, s, env) => sessionThread(d, s, env).threadId;
@@ -260,6 +303,28 @@ export function forkThread(d, { from, name, agent = '' } = {}, env = process.env
   const thread = createThread(d, { name: String(name || '').trim() || tr(cfg.lang, 'branchDefault', pname), parent: ptid, forkOf: c.id, extra: ptid !== INBOX && d.threads[ptid].group ? { group: d.threads[ptid].group } : {} });
   const record = addCommit(d, { thread: thread.id, kind: 'fork', title: tr(cfg.lang, 'forkTitle', pname, c.title).slice(0, 120), parents: [c.id], ts: Math.max(Date.now(), c.ts + 1), agent });
   return { thread, record };
+}
+
+/**
+ * Detaches a forked line: it becomes a line of its own, with no parent line and no fork point. Its fork record goes,
+ * and the records after it start the line. take: a record on another line (the request that started this one, say)
+ * moves over as the line's first record; the records after it on its old line follow on from the one before it.
+ */
+export function detachThread(d, { thread, take = '' }) {
+  const tid = resolveThreadRef(d, thread), th = tid && tid !== INBOX && d.threads[tid];
+  if (!th) throw new Error(`No thread "${thread}"`);
+  if (!th.parent && !th.forkOf) throw new Error(`"${th.name}" is not a fork; it is a line of its own already`);
+  const first = take ? d.commits[take] : null;
+  if (take && !first) throw new Error(`No record "${take}"`);
+  if (first && threadIdOf(d, first) === tid) throw new Error(`"${first.title}" is on "${th.name}" already`);
+  const old = th.parent, on = c => threadIdOf(d, c) === tid;
+  const repoint = (from, to, which) => { for (const c of Object.values(d.commits)) if (which(c) && (c.parents || []).includes(from)) c.parents = [...new Set(c.parents.flatMap(p => (p === from ? to : [p])))]; };
+  if (first) { repoint(first.id, first.parents || [], c => !on(c)); first.parents = []; first.thread = tid; }
+  for (const c of Object.values(d.commits)) if (c.kind === 'fork' && on(c)) { delete d.commits[c.id]; repoint(c.id, first ? [first.id] : [], on); }
+  // Nothing on the line points back at the line it came from any more, but a merge from it.
+  for (const c of Object.values(d.commits)) if (on(c) && c.kind !== 'merge' && c.parents) c.parents = c.parents.filter(p => !d.commits[p] || threadIdOf(d, d.commits[p]) !== old);
+  th.parent = null; th.forkOf = null;
+  return th;
 }
 
 /**

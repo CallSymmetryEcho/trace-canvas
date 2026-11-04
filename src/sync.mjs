@@ -135,6 +135,15 @@ export function syncSoon(cli, env = process.env) {
   return true;
 }
 
+// How the last sync went, for the page: { at, failed, lastOk, others: { machine: when its file last changed } }.
+const statusFile = env => path.join(home(env), '.sync-status.json');
+export function syncStatus(env = process.env) { try { return JSON.parse(fs.readFileSync(statusFile(env), 'utf8')); } catch { return null; } }
+function noteStatus(env, failed, others) {
+  const old = syncStatus(env) || {}, at = Date.now();
+  try { fs.writeFileSync(statusFile(env), JSON.stringify({ at, failed: failed || null, lastOk: failed ? old.lastOk || null : at, others: others || old.others || {} })); } catch {}
+}
+const firstErr = out => String(out || '').split('\n').map(l => l.trim()).filter(Boolean).pop() || 'unknown error';
+
 export function runSync(env = process.env) {
   const cfg = readConfig(env), mapDir = cfg.map, machine = cfg.machine;
   if (!mapDir || !fs.existsSync(path.join(mapDir, '.git'))) return { error: 'No location map repository (setup --map, or clone it to ~/agent-map)' };
@@ -164,8 +173,15 @@ export function runSync(env = process.env) {
       pushed = git(mapDir, ['push', '-q']).ok || (git(mapDir, ['pull', '-q', '--rebase', '--autostash']).ok && git(mapDir, ['push', '-q']).ok);
     }
     fs.writeFileSync(path.join(home(env), '.sync-last'), String(Date.now()));
-    return { machine, imported: res.imported, changed: res.changed, moved: res.moved, committed, pushed, offline: !pulled.ok, error };
+    // Commits that are still not on the remote mean the other machines do not have them: a failure, not a quiet "Committed".
+    const unpushed = Number(git(mapDir, ['rev-list', '--count', '@{u}..HEAD']).out) || 0;
+    const others = {};
+    for (const f of fs.readdirSync(dir)) if (f.endsWith('.jsonl') && f !== `${machine}.jsonl`) { const ct = Number(git(mapDir, ['log', '-1', '--format=%ct', '--', `canvas/${f}`]).out) * 1000; if (ct) others[f.slice(0, -6)] = ct; }
+    const failed = error || (!pulled.ok ? `could not pull: ${firstErr(pulled.out)}` : unpushed ? `${unpushed} commit${unpushed === 1 ? '' : 's'} not pushed` : null);
+    noteStatus(env, failed, others);
+    return { machine, imported: res.imported, changed: res.changed, moved: res.moved, committed, pushed, unpushed, offline: !pulled.ok, error };
   } catch (e) {
+    noteStatus(env, String(e && e.message || e));
     return { error: String(e && e.message || e) };
   } finally {
     try { fs.rmdirSync(lock); } catch {}

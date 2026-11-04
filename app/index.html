@@ -545,6 +545,8 @@ textarea.big-input { line-height: 1.3; }
 .md a { color: var(--accent); } .md .md-ref { text-decoration: underline dotted var(--faint); text-underline-offset: 3px; }
 .md .tbl { overflow-x: auto; margin: 0 0 .7em; } .md table { border-collapse: collapse; font-size: .93em; margin: 0; }
 .md th, .md td { border: 1px solid var(--rule); padding: 4px 8px; text-align: left; vertical-align: top; } .md th { background: var(--surface-2); }
+.md img { display: block; max-width: 100%; height: auto; margin: .5em auto; border-radius: 6px; } .md .md-img-err { color: var(--muted); font-size: .92em; }
+.md math { font-size: 1.1em; font-family: 'STIX Two Math', 'Cambria Math', 'Latin Modern Math', math; } /* a math font: brackets and roots stretch only with one (macOS has STIX Two, Windows Cambria) */ .md .md-math { overflow-x: auto; overflow-y: hidden; margin: 0 0 .7em; padding: .1em 0; }
 .md-body { background: var(--surface-2); border: 1px solid var(--rule-soft); border-radius: 8px; padding: 10px 12px; max-height: 46vh; overflow: auto; }
 body.read-page .sheet { width: min(860px, 100%); }
 .md-read { font-size: 15px; line-height: 1.75; max-width: 72ch; margin: 0 auto; width: 100%; }
@@ -1148,7 +1150,7 @@ apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent 
     dayLabel: d => `${I18N.en.week[d.getDay()]} ${d.getMonth() + 1}/${d.getDate()}`,
     monthLabel: d => `${I18N.en.months[d.getMonth()]} ${d.getFullYear()}`,
     tickDay: d => `${I18N.en.week[d.getDay()]} ${d.getDate()}`,
-    dRecord: 'Record', dTitle: 'Title', dKind: 'Type', dThread: 'Thread', dDone: 'Done', dBody: 'Details', mdEdit: 'Edit', mdDone: 'Done', mdExpand: 'Read', mdRead: 'Read', mdErr_missing: 'This file is not on this computer: it may have been moved or renamed, or it is on another machine.', mdErr_big: 'This file is over 2 MB.', mdErr_unlinked: 'No record links this file.', mdErr_type: 'Only .md files open here.', dBodyPh: 'Context, a summary of what the agent produced, next steps…',
+    dRecord: 'Record', dTitle: 'Title', dKind: 'Type', dThread: 'Thread', dDone: 'Done', dBody: 'Details', mdEdit: 'Edit', mdDone: 'Done', mdExpand: 'Read', mdRead: 'Read', mdErr_missing: 'This file is not on this computer: it may have been moved or renamed, or it is on another machine.', mdErr_big: 'This file is over 2 MB.', mdErr_unlinked: 'No record links this file.', mdErr_type: 'Only .md files open here.', mdView: 'View', mdErr_bigImg: 'This image is over 10 MB.', dBodyPh: 'Context, a summary of what the agent produced, next steps…',
     dLinks: 'Links or file paths, one per line', dLinksPh: 'https://…  or  ~/Documents/plan.md', dAgent: 'Source', dAgentPh: 'me / Claude Code…', dTime: 'Time',
     forkedFromRec: 'Forked from', mergedFromThread: 'Merged from thread', forkedHere: 'Forked from here:',
     forkHere: 'Fork from here', viewThread: 'View thread', forkNamePh: 'Name of the new thread', createBranch: 'Create branch',
@@ -1329,7 +1331,7 @@ apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的
     dayLabel: d => `${d.getMonth() + 1}/${d.getDate()} 周${I18N.zh.week[d.getDay()]}`,
     monthLabel: d => `${d.getFullYear()} 年 ${d.getMonth() + 1} 月`,
     tickDay: d => `${d.getDate()} ${I18N.zh.week[d.getDay()]}`,
-    dRecord: '记录', dTitle: '标题', dKind: '类型', dThread: '所在线程', dDone: '已完成', dBody: '详情', mdEdit: '编辑', mdDone: '完成', mdExpand: '放大阅读', mdRead: '阅读', mdErr_missing: '这台电脑上找不到这个文件：可能已被移动或改名，或者在另一台机器上。', mdErr_big: '文件超过 2 MB。', mdErr_unlinked: '没有记录链接这个文件。', mdErr_type: '这里只能打开 .md 文件。', dBodyPh: '背景、agent 的输出摘要、下一步要做什么…',
+    dRecord: '记录', dTitle: '标题', dKind: '类型', dThread: '所在线程', dDone: '已完成', dBody: '详情', mdEdit: '编辑', mdDone: '完成', mdExpand: '放大阅读', mdRead: '阅读', mdErr_missing: '这台电脑上找不到这个文件：可能已被移动或改名，或者在另一台机器上。', mdErr_big: '文件超过 2 MB。', mdErr_unlinked: '没有记录链接这个文件。', mdErr_type: '这里只能打开 .md 文件。', mdView: '查看', mdErr_bigImg: '这张图超过 10 MB。', dBodyPh: '背景、agent 的输出摘要、下一步要做什么…',
     dLinks: '链接或文件路径，每行一个', dLinksPh: 'https://…  或  ~/Documents/方案.md', dAgent: '来源', dAgentPh: '自己 / Claude Code…', dTime: '时间',
     forkedFromRec: '分叉自', mergedFromThread: '合并自线程', forkedHere: '从这里分出了',
     forkHere: '从这里分叉', viewThread: '查看线程', forkNamePh: '新线程名称', createBranch: '创建分支',
@@ -3030,24 +3032,150 @@ function threadOptions(selected, { excludeId, onlyOpen } = {}) {
 }
 // A local report (a .md file a record links) gets 阅读, which shows it rendered in the reader.
 const isMdPath = l => !/^https?:\/\//i.test(l) && /\.(md|markdown)$/i.test(l.trim());
+// A local image a record links gets 查看, which opens it in the reader (loaded on the click, not before).
+const isImgPath = l => !/^https?:\/\//i.test(l) && /\.(png|jpe?g|gif|webp|svg)$/i.test(l.trim());
 function linksView(links) {
   if (!links || !links.length) return '';
   return `<div class="links">${links.map(l => /^https?:\/\//i.test(l)
     ? `<a href="${esc(l)}" target="_blank" rel="noopener noreferrer">${esc(l)}</a>`
-    : isMdPath(l) && SERVER ? `<div><code>${esc(l)}</code><button class="linkish" data-act="read-file" data-path="${esc(l)}">${esc(t('mdRead'))}</button></div>` : `<code>${esc(l)}</code>`).join('')}</div>`;
+    : isMdPath(l) && SERVER ? `<div><code>${esc(l)}</code><button class="linkish" data-act="read-file" data-path="${esc(l)}">${esc(t('mdRead'))}</button></div>`
+    : isImgPath(l) && SERVER ? `<div><code>${esc(l)}</code><button class="linkish" data-act="view-img" data-path="${esc(l)}">${esc(t('mdView'))}</button></div>` : `<code>${esc(l)}</code>`).join('')}</div>`;
 }
 // <md>
+// TeX math ($…$, $$…$$) to MathML, which the browser draws itself: no library, works offline.
+// ponytail: the common subset (fractions, roots, scripts, Greek, operators, accents, \left…\right, matrices, cases,
+// aligned); anything else throws and the formula shows as its source. \ce (chemistry) would be the next to add.
+// 'name value name value …' to an object.
+const texPairs = s => { const a = s.split(' '), o = {}; for (let k = 0; k < a.length; k += 2) o[a[k]] = a[k + 1]; return o; };
+const TEX_MI = texPairs('alpha α beta β gamma γ delta δ epsilon ϵ varepsilon ε zeta ζ eta η theta θ vartheta ϑ iota ι kappa κ lambda λ mu μ nu ν xi ξ pi π varpi ϖ rho ρ varrho ϱ sigma σ varsigma ς tau τ upsilon υ phi ϕ varphi φ chi χ psi ψ omega ω infty ∞ partial ∂ nabla ∇ hbar ℏ ell ℓ emptyset ∅ varnothing ∅ Re ℜ Im ℑ aleph ℵ');
+const TEX_UP = texPairs('Gamma Γ Delta Δ Theta Θ Lambda Λ Xi Ξ Pi Π Sigma Σ Upsilon Υ Phi Φ Psi Ψ Omega Ω');
+const TEX_MO = texPairs('times × cdot ⋅ div ÷ pm ± mp ∓ ast ∗ star ⋆ circ ∘ bullet ∙ oplus ⊕ otimes ⊗ leq ≤ le ≤ geq ≥ ge ≥ neq ≠ ne ≠ approx ≈ sim ∼ simeq ≃ '
+  + 'cong ≅ equiv ≡ propto ∝ ll ≪ gg ≫ in ∈ notin ∉ ni ∋ subset ⊂ subseteq ⊆ supset ⊃ supseteq ⊇ cup ∪ cap ∩ setminus ∖ wedge ∧ vee ∨ neg ¬ forall ∀ exists ∃ '
+  + 'to → rightarrow → leftarrow ← Rightarrow ⇒ Leftarrow ⇐ leftrightarrow ↔ Leftrightarrow ⇔ iff ⟺ implies ⟹ mapsto ↦ uparrow ↑ downarrow ↓ rightleftharpoons ⇌ '
+  + 'longrightarrow ⟶ cdots ⋯ ldots … dots … vdots ⋮ ddots ⋱ perp ⊥ parallel ∥ mid ∣ angle ∠ triangle △ prime ′ degree ° langle ⟨ rangle ⟩ lvert | rvert | lVert ‖ rVert ‖ '
+  + 'lfloor ⌊ rfloor ⌋ lceil ⌈ rceil ⌉ backslash ∖ | ‖ { { } } % % $ $ # # & & _ _');
+const TEX_BIG = { sum: '∑', prod: '∏', coprod: '∐', bigcup: '⋃', bigcap: '⋂', bigoplus: '⨁', bigotimes: '⨂' }, TEX_INT = { int: '∫', iint: '∬', iiint: '∭', oint: '∮' };
+const TEX_LIM = { lim: 'lim', limsup: 'lim sup', liminf: 'lim inf', max: 'max', min: 'min', sup: 'sup', inf: 'inf' };
+const TEX_FN = 'sin cos tan cot sec csc arcsin arccos arctan sinh cosh tanh coth log ln lg exp det dim ker arg deg gcd Pr'.split(' ');
+const TEX_ACC = { hat: '^', widehat: '^', bar: '¯', overline: '‾', vec: '→', overrightarrow: '→', dot: '˙', ddot: '¨', tilde: '˜', widetilde: '˜', check: 'ˇ', breve: '˘' };
+const TEX_SP = { ',': '0.167em', ':': '0.222em', '>': '0.222em', ';': '0.278em', ' ': '0.25em', '!': '0', quad: '1em', qquad: '2em', enspace: '0.5em', thinspace: '0.167em' };
+const TEX_BIGSZ = { big: '1.2em', Big: '1.6em', bigg: '2.1em', Bigg: '2.6em' };
+const TEX_ENV = { matrix: '', pmatrix: '()', bmatrix: '[]', Bmatrix: '{}', vmatrix: '||', Vmatrix: '‖‖', smallmatrix: '', cases: '{', aligned: '', align: '', 'align*': '', split: '', gathered: '', gather: '', 'gather*': '', array: '', equation: '', 'equation*': '' };
+// display: true block, false inline, null the bare formula (for \mathrm{…}, whose letters are upright: up).
+function texMath(src, display, up = false) {
+  const tok = String(src).match(/\\([a-zA-Z]+|[\s\S])|[\s\S]/g) || [];
+  let i = 0;
+  const fail = m => { throw new Error(m); };
+  const skip = () => { while (/^\s$/.test(tok[i] || '')) i++; };
+  const mo = (s, a = '') => `<mo${a}>${esc(s)}</mo>`, mi = (s, a = '') => `<mi${a}>${esc(s)}</mi>`;
+  const row = xs => (xs = xs.filter(Boolean)).length === 1 ? xs[0] : `<mrow>${xs.join('')}</mrow>`;
+  const STOP = ['}', '&', '\\\\', '\\end', '\\right', '\\middle'];
+  // A braced group's text as written (\text, \mathrm, environment names).
+  const raw = () => { skip(); if (tok[i] !== '{') fail('{'); let d = 0, s = ''; for (; i < tok.length; i++) { const t = tok[i]; if (t === '{' && !d++) continue; if (t === '}' && !--d) { i++; return s; } s += t; } return fail('}'); };
+  const list = stops => { const out = []; for (;;) { skip(); const t = tok[i]; if (t === undefined || stops.includes(t)) return out; if (STOP.includes(t)) fail(t); out.push(scripts(atom())); } };
+  const group = () => { const r = list(['}']); if (tok[i++] !== '}') fail('}'); return row(r); };
+  const arg = () => { skip(); if (tok[i] === '{') { i++; return group(); } return atom(true).h; };
+  const delim = () => { skip(); const t = tok[i++], c = t && t[0] === '\\' ? TEX_MO[t.slice(1)] : t; if (c === undefined) fail('delimiter'); return c === '.' ? '' : c; };
+  // Rows of cells up to \end (or the end of the formula): matrices, cases, aligned, and a top level split by \\.
+  const rows = end => {
+    const rs = [];
+    for (let cells = [];;) {
+      cells.push(row(list(['&', '\\\\', '\\end'])));
+      const t = tok[i++];
+      if (t === '&') continue;
+      rs.push(cells); cells = [];
+      if (t === '\\\\') { skip(); if (tok[i] === '[') while (i < tok.length && tok[i++] !== ']'); continue; }
+      if (end ? t === '\\end' && raw() === end : t === undefined) break;
+      fail(end || t);
+    }
+    if (rs.length > 1 && rs[rs.length - 1].every(c => c === '<mrow></mrow>')) rs.pop(); // a closing \\
+    return rs;
+  };
+  const table = (rs, align) => `<mtable>${rs.map(r => `<mtr>${r.map((c, k) => `<mtd style="text-align:${align(k)}">${c}</mtd>`).join('')}</mtr>`).join('')}</mtable>`;
+  function atom(single) {
+    skip();
+    const t = tok[i++];
+    if (t === undefined || STOP.includes(t)) fail(t || 'end');
+    if (t === '{') return { h: group() };
+    if (t === '^' || t === '_') { i--; return { h: '<mrow></mrow>' }; } // {}^{14}C
+    if (/^[0-9]$/.test(t)) { let n = t; if (!single) while (/^[0-9]$/.test(tok[i] || '') || (tok[i] === '.' && /^[0-9]$/.test(tok[i + 1] || ''))) n += tok[i++]; return { h: `<mn>${n}</mn>` }; }
+    if (/^\p{L}$/u.test(t)) return { h: mi(t, up ? ' mathvariant="normal"' : '') };
+    if (t === '~') return { h: '<mspace width="0.25em"></mspace>' };
+    if (t[0] !== '\\') return { h: mo({ '-': '−', '*': '∗', "'": '′' }[t] || t, '()[]|'.includes(t) ? ' stretchy="false"' : '') };
+    const c = t.slice(1);
+    if (c in TEX_MI) return { h: mi(TEX_MI[c]) };
+    if (c in TEX_UP) return { h: mi(TEX_UP[c], ' mathvariant="normal"') };
+    if (c in TEX_SP) return { h: TEX_SP[c] === '0' ? '' : `<mspace width="${TEX_SP[c]}"></mspace>` };
+    if (c in TEX_MO) return { h: mo(TEX_MO[c], /^[{}|]$|^[lr](angle|vert|Vert|floor|ceil)$/.test(c) ? ' stretchy="false"' : '') };
+    if (c in TEX_BIG) return { h: mo(TEX_BIG[c]), lim: true };
+    if (c in TEX_INT) return { h: mo(TEX_INT[c]) };
+    if (c in TEX_LIM) return { h: mo(TEX_LIM[c], ' movablelimits="true"'), lim: true, fn: true };
+    if (TEX_FN.includes(c)) return { h: mi(c), fn: true };
+    if (c in TEX_ACC) return { h: `<mover accent="true">${arg()}${mo(TEX_ACC[c], /^(wide|over)/.test(c) ? ' stretchy="true"' : '')}</mover>` };
+    if (c.replace(/[lrm]$/, '') in TEX_BIGSZ) { const s = TEX_BIGSZ[c.replace(/[lrm]$/, '')], d = delim(); return { h: d ? mo(d, ` stretchy="true" minsize="${s}" maxsize="${s}"`) : '' }; }
+    switch (c) {
+      case 'frac': case 'dfrac': case 'tfrac': case 'cfrac': return { h: `<mfrac>${arg()}${arg()}</mfrac>` };
+      case 'binom': return { h: `<mrow>${mo('(')}<mfrac linethickness="0">${arg()}${arg()}</mfrac>${mo(')')}</mrow>` };
+      case 'sqrt': { skip(); if (tok[i] !== '[') return { h: `<msqrt>${arg()}</msqrt>` }; i++; const n = row(list([']'])); i++; return { h: `<mroot>${arg()}${n}</mroot>` }; }
+      case 'text': case 'textrm': case 'textit': case 'textbf': case 'mbox': return { h: `<mtext>${esc(raw())}</mtext>` };
+      case 'mathrm': case 'mathup': case 'operatorname': { const r = raw(); return /^[\w\s]*$/.test(r) ? { h: mi(r.trim(), ' mathvariant="normal"'), fn: c === 'operatorname' } : { h: texMath(r, null, true) }; }
+      case 'mathbf': case 'boldsymbol': case 'bm': return { h: `<mrow style="font-weight:bold">${arg()}</mrow>` };
+      case 'mathbb': return { h: row([...raw()].map(x => mi({ R: 'ℝ', N: 'ℕ', Z: 'ℤ', Q: 'ℚ', C: 'ℂ', P: 'ℙ', H: 'ℍ' }[x] || x, ' mathvariant="normal"'))) };
+      case 'mathcal': case 'mathscr': case 'mathit': case 'mathsf': case 'mathtt': case 'mathnormal': return { h: arg() };
+      case 'phantom': return { h: `<mphantom>${arg()}</mphantom>` };
+      case 'tag': case 'label': raw(); return { h: '' };
+      case 'nonumber': case 'notag': case 'displaystyle': case 'textstyle': case 'limits': case 'nolimits': return { h: '' };
+      case 'left': { const a = delim(), body = [mo(a, ' stretchy="true"')]; for (;;) { body.push(...list(['\\right', '\\middle'])); const m = tok[i++]; if (m !== '\\right' && m !== '\\middle') fail('\\right'); body.push(mo(delim(), ' stretchy="true"')); if (m === '\\right') return { h: `<mrow>${body.join('')}</mrow>` }; } }
+      case 'begin': {
+        const env = raw(), fence = TEX_ENV[env];
+        if (fence === undefined) fail(env);
+        if (env === 'array') raw(); // its column spec
+        const al = /^(align|split)/.test(env) ? k => (k % 2 ? 'left' : 'right') : env === 'cases' ? () => 'left' : () => 'center';
+        const tb = table(rows(env), al);
+        return { h: fence ? `<mrow>${mo(fence[0], ' stretchy="true"')}${tb}${fence[1] ? mo(fence[1], ' stretchy="true"') : ''}</mrow>` : tb };
+      }
+    }
+    return fail(t);
+  }
+  function scripts(base) {
+    let sub = null, sup = null;
+    for (;;) {
+      skip();
+      if (tok[i] === '^' && sup === null) { i++; sup = arg(); } else if (tok[i] === '_' && sub === null) { i++; sub = arg(); } else if (tok[i] === "'" && sup === null) { let p = ''; while (tok[i] === "'") { p += '′'; i++; } sup = mo(p); } else break;
+    }
+    const [a, b, c] = base.lim ? ['munder', 'mover', 'munderover'] : ['msub', 'msup', 'msubsup'];
+    const h = sub && sup ? `<${c}>${base.h}${sub}${sup}</${c}>` : sub ? `<${a}>${base.h}${sub}</${a}>` : sup ? `<${b}>${base.h}${sup}</${b}>` : base.h;
+    return base.fn ? h + '<mo>⁡</mo>' : h;
+  }
+  const rs = rows(null), body = rs.length === 1 && rs[0].length === 1 ? rs[0][0] : table(rs, rs.some(r => r.length > 1) ? k => (k % 2 ? 'left' : 'right') : () => 'center');
+  return display === null ? body : `<math${display ? ' display="block"' : ''}>${body}</math>`;
+}
+// A formula, or (if it does not parse) its source as code, so the paragraph reads on.
+function mathHTML(tex, display) {
+  try { return texMath(tex, display); } catch { return `<code class="md-math-err">${esc(display ? `$$${tex}$$` : `$${tex}$`)}</code>`; }
+}
+// Images (![alt](src)) show only in the reader, which sets this: '' for a record's details (web images), a linked report's
+// path for that report (its own images too, fetched by openReader). Elsewhere an image is its name, the path on hover.
+let mdImgFrom = null;
+const mdImg = (alt, src) => /^https?:\/\//i.test(src) && mdImgFrom !== null ? `<img src="${src}" alt="${alt}" loading="lazy" referrerpolicy="no-referrer">`
+  : mdImgFrom ? `<img data-img="${src}" alt="${alt}">` : `<span class="md-ref" title="${src}">${alt || src.split('/').pop()}</span>`;
 // Markdown to HTML, for reading: the text is escaped first, so only these tags come out.
-// ponytail: headings, lists, quotes, code, tables, links, bold/italic; no nested blockquotes or HTML passthrough.
+// ponytail: headings, lists, quotes, code, tables, links, images, bold/italic, math; no nested blockquotes or HTML passthrough.
 function mdInline(s) {
-  const codes = [];
-  s = esc(s).replace(/`([^`]+)`/g, (_, c) => `\u0000${codes.push(c) - 1}\u0000`);
-  s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+  const keep = [], hold = h => `\u0000${keep.push(h) - 1}\u0000`;
+  // Code first, so a $ in code stays text; then $$…$$ and $…$. Money is not math: a $ before a space or a digit
+  // after the closing $ ("$5 and $10", "$5-$10") ends nothing (as in Pandoc). \$ is a dollar sign.
+  s = String(s).replace(/`([^`]+)`/g, (_, c) => hold(`<code>${esc(c)}</code>`))
+    .replace(/\$\$((?:\\.|[^$\\\u0000])+?)\$\$/g, (_, m) => hold(mathHTML(m, true)))
+    .replace(/(^|[^\\$])\$(?=[^\s$])((?:\\.|[^$\\\u0000])*?[^\s\\$\u0000])\$(?!\d)/g, (_, b, m) => b + hold(mathHTML(m, false)))
+    .replace(/\\\$/g, '$');
+  s = esc(s).replace(/!\[([^\]]*)\]\(([^\s)]+)\)/g, (_, alt, src) => hold(mdImg(alt, src)))
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
     .replace(/\[([^\]]+)\]\(([^\s)]+)\)/g, '<span class="md-ref" title="$2">$1</span>') // a file next to the report: its name, the path on hover
     .replace(/(^|[\s(])(https?:\/\/[^\s<)]*[^\s<).,;:!?。，；])/g, '$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>')
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/(^|[^*\w])\*([^*\s][^*]*)\*/g, '$1<em>$2</em>')
     .replace(/~~([^~]+)~~/g, '<del>$1</del>');
-  return s.replace(/\u0000(\d+)\u0000/g, (_, i) => `<code>${codes[i]}</code>`);
+  return s.replace(/\u0000(\d+)\u0000/g, (_, i) => keep[i]);
 }
 function mdHTML(src) {
   const L = String(src || '').replace(/\r\n?/g, '\n').split('\n'), out = [];
@@ -3060,6 +3188,12 @@ function mdHTML(src) {
     if ((m = /^\s*(`{3,}|~{3,})/.exec(l))) {
       const body = []; for (i++; i < L.length && !L[i].trim().startsWith(m[1]); i++) body.push(L[i]);
       i++; out.push(`<pre><code>${esc(body.join('\n'))}</code></pre>`); continue;
+    }
+    // A formula on lines of its own: $$ … $$, on one line or several.
+    if (/^\s*\$\$/.test(l)) {
+      const first = l.trim().slice(2); let j = i;
+      if (!first.includes('$$')) for (j = i + 1; j < L.length && !L[j].includes('$$'); j++);
+      if (j < L.length) { const tex = [first, ...L.slice(i + 1, j + 1)].join('\n'); out.push(`<div class="md-math">${mathHTML(tex.slice(0, tex.indexOf('$$')), true)}</div>`); i = j + 1; continue; }
     }
     if ((m = /^(#{1,6})\s+(.*?)\s*#*$/.exec(l))) { out.push(`<h${m[1].length}>${mdInline(m[2])}</h${m[1].length}>`); i++; continue; }
     if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(l)) { out.push('<hr>'); i++; continue; }
@@ -3083,21 +3217,43 @@ function mdHTML(src) {
         return `<li>${head}${rest.some(x => x.trim()) ? mdHTML(rest.join('\n')) : ''}</li>`;
       }).join('')}</${tag}>`); continue;
     }
-    const para = []; for (; i < L.length && L[i].trim() && !/^(#{1,6}\s|\s*(`{3,}|~{3,})|\s*>)/.test(L[i]) && !(para.length && isList(L[i])); i++) para.push(L[i].trim());
+    const para = []; for (; i < L.length && L[i].trim() && !/^(#{1,6}\s|\s*(`{3,}|~{3,})|\s*>)/.test(L[i]) && !(para.length && (isList(L[i]) || /^\s*\$\$/.test(L[i]))); i++) para.push(L[i].trim());
     out.push(`<p>${para.map(mdInline).join('<br>')}</p>`);
   }
   return out.join('');
 }
 // </md>
-function openReader(title, md, src) {
+function openReader(title, md, src, html) {
   S.sheet = 'read'; document.body.classList.add('sheet-open', 'read-page');
-  setSheet(title, `${src ? `<div class="md-src">${esc(src)}</div>` : ''}<article class="md md-read">${md === null ? `<p>${esc(t('gxLoading'))}</p>` : mdHTML(md)}</article>`);
+  for (const u of S.readBlobs || []) URL.revokeObjectURL(u);
+  S.readBlobs = [];
+  mdImgFrom = src || '';
+  try { setSheet(title, `${src ? `<div class="md-src">${esc(src)}</div>` : ''}<article class="md md-read">${html || (md === null ? `<p>${esc(t('gxLoading'))}</p>` : mdHTML(md))}</article>`); } finally { mdImgFrom = null; }
   $('#sheet-body').scrollTop = 0;
+  // A report's own images, fetched when the report opens, under the report's rule (src/git-view.mjs readLinkedImage).
+  for (const img of $$('#sheet-body img[data-img]')) imgBlob(img.dataset.img, src).then(r => { if (r.url) { S.readBlobs.push(r.url); img.src = r.url; } else img.outerHTML = `<span class="md-img-err">${esc(img.alt || img.dataset.img)}: ${esc(mdErr(r.error))}</span>`; });
+}
+const mdErr = e => (t('mdErr_' + e) === 'mdErr_' + e ? e : t('mdErr_' + e));
+async function imgBlob(path, from) {
+  const q = `path=${encodeURIComponent(path)}${from ? `&from=${encodeURIComponent(from)}` : ''}`;
+  try {
+    const r = await fetch(`/api/img?${q}`, { headers: { 'X-Trace-Canvas': '1' }, cache: 'no-store' });
+    if (/json/.test(r.headers.get('content-type') || '')) return { error: (await r.json()).error };
+    return { url: URL.createObjectURL(await r.blob()) }; // the reader revokes it when it shows something else
+  } catch { return { error: t('syncOfflineTitle') }; }
+}
+async function viewImage(path) {
+  const name = path.split('/').pop();
+  openReader(name, null, path);
+  const r = await imgBlob(path);
+  if (S.sheet !== 'read') { if (r.url) URL.revokeObjectURL(r.url); return; }
+  openReader(name, null, path, r.url ? `<img src="${r.url}" alt="${esc(name)}">` : `<blockquote><p>${esc(mdErr(r.error))}</p></blockquote>`);
+  if (r.url) S.readBlobs.push(r.url);
 }
 async function readFile(path) {
   openReader(path.split('/').pop(), null, path);
   const r = await fetch(`/api/md?path=${encodeURIComponent(path)}`, { headers: { 'X-Trace-Canvas': '1' }, cache: 'no-store' }).then(x => x.json()).catch(() => ({ error: t('syncOfflineTitle') }));
-  if (S.sheet === 'read') openReader(path.split('/').pop(), r.error ? `> ${t('mdErr_' + r.error) === 'mdErr_' + r.error ? r.error : t('mdErr_' + r.error)}` : r.text, path);
+  if (S.sheet === 'read') openReader(path.split('/').pop(), r.error ? `> ${mdErr(r.error)}` : r.text, path);
 }
 const delUI = q => S.ui.del
   ? `<span class="confirm">${esc(q)}</span><button class="btn btn-danger" data-act="del-confirm">${esc(t('del'))}</button><button class="btn" data-act="del-cancel">${esc(t('cancel'))}</button>`
@@ -3427,6 +3583,7 @@ detail.addEventListener('click', e => {
     case 'body-done': S.ui = {}; render(); break;
     case 'read-body': { const c = S.commits.get(s.id); if (c) openReader(c.title, c.body || ''); break; }
     case 'read-file': readFile(b.dataset.path); break;
+    case 'view-img': viewImage(b.dataset.path); break;
     case 'del-confirm':
       if (s.type === 'commit') removeDoc('commits', s.id);
       else if (s.type === 'thread') deleteThread(s.id);

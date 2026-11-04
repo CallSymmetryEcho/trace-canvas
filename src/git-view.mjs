@@ -105,16 +105,39 @@ export async function commitDiff(d, id, file, against = null) {
   return r ? { file, diff: r.out, truncated: !!r.truncated } : { error: 'git could not show this diff' };
 }
 
+const home = p => p.replace(/^~(?=\/|$)/, os.homedir());
+const linked = (d, p) => Object.values(d.commits || {}).some(c => (c.links || []).some(l => String(l).trim() === p));
 /** A local report a record links (.md or .markdown), as text for the page's reader, or an error code. Only a path some record
  * links is read, so the page cannot read anything else; ~ is the home folder. */
 export function readLinkedMd(d, want) {
   const p = String(want || '').trim();
   if (!/\.(md|markdown)$/i.test(p)) return { error: 'type' };
-  if (!Object.values(d.commits || {}).some(c => (c.links || []).some(l => String(l).trim() === p))) return { error: 'unlinked' };
-  const file = p.replace(/^~(?=\/|$)/, os.homedir());
+  if (!linked(d, p)) return { error: 'unlinked' };
   try {
-    const st = fs.statSync(file);
+    const file = home(p), st = fs.statSync(file);
     if (st.size > 2 << 20) return { error: 'big' };
     return { text: fs.readFileSync(file, 'utf8') };
+  } catch { return { error: 'missing' }; }
+}
+
+const IMG = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml' };
+/** An image for the reader: one a record links, or (with from) one a linked .md report shows as ![alt](src), a relative src
+ * taken from the report's folder. Nothing else is read; 10 MB at most. Returns { type, data } or { error }. */
+export function readLinkedImage(d, want, from) {
+  const p = String(want || '').trim(), type = IMG[((/\.(\w+)$/.exec(p) || [])[1] || '').toLowerCase()];
+  if (!type) return { error: 'type' };
+  let file = home(p);
+  if (from) {
+    const md = readLinkedMd(d, from);
+    if (md.error) return md;
+    if (![...md.text.matchAll(/!\[[^\]]*\]\(\s*<?([^\s)>]+)>?(?:\s+"[^"]*")?\s*\)/g)].some(m => m[1] === p)) return { error: 'unlinked' };
+    let src = p; try { src = decodeURI(p); } catch {}
+    file = /^[/~]/.test(src) ? home(src) : path.resolve(path.dirname(home(String(from).trim())), src);
+  } else if (!linked(d, p)) return { error: 'unlinked' };
+  try {
+    const st = fs.statSync(file);
+    if (!st.isFile()) return { error: 'missing' };
+    if (st.size > 10 << 20) return { error: 'bigImg' };
+    return { type, data: fs.readFileSync(file) };
   } catch { return { error: 'missing' }; }
 }

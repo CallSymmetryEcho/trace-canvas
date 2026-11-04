@@ -17,7 +17,7 @@ import { applyRetro, askAgent, retroRecord, runRetro } from './retro.mjs';
 import { focusTab, openTerminal, terminalCommand } from './agents.mjs';
 import { draftLessons, rememberLesson } from './lessons.mjs';
 import { otherMachines, remoteLive } from './remote.mjs';
-import { commitDiff, commitInfo, readLinkedMd } from './git-view.mjs';
+import { commitDiff, commitInfo, readLinkedImage, readLinkedMd } from './git-view.mjs';
 import { runSync, syncSoon, syncStatus } from './sync.mjs';
 import { doctor } from './doctor.mjs';
 import { desktopSessions } from './desktop.mjs';
@@ -123,6 +123,14 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
       if (req.method === 'GET' && p === '/api/md') {
         if (req.headers['x-trace-canvas'] !== '1') return send(res, 403, { error: 'missing header' });
         return send(res, 200, readLinkedMd(readData(), url.searchParams.get('path')));
+      }
+      // An image for the reader: one a record links, or one a linked report shows (same rule as above).
+      if (req.method === 'GET' && p === '/api/img') {
+        if (req.headers['x-trace-canvas'] !== '1') return send(res, 403, { error: 'missing header' });
+        const r = readLinkedImage(readData(), url.searchParams.get('path'), url.searchParams.get('from'));
+        if (r.error) return send(res, 200, r);
+        res.writeHead(200, { 'Content-Type': r.type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox" });
+        return res.end(r.data);
       }
       // What a commit record changed, read from git on demand (src/git-view.mjs).
       if (req.method === 'GET' && p === '/api/git/commit') return send(res, 200, await commitInfo(readData(), url.searchParams.get('record'), url.searchParams.get('against')));

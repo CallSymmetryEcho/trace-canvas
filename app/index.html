@@ -1070,8 +1070,8 @@ const I18N = {
     tBound: n => `Bound to “${n}”`, tUnbound: 'Back to the repository and branch line',
     actorHuman: 'You', actorAgent: 'Agent', liveTipTime: 'now',
     goalsBtn: 'Goals', goalsBtnTitle: 'Goals and to-dos of every line', goalsTitle: 'Goals and to-dos',
-    goalsTip: 'How it fits together: the <b>inbox</b> holds loose ideas you have not thought through; a <b>to-do</b> □ belongs to a line and is a next step you or an agent can take; a line\'s <b>goal</b> is the outcome it is working towards (write it in the line\'s panel). Agents read goals and to-dos with the MCP tool <b>trace_tasks</b> and tick what they finish with <b>trace_task_done</b>, so you can see progress here without asking.',
-    goalsTipHide: 'Got it', goalsHelp: 'How it works', goalsView: 'Open the record', goalsEdit: 'Edit', goalsAddBtn: 'Add', goalsShowDone: 'Show done', goalsSummary: (open, lines) => `${open} open to-do${open === 1 ? '' : 's'} on ${lines} line${lines === 1 ? '' : 's'}`,
+    goalsTip: 'How it fits together: the <b>inbox</b> holds loose ideas you have not thought through; a <b>to-do</b> □ belongs to a line and is a next step you or an agent can take; a line\'s <b>goal</b> is the outcome it is working towards (write it in the line\'s panel). Agents read goals and to-dos with the MCP tool <b>trace_tasks</b> and tick what they finish with <b>trace_task_done</b>, so you can see progress here without asking. Click <b>✓ done/total ▸</b> on a card to show its finished to-dos.',
+    goalsTipHide: 'Got it', goalsHelp: 'How it works', goalsView: 'Open the record', goalsEdit: 'Edit', goalsAddBtn: 'Add', goalsShowDone: 'Show the finished to-dos', goalsHideDone: 'Hide the finished to-dos', goalsSummary: (open, lines) => `${open} open to-do${open === 1 ? '' : 's'} on ${lines} line${lines === 1 ? '' : 's'}`,
     goalsNoGoal: 'No goal yet. Tap to write one.', goalsAdd: '+ Add a to-do', goalsOpenLine: 'Open line',
     goalsOthers: n => `${n} more line${n === 1 ? ' has' : 's have'} no goal or to-do yet.`, goalsEmpty: 'No goals or to-dos yet. Open a line, write its goal, and add to-dos here or with the □ kind below.',
     goalsBy: name => `ticked by ${name}`, tTaskAdded: 'To-do added',
@@ -1244,8 +1244,8 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     tBound: n => `已绑定到「${n}」`, tUnbound: '已改回按仓库和分支自动归线',
     actorHuman: '你', actorAgent: 'Agent', liveTipTime: '此刻',
     goalsBtn: '目标', goalsBtnTitle: '每条线的目标和待办', goalsTitle: '目标和待办',
-    goalsTip: '怎么用：<b>收件箱</b>放还没想清楚的零散想法；<b>待办</b> □ 挂在具体的线上，是你或 agent 可以去做的下一步；线的<b>目标</b>是它要达到的结果，写在这条线的面板里。agent 用 MCP 工具 <b>trace_tasks</b> 读取目标和待办，做完用 <b>trace_task_done</b> 勾上，你在这里就能看到进度，不用去问。',
-    goalsTipHide: '知道了', goalsHelp: '怎么用？', goalsView: '查看记录', goalsEdit: '编辑', goalsAddBtn: '添加', goalsShowDone: '显示已完成', goalsSummary: (open, lines) => `${lines} 条线上还有 ${open} 项待办`,
+    goalsTip: '怎么用：<b>收件箱</b>放还没想清楚的零散想法；<b>待办</b> □ 挂在具体的线上，是你或 agent 可以去做的下一步；线的<b>目标</b>是它要达到的结果，写在这条线的面板里。agent 用 MCP 工具 <b>trace_tasks</b> 读取目标和待办，做完用 <b>trace_task_done</b> 勾上，你在这里就能看到进度，不用去问。点卡片上的 <b>✓ 已完成/总数 ▸</b>，可以展开这张卡片已完成的待办。',
+    goalsTipHide: '知道了', goalsHelp: '怎么用？', goalsView: '查看记录', goalsEdit: '编辑', goalsAddBtn: '添加', goalsShowDone: '显示已完成的待办', goalsHideDone: '收起已完成的待办', goalsSummary: (open, lines) => `${lines} 条线上还有 ${open} 项待办`,
     goalsNoGoal: '还没写目标，点这里填写。', goalsAdd: '+ 添加待办', goalsOpenLine: '打开这条线',
     goalsOthers: n => `另外 ${n} 条线还没有目标或待办。`, goalsEmpty: '还没有目标或待办。打开一条线写下目标，再在这里或用下方的 □ 类型添加待办。',
     goalsBy: name => `由 ${name} 勾选`, tTaskAdded: '已添加待办',
@@ -1318,7 +1318,7 @@ const S = {
   captureKind: 'idea', captureThread: ls.get('tc.captureThread', INBOX),
   mode: 'loading', readOnly: false, offline: false, got: new Set(), dragId: null,
   ai: null, sheet: null,
-  live: [], liveOthers: [], sessions: [], machine: '', goalsShowDone: false, glDone: ls.get('tc.glDone', []), multiGroup: '', dragMembers: null, focusGroup: ls.get('tc.focusGroup', null), folded: ls.get('tc.folded', []), platform: '',
+  live: [], liveOthers: [], sessions: [], machine: '', glDone: ls.get('tc.glDone', []), multiGroup: '', dragMembers: null, focusGroup: ls.get('tc.focusGroup', null), folded: ls.get('tc.folded', []), platform: '',
 };
 
 // Sync trouble (it failed, or another machine has been quiet for over a day) is only a dot: on More and on the
@@ -3499,12 +3499,12 @@ function renderGoals() {
   };
   const body = (PHONE.matches ? `<details class="gl-help"><summary>${esc(t('goalsHelp'))}</summary><span>${t('goalsTip')}</span></details>` : tipHidden ? '' : `<div class="gl-tip"><span>${t('goalsTip')}</span><button class="btn" id="gl-tip-hide">${esc(t('goalsTipHide'))}</button></div>`)
     + quietStrip()
-    + `<div class="gl-bar-top"><span>${esc(t('goalsSummary', totalOpen, groups.filter(g => g.open.length).length))}</span><label class="check"><input type="checkbox" id="gl-show-done" ${S.goalsShowDone ? 'checked' : ''}>${esc(t('goalsShowDone'))}</label></div>`
+    + `<div class="gl-bar-top"><span>${esc(t('goalsSummary', totalOpen, groups.filter(g => g.open.length).length))}</span></div>`
     + (groups.length ? groups.map(({ th, tasks, open, goal }) => {
-      const showDone = S.goalsShowDone || S.glDone.includes(th.id), shown = showDone ? tasks : open;
+      const showDone = S.glDone.includes(th.id), shown = showDone ? tasks : open;
       const pct = tasks.length ? Math.round(100 * (tasks.length - open.length) / tasks.length) : 0;
       return `<section class="gl-group" style="--c:${th.color}">
-        <div class="gl-head"><span class="roundel" style="--c:${th.color}"></span><b>${esc(th.name)}</b>${tasks.length > open.length ? `<button class="gl-prog" data-gl-done="${esc(th.id)}" aria-pressed="${showDone}" title="${esc(t('goalsShowDone'))}">✓ ${tasks.length - open.length}/${tasks.length}</button>` : `<span class="gl-prog">${tasks.length - open.length}/${tasks.length}</span>`}${liveBadge(th.id)}<button class="linkish" data-goto="${esc(th.id)}">${esc(t('goalsOpenLine'))}</button></div>
+        <div class="gl-head"><span class="roundel" style="--c:${th.color}"></span><b>${esc(th.name)}</b>${tasks.length > open.length ? `<button class="gl-prog" data-gl-done="${esc(th.id)}" aria-pressed="${showDone}" title="${esc(t(showDone ? 'goalsHideDone' : 'goalsShowDone'))}">✓ ${tasks.length - open.length}/${tasks.length} ${showDone ? '▾' : '▸'}</button>` : `<span class="gl-prog">${tasks.length - open.length}/${tasks.length}</span>`}${liveBadge(th.id)}<button class="linkish" data-goto="${esc(th.id)}">${esc(t('goalsOpenLine'))}</button></div>
         ${th.id === INBOX ? '' : S.glEdit === 'goal:' + th.id ? `<textarea class="gl-goal-in" data-goal="${esc(th.id)}" rows="${Math.min(6, Math.max(2, Math.ceil(goal.length / 22)))}" placeholder="${esc(t('threadGoalPh'))}">${esc(goal)}</textarea>` : `<div class="gl-goal ${goal ? '' : 'none'}" data-goal-edit="${esc(th.id)}" title="${esc(t('goalsEdit'))}">${esc(goal || t('goalsNoGoal'))}</div>`}
         ${tasks.length ? `<div class="gl-meter"><i style="width:${pct}%"></i></div>` : ''}
         ${shown.length ? `<ul class="gl-tasks">${shown.map(row).join('')}</ul>` : ''}
@@ -3554,7 +3554,6 @@ sheetBody.addEventListener('click', e => {
 sheetBody.addEventListener('change', e => {
   if (S.sheet !== 'goals') return;
   const el = e.target;
-  if (el.id === 'gl-show-done') { S.goalsShowDone = el.checked; renderGoals(); return; }
   if (el.dataset.who && canWrite()) { patchDoc('commits', el.dataset.who, { assignee: el.value || null }, 0); setTimeout(renderGoals, 0); return; }
   if (el.dataset.task && canWrite()) {
     patchDoc('commits', el.dataset.task, el.checked ? { done: true, doneBy: 'human', doneAt: Date.now() } : { done: false, doneBy: null, doneAt: null }, 0);

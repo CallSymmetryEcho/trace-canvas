@@ -1043,7 +1043,7 @@ const I18N = {
     liveHead: 'Running session', liveUntitled: 'Untitled session', liveStarted: x => `Started ${x}`, liveSeen: x => ` · last activity ${x}`,
     livePrompt: 'Latest instruction', liveThread: 'Thread', liveAuto: 'Automatic (repository and branch)', liveNow: 'Now on',
     liveResume: 'Resume in a terminal', openChat: 'Open the chat', goTerm: 'Go to its terminal', tNoTerm: 'Its terminal tab is no longer open', liveRunning: 'Running now', lineSessions: 'Sessions on this line', loggedIn: 'Logged in',
-    gxChanges: 'Changes', gxLoading: 'Reading from git…', gxNoRepo: 'This repository is not on this computer.', gxNoCommit: 'This commit is no longer in its repository (rewritten or cleaned up).',
+    gxChanges: 'Changes', gxLoading: 'Reading from git…', gxNoRepo: 'This repository is not on this computer.', gxNoRepoOn: m => `This repository is on ${m}, not on this computer.`, gxNoCommit: 'This commit is no longer in its repository (rewritten or cleaned up).',
     gxFiles: n => `${n} file${n === 1 ? '' : 's'}`, gxMore: n => `${n} more`, gxQuiet: n => `${n} binary or generated`, gxBinary: 'binary',
     gxCompare: 'Compare with', gxThisOnly: 'this commit only', gxOtherRepo: 'That station is in another repository.', gxTruncated: 'Cut at 200 KB.',
     gxLater: 'Committed later in', gxUncommitted: 'Not committed yet.', copyResume: 'Copy resume command', lineSessionsHint: 'Resume one to keep working on this line instead of starting a new session.', liveBadge: (n, w) => `${n} running${w ? `, ${w} need${w === 1 ? 's' : ''} you` : ''}`,
@@ -1217,7 +1217,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     liveHead: '运行中的会话', liveUntitled: '未命名会话', liveStarted: x => `开始于 ${x}`, liveSeen: x => ` · 最近活动 ${x}`,
     livePrompt: '最近的指令', liveThread: '所属线', liveAuto: '自动（按仓库和分支）', liveNow: '当前在',
     liveResume: '在终端里恢复', openChat: '打开对话', goTerm: '跳到终端', tNoTerm: '它的终端标签页已经关了', liveRunning: '正在运行', lineSessions: '这条线上的会话', loggedIn: '记在这个会话里',
-    gxChanges: '改动', gxLoading: '正在从 git 读取…', gxNoRepo: '这台电脑上没有这个仓库。', gxNoCommit: '仓库里已经没有这个提交，可能被改写或清理了。',
+    gxChanges: '改动', gxLoading: '正在从 git 读取…', gxNoRepo: '这台电脑上没有这个仓库。', gxNoRepoOn: m => `这个仓库在 ${m} 上，这台电脑上没有。`, gxNoCommit: '仓库里已经没有这个提交，可能被改写或清理了。',
     gxFiles: n => `${n} 个文件`, gxMore: n => `还有 ${n} 个`, gxQuiet: n => `${n} 个二进制或生成文件`, gxBinary: '二进制',
     gxCompare: '对比', gxThisOnly: '只看这次提交', gxOtherRepo: '那个站点不在同一个仓库。', gxTruncated: '超过 200 KB，已截断。',
     gxLater: '之后提交于', gxUncommitted: '尚未提交。', copyResume: '复制恢复命令', lineSessionsHint: '恢复其中一个就能接着在这条线上做，不用新开会话。', liveBadge: (n, w) => `${n} 个运行中${w ? `，${w} 个等你` : ''}`,
@@ -2824,7 +2824,7 @@ function changesHTML(c) {
   const against = GX.against.get(c.id) || '', key = `${c.id}|${against}`, q = `record=${encodeURIComponent(c.id)}${against ? `&against=${encodeURIComponent(against)}` : ''}`;
   const info = gxGet(GX.info, key, `/api/git/commit?${q}`);
   if (!info) return head + `<p class="gx-note">${esc(t('gxLoading'))}</p>`;
-  if (info.missing || info.error) return head + `<p class="gx-note">${esc(info.error || t(info.missing === 'no-repo' ? 'gxNoRepo' : 'gxNoCommit'))}</p>`;
+  if (info.missing || info.error) return head + `<p class="gx-note">${esc(info.error || (info.missing === 'no-repo' ? (info.machine && info.machine !== S.machine ? t('gxNoRepoOn', info.machine) : t('gxNoRepo')) : t('gxNoCommit')))}</p>`;
   const files = info.files || [], main = files.filter(f => !f.binary && !f.generated), quiet = files.filter(f => f.binary || f.generated);
   const add = files.reduce((n, f) => n + f.add, 0), del = files.reduce((n, f) => n + f.del, 0), max = Math.max(1, ...main.map(f => f.add + f.del));
   const all = GX.more.has(key), shown = all ? [...main, ...quiet] : main.slice(0, 8), hidden = files.length - shown.length;

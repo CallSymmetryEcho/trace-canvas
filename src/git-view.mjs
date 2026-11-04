@@ -23,11 +23,13 @@ const shaOf = c => (c && (c.gitCommit || ((c.id || '').match(/^c-git-([0-9a-f]{7
 const firstLine = s => String(s || '').split('\n')[0].trim();
 
 // Where to look: the record's own repository, its session's folder, its line's folder, then every
-// folder the canvas knows, which finds commits logged before records kept their repository.
+// folder the canvas knows, which finds commits logged before records kept their repository, and every
+// repository another record names: a commit made on another machine is found in this one's clone.
 function candidates(d, c) {
   const s = (d.sessions || {})[c.session], th = d.threads[c.thread];
   const lines = Object.values(d.threads).map(t => firstLine(t.note)), sessions = Object.values(d.sessions || {}).map(x => x.cwd);
-  return [...new Set([c.repo, s && s.cwd, th && firstLine(th.note), ...lines, ...sessions].filter(p => p && path.isAbsolute(p)))];
+  const repos = Object.values(d.commits).map(x => x.repo);
+  return [...new Set([c.repo, s && s.cwd, th && firstLine(th.note), ...lines, ...sessions, ...repos].filter(p => p && path.isAbsolute(p)))];
 }
 
 const found = new Map(); // sha → repository; ponytail: first-in-first-out at 200, enough for one person's canvas
@@ -45,7 +47,9 @@ async function locate(d, c) {
       return { sha, repo };
     }
   }
-  return { sha, missing: !here.length || (c.repo && !fs.existsSync(c.repo)) ? 'no-repo' : 'no-commit' };
+  // Not here: say which computer it was made on, so the person knows where to look.
+  const missing = !here.length || (c.repo && !fs.existsSync(c.repo)) ? 'no-repo' : 'no-commit';
+  return { sha, missing, ...(missing === 'no-repo' && c.machine ? { machine: c.machine } : {}) };
 }
 
 // numstat lines → files, the biggest change first; binary and generated files go last.

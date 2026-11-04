@@ -24,6 +24,7 @@ test('a commit record shows its files and diffs, compares with another, and says
   const r = repo(root, 'tripsplit');
   const one = r.commit({ 'split.js': 'a\nb\nc\n', 'package-lock.json': '{}\n', 'logo.png': Buffer.from([0, 1, 2, 0, 255]) }, 'Split the bill');
   const two = r.commit({ 'split.js': 'a\nB\nc\nd\n' }, 'Round to cents');
+  const three = r.commit({ 'notes.md': 'x\n' }, 'Notes');
   const big = r.commit({ 'big.txt': 'x'.repeat(120) + '\n'.repeat(1) + ('y'.repeat(99) + '\n').repeat(3000) }, 'A big file');
   const d = emptyData();
   const th = createThread(d, { name: 'tripsplit', key: 'tripsplit', note: r.dir });
@@ -32,7 +33,10 @@ test('a commit record shows its files and diffs, compares with another, and says
   rec('r2', { gitCommit: two }); // no repository recorded: found through the line's folder
   rec('r3', { gitCommit: big, repo: r.dir });
   rec('gone', { gitCommit: 'deadbee', repo: r.dir });
-  rec('elsewhere', { gitCommit: 'abcdef1', repo: path.join(root, 'not-here') });
+  rec('elsewhere', { gitCommit: 'abcdef1', repo: path.join(root, 'not-here'), machine: 'studio' });
+  // Made on another machine, in a folder that is not here: found in this machine's clone that another record names.
+  const away = createThread(d, { name: 'away' });
+  d.commits.abroad = { id: 'abroad', thread: away.id, kind: 'agent', title: 'abroad', ts: 9, gitCommit: three, repo: '/home/studio/tripsplit', machine: 'studio' };
 
   const i1 = await commitInfo(d, 'r1');
   assert.equal(i1.subject, 'Split the bill');
@@ -47,7 +51,8 @@ test('a commit record shows its files and diffs, compares with another, and says
 
   assert.equal((await commitDiff(d, 'r3', 'big.txt')).truncated, true);
   assert.equal((await commitInfo(d, 'gone')).missing, 'no-commit');
-  assert.equal((await commitInfo(d, 'elsewhere')).missing, 'no-repo');
+  assert.deepEqual([(await commitInfo(d, 'elsewhere')).missing, (await commitInfo(d, 'elsewhere')).machine], ['no-repo', 'studio']);
+  assert.equal((await commitInfo(d, 'abroad')).repo, r.dir);
   assert.equal((await commitInfo(d, 'nope')).error, 'No such record');
 });
 

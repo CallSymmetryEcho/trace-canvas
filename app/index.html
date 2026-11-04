@@ -248,10 +248,12 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 /* While a round runs: a light runs round the card's border, a ticker under its head names the to-do in hand,
    and the switch's knob breathes. Compositor-friendly (one rotating angle, one translate); off when motion is reduced. */
 @property --ap-a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
-.card.ap-on::after { content: ''; position: absolute; inset: -1px; padding: 2px; border-radius: inherit; pointer-events: none; z-index: 2;
+.card.ap-on::after, .detail.ap-on::after { content: ''; position: absolute; inset: -1px; padding: 2px; border-radius: inherit; pointer-events: none; z-index: 2;
   background: conic-gradient(from var(--ap-a), transparent 0 50%, color-mix(in srgb, var(--ok) 40%, transparent) 72%, var(--ok) 90%, transparent 97%);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: ap-run 3.2s linear infinite; }
 @keyframes ap-run { to { --ap-a: 360deg; } }
+/* The line panel of a running line: the same light, slower and softer, just inside its border (the panel clips overflow). */
+.detail.ap-on::after { inset: 0; padding: 1.5px; z-index: 5; opacity: .8; animation-duration: 6s; }
 .ap-tick { overflow: hidden; margin: -2px 12px 6px; height: 18px; border-radius: 999px; background: color-mix(in srgb, var(--ok) 9%, transparent); font-size: 11.5px; line-height: 18px; color: var(--ok); white-space: nowrap;
   -webkit-mask: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); mask: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
 .ap-tick span { display: inline-block; padding-left: 100%; animation: ap-tick 14s linear infinite; }
@@ -259,7 +261,7 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .ap-sw:checked::after { animation: ap-knob 2s ease-in-out infinite; }
 @keyframes ap-knob { 50% { box-shadow: 0 1px 3px rgba(0,0,0,.25), 0 0 0 4px color-mix(in srgb, var(--ok) 30%, transparent); } }
 @media (prefers-reduced-motion: reduce) { .chip-auto { animation: none; } .ap-burst::before { animation: none; display: none; } .ap-sw, .ap-sw::after { transition: none; }
-  .card.ap-on::after, .ap-sw:checked::after { animation: none; } .ap-tick span { animation: none; padding-left: 8px; } }
+  .card.ap-on::after, .detail.ap-on::after, .ap-sw:checked::after { animation: none; } .ap-tick span { animation: none; padding-left: 8px; } }
 .chip-done { background: var(--surface-2); }
 .chip-merged { background: var(--surface-2); }
 .strip { list-style: none; margin: 0; padding: 2px 10px 4px 4px; position: relative; }
@@ -3114,6 +3116,7 @@ function renderDetail() {
     const ok = sel.type === 'commit' ? S.commits.has(sel.id) : sel.type === 'thread' ? (sel.id === INBOX || S.threads.has(sel.id)) : sel.type === 'live' ? S.live.some(s => s.id === sel.id) : sel.type === 'group' ? groupNames().includes(sel.id) : S.edges.has(sel.id);
     if (!ok) { S.sel = sel = null; }
   }
+  detail.classList.toggle('ap-on', !!sel && sel.type === 'thread' && !!getThread(sel.id).autopilot);
   if (!sel) { detail.hidden = true; detail.innerHTML = ''; lastKey = ''; lastHTML = ''; return; }
   const key = LANG + ':' + sel.type + ':' + sel.id + ':' + JSON.stringify(S.ui);
   const ae = document.activeElement;

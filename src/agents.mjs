@@ -133,10 +133,12 @@ export function tmuxAttach(s) {
 // 'no-tmux' when the machine has none, or the error.
 // tmux starts a session even when its command dies at once (not found, a folder gone), so the pane is kept for 3 s and
 // looked at: dead, its last lines are the error and the session goes.
+// The tmux server a new-session starts keeps the fds it was handed: zsh holds a copy of stderr on fd 6 (the ssh
+// channel), so ssh waited for the agent to end and timed out after 30 s with the agent running. Fds 3-9 are closed.
 export function startDetached({ machine, name, cmd }, run = execFile, wait = 3) {
   const n = q(name);
   const script = `command -v tmux >/dev/null || exit 3; tmux has-session -t ${n} 2>/dev/null && exit 4; `
-    + `tmux new-session -d -s ${n} ${q(`exec "$SHELL" -lc ${q(`PATH="$HOME/.local/bin:$PATH"; ${cmd}`)}`)} \\; set-option -t ${n} remain-on-exit on; sleep ${wait}; `
+    + `tmux new-session -d -s ${n} ${q(`exec "$SHELL" -lc ${q(`PATH="$HOME/.local/bin:$PATH"; ${cmd}`)}`)} \\; set-option -t ${n} remain-on-exit on 3>&- 4>&- 5>&- 6>&- 7>&- 8>&- 9>&-; sleep ${wait}; `
     + `if [ "$(tmux display-message -p -t ${n} '#{pane_dead}')" = 1 ]; then tmux capture-pane -p -S -200 -t ${n} | grep -v -e '^[[:space:]]*$' -e '^Pane is dead' | tail -5; tmux kill-session -t ${n}; exit 5; fi; tmux set-option -t ${n} remain-on-exit off`;
   return new Promise(done => run('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', machine, `exec "$SHELL" -lc ${q(script)}`], { timeout: 30e3 }, (err, out, errOut) => {
     if (!err) return done('');

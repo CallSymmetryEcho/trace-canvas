@@ -216,7 +216,7 @@ test('another machine\'s agent starts in tmux there and a window watches it; wit
   assert.deepEqual(got.slice(0, 5), ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', 'lab']);
   // What the remote login shell runs, unquoted once by it:
   const inner = (await import('node:child_process')).execFileSync('sh', ['-c', `printf %s ${got[5].replace(/^exec "\$SHELL" -lc /, '')}`], { encoding: 'utf8' });
-  assert.equal(inner, `command -v tmux >/dev/null || exit 3; tmux has-session -t 'tc-c1' 2>/dev/null && exit 4; tmux new-session -d -s 'tc-c1' 'exec "$SHELL" -lc '\\''PATH="$HOME/.local/bin:$PATH"; claude '\\''\\'\\'''\\''go'\\''\\'\\'''\\'''\\''' \\; set-option -t 'tc-c1' remain-on-exit on; sleep 3; `
+  assert.equal(inner, `command -v tmux >/dev/null || exit 3; tmux has-session -t 'tc-c1' 2>/dev/null && exit 4; tmux new-session -d -s 'tc-c1' 'exec "$SHELL" -lc '\\''PATH="$HOME/.local/bin:$PATH"; claude '\\''\\'\\'''\\''go'\\''\\'\\'''\\'''\\''' \\; set-option -t 'tc-c1' remain-on-exit on 3>&- 4>&- 5>&- 6>&- 7>&- 8>&- 9>&-; sleep 3; `
     + `if [ "$(tmux display-message -p -t 'tc-c1' '#{pane_dead}')" = 1 ]; then tmux capture-pane -p -S -200 -t 'tc-c1' | grep -v -e '^[[:space:]]*$' -e '^Pane is dead' | tail -5; tmux kill-session -t 'tc-c1'; exit 5; fi; tmux set-option -t 'tc-c1' remain-on-exit off`);
   assert.equal(await startDetached({ machine: 'lab', name: 'n', cmd: 'x' }, ssh(3)), 'no-tmux');
   assert.equal(await startDetached({ machine: 'lab', name: 'n', cmd: 'x' }, ssh(4)), 'exists');

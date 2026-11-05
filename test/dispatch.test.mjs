@@ -75,10 +75,11 @@ test('dispatch hands each line\'s new to-dos to the agent working on it, and say
   const off = dispatch(d, { refs: ['Far'], awayLive: () => ({ sessions: [] }) }, env)[0];
   assert.equal(off.action, 'resume');
   assert.equal(off.session.machine, 'bsuper');
-  assert.match(off.command, /^ssh -t bsuper 'exec "\$SHELL" -lc .*cd .*\/home\/u\/proj.* && claude --resume r1 /);
+  assert.match(off.command, /^ssh -t bsuper 'exec "\$SHELL" -lc .*PATH="\$HOME\/\.local\/bin:\$PATH"; if cd .*\/home\/u\/proj.* 2>\/dev\/null; then claude --resume r1 /);
   // It runs there in tmux, named by the session; the attach and the by-hand command are plain ssh -t.
-  assert.deepEqual([off.tmux.machine, off.tmux.name, off.tmux.attach], ['bsuper', 'tc-r1', `ssh -t bsuper 'exec "$SHELL" -lc '\\''tmux attach -t tc-r1'\\'''`]);
-  assert.match(off.tmux.cmd, /^cd .*\/home\/u\/proj.* && claude --resume r1 /);
+  assert.deepEqual([off.tmux.machine, off.tmux.name, off.tmux.attach], ['bsuper', 'tc-r1', `ssh -t bsuper 'exec "$SHELL" -lc '\\''PATH="$HOME/.local/bin:$PATH"; tmux attach -t tc-r1'\\'''`]);
+  // Its folder may be gone there: then a new session on the line instead of a resume that cannot find it.
+  assert.match(off.tmux.cmd, /^if cd .*\/home\/u\/proj.* 2>\/dev\/null; then claude --resume r1 .*; else echo .*is gone: a new session instead.*; TRACE_CANVAS_THREAD=\S+ claude .*; fi$/);
   todo(far, 'Plot the results');
   assert.equal(dispatch(d, { refs: ['Far'], awayLive: () => ({ sessions: [{ id: 'r1', status: 'idle' }] }) }, env)[0].action, 'busy');
 
@@ -118,7 +119,7 @@ test('dispatch hands each line\'s new to-dos to the agent working on it, and say
   todo(two, 'Fourth, anywhere');
   const rowsTwo = dispatch(d, { refs: ['Two'], awayLive: idle }, env);
   assert.deepEqual(rowsTwo.map(r => [r.on || '', r.session.id, r.todos.map(c => c.title)]).sort(), [['', 'm1', ['Fourth, anywhere']], ['bsuper', 'b1', ['Third, on bsuper']]]);
-  assert.match(rowsTwo.find(r => r.on).command, /^ssh -t bsuper .*cd .*\/home\/u\/two.* && claude --resume b1 /);
+  assert.match(rowsTwo.find(r => r.on).command, /^ssh -t bsuper .*if cd .*\/home\/u\/two.* 2>\/dev\/null; then claude --resume b1 /);
   todo(two, 'Fifth');
   const lab = dispatch(d, { refs: ['Two'], on: 'lab', awayLive: idle }, env)[0];
   assert.deepEqual([lab.action, lab.machine, lab.on], ['start', 'lab', 'lab']);
@@ -202,10 +203,14 @@ test('another machine\'s agent starts in tmux there and a window watches it; wit
   assert.deepEqual(got.slice(0, 5), ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', 'lab']);
   // What the remote login shell runs, unquoted once by it:
   const inner = (await import('node:child_process')).execFileSync('sh', ['-c', `printf %s ${got[5].replace(/^exec "\$SHELL" -lc /, '')}`], { encoding: 'utf8' });
-  assert.equal(inner, `command -v tmux >/dev/null || exit 3; tmux has-session -t 'tc-c1' 2>/dev/null && exit 4; tmux new-session -d -s 'tc-c1' 'exec "$SHELL" -lc '\\''claude '\\''\\'\\'''\\''go'\\''\\'\\'''\\'''\\'''`);
+  assert.equal(inner, `command -v tmux >/dev/null || exit 3; tmux has-session -t 'tc-c1' 2>/dev/null && exit 4; tmux new-session -d -s 'tc-c1' 'exec "$SHELL" -lc '\\''PATH="$HOME/.local/bin:$PATH"; claude '\\''\\'\\'''\\''go'\\''\\'\\'''\\'''\\''' \\; set-option -t 'tc-c1' remain-on-exit on; sleep 3; `
+    + `if [ "$(tmux display-message -p -t 'tc-c1' '#{pane_dead}')" = 1 ]; then tmux capture-pane -p -S -200 -t 'tc-c1' | grep -v -e '^[[:space:]]*$' -e '^Pane is dead' | tail -5; tmux kill-session -t 'tc-c1'; exit 5; fi; tmux set-option -t 'tc-c1' remain-on-exit off`);
   assert.equal(await startDetached({ machine: 'lab', name: 'n', cmd: 'x' }, ssh(3)), 'no-tmux');
   assert.equal(await startDetached({ machine: 'lab', name: 'n', cmd: 'x' }, ssh(4)), 'exists');
   assert.match(await startDetached({ machine: 'lab', name: 'n', cmd: 'x' }, ssh(255)), /Connection refused/);
+  // It died at once (claude not found, its folder gone): what it printed is the error.
+  const dead = (cmd, args, o, cb) => cb(Object.assign(new Error('x'), { code: 5 }), 'zsh:1: command not found: claude\n', '');
+  assert.equal(await startDetached({ machine: 'lab', name: 'n', cmd: 'x' }, dead), 'the agent stopped at once on lab: zsh:1: command not found: claude');
 
   const opened = [], open = async c => { opened.push(c); return null; };
   const row = { command: 'ssh -t lab plain', tmux: { machine: 'lab', name: 'tc-c1', cmd: 'x', attach: 'ssh -t lab attach' } };
@@ -216,4 +221,15 @@ test('another machine\'s agent starts in tmux there and a window watches it; wit
   assert.deepEqual(await launchRow(row, { open, start: async () => 'refused' }), { failed: 'refused' });
   assert.deepEqual(await launchRow({ command: 'claude here' }, { open, start: async () => { throw new Error('not for this machine'); } }), { failed: null });
   assert.deepEqual(opened, ['ssh -t lab attach', 'ssh -t lab attach', 'ssh -t lab plain', 'claude here']);
+});
+
+test('another machine\'s session in tmux opens by its pane, or for an older record the pane with its tty', async () => {
+  const { tmuxAttach } = await import('../src/agents.mjs');
+  const { execFileSync } = await import('node:child_process');
+  const inner = cmd => execFileSync('sh', ['-c', `printf %s ${execFileSync('sh', ['-c', `printf %s ${cmd.replace(/^ssh -t \S+ /, '')}`], { encoding: 'utf8' }).replace(/^exec "\$SHELL" -lc /, '')}`], { encoding: 'utf8' });
+  assert.equal(inner(tmuxAttach({ machine: 'bs', term: 'tmux', tty: '/dev/pts/8', tmux: '/tmp/tmux-1000/default', pane: '%0' })),
+    `PATH="$HOME/.local/bin:$PATH"; p='%0'; [ -n "$p" ] && tmux -S '/tmp/tmux-1000/default' has-session -t "$p" 2>/dev/null || { echo 'Its tmux pane is gone.'; exit 1; }; tmux -S '/tmp/tmux-1000/default' select-window -t "$p"; tmux -S '/tmp/tmux-1000/default' select-pane -t "$p"; exec tmux -S '/tmp/tmux-1000/default' attach -t "$p"`);
+  assert.match(inner(tmuxAttach({ machine: 'bs', term: 'tmux', tty: '/dev/pts/8' })), /^PATH=.*; p="\$\(tmux list-panes -a -F '#\{pane_tty\} #\{pane_id\}' \| awk '\$1=="\/dev\/pts\/8"\{print \$2\}'\)"; .*exec tmux attach -t "\$p"$/);
+  assert.equal(tmuxAttach({ machine: 'bs', term: 'iTerm.app', tty: '/dev/ttys001' }), ''); // not in tmux
+  assert.equal(tmuxAttach({ machine: 'bs', term: 'tmux', tty: '/dev/pts/8; rm -rf ~' }), ''); // only a real tty goes in
 });

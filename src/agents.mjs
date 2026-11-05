@@ -92,14 +92,31 @@ export function openTerminal(cmd, env = process.env) {
     c.on('error', e => done(e.message)).on('spawn', () => { c.unref(); done(null); });
   });
 }
+// A command run on another machine over ssh, in its login shell. A login shell that is not interactive skips .zshrc
+// and .bashrc, where ~/.local/bin (claude's and codex's own installers) is usually put on PATH, so it is put first here.
+export const remote = (machine, cmd) => `ssh -t ${machine} ${q(`exec "$SHELL" -lc ${q(`PATH="$HOME/.local/bin:$PATH"; ${cmd}`)}`)}`;
+// Opening another machine's session that runs in tmux: its pane (the hook notes it; for an older record, the pane with
+// its tty), shown and attached over ssh. '' when it is not in tmux.
+export function tmuxAttach(s) {
+  if (!s.machine || !(s.pane || (s.term === 'tmux' && /^\/dev\/(pts\/|ttys?)\d+$/.test(s.tty || '')))) return '';
+  const t = s.tmux ? `tmux -S ${q(s.tmux)}` : 'tmux';
+  const find = s.pane ? q(s.pane) : `"$(${t} list-panes -a -F '#{pane_tty} #{pane_id}' | awk '$1=="${s.tty}"{print $2}')"`;
+  return remote(s.machine, `p=${find}; [ -n "$p" ] && ${t} has-session -t "$p" 2>/dev/null || { echo 'Its tmux pane is gone.'; exit 1; }; ${t} select-window -t "$p"; ${t} select-pane -t "$p"; exec ${t} attach -t "$p"`);
+}
 // An agent for another machine runs there in a detached tmux session, so it keeps going when this window closes or
 // the network drops; ssh only starts it. Resolves '' when started, 'exists' when that tmux session is already there,
 // 'no-tmux' when the machine has none, or the error.
-export function startDetached({ machine, name, cmd }, run = execFile) {
-  const script = `command -v tmux >/dev/null || exit 3; tmux has-session -t ${q(name)} 2>/dev/null && exit 4; tmux new-session -d -s ${q(name)} ${q(`exec "$SHELL" -lc ${q(cmd)}`)}`;
+// tmux starts a session even when its command dies at once (not found, a folder gone), so the pane is kept for 3 s and
+// looked at: dead, its last lines are the error and the session goes.
+export function startDetached({ machine, name, cmd }, run = execFile, wait = 3) {
+  const n = q(name);
+  const script = `command -v tmux >/dev/null || exit 3; tmux has-session -t ${n} 2>/dev/null && exit 4; `
+    + `tmux new-session -d -s ${n} ${q(`exec "$SHELL" -lc ${q(`PATH="$HOME/.local/bin:$PATH"; ${cmd}`)}`)} \\; set-option -t ${n} remain-on-exit on; sleep ${wait}; `
+    + `if [ "$(tmux display-message -p -t ${n} '#{pane_dead}')" = 1 ]; then tmux capture-pane -p -S -200 -t ${n} | grep -v -e '^[[:space:]]*$' -e '^Pane is dead' | tail -5; tmux kill-session -t ${n}; exit 5; fi; tmux set-option -t ${n} remain-on-exit off`;
   return new Promise(done => run('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', machine, `exec "$SHELL" -lc ${q(script)}`], { timeout: 30e3 }, (err, out, errOut) => {
     if (!err) return done('');
-    done(err.code === 3 ? 'no-tmux' : err.code === 4 ? 'exists' : String(errOut || err.message).trim() || `ssh exited ${err.code}`);
+    done(err.code === 3 ? 'no-tmux' : err.code === 4 ? 'exists' : err.code === 5 ? `the agent stopped at once on ${machine}: ${String(out).trim().split('\n').join(' / ')}`
+      : String(errOut || err.message).trim() || `ssh exited ${err.code}`);
   }));
 }
 /** Opens what a dispatch or Autopilot row needs. With row.tmux (another machine): starts it there in tmux, then opens

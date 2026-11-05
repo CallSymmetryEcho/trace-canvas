@@ -1150,7 +1150,7 @@ apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent 
     dayLabel: d => `${I18N.en.week[d.getDay()]} ${d.getMonth() + 1}/${d.getDate()}`,
     monthLabel: d => `${I18N.en.months[d.getMonth()]} ${d.getFullYear()}`,
     tickDay: d => `${I18N.en.week[d.getDay()]} ${d.getDate()}`,
-    dRecord: 'Record', dTitle: 'Title', dKind: 'Type', dThread: 'Thread', dDone: 'Done', dBody: 'Details', mdEdit: 'Edit', mdDone: 'Done', mdExpand: 'Read', mdRead: 'Read', mdErr_missing: 'This file is not on this computer: it may have been moved or renamed, or it is on another machine.', mdErr_big: 'This file is over 2 MB.', mdErr_unlinked: 'No record links this file.', mdErr_type: 'Only .md files open here.', mdView: 'View', mdErr_bigImg: 'This image is over 10 MB.', dBodyPh: 'Context, a summary of what the agent produced, next steps…',
+    dRecord: 'Record', dTitle: 'Title', dKind: 'Type', dThread: 'Thread', dDone: 'Done', openTmux: 'Open in a terminal (tmux)', dBody: 'Details', mdEdit: 'Edit', mdDone: 'Done', mdExpand: 'Read', mdRead: 'Read', mdErr_missing: 'This file is not on this computer: it may have been moved or renamed, or it is on another machine.', mdErr_big: 'This file is over 2 MB.', mdErr_unlinked: 'No record links this file.', mdErr_type: 'Only .md files open here.', mdView: 'View', mdErr_bigImg: 'This image is over 10 MB.', dBodyPh: 'Context, a summary of what the agent produced, next steps…',
     dLinks: 'Links or file paths, one per line', dLinksPh: 'https://…  or  ~/Documents/plan.md', dAgent: 'Source', dAgentPh: 'me / Claude Code…', dTime: 'Time',
     forkedFromRec: 'Forked from', mergedFromThread: 'Merged from thread', forkedHere: 'Forked from here:',
     forkHere: 'Fork from here', viewThread: 'View thread', forkNamePh: 'Name of the new thread', createBranch: 'Create branch',
@@ -1331,7 +1331,7 @@ apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的
     dayLabel: d => `${d.getMonth() + 1}/${d.getDate()} 周${I18N.zh.week[d.getDay()]}`,
     monthLabel: d => `${d.getFullYear()} 年 ${d.getMonth() + 1} 月`,
     tickDay: d => `${d.getDate()} ${I18N.zh.week[d.getDay()]}`,
-    dRecord: '记录', dTitle: '标题', dKind: '类型', dThread: '所在线程', dDone: '已完成', dBody: '详情', mdEdit: '编辑', mdDone: '完成', mdExpand: '放大阅读', mdRead: '阅读', mdErr_missing: '这台电脑上找不到这个文件：可能已被移动或改名，或者在另一台机器上。', mdErr_big: '文件超过 2 MB。', mdErr_unlinked: '没有记录链接这个文件。', mdErr_type: '这里只能打开 .md 文件。', mdView: '查看', mdErr_bigImg: '这张图超过 10 MB。', dBodyPh: '背景、agent 的输出摘要、下一步要做什么…',
+    dRecord: '记录', dTitle: '标题', dKind: '类型', dThread: '所在线程', dDone: '已完成', openTmux: '在终端里打开（tmux）', dBody: '详情', mdEdit: '编辑', mdDone: '完成', mdExpand: '放大阅读', mdRead: '阅读', mdErr_missing: '这台电脑上找不到这个文件：可能已被移动或改名，或者在另一台机器上。', mdErr_big: '文件超过 2 MB。', mdErr_unlinked: '没有记录链接这个文件。', mdErr_type: '这里只能打开 .md 文件。', mdView: '查看', mdErr_bigImg: '这张图超过 10 MB。', dBodyPh: '背景、agent 的输出摘要、下一步要做什么…',
     dLinks: '链接或文件路径，每行一个', dLinksPh: 'https://…  或  ~/Documents/方案.md', dAgent: '来源', dAgentPh: '自己 / Claude Code…', dTime: '时间',
     forkedFromRec: '分叉自', mergedFromThread: '合并自线程', forkedHere: '从这里分出了',
     forkHere: '从这里分叉', viewThread: '查看线程', forkNamePh: '新线程名称', createBranch: '创建分支',
@@ -1836,7 +1836,8 @@ const chatHref = id => `claude://claude.ai/epitaxy/${encodeURIComponent(id)}`;
 // or the tab a live session runs in: Terminal or iTerm2 (tty from the hook), GNOME Terminal or Konsole (their tab id).
 // cls styles it; text overrides the label.
 function jumpTo(s, cls, text) {
-  if (s.away) return ''; // another machine's session: its chat and terminal are not here
+  // Another machine's session: its chat and terminal are not here, but one in tmux opens in a tab here over ssh.
+  if (s.away) return s.attach && !S.remote ? `<button class="${cls}" data-act="focus-term" data-sid="${esc(s.id)}" title="${esc(s.attach)}">${text || esc(t('openTmux'))}</button>` : '';
   const a = (href, key) => `<a class="${cls}" href="${esc(href)}" title="${esc(t(key))}">${text || esc(t(key))}</a>`;
   if (s.desktopId) return a(chatHref(s.desktopId), 'openChat');
   if (!S.remote && (s.tty && ['Apple_Terminal', 'iTerm.app'].includes(s.term) || s.tab && ['gnome-terminal', 'konsole'].includes(s.term) || s.tmux && s.pane)) return `<button class="${cls}" data-act="focus-term" data-sid="${esc(s.id)}" title="${esc(t('goTerm'))}">${text || esc(t('goTerm'))}</button>`;
@@ -1858,7 +1859,7 @@ function liveDetail(s) {
   // A background session (claude --bg) is joined with attach; --resume would start a second copy of it.
   const here = s.kind === 'bg' ? `claude attach ${s.id}` : s.resume || `claude --resume ${s.id}`;
   // On another machine: resumed there over ssh, in its login shell; its chat, terminal and line are that machine's.
-  const cmd = s.away ? `ssh -t ${s.machine} ${shq(`exec "$SHELL" -lc ${shq(`${s.cwd ? `cd ${shq(s.cwd)} && ` : ''}${here}`)}`)}` : here;
+  const cmd = s.attach ? s.attach : s.away ? `ssh -t ${s.machine} ${shq(`exec "$SHELL" -lc ${shq(`${s.cwd ? `cd ${shq(s.cwd)} && ` : ''}${here}`)}`)}` : here;
   const opts = `<option value="">${esc(t('liveAuto'))}</option>` + orderedThreads().filter(th => (th.status !== 'merged' && inFocus(th)) || th.id === s.threadId)
     .map(th => `<option value="${esc(th.id)}" ${s.bound && th.id === s.threadId ? 'selected' : ''}>${esc(th.name)}</option>`).join('');
   const where = [[s.repo, s.branch].filter(Boolean).join(' · '), s.model].filter(Boolean).join(' · ');
@@ -1869,7 +1870,7 @@ function liveDetail(s) {
     <div class="d-scroll">
       <div class="l-title">${esc(liveTitle(s))}</div>
       <div class="l-status st-${esc(s.status)}"><span class="ldot"></span>${esc(stLabel(s.status))}${s.activity ? `<span class="act">${esc(s.activity)}</span>` : ''}</div>
-      ${s.away ? `<div class="meta"><span>${esc(t('onMachine', s.machine))}</span></div>` : jumpTo(s, 'btn btn-primary') || rcLink(s) ? `<div class="d-actions">${jumpTo(s, 'btn btn-primary')}${jumpTo(s, 'x').includes(esc(s.rc || '\u0000')) ? '' : rcLink(s)}</div>` : ''}
+      ${s.away ? `<div class="meta"><span>${esc(t('onMachine', s.machine))}</span></div>${s.attach && !S.remote ? `<div class="d-actions">${jumpTo(s, 'btn btn-primary')}</div>` : ''}` : jumpTo(s, 'btn btn-primary') || rcLink(s) ? `<div class="d-actions">${jumpTo(s, 'btn btn-primary')}${jumpTo(s, 'x').includes(esc(s.rc || '\u0000')) ? '' : rcLink(s)}</div>` : ''}
       <div class="meta">
         ${where ? `<span>${esc(where)}</span>` : ''}
         ${s.cwd ? `<span class="mono">${esc(s.cwd)}</span>` : ''}

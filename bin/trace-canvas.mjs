@@ -401,8 +401,9 @@ async function main() {
       const { liveSessions } = await import('../src/ops.mjs');
       const { readData } = await import('../src/store.mjs');
       const d = readData(), { sessions } = liveSessions(d);
-      // --json: for another machine reading this one's sessions over ssh (src/remote.mjs); what it can use there.
-      if (flag('json', false)) { console.log(JSON.stringify(sessions.map(({ id, agent, agentKey, status, title, prompt, activity, threadId, bound, cwd, repo, branch, model, startedAt, lastSeen, resume, agents }) => ({ id, agent, agentKey, status, title, prompt, activity, threadId, bound, cwd, repo, branch, model, startedAt, lastSeen, resume, agents })))); break; }
+      // --json: for another machine reading this one's sessions over ssh (src/remote.mjs); what it can use there (the
+      // terminal fields: a session in tmux opens there by attaching to its pane).
+      if (flag('json', false)) { console.log(JSON.stringify(sessions.map(({ id, agent, agentKey, status, title, prompt, activity, threadId, bound, cwd, repo, branch, model, startedAt, lastSeen, resume, agents, tty, term, tmux, pane }) => ({ id, agent, agentKey, status, title, prompt, activity, threadId, bound, cwd, repo, branch, model, startedAt, lastSeen, resume, agents, tty, term, tmux, pane })))); break; }
       if (!sessions.length) { console.log('No running sessions.'); break; }
       for (const s of sessions) {
         const where = s.threadId ? `${d.threads[s.threadId].name}${s.bound ? ' (bound)' : ''}` : '-';

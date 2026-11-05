@@ -84,9 +84,9 @@ test('a session bound through the tools says which agent and machine it is, befo
   // Seen from the Mac, it resumes over ssh, in the login shell there (ssh alone has no codex on its PATH).
   const d = readData(env), tid = Object.values(d.threads)[0].id;
   const cmd = threadSessions(d, tid, { ...s.env, TRACE_CANVAS_MACHINE: 'mac' })[0].command;
-  assert.equal(cmd, `ssh -t bsuperstation 'exec "$SHELL" -lc '\\''codex resume cx9'\\'''`);
+  assert.equal(cmd, `ssh -t bsuperstation 'exec "$SHELL" -lc '\\''PATH="$HOME/.local/bin:$PATH"; codex resume cx9'\\'''`);
   // What the remote end gets, once this shell has taken the quotes off: the login shell runs the command.
-  assert.equal(execFileSync('sh', ['-c', `printf %s ${cmd.slice('ssh -t bsuperstation '.length)}`], { encoding: 'utf8' }), `exec "$SHELL" -lc 'codex resume cx9'`);
+  assert.equal(execFileSync('sh', ['-c', `printf %s ${cmd.slice('ssh -t bsuperstation '.length)}`], { encoding: 'utf8' }), `exec "$SHELL" -lc 'PATH="$HOME/.local/bin:$PATH"; codex resume cx9'`);
 });
 
 test('a part of a line name finds the line when only one line has it', () => {

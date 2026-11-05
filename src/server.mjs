@@ -178,7 +178,9 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
       // Go to the terminal: brings a live session's tab to the front (Terminal or iTerm2, GNOME Terminal or Konsole).
       if (req.method === 'POST' && p === '/api/focus') {
         const body = JSON.parse(await readBody(req));
-        return send(res, 200, await focusTab(withCodexTerm()(readLive(String(body.session || ''))) || {}) ? { ok: true } : { error: 'not found' });
+        const sid = String(body.session || ''), far = away.flatMap(m => m.sessions).find(s => s.id === sid && s.attach);
+        if (far) { const failed = await openTerminal(far.attach); return send(res, 200, failed ? { error: failed, command: far.attach } : { ok: true }); }
+        return send(res, 200, await focusTab(withCodexTerm()(readLive(sid)) || {}) ? { ok: true } : { error: 'not found' });
       }
       // ▶ Start: a Claude Code session on the line in a new Terminal window, with Remote Control on, so it
       // shows in the Claude app on the phone. Built from the line or to-do id like Open in Terminal; a line

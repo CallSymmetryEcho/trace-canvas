@@ -2,13 +2,13 @@
 // trace-canvas in their login shell. One shared connection per machine (ControlMaster), so polling stays cheap.
 import { execFile, execFileSync } from 'node:child_process';
 import { readConfig } from './store.mjs';
-import { q } from './agents.mjs';
+import { q, tmuxAttach } from './agents.mjs';
 
 export const ARGS = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5', '-o', 'ControlMaster=auto', '-o', 'ControlPath=/tmp/tc-ssh-%C', '-o', 'ControlPersist=120'];
 const CMD = `exec "$SHELL" -lc 'trace-canvas live --json'`;
 const parse = (machine, out) => {
   const sessions = JSON.parse(out);
-  return { machine, sessions: sessions.map(s => ({ ...s, machine, away: true })) };
+  return { machine, sessions: sessions.map(s => ({ ...s, machine, away: true, attach: tmuxAttach({ ...s, machine }) })) };
 };
 
 /** A machine's running sessions: { machine, sessions } or { machine, error }. */

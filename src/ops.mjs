@@ -5,7 +5,7 @@ import { INBOX, COLS, absorb, addCommit, createThread, findThreadByName, goalOf,
 import { headline, firstLine } from './git-events.mjs';
 import { AGENT, bindSession, gitRoot, logGitEvents, repoInfo, resumeLink, sessionThread, turnBody, rel } from './hook.mjs';
 import { listLive } from './live.mjs';
-import { AGENTS, q } from './agents.mjs';
+import { AGENTS, q, remote } from './agents.mjs';
 import { desktopSessions } from './desktop.mjs';
 import { remoteLiveSync } from './remote.mjs';
 import { tr } from './i18n.mjs';
@@ -191,8 +191,12 @@ export function dispatch(d, { refs = [], all = false, self = null, on = '', away
       const prompt = promptFor ? oneLine(promptFor(th, tid, todos)) : oneLine(`New to-dos on the Trace Canvas line "${th.name}" (thread ${tid}) are yours: ${todos.map((c, i) => `${i + 1}) ${c.title} [${c.id}]`).join('; ')}. Do them in order; read the line with trace_read_thread for context, tick each with trace_task_done when it is done, and log results with trace_log.`);
       const session = { id: sid, title: s.title || (run && (run.title || run.prompt)) || '', status: run ? run.status : 'off', ...(away ? { machine: away } : {}), ...(run && run.desktopId ? { desktopId: run.desktopId } : {}), ...(run && run.name ? { name: run.name } : {}) };
       const action = sid === self ? 'self' : away ? (run ? 'busy' : 'resume') : run && key === 'claude' ? 'message' : run && run.status === 'working' ? 'busy' : 'resume';
-      const wake = `${s.cwd ? `cd ${q(s.cwd)} && ` : ''}${AGENTS[key].wake(sid, prompt)}`;
-      const fresh = () => { const cmd = handTo(d, { ref: todos[0].id, to: key, remote: key === 'claude', here: !away, prompt: promptFor && promptFor(th, tid, todos) }, env).command; return away ? remote(away, cmd) : cmd; };
+      const freshCmd = () => handTo(d, { ref: todos[0].id, to: key, remote: key === 'claude', here: !away, prompt: promptFor && promptFor(th, tid, todos) }, env).command;
+      const fresh = () => (away ? remote(away, freshCmd()) : freshCmd());
+      // On another machine the session's folder may be gone (its transcript sits under it): then a new session.
+      const wake = !s.cwd ? AGENTS[key].wake(sid, prompt) : away
+        ? `if cd ${q(s.cwd)} 2>/dev/null; then ${AGENTS[key].wake(sid, prompt)}; else echo ${q(`${s.cwd} is gone: a new session instead`)}; ${freshCmd()}; fi`
+        : `cd ${q(s.cwd)} && ${AGENTS[key].wake(sid, prompt)}`;
       rows.push({ ...row, action, session, prompt, ...(action === 'resume' ? (away ? awayRun(away, wake, sid.slice(0, 8)) : { command: wake }) : action === 'busy' ? { command: fresh() } : {}) });
     }
   }
@@ -560,7 +564,7 @@ export function listThreads(d, { query, includeDone = true } = {}) {
 
 // A command run on another machine over ssh (machine names are the ssh aliases), in the user's login shell there:
 // ssh alone runs it with a bare PATH (/usr/bin:/bin), without claude, codex or node.
-export const remote = (machine, cmd) => `ssh -t ${machine} ${q(`exec "$SHELL" -lc ${q(cmd)}`)}`;
+export { remote };
 // Dispatched to another machine: it runs there in tmux session tc-<id> (a new one by its first to-do, a resumed one by
 // its session), started by launchRow; command stays the plain ssh -t, for a person to run by hand.
 const awayRun = (machine, cmd, id) => ({ command: remote(machine, cmd), tmux: { machine, name: `tc-${id}`, cmd, attach: remote(machine, `tmux attach -t tc-${id}`) } });

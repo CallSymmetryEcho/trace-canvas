@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { addCommit, dataFile, ensureThread, importText, INBOX, mutate, readConfig, readData, threadById, threadIdOf } from './store.mjs';
 import { sessionThread, whereFind } from './hook.mjs';
 import { agentEnv, agentKey, agentOf } from './agents.mjs';
+import { sessionOfPid } from './live.mjs';
 import { bindLiveSession, captureSession, detachThread, forkThread, listTasks, listThreads, liveSessions, mergeDataset, mergeThreads, readThread, setTaskDone } from './ops.mjs';
 import { currentSessionId, describeSession, findTranscript, findTranscripts, parseTranscript } from './transcript.mjs';
 
@@ -16,6 +17,19 @@ const VERSION = JSON.parse(fs.readFileSync(path.join(here, '..', 'package.json')
 const PROTOCOLS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
 const projectDir = () => process.env.CLAUDE_PROJECT_DIR || process.cwd();
 const port = () => Number(process.env.TRACE_CANVAS_PORT || 4777);
+// trace_log's to: a session id, a cross-session sender (cc-socks/<pid>.sock or the pid), or a record that session logged.
+export function replyTo(v, d = readData(), env = process.env) {
+  const s = v.trim(), pid = /(?:^|\/)(\d+)(?:\.sock)?$/.exec(s);
+  if (pid && (/^\d+$/.test(s) || s.endsWith('.sock'))) {
+    const sid = sessionOfPid(pid[1], env);
+    if (!sid) throw new Error(`No session known for process ${pid[1]}: give its session id instead`);
+    return sid;
+  }
+  const c = d.commits[s];
+  if (c) { if (c.fromSession || c.session) return c.fromSession || c.session; throw new Error(`Record ${s} names no session`); }
+  if (!/^[0-9a-f-]{8,}$/i.test(s)) throw new Error(`to: a session id, a cc-socks/<pid>.sock, a pid or a record id, not "${s}"`);
+  return s;
+}
 
 const INSTRUCTIONS = `Trace Canvas keeps a trace of parallel work as threads (like git branches) and records (like commits), shown as a canvas, a branch graph and a timeline.
 Use trace_capture_session to put the current Claude Code session on the canvas; write 2-6 highlights (decisions, outcomes, next steps) and a short summary yourself, in the user's language.
@@ -84,7 +98,7 @@ const TOOLS = [
     name: 'trace_log',
     title: 'Log one record',
     description: 'Adds one record to a thread (created if the name is new) or to the inbox.',
-    inputSchema: { type: 'object', properties: { title: { type: 'string' }, kind: KIND, thread: { type: 'string' }, body: { type: 'string' }, links: { type: 'array', items: { type: 'string' } }, agent: { type: 'string' }, assignee: { type: 'string', enum: ['claude', 'codex', 'gemini'], description: 'Hand this to-do to an agent (kind defaults to task).' }, on: { type: 'string', description: 'The machine to do this to-do on (as the canvas names machines): dispatch gives it to the latest session on that machine for its line, or starts one there.' } }, required: ['title'] },
+    inputSchema: { type: 'object', properties: { title: { type: 'string' }, kind: KIND, thread: { type: 'string' }, body: { type: 'string' }, links: { type: 'array', items: { type: 'string' } }, agent: { type: 'string' }, assignee: { type: 'string', enum: ['claude', 'codex', 'gemini'], description: 'Hand this to-do to an agent (kind defaults to task).' }, on: { type: 'string', description: 'The machine to do this to-do on (as the canvas names machines): dispatch gives it to the latest session on that machine for its line, or starts one there.' }, to: { type: 'string', description: 'A reply for one session, shown to it at the start of its next turn even when its process (and its messaging name) changed meanwhile: its session id, the from= of the cross-session message you answer (the socket path or pid, even if gone), or the id of a record it logged. Use it when SendMessage cannot reach the sender, or alongside it.' } }, required: ['title'] },
     annotations: { readOnlyHint: false, destructiveHint: false },
   },
   {
@@ -223,11 +237,12 @@ async function callTool(name, a = {}) {
       // The session that logs it, so anyone can find the conversation behind a to-do (not `session`:
       // a task record with a session is a prompt the hooks logged).
       try { from = currentSessionId({ projectDir: projectDir() }); } catch {}
+      const to = a.to ? replyTo(String(a.to)) : '';
       const c = mutate(d => {
         const thread = a.thread ? ensureThread(d, a.thread) : INBOX, kind = a.kind || (a.assignee ? 'task' : 'agent');
         const same = kind === 'task' && Object.values(d.commits).find(x => x.kind === 'task' && !x.done && threadIdOf(d, x) === thread && norm(x.title) === norm(a.title));
         if (same) { dup = true; return same; }
-        return addCommit(d, { thread, kind, title: a.title, body: a.body || '', links: Array.isArray(a.links) ? a.links : [], agent: a.agent || agentOf(agentKey()).name, extra: { ...(a.assignee ? { assignee: a.assignee } : {}), ...(a.on ? { on: String(a.on) } : {}), ...(from ? { fromSession: from } : {}) } });
+        return addCommit(d, { thread, kind, title: a.title, body: a.body || '', links: Array.isArray(a.links) ? a.links : [], agent: a.agent || agentOf(agentKey()).name, extra: { ...(a.assignee ? { assignee: a.assignee } : {}), ...(a.on ? { on: String(a.on) } : {}), ...(from ? { fromSession: from } : {}), ...(to ? { to } : {}) } });
       });
       const where = c.thread === INBOX ? 'the inbox' : `"${readData().threads[c.thread].name}"`;
       return { text: dup ? `Already an open to-do on ${where}.` : `Logged to ${where}.`, data: { id: c.id, thread: c.thread, ...(dup ? { existing: true } : {}) } };

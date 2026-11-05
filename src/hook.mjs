@@ -175,7 +175,9 @@ export function handleHook(input, env = process.env) {
   const known = ev !== 'SessionEnd' && readLive(sid, env);
   const info = ev !== 'SessionEnd' && relevantTool && !(quick && known) ? repoInfo(cwd) : null;
   // The session's terminal tab and agent process, looked up until the process is found (Go to the terminal; live while it runs).
-  const terminal = ev !== 'SessionEnd' && !(known && 'pid' in known) ? terminalOf(env) : null;
+  // A new process for the same session (the Agent SDK starts one each turn): its pid, so replies to it still find it.
+  const terminal = ev === 'SessionEnd' ? null : !(known && 'pid' in known) ? terminalOf(env)
+    : +env.CLAUDE_PID && known.pid !== +env.CLAUDE_PID ? { pid: +env.CLAUDE_PID } : null;
   // The repository a commit landed in, which is often not cwd's (`cd other && git commit`).
   const bashCmd = ev === 'PostToolUse' && input.tool_name === 'Bash' ? String((input.tool_input || {}).command || '') : '';
   const commitRepo = GIT_COMMIT.test(bashCmd) ? gitRoot(commandDir(bashCmd, cwd)) : null;
@@ -457,8 +459,21 @@ export function autopilotGate(input, env = process.env) {
   return th ? `The person turned Autopilot off on the Trace Canvas line "${th.name}" (thread ${th.id}). Stop here: do not go on with this to-do or start another. Log one record with trace_log on that line saying where you stopped and what is left half done, then end your turn and wait for the person.` : '';
 }
 
+// Replies other sessions logged for this one (trace_log to): handed over once, at its next turn. A session whose
+// process changes every turn (the Agent SDK) has a new messaging name each time, so a SendMessage reply misses it.
+export function takeReplies(sid, env = process.env, now = Date.now()) {
+  const mine = c => c.to && !c.deliveredAt && sid.startsWith(c.to);
+  if (!Object.values(readData(env).commits).some(mine)) return '';
+  const got = mutate(d => Object.values(d.commits).filter(mine).sort((a, b) => a.ts - b.ts).map(c => { c.deliveredAt = now; return c; }), env);
+  return got.length ? `Replies other sessions left for you on Trace Canvas: ${got.map(c => `[${c.id}] ${firstLine(c.title, 160)}${c.body ? ` — ${String(c.body).replace(/\s+/g, ' ').slice(0, 600)}` : ''}`).join(' | ')}` : '';
+}
+
 export function promptContext(input, env = process.env) {
   if (!input.session_id || cleanPrompt(input.prompt).startsWith('/')) return '';
+  const replies = takeReplies(input.session_id, env);
+  return [replies, lineContext(input, env)].filter(Boolean).join('\n');
+}
+function lineContext(input, env) {
   const d = readData(env), { threadId } = sessionThread(d, { id: input.session_id }, env);
   const th = threadId && d.threads[threadId];
   // The person answering an Autopilot agent that stopped to ask: the switch is still on, so it goes on after this.

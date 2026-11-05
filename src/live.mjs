@@ -35,6 +35,15 @@ export function claudeSessions(env = process.env) {
   for (const n of names) { const r = readJson(path.join(dir, n)); if (r && r.sessionId && r.pid) out.set(r.sessionId, r); }
   return out;
 }
+/** The session a Claude Code process is or was: its sessions/<pid>.json while it runs, else the pids the hooks noted. */
+export function sessionOfPid(pid, env = process.env) {
+  pid = Number(pid);
+  for (const [sid, r] of claudeSessions(env)) if (r.pid === pid) return sid;
+  let names = [];
+  try { names = fs.readdirSync(liveDir(env)).filter(n => n.endsWith('.json') && !n.includes('.agent-')); } catch {}
+  for (const n of names) { const s = readJson(path.join(liveDir(env), n)); if (s && (s.pid === pid || (s.pids || []).includes(pid))) return s.id; }
+  return '';
+}
 const RANK = { waiting: 0, working: 1, idle: 2 };
 // Tools that stop and wait for the person, so the session needs you while they run.
 const ASKS = new Set(['AskUserQuestion', 'ExitPlanMode']);
@@ -214,6 +223,9 @@ export function updateLive(input, { info = null, key = null, env = process.env, 
   if (agent) Object.assign(doc, { agent, agentKey, resume });
   if (machine) doc.machine = machine;
   if (terminal) Object.assign(doc, terminal);
+  // A session can change process every turn (the Agent SDK, Even's terminal): the pids it had, so a message's sender
+  // (cc-socks/<pid>.sock) is still found after that process is gone.
+  if (doc.pid) doc.pids = [...new Set([...(prev.pids || []), doc.pid])].slice(-30);
   if (info) Object.assign(doc, { repo: info.repo, branch: info.branch, root: info.root });
   if (key) doc.key = key;
   if (input.session_title) doc.title = String(input.session_title).slice(0, 120);

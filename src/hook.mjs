@@ -15,7 +15,7 @@ import { lessonsFor } from './lessons.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { dataFile, home, mutate, readConfig, readData, createThread, addCommit, lastCommit, goalOf, hashId, threadById, threadByKey, isTodo, AUTOPILOT_ASK, AUTOPILOT_WORKER, AUTOPILOT_END } from './store.mjs';
+import { dataFile, home, mutate, readConfig, readData, createThread, addCommit, lastCommit, goalOf, hashId, threadById, threadByKey, isTodo, REVIEW_GATE, AUTOPILOT_ASK, AUTOPILOT_WORKER, AUTOPILOT_END } from './store.mjs';
 import { gitEvents, redirectTargets, BASH_WRITES, EDIT_TOOLS, GIT_COMMIT, commandDir, commitMessage, headline, firstLine, cleanPrompt } from './git-events.mjs';
 import { tr } from './i18n.mjs';
 const threadIdOfLocal = (d, c) => (c && c.thread && d.threads[c.thread] ? c.thread : 'inbox');
@@ -216,9 +216,11 @@ export function handleHook(input, env = process.env) {
       // session to turn Autopilot on names the line, and that session is not the one doing it.
       const raw = String(input.prompt || ''), ap = /^Autopilot \(beta\) on the Trace Canvas line .*?\(thread ([\w-]+)\)/m.exec(raw);
       const apTh = ap ? d.threads[ap[1]] : /autopilot/i.test(raw) ? Object.values(d.threads).find(t => t.autopilot && !t.autopilot.session && raw.includes(t.id)) : null;
-      if (apTh && apTh.autopilot) { apTh.autopilot = { ...apTh.autopilot, session: sid, on: Date.now() }; changed = true; }
-      // The person's message to an Autopilot agent (an answer, most often) starts a new stretch for autopilotStop.
-      for (const t of Object.values(d.threads)) if (t.autopilot && t.autopilot.session === sid) { t.autopilot = { ...t.autopilot, turn: Date.now(), nudged: 0 }; changed = true; }
+      // A round another session already holds stays with it (a prompt pasted twice): two agents on one line, one of them ungated.
+      if (apTh && apTh.autopilot && (!apTh.autopilot.session || apTh.autopilot.session === sid)) { apTh.autopilot = { ...apTh.autopilot, session: sid, on: Date.now() }; changed = true; }
+      // The person's message to an Autopilot agent (an answer, most often) starts a new stretch for autopilotStop. Kept in the
+      // session's own state, not on the line: a write there would sync over the person turning it off on another machine.
+      if (Object.values(d.threads).some(t => t.autopilot && t.autopilot.session === sid)) { state.apTurn = Date.now(); state.apNudged = 0; }
       // The person speaking to a session Autopilot was turned off in lets it work again (autopilotGate).
       for (const t of Object.values(d.threads)) if (t.apStopped && t.apStopped.session === sid) { delete t.apStopped; changed = true; }
       const log = !isCommand && prompt && !handoff && !notTask(prompt) && (cfg.prompts === 'all' || (cfg.prompts === 'first' && !s.prompted) || (cfg.prompts === 'long' && prompt.length >= 60));
@@ -413,26 +415,30 @@ export function sessionStartContext(input, env = process.env) {
 export function autopilotStop(input, env = process.env) {
   const sid = input.session_id;
   if (!sid) return '';
+  // Reads only: its counters live in the session's state, so the running machine never writes the line (see the UserPromptSubmit part).
+  const d = readData(env), th = Object.values(d.threads).find(t => t.autopilot && t.autopilot.session === sid);
+  if (!th) return '';
+  const st = loadState(sid, env), ap = th.autopilot, since = Math.max(ap.on || 0, st.apTurn || 0);
+  const cs = Object.values(d.commits).filter(c => threadIdOfLocal(d, c) === th.id);
+  // Stopped to ask, or held at the review gate (its prompt says to write the summary there).
+  if (cs.some(c => c.ts > since && AUTOPILOT_END.test(c.title || ''))) return '';
+  if (cs.filter(c => isTodo(c) && c.done && c.toReview).length >= REVIEW_GATE) return '';
   let reason = '';
-  mutate(d => {
-    const th = Object.values(d.threads).find(t => t.autopilot && t.autopilot.session === sid);
-    if (!th) return false;
-    const ap = th.autopilot, since = Math.max(ap.on || 0, ap.turn || 0);
-    const cs = Object.values(d.commits).filter(c => threadIdOfLocal(d, c) === th.id);
-    if (cs.some(c => c.ts > since && AUTOPILOT_END.test(c.title || ''))) return false; // it stopped to ask
-    // The to-dos trace_tasks lists (not a session's first instruction), less those it asked about or gave a worker this round.
-    const said = re => cs.filter(c => c.ts > (ap.on || 0) && re.test(c.title || '')).map(c => `${c.title} ${c.body || ''}`);
-    const asks = said(AUTOPILOT_ASK), handed = said(AUTOPILOT_WORKER), named = (list, c) => list.some(a => a.includes(c.id));
+  {
+    // The to-dos trace_tasks lists (not a session's first instruction), less those it asked about since the person last spoke
+    // (an answer frees the to-do) or gave a worker this round.
+    const said = (re, from) => cs.filter(c => c.ts > from && re.test(c.title || '')).map(c => `${c.title} ${c.body || ''}`);
+    const asks = said(AUTOPILOT_ASK, since), handed = said(AUTOPILOT_WORKER, ap.on || 0), named = (list, c) => list.some(a => a.includes(c.id));
     const open = cs.filter(c => isTodo(c) && !c.done).sort((a, b) => a.ts - b.ts), todo = open.filter(c => !named(asks, c) && !named(handed, c));
     const progress = cs.filter(c => isTodo(c) && c.done).length + open.length - todo.length; // ticked, asked about or handed out
-    if (!open.length || (ap.nudged && progress <= ap.doneAtNudge)) return false;
-    if (!todo.length && open.some(c => named(handed, c) && !named(asks, c))) return false; // waiting for its workers: their results wake it
-    th.autopilot = { ...ap, nudged: (ap.nudged || 0) + 1, doneAtNudge: progress };
+    if (!open.length || (st.apNudged && progress <= st.apDoneAtNudge)) return '';
+    if (!todo.length && open.some(c => named(handed, c) && !named(asks, c))) return ''; // waiting for its workers: their results wake it
+    saveState(sid, { ...st, apNudged: (st.apNudged || 0) + 1, apDoneAtNudge: progress }, env);
     const head = `Autopilot is on for the line "${th.name}" (thread ${th.id}), to clear its to-dos: ${open.length} open`;
     reason = todo.length
       ? `${head}, next: ${firstLine(todo[0].title, 120)} [${todo[0].id}]. Go on by the decision profile, with this line's to-dos only. One you cannot decide: log "Question: <the question> [<its id>]" and go on with the next; write the "Autopilot summary" only when the rest all wait on the person or on another running session.`
       : `${head}, each with a question asked. Log the "Autopilot summary" with the count (cleared N · M wait on you · K with others) and the questions together, then stop.`;
-  }, env);
+  }
   return reason;
 }
 

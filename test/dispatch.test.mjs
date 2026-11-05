@@ -246,3 +246,30 @@ test('another machine\'s session in tmux opens by its pane, or for an older reco
   assert.equal(tmuxAttach({ machine: 'bs', term: 'iTerm.app', tty: '/dev/ttys001' }), ''); // not in tmux
   assert.equal(tmuxAttach({ machine: 'bs', term: 'tmux', tty: '/dev/pts/8; rm -rf ~' }), ''); // only a real tty goes in
 });
+
+test('an Autopilot round goes to one session whatever the to-dos say, is not started over a running one, and reads other machines once outside the lock', async () => {
+  const { startAutopilot, awayCache } = await import('../src/ops.mjs');
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-autopilot-'));
+  const env = { ...process.env, TRACE_CANVAS_HOME: path.join(tmp, 'home'), TRACE_CANVAS_DESKTOP_DIR: path.join(tmp, 'desk'), TRACE_CANVAS_LANG: 'en', TRACE_CANVAS_MACHINE: machineName() };
+  const d = emptyData(), now = Date.now();
+  const app = createThread(d, { name: 'App' }).id;
+  addCommit(d, { thread: app, kind: 'task', title: 'Plain one', ts: now - 3e5 });
+  addCommit(d, { thread: app, kind: 'task', title: 'For Codex', ts: now - 2e5, extra: { assignee: 'codex' } });
+  addCommit(d, { thread: app, kind: 'task', title: 'On the GPU box', ts: now - 1e5, extra: { on: 'gpubox' } });
+  const rows = startAutopilot(d, { thread: 'App' }, env);
+  assert.equal(rows.length, 1); // not three agents racing on the line
+  assert.equal(rows[0].todos.length, 3);
+  // A round running in a live session here is not started again over it.
+  const live = path.join(tmp, 'home', 'live');
+  fs.mkdirSync(live, { recursive: true });
+  fs.writeFileSync(path.join(live, 'run1.json'), JSON.stringify({ id: 'run1', agent: 'Claude Code', status: 'working', startedAt: now, lastSeen: now, cwd: tmp }));
+  d.threads[app].autopilot = { at: now, session: 'run1', on: now };
+  assert.throws(() => startAutopilot(d, { thread: 'App' }, env), /already runs on "App"/);
+  d.threads[app].autopilot.session = 'gone1'; // not running: handed out again
+  assert.equal(startAutopilot(d, { thread: 'App' }, env).length, 1);
+  // awayCache: the dry run reads a machine once, the run under the lock reuses it.
+  let reads = 0;
+  const away = awayCache(m => { reads++; return { machine: m, sessions: [] }; });
+  away('gpubox'); away('gpubox');
+  assert.equal(reads, 1);
+});

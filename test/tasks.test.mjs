@@ -70,7 +70,7 @@ test('Autopilot is told to stop when ten wait for review, to give a result, and 
   const d = emptyData(), th = createThread(d, { name: 'x' });
   const p = autopilotPrompt(d, th, th.id);
   assert.equal(REVIEW_GATE, 10);
-  assert.match(p, /toReview: 10 or more, stop too/);
+  assert.match(p, /toReview: 10 or more, the person reviews first: log the "Autopilot summary" saying so, then stop/);
   assert.match(p, /give trace_task_done a result/);
   assert.match(p, /returned: was sent back by the person/);
 });

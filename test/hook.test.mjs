@@ -305,3 +305,27 @@ test('a to-do handed to a worker is not pushed again, and with only workers left
   mutate(d => { d.commits[a].done = true; addCommit(d, { thread: tid, kind: 'note', title: `Question: which palette? [${b}]` }); }, s.env);
   assert.match(autopilotStop({ session_id: 's1' }, s.env), /1 open, each with a question asked/); // the worker came back with a question
 });
+
+test('Autopilot under review: a second session does not take a running round, the Stop hook writes nothing to the line, holds at the review gate, and an answer frees the to-do asked about', async () => {
+  const { autopilotStop } = await import('../src/hook.mjs');
+  const { addCommit } = await import('../src/store.mjs');
+  const s = sandbox();
+  const now = Date.now();
+  const tid = mutate(d => { const th = createThread(d, { name: 'App' }); th.autopilot = { at: now - 9e4, session: 's1', on: now - 6e4 }; return th.id; }, s.env);
+  // Pasted into a second session: the round stays with s1.
+  handleHook({ session_id: 's2', cwd: s.repo, hook_event_name: 'UserPromptSubmit', prompt: `Autopilot (beta) on the Trace Canvas line "App" (thread ${tid}): the goal is to clear` }, s.env);
+  assert.equal(s.data().threads[tid].autopilot.session, 's1');
+  const a = mutate(d => addCommit(d, { thread: tid, kind: 'task', title: 'Pick a colour', ts: now - 5e4 }).id, s.env);
+  const before = JSON.stringify(s.data().threads[tid]);
+  assert.match(autopilotStop({ session_id: 's1' }, s.env), /next: Pick a colour/);
+  assert.equal(JSON.stringify(s.data().threads[tid]), before); // counters stay in the session's state, not on the synced line
+  // Asked, summarised, then the person answers: the answer frees the to-do.
+  mutate(d => { addCommit(d, { thread: tid, kind: 'note', title: `Question: which colour? [${a}]` }); addCommit(d, { thread: tid, kind: 'note', title: 'Autopilot summary: cleared 0 · 1 wait on you · 0 with others' }); }, s.env);
+  assert.equal(autopilotStop({ session_id: 's1' }, s.env), '');
+  s.fire('UserPromptSubmit', { prompt: 'Blue.', prompt_id: 'q9' });
+  assert.match(autopilotStop({ session_id: 's1' }, s.env), new RegExp(`next: Pick a colour \\[${a}\\]`));
+  // Ten agent-ticked to-dos waiting for review: it is not pushed on.
+  s.fire('UserPromptSubmit', { prompt: 'Go on.', prompt_id: 'q10' });
+  mutate(d => { for (let i = 0; i < 10; i++) { const c = addCommit(d, { thread: tid, kind: 'task', title: `Done ${i}`, ts: now - 4e4 }); c.done = true; c.toReview = true; } }, s.env);
+  assert.equal(autopilotStop({ session_id: 's1' }, s.env), '');
+});

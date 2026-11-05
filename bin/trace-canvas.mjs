@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { addCommit, dataFile, ensureThread, home, importText, INBOX, mutate, readConfig, writeConfig } from '../src/store.mjs';
+import { addCommit, dataFile, ensureThread, home, importText, INBOX, mutate, readConfig, readData, writeConfig } from '../src/store.mjs';
 import { execFileSync } from 'node:child_process';
 import { handleHook, python3, readStdin } from '../src/hook.mjs';
 import { agentFiles, allowSafeTools, codexHooks, codexWritable, geminiHooks, hookCommand, install, installAgentMcp, installMcp, installSkill, linkCommand, onPath, settingsPath, uninstall } from '../src/install.mjs';
@@ -145,7 +145,7 @@ async function runRows(rows, { run, json }) {
     const who = AGENTS[r.agent].name, s = r.session, name = s && `"${s.title.slice(0, 50) || s.id.slice(0, 8)}"`;
     console.log(`\n${r.thread.name}: ${r.todos.length} to-do${r.todos.length === 1 ? '' : 's'} for ${who}${r.on ? ` on ${r.on}` : ''}`);
     for (const c of r.todos) console.log(`  □ ${c.title}  [${c.id}]`);
-    if (r.action === 'self') console.log('  → Your own line: they are yours.');
+    if (r.action === 'self') console.log(`  → Your own line: they are yours.${r.prompt ? ` Work them by this:\n    ${r.prompt}` : ''}`); // Autopilot's rules reach the caller too
     else if (r.action === 'message') console.log(`  → Running session ${name} (${s.status}${s.name ? `, messaged as ${s.name}` : ''}${s.desktopId ? `, ${s.desktopId}` : ''}): send it this message:\n    ${r.prompt}`);
     else if (r.action === 'busy') console.log(`  → ${who} session ${name} is busy. Choose:\n    A) paste this into it when it stops:\n       ${r.prompt}\n    B) or start a new session for them:\n       ${r.command}`);
     else if (r.failed) console.log(`  → No terminal window opened: ${r.failed}\n    Run it yourself:\n    ${r.command}`);
@@ -197,7 +197,11 @@ async function main() {
         if (raw.trim()) {
           const payload = JSON.parse(raw), input = normalize(agent, payload);
           event = payload.hook_event_name; // the CLI's own name for it, which its output must repeat
+          // The switch lit (or let go) here reaches the other machines at once, also where no page server runs (an ssh or tmux box).
+          const apSig = input.hook_event_name === 'UserPromptSubmit' && process.env.TRACE_CANVAS_DISABLE !== '1' && (await import('../src/sync.mjs')).autopilotSig;
+          const sig0 = apSig && apSig(readData());
           outcome = handleHook(input);
+          if (apSig && apSig(readData()) !== sig0) (await import('../src/sync.mjs')).syncSoon(SELF, process.env, { now: true });
           if (input.hook_event_name === 'SessionEnd' && process.env.TRACE_CANVAS_DISABLE !== '1') (await import('../src/sync.mjs')).syncSoon(SELF);
           // The line's history from before catches up in the background (src/history.mjs).
           if (outcome && outcome.history) spawn(process.execPath, [SELF, 'history', outcome.history, '--quiet'], { detached: true, stdio: 'ignore' }).unref();
@@ -327,12 +331,15 @@ async function main() {
       // Dispatch: each line's new to-dos go to its agent. A stopped session is resumed and a line without one gets a
       // new session, each in a new terminal window (macOS, or a Linux desktop); a running Claude Code session is messaged by the agent
       // that called this (the skill), since only an agent can reach it.
-      const { dispatch } = await import('../src/ops.mjs');
+      const { dispatch, awayCache } = await import('../src/ops.mjs');
       const { terminalCommand } = await import('../src/agents.mjs');
       const on = str(flag('on', '')), all = !!flag('all', false), json = !!flag('json', false), print = !!flag('print', false), run = !print && !!terminalCommand('');
       // --print only shows what would happen: nothing is assigned or saved.
       let rows = [];
-      mutate(d => { rows = dispatch(d, { refs: argv.filter(Boolean), all, on, self: process.env.CLAUDE_CODE_SESSION_ID || null }); return print ? false : rows; });
+      // Other machines are read over ssh in a dry run on a copy, never under the data lock (awayCache in src/ops.mjs).
+      const ask = { refs: argv.filter(Boolean), all, on, self: process.env.CLAUDE_CODE_SESSION_ID || null, awayLive: awayCache() };
+      try { dispatch(readData(), ask); } catch {}
+      mutate(d => { rows = dispatch(d, ask); return print ? false : rows; });
       await runRows(rows, { run, json });
       break;
     }
@@ -340,13 +347,15 @@ async function main() {
       // Autopilot (beta) on one line, until the person turns it off. Every open to-do goes to the line's agent with the
       // decision profile; it works until it cannot decide, writes a summary and asks, and goes on after the answer (the
       // hook reminds it the switch is still on). --stop turns it off.
-      const { startAutopilot, stopAutopilot } = await import('../src/ops.mjs');
+      const { startAutopilot, stopAutopilot, awayCache } = await import('../src/ops.mjs');
       const { terminalCommand } = await import('../src/agents.mjs');
       const stop = !!flag('stop', false), json = !!flag('json', false), print = !!flag('print', false), ref = argv.join(' ').trim();
       if (!ref) { console.error('Usage: trace-canvas autopilot <line> [--stop] [--print] [--json]'); process.exit(1); }
       if (stop) { const th = mutate(d => stopAutopilot(d, { thread: ref })); console.log(`Autopilot is off on "${th.name}"; its agent stops before the next to-do.`); break; }
       let rows = [];
-      mutate(d => { rows = startAutopilot(d, { thread: ref, self: process.env.CLAUDE_CODE_SESSION_ID || null }); return print ? false : rows; });
+      const ask = { thread: ref, self: process.env.CLAUDE_CODE_SESSION_ID || null, awayLive: awayCache() };
+      try { startAutopilot(readData(), ask); } catch {}
+      mutate(d => { rows = startAutopilot(d, ask); return print ? false : rows; });
       await runRows(rows, { run: !print && !!terminalCommand(''), json });
       if (!json && !print) console.log('\nAutopilot is asked: it turns on when a session takes the prompt (its hook says so) and stays on: the agent stops to ask what it cannot decide and goes on after your answer, until you stop it with trace-canvas autopilot <line> --stop.');
       break;

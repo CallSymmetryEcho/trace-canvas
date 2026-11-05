@@ -213,6 +213,8 @@ export function ensureThread(d, name) {
 export const isTodo = c => c.kind === 'task' && !(c.session && !c.highlight);
 // An Autopilot agent's question on a to-do it cannot decide, naming the to-do's id: it goes on with the next one.
 export const AUTOPILOT_ASK = /^(Question|问题)\s*[:：]/i;
+// Autopilot pauses when this many of a line's to-dos ticked by an agent wait for the person's review.
+export const REVIEW_GATE = 10;
 // A to-do an Autopilot agent handed to a subagent of its own (a worker), naming its id: the agent checks and ticks it later.
 export const AUTOPILOT_WORKER = /^(Worker|并行)\s*[:：]/i;
 // The record an Autopilot agent writes when it has done what is open, before it waits for more (src/ops.mjs).

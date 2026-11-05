@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { COLS, addCommit, dataFile, home, mutate, readConfig, readData, toArrays, writeConfig } from './store.mjs';
 import { demoData } from './demo.mjs';
 import { liveDir, readLive, withCodexTerm } from './live.mjs';
-import { bindLiveSession, findThreadLoose, handTo, liveSessions, sessionList, startAutopilot, stopAutopilot } from './ops.mjs';
+import { awayCache, bindLiveSession, findThreadLoose, handTo, liveSessions, sessionList, startAutopilot, stopAutopilot } from './ops.mjs';
 import { applyRetro, askAgent, retroRecord, runRetro } from './retro.mjs';
 import { focusTab, launchRow, openTerminal, terminalCommand } from './agents.mjs';
 import { draftLessons, rememberLesson } from './lessons.mjs';
@@ -177,7 +177,10 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         const body = JSON.parse(await readBody(req)), thread = String(body.thread || '');
         try {
           if (body.stop) { mutate(d => stopAutopilot(d, { thread })); broadcast('change'); return send(res, 200, { ok: true }); }
-          const rows = mutate(d => startAutopilot(d, { thread }));
+          // Other machines are read over ssh in a dry run first, never under the data lock (awayCache in src/ops.mjs).
+          const awayLive = awayCache();
+          try { startAutopilot(readData(), { thread, awayLive }); } catch {}
+          const rows = mutate(d => startAutopilot(d, { thread, awayLive }));
           for (const r of rows) if (r.command && r.action !== 'busy') Object.assign(r, await launchRow(r));
           broadcast('change');
           return send(res, 200, { rows });

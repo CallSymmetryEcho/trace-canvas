@@ -8,6 +8,7 @@ import os from 'node:os';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { readConfig } from './store.mjs';
+import { listLive } from './live.mjs';
 
 export const q = s => `'${String(s).replace(/'/g, `'\\''`)}'`; // POSIX shell quoting
 
@@ -69,7 +70,18 @@ export function typeable(cmd, dir = os.tmpdir()) {
  * this machine has no terminal to open. macOS: Terminal. Linux: $TERMINAL, then the usual ones, on the desktop's
  * display; the window stays open in a login shell once cmd is done. Going to an existing tab is macOS only.
  */
-export function terminalCommand(cmd, env = process.env, platform = process.platform) {
+// GNOME Terminal puts --tab in the window of $GNOME_TERMINAL_SCREEN, and without it opens a new window: the page server
+// (systemd) has none, and an agent dispatching from its own tab has its own window's. The tab of the agent session in
+// GNOME Terminal that was active last, while it still runs (a screen that is gone opens nothing, and says so only on
+// stderr), so every agent opens in that one window. '' when none runs there.
+export function agentScreen(env = process.env) {
+  const alive = pid => { try { return !!pid && process.kill(pid, 0); } catch { return false; } };
+  let live = [];
+  try { live = listLive(env); } catch {}
+  const s = live.filter(s => s.term === 'gnome-terminal' && /^\/org\/gnome\/Terminal\/screen\//.test(s.tab || '') && alive(s.pid)).sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0))[0];
+  return s ? s.tab : '';
+}
+export function terminalCommand(cmd, env = process.env, platform = process.platform, screen = null) {
   if (platform === 'darwin') return ['osascript', ['-e', (macTerminal(env) === 'iterm' ? itermScript : terminalScript)(typeable(cmd))], env];
   if (platform !== 'linux') return null;
   const shown = desktopEnv(env);
@@ -80,6 +92,7 @@ export function terminalCommand(cmd, env = process.env, platform = process.platf
   let real = term[0];
   try { real = path.basename(fs.realpathSync(term[1])).replace(/\.(wrapper|real)$/, ''); } catch {}
   if (real !== term[0] && which(real, env)) term[0] = real, term[1] = which(real, env);
+  if (term[0] === 'gnome-terminal') { const sc = screen ?? agentScreen(env); if (sc) shown.GNOME_TERMINAL_SCREEN = sc; }
   const sh = env.SHELL || '/bin/sh', run = [sh, '-lc', `${cmd}; exec ${q(sh)} -l`];
   // A new tab where the terminal has a flag for it; a new window everywhere else.
   const lead = { konsole: ['--new-tab', '-e'], 'gnome-terminal': ['--tab', '--'], 'xfce4-terminal': ['--tab', '-x'], wezterm: ['start', '--'] }[term[0]] || ['-e'];

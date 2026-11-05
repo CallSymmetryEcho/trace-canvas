@@ -162,6 +162,10 @@ test('a new terminal tab or window: iTerm2 tabs or Terminal windows on macOS; on
   const caller = { ...env, CLAUDECODE: '1', CLAUDE_PID: '9', CLAUDE_CODE_SESSION_ID: 'caller', CLAUDE_CODE_CHILD_SESSION: '1', CLAUDE_CODE_ENTRYPOINT: 'sdk-ts', CLAUDE_CODE_MESSAGING_SOCKET: '/s', CLAUDE_CODE_MESSAGING_TOKEN: 't', CLAUDE_CONFIG_DIR: '/cfg', CLAUDE_CODE_USE_BEDROCK: '1' };
   const given = terminalCommand('ls', caller, 'linux')[2];
   assert.deepEqual(Object.keys(given).filter(k => /^CLAUDE/.test(k)).sort(), ['CLAUDE_CODE_USE_BEDROCK', 'CLAUDE_CONFIG_DIR']);
+  // GNOME Terminal: the tab goes into the window of the agent that runs there, not a new window each time.
+  const gt = { ...env, TERMINAL: 'gnome-terminal', GNOME_TERMINAL_SCREEN: '/org/gnome/Terminal/screen/mine' };
+  assert.equal(terminalCommand('ls', gt, 'linux', '/org/gnome/Terminal/screen/agents')[2].GNOME_TERMINAL_SCREEN, '/org/gnome/Terminal/screen/agents');
+  assert.equal(terminalCommand('ls', gt, 'linux', '')[2].GNOME_TERMINAL_SCREEN, '/org/gnome/Terminal/screen/mine'); // none runs: the caller's
   assert.equal(terminalCommand('ls', { PATH: '/nowhere', DISPLAY: ':0' }, 'linux'), null); // no terminal
   assert.equal(terminalCommand('ls', env, 'win32'), null);
 });

@@ -298,7 +298,7 @@ body.history-open .hist-btn span { display: inline; }
 .h-empty { border-radius: 16px; padding: 28px; text-align: center; color: var(--muted); }
 .h-empty b { display: block; font: 600 22px var(--f-display); color: var(--ink); margin-bottom: 6px; }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .h-glass, .h-plaque { background: var(--surface); } }
-@media (prefers-reduced-motion: reduce) { .h-plaque, .h-cap { transition: none; } }
+@media (prefers-reduced-motion: reduce), (hover: none) { .h-plaque, .h-cap { transition: none; } }
 @media (max-width: 760px) { .h-wrap { padding: 18px 16px 40px; } .h-hero h2 { font-size: 36px; } .h-wall { grid-template-columns: 1fr; } .h-glass, .h-plaque { -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); } .hist-btn span { display: none; } }
 .wrap-text { width: 100%; min-height: 220px; font: inherit; font-size: 13px; line-height: 1.5; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 7px; background: var(--surface); color: var(--ink); box-sizing: border-box; }
 .card .grp-tog { --c: var(--rule); }
@@ -370,7 +370,7 @@ body.history-open .hist-btn span { display: inline; }
 @keyframes ap-tick { to { transform: translateX(-100%); } }
 .chip-wait { color: var(--ok); border: 1px dashed var(--ok); opacity: .75; }
 @keyframes ap-wait { 50% { opacity: .55; } }
-@media (prefers-reduced-motion: reduce) { .chip-auto { animation: none; } .ap-burst::before { animation: none; display: none; } .ap-fill, .ap-knob, .ap-v, .ap-dot, .ap-row, .ap-row > span em { transition: none; }
+@media (prefers-reduced-motion: reduce), (hover: none) { .chip-auto { animation: none; } .ap-burst::before { animation: none; display: none; } .ap-fill, .ap-knob, .ap-v, .ap-dot, .ap-row, .ap-row > span em { transition: none; }
   .card.ap-on::after, .detail.ap-on::after, .is-run .ap-v::before, .is-run .ap-v::after, .is-wait .ap-knob { animation: none; } .ap-tick span { animation: none; padding-left: 8px; } }
 .chip-done { background: var(--surface-2); }
 .chip-merged { background: var(--surface-2); }
@@ -493,7 +493,7 @@ body.history-open .hist-btn span { display: inline; }
 .git-svg .tip.st-idle { fill: var(--faint); }
 .git-svg .lane-live { stroke-width: 2; stroke-dasharray: 3 4; fill: none; }
 .git-svg [data-sid] { cursor: pointer; }
-@media (prefers-reduced-motion: reduce) { .git-svg .tip.st-working { animation: none; } }
+@media (prefers-reduced-motion: reduce), (hover: none) { .git-svg .tip.st-working { animation: none; } }
 
 /* ---------- timeline ---------- */
 .tl-wrap { position: absolute; inset: 0; display: flex; flex-direction: column; }
@@ -676,7 +676,7 @@ body.sheet-open .top { z-index: 80; }
 .flash { animation: flash 1.4s ease-out; }
 @keyframes flash { 0% { box-shadow: 0 0 0 4px var(--accent); } 100% { box-shadow: 0 0 0 0 transparent; } }
 
-@media (prefers-reduced-motion: reduce) {
+@media (prefers-reduced-motion: reduce), (hover: none) {
   .flash, .pulse { animation: none; }
   .card { transition: none; }
 }
@@ -776,7 +776,7 @@ body.sheet-open .top { z-index: 80; }
 .st-working .ldot, .ldot.st-working { background: var(--ok); animation: lpulse 1.6s ease-in-out infinite; }
 .st-waiting .ldot, .ldot.st-waiting { background: var(--warn); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 28%, transparent); }
 @keyframes lpulse { 50% { opacity: .35; } }
-@media (prefers-reduced-motion: reduce) { .st-working .ldot, .ldot.st-working { animation: none; } }
+@media (prefers-reduced-motion: reduce), (hover: none) { .st-working .ldot, .ldot.st-working, .ag-agent.st-running .ldot { animation: none; } }
 .live-badge { flex: none; display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--rule); color: var(--muted); }
 .live-badge.st-working { border-color: var(--ok); color: var(--ok); }
 .live-badge.st-waiting { border-color: var(--warn); color: var(--warn); }
@@ -2641,12 +2641,12 @@ function fit() {
   const r = vp.getBoundingClientRect();
   const padX = 24, padTop = 24, padBottom = 70;
   const availW = r.width - padX * 2, availH = r.height - padTop - padBottom;
-  const z = clamp(Math.min(availW / (x1 - x0), availH / (y1 - y0)), r.width < 600 ? 0.6 : 0.3, 1.1);
+  const z = clamp(Math.min(availW / (x1 - x0), availH / (y1 - y0)), r.width < 600 || matchMedia('(hover: none)').matches ? 0.6 : 0.3, 1.1); // a tablet: readable cards, pan for the rest
   const w = (x1 - x0) * z, hgt = (y1 - y0) * z;
   S.cam = {
     z,
     x: (w <= availW ? padX + (availW - w) / 2 : padX) - x0 * z,
-    y: (hgt <= availH ? padTop + (availH - hgt) / 2 : padTop) - y0 * z,
+    y: (hgt <= availH && w <= availW ? padTop + (availH - hgt) / 2 : padTop) - y0 * z,
   };
   applyCam();
 }

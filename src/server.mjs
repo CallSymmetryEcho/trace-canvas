@@ -5,6 +5,7 @@
 // form or fetch cannot send without a preflight this server never approves.
 import fs from 'node:fs';
 import http from 'node:http';
+import zlib from 'node:zlib';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { execFile, spawn, spawnSync } from 'node:child_process';
@@ -14,7 +15,7 @@ import { demoData } from './demo.mjs';
 import { liveDir, readLive, withCodexTerm } from './live.mjs';
 import { awayCache, bindLiveSession, findThreadLoose, handTo, liveSessions, sessionList, startAutopilot, stopAutopilot } from './ops.mjs';
 import { applyRetro, askAgent, retroRecord, runRetro } from './retro.mjs';
-import { focusTab, launchRow, openTerminal, terminalCommand } from './agents.mjs';
+import { AGENTS, focusTab, launchRow, openTerminal, terminalCommand } from './agents.mjs';
 import { draftLessons, rememberLesson } from './lessons.mjs';
 import { otherMachines, remoteLive } from './remote.mjs';
 import { commitDiff, commitInfo, readLinkedImage, readLinkedMd } from './git-view.mjs';
@@ -43,8 +44,12 @@ const same = (a, b) => typeof a === 'string' && typeof b === 'string' && a.lengt
 const canStart = remote => !!terminalCommand('') && (!remote || !!(readConfig().phone || {}).start);
 export const phoneUrl = (phone, port) => `http://${phone.host}:${phone.port || port}/?k=${phone.token}`;
 function send(res, status, body, type = 'application/json; charset=utf-8') {
-  res.writeHead(status, { 'Content-Type': type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
-  res.end(typeof body === 'string' ? body : JSON.stringify(body));
+  let out = typeof body === 'string' ? body : JSON.stringify(body);
+  const head = { 'Content-Type': type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', Vary: 'Accept-Encoding' };
+  // /api/data is ~3 MB and is fetched again on every change: gzipped it is a tenth of that over Tailscale to a phone.
+  if (out.length > 8192 && /\bgzip\b/.test(res.req?.headers['accept-encoding'] || '')) { out = zlib.gzipSync(out, { level: 4 }); head['Content-Encoding'] = 'gzip'; }
+  res.writeHead(status, head);
+  res.end(out);
 }
 function readBody(req, limit = 4 << 20) {
   return new Promise((resolve, reject) => {
@@ -198,7 +203,10 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
       // that already has a session running gets none, the person is pointed at that one instead.
       if (req.method === 'POST' && p === '/api/start') {
         if (!canStart(remote)) return send(res, 403, { error: remote ? 'Turn it on with trace-canvas phone --allow-start' : 'No terminal to open on this machine (macOS, or a Linux desktop)' });
-        const body = JSON.parse(await readBody(req)), args = { ref: String(body.todo || body.thread || ''), to: 'claude', remote: true };
+        // A to-do handed to Codex or Gemini starts that agent; handTo would otherwise reassign it to Claude Code.
+        const body = JSON.parse(await readBody(req)), todo = body.todo && readData().commits[String(body.todo)];
+        const to = todo && AGENTS[todo.assignee] ? todo.assignee : 'claude';
+        const args = { ref: String(body.todo || body.thread || ''), to, remote: to === 'claude' };
         const busy = handTo(readData(), args).live[0];
         if (busy) return send(res, 200, { busy: { id: busy.id, title: busy.title || '', status: busy.status || '' } });
         const r = mutate(d => handTo(d, args));

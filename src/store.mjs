@@ -14,6 +14,7 @@ export function home(env = process.env) {
   return env.TRACE_CANVAS_HOME || path.join(os.homedir(), '.trace-canvas');
 }
 export const dataFile = env => path.join(home(env), 'data.json');
+const ownHome = env => !!env.TRACE_CANVAS_HOME && path.resolve(env.TRACE_CANVAS_HOME) !== path.join(os.homedir(), '.trace-canvas');
 const lockDir = env => path.join(home(env), '.lock');
 const configFile = env => path.join(home(env), 'config.json');
 
@@ -89,7 +90,8 @@ export function readConfig(env = process.env) {
     prompts: env.TRACE_CANVAS_PROMPTS || file.prompts || 'first',
     turns: env.TRACE_CANVAS_TURNS || file.turns || 'changes',
     // The location map (key_locations.yaml + tools/where.py); ~/agent-map when it exists.
-    map: env.TRACE_CANVAS_MAP || file.map || (fs.existsSync(path.join(os.homedir(), 'agent-map', 'tools', 'where.py')) ? path.join(os.homedir(), 'agent-map') : ''),
+    // A data folder of its own (TRACE_CANVAS_HOME: tests, a dev copy) syncs only where it is told to, never to ~/agent-map by default.
+    map: env.TRACE_CANVAS_MAP || file.map || (!ownHome(env) && fs.existsSync(path.join(os.homedir(), 'agent-map', 'tools', 'where.py')) ? path.join(os.homedir(), 'agent-map') : ''),
     // Which computer this is, as the location map names it (setup --machine); records and sessions carry it.
     machine: env.TRACE_CANVAS_MACHINE || file.machine || os.hostname().split('.')[0].toLowerCase(),
     // Phone access (trace-canvas phone): { host, ip, bind, port?, token }, or null when off.

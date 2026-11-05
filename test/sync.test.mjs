@@ -174,3 +174,59 @@ test('an Autopilot switch that changed syncs at once and nudges the other machin
   assert.equal(syncSoon('cli', env, { now: true, spawnIt }), true);
   assert.deepEqual(runs, [['sync', '--quiet', '--nudge']]);
 });
+
+test('a copy of the data that syncs under the same name takes in what it never had instead of deleting it (11-04: 124 deletions)', () => {
+  const { root, a, b } = twoMachines();
+  mutate(d => { const th = createThread(d, { name: 'thesis' }); addCommit(d, { thread: th.id, kind: 'note', title: 'early', ts: 1 }); }, a.env);
+  a.sync();
+  // A dev copy of mac's folder, taken now: an old snapshot from here on.
+  const dev = { ...a.env, TRACE_CANVAS_HOME: path.join(root, 'home-dev') };
+  fs.mkdirSync(dev.TRACE_CANVAS_HOME); fs.copyFileSync(path.join(a.env.TRACE_CANVAS_HOME, 'data.json'), path.join(dev.TRACE_CANVAS_HOME, 'data.json'));
+  const later = mutate(d => addCommit(d, { thread: Object.keys(d.threads)[0], kind: 'agent', title: 'written after the copy', ts: 5 }).id, a.env);
+  a.sync();
+  const r = runSync(dev);
+  assert.equal(r.error, null);
+  assert.ok(readData(dev).commits[later], 'the copy takes in the record it never had');
+  b.sync();
+  assert.ok(b.data().commits[later], 'and the other machine keeps it');
+  assert.doesNotMatch(fs.readFileSync(path.join(a.map, 'canvas', 'mac.jsonl'), 'utf8'), /"del":true/);
+});
+
+test('a sync that would delete more than 50 records at once is refused unless asked for', () => {
+  const { a } = twoMachines();
+  mutate(d => { const th = createThread(d, { name: 'big' }); for (let i = 0; i < 60; i++) addCommit(d, { thread: th.id, kind: 'note', title: `n${i}`, ts: i + 1 }); }, a.env);
+  a.sync();
+  const before = fs.readFileSync(path.join(a.map, 'canvas', 'mac.jsonl'), 'utf8');
+  mutate(d => { d.commits = {}; }, a.env);
+  const r = runSync(a.env);
+  assert.equal(r.refused, 60);
+  assert.match(r.error, /--allow-deletes/);
+  assert.equal(fs.readFileSync(path.join(a.map, 'canvas', 'mac.jsonl'), 'utf8'), before, 'nothing written');
+  assert.match(syncStatus(a.env).failed, /would delete 60/);
+  assert.equal(runSync(a.env, { allowDeletes: true }).error, null);
+  assert.equal((fs.readFileSync(path.join(a.map, 'canvas', 'mac.jsonl'), 'utf8').match(/"del":true/g) || []).length, 60);
+});
+
+test('a rebase left half done is tidied before the sync: with no steps left its autostash goes to the stash list', () => {
+  const { a } = twoMachines();
+  mutate(d => { createThread(d, { name: 'x' }); }, a.env);
+  a.sync();
+  fs.writeFileSync(path.join(a.map, 'canvas', 'README.md'), 'edited\n');
+  const stash = git(a.map, 'stash', 'create');
+  git(a.map, 'checkout', '-q', '--', 'canvas/README.md');
+  fs.mkdirSync(path.join(a.map, '.git', 'rebase-merge')); fs.writeFileSync(path.join(a.map, '.git', 'rebase-merge', 'autostash'), stash + '\n');
+  assert.match(git(a.map, 'status'), /rebas/i);
+  const r = a.sync();
+  assert.equal(r.error, null); assert.equal(r.offline, false);
+  assert.ok(!fs.existsSync(path.join(a.map, '.git', 'rebase-merge')));
+  assert.match(git(a.map, 'stash', 'list'), /autostash/);
+});
+
+test('a data folder of its own (TRACE_CANVAS_HOME) never syncs to ~/agent-map unless told to', async () => {
+  const { readConfig } = await import('../src/store.mjs');
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-own-'));
+  assert.equal(readConfig({ TRACE_CANVAS_HOME: home }).map, '');
+  assert.equal(readConfig({ TRACE_CANVAS_HOME: home, TRACE_CANVAS_MAP: '/some/map' }).map, '/some/map');
+  fs.writeFileSync(path.join(home, 'config.json'), JSON.stringify({ map: '/from/config' }));
+  assert.equal(readConfig({ TRACE_CANVAS_HOME: home }).map, '/from/config');
+});

@@ -62,7 +62,10 @@ function readFile(file) {
  * changed here since this machine's last file → now; else a newer version from another machine is
  * taken with its own time (so it is not stamped again here); else it stays as it was.
  */
-export function syncDocs(d, { dir, machine, host = os.hostname(), now = Date.now() }) {
+// seen: the documents this data folder held at its last sync (null: not known, as before .sync-keys). A document in
+// this machine's file that the folder never held was written there by another folder under the same name (a copy, a
+// dev instance with an old snapshot): it is taken in, not deleted. deleted: tombstones this sync writes.
+export function syncDocs(d, { dir, machine, host = os.hostname(), now = Date.now(), seen = null }) {
   const moved = canonicalize(d);
   for (const k of KINDS) d[k] = d[k] || {};
   const own = readFile(path.join(dir, `${machine}.jsonl`)).docs;
@@ -78,13 +81,18 @@ export function syncDocs(d, { dir, machine, host = os.hostname(), now = Date.now
   for (const k of KINDS) for (const [id, doc] of Object.entries(d[k])) { const x = exportDoc(k, doc); local.set(`${k}/${id}`, { k, id, doc: x, h: canonical(x) }); }
 
   const out = [];
-  let imported = 0, changed = 0;
+  let imported = 0, changed = 0, deleted = 0;
   for (const key of new Set([...local.keys(), ...own.keys(), ...theirs.keys()])) {
     const L = local.get(key), O = own.get(key), R = theirs.get(key);
     const [k, id] = [key.slice(0, key.indexOf('/')), key.slice(key.indexOf('/') + 1)];
+    if (!L && O && !O.del && seen && !seen.has(key)) {
+      const N = R && !R.del && R.t > O.t ? R : O;
+      imported++; d[k][id] = N.doc; out.push({ k, id, t: N.t, doc: N.doc });
+      continue;
+    }
     const here = L ? !O || O.h !== L.h : O && !O.del; // created, edited or deleted here since the last file
     if (here && !(R && R.t > now)) {
-      changed++;
+      changed++; if (!L) deleted++;
       out.push(L ? { k, id, t: now, doc: L.doc } : { k, id, t: now, del: true });
       continue;
     }
@@ -101,13 +109,39 @@ export function syncDocs(d, { dir, machine, host = os.hostname(), now = Date.now
   }
   out.sort((a, b) => (a.k < b.k ? -1 : a.k > b.k ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const text = [canonical({ k: 'machine', id: machine, host }), ...out.map(x => canonical(x.del ? { del: true, id: x.id, k: x.k, t: x.t } : { doc: x.doc, id: x.id, k: x.k, t: x.t }))].join('\n') + '\n';
-  return { text, imported, changed, moved };
+  return { text, imported, changed, moved, deleted, keys: out.filter(x => !x.del).map(x => `${x.k}/${x.id}`) };
 }
 
-function git(cwd, args, timeout = 20000) {
+function git(cwd, args, timeout = 20000) { // timeout 0: none
   try { return { ok: true, out: execFileSync('git', ['-C', cwd, ...args], { encoding: 'utf8', timeout, stdio: ['ignore', 'pipe', 'pipe'] }).trim() }; }
   catch (e) { return { ok: false, out: String((e.stderr || '') + (e.stdout || '') || e.message).trim() }; }
 }
+
+// A rebase left half done (11-04: a sync cut off by its timeout left only the autostash) blocks every later pull. With no
+// steps left, --quit ends it and keeps the autostash in the stash list; with steps left, --abort goes back to the start.
+export function tidyRebase(mapDir) {
+  const gitDir = path.resolve(mapDir, git(mapDir, ['rev-parse', '--git-dir']).out || '.git');
+  for (const r of ['rebase-merge', 'rebase-apply']) {
+    const at = path.join(gitDir, r);
+    if (!fs.existsSync(at)) continue;
+    const steps = ['git-rebase-todo', 'next'].some(f => fs.existsSync(path.join(at, f)));
+    git(mapDir, ['rebase', steps ? '--abort' : '--quit'], 0);
+    return steps ? 'aborted' : 'quit';
+  }
+  return null;
+}
+// Fetching goes over the network and keeps its timeout; the rebase is local and has none, so it is never cut off half
+// way. A rebase that stops on a conflict is aborted: the sync reports it and the folder is as it was.
+function pull(mapDir) {
+  tidyRebase(mapDir);
+  const f = git(mapDir, ['fetch', '-q']);
+  if (!f.ok) return f;
+  const r = git(mapDir, ['rebase', '-q', '--autostash', '@{u}'], 0);
+  if (!r.ok) git(mapDir, ['rebase', '--abort'], 0);
+  return r;
+}
+// More deletions than this in one sync is refused: a stale copy of the data looks just like that (11-04: 124).
+export const DELETE_LIMIT = 50;
 
 /** The machine whose file this is, if another host already writes it; setup refuses that name. */
 export function machineOwner(mapDir, machine) {
@@ -148,7 +182,7 @@ function noteStatus(env, failed, others) {
 }
 const firstErr = out => String(out || '').split('\n').map(l => l.trim()).filter(Boolean).pop() || 'unknown error';
 
-export function runSync(env = process.env) {
+export function runSync(env = process.env, { allowDeletes = env.TRACE_CANVAS_ALLOW_DELETES === '1' } = {}) {
   const cfg = readConfig(env), mapDir = cfg.map, machine = cfg.machine;
   if (!mapDir || !fs.existsSync(path.join(mapDir, '.git'))) return { error: 'No location map repository (setup --map, or clone it to ~/agent-map)' };
   const lock = path.join(home(env), '.sync-lock');
@@ -158,14 +192,28 @@ export function runSync(env = process.env) {
   try {
     const dir = path.join(mapDir, 'canvas'), file = path.join(dir, `${machine}.jsonl`);
     fs.mkdirSync(dir, { recursive: true });
-    const pulled = git(mapDir, ['pull', '-q', '--rebase', '--autostash']);
+    const pulled = pull(mapDir);
+    const keysFile = path.join(home(env), '.sync-keys');
+    let seen = null; // a folder that synced before .sync-keys existed deletes as before, once; a new folder deletes nothing
+    try { seen = new Set(fs.readFileSync(keysFile, 'utf8').split('\n').filter(Boolean)); } catch { if (!fs.existsSync(path.join(home(env), '.sync-last'))) seen = new Set(); }
     // Keep a copy before the first sync rewrites line ids.
     const bak = `${dataFile(env)}.before-first-sync`;
     if (!fs.existsSync(file) && fs.existsSync(dataFile(env)) && !fs.existsSync(bak)) fs.copyFileSync(dataFile(env), bak);
     let res;
-    mutate(d => { res = syncDocs(d, { dir, machine }); return res.imported || res.moved ? undefined : false; }, env);
+    let refused = false;
+    mutate(d => {
+      res = syncDocs(d, { dir, machine, seen });
+      if (res.deleted > DELETE_LIMIT && !allowDeletes) { refused = true; return false; }
+      return res.imported || res.moved ? undefined : false;
+    }, env);
+    if (refused) {
+      const error = `this sync would delete ${res.deleted} records at once, so nothing was written; if that is meant, run: trace-canvas sync --allow-deletes`;
+      noteStatus(env, error);
+      return { machine, error, refused: res.deleted };
+    }
     const before = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
     if (res.text !== before) fs.writeFileSync(file, res.text);
+    fs.writeFileSync(keysFile, res.keys.join('\n'));
     let committed = false, pushed = false, error = null;
     if (git(mapDir, ['status', '--porcelain', '--', `canvas/${machine}.jsonl`]).out) {
       git(mapDir, ['add', '--', `canvas/${machine}.jsonl`]);
@@ -174,7 +222,7 @@ export function runSync(env = process.env) {
       if (!c.ok) error = c.out.split('\n').slice(-3).join(' ');
     }
     if (!error && git(mapDir, ['rev-list', '--count', '@{u}..HEAD']).out !== '0') {
-      pushed = git(mapDir, ['push', '-q']).ok || (git(mapDir, ['pull', '-q', '--rebase', '--autostash']).ok && git(mapDir, ['push', '-q']).ok);
+      pushed = git(mapDir, ['push', '-q']).ok || (pull(mapDir).ok && git(mapDir, ['push', '-q']).ok);
     }
     fs.writeFileSync(path.join(home(env), '.sync-last'), String(Date.now()));
     // Commits that are still not on the remote mean the other machines do not have them: a failure, not a quiet "Committed".

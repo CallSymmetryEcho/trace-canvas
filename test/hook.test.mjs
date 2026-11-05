@@ -199,7 +199,7 @@ test('the location map still answers when the python3 first on PATH is broken', 
   finally { process.env.PATH = PATH; }
 });
 
-test('an Autopilot round lights only when its prompt reaches a session, and an ordinary prompt does not light it', () => {
+test('an Autopilot round lights only when its prompt reaches a session, and an ordinary prompt does not light it', async () => {
   const s = sandbox();
   const tid = mutate(d => { const th = createThread(d, { name: 'App' }); th.autopilot = { at: Date.now() }; return th.id; }, s.env);
   s.fire('UserPromptSubmit', { prompt: 'Fix the login bug please', prompt_id: 'p1' });
@@ -217,4 +217,10 @@ test('an Autopilot round lights only when its prompt reaches a session, and an o
   mutate(d => { d.threads[tid].autopilot = { at: Date.now() }; }, s.env);
   s.fire('UserPromptSubmit', { prompt: `<pasted_content id="6cbc">\nAutopilot (beta) on the Trace Canvas line "App" (thread ${tid}): work\n</pasted_content id="6cbc">\n\n why not the rest`, prompt_id: 'p4' });
   assert.equal(s.data().threads[tid].autopilot.session, 's1');
+  // It stopped to ask; the person's answer in that session carries the reminder that the switch is still on.
+  const { promptContext } = await import('../src/hook.mjs');
+  assert.match(promptContext({ session_id: 's1', prompt: 'Use the second option' }, s.env), new RegExp(`Autopilot is still on for the line "App" \\(thread ${tid}\\): if this message answers what you stopped to ask, log the answer as a decision, then go on`));
+  assert.doesNotMatch(promptContext({ session_id: 's2', prompt: 'Something else' }, s.env), /Autopilot/);
+  mutate(d => { delete d.threads[tid].autopilot; }, s.env);
+  assert.doesNotMatch(promptContext({ session_id: 's1', prompt: 'Thanks' }, s.env), /Autopilot/); // Stop: no reminder
 });

@@ -88,8 +88,7 @@ Goals and to-dos
   trace-canvas hand <to-do|thread> --to claude|codex|gemini
                                                    Assign it and print the command that starts the agent on it
   trace-canvas autopilot <line> [--stop] [--print]   Autopilot (beta): until you stop it, the line's agent works every open
-                                                   to-do by the decision profile and asks only what it must;
-                                                   --wait [--timeout s]: for that agent, wait for new to-dos or Stop
+                                                   to-do by the decision profile and asks only what it must
   trace-canvas dispatch [line|to-do...] [--on machine] [--all] [--print] [--json]
                                                    Hand each line's new to-dos (or the to-dos named) to the agent working on it and wake it
                                                    (resume or start in a new terminal window; --print only prints)
@@ -323,30 +322,17 @@ async function main() {
     }
     case 'autopilot': {
       // Autopilot (beta) on one line, until the person turns it off. Every open to-do goes to the line's agent with the
-      // decision profile; the agent checks the switch before each to-do, and when it has done what is open it writes a
-      // summary and waits here (--wait) for new to-dos. --stop turns it off.
-      const { autopilotNews, startAutopilot, stopAutopilot } = await import('../src/ops.mjs');
+      // decision profile; it works until it cannot decide, writes a summary and asks, and goes on after the answer (the
+      // hook reminds it the switch is still on). --stop turns it off.
+      const { startAutopilot, stopAutopilot } = await import('../src/ops.mjs');
       const { terminalCommand } = await import('../src/agents.mjs');
-      const stop = !!flag('stop', false), json = !!flag('json', false), print = !!flag('print', false), wait = !!flag('wait', false), timeout = Number(flag('timeout', 0)) * 1000 || 0, ref = argv.join(' ').trim();
-      if (!ref) { console.error('Usage: trace-canvas autopilot <line> [--stop] [--print] [--json] [--wait [--timeout s]]'); process.exit(1); }
+      const stop = !!flag('stop', false), json = !!flag('json', false), print = !!flag('print', false), ref = argv.join(' ').trim();
+      if (!ref) { console.error('Usage: trace-canvas autopilot <line> [--stop] [--print] [--json]'); process.exit(1); }
       if (stop) { const th = mutate(d => stopAutopilot(d, { thread: ref })); console.log(`Autopilot is off on "${th.name}"; its agent stops before the next to-do.`); break; }
-      if (wait) {
-        // Ends when there is something to do (exit 0), when the switch goes off (exit 2), or after --timeout seconds (exit 1).
-        const { readData } = await import('../src/store.mjs'), { resolveThreadRef } = await import('../src/ops.mjs');
-        const tid = resolveThreadRef(readData(), ref), until = Date.now() + timeout;
-        if (!tid) { console.error(`No line "${ref}"`); process.exit(1); }
-        for (;;) {
-          const n = autopilotNews(readData(), tid);
-          if (n.off) { console.log('Autopilot is off: the person stopped it. Stop here.'); process.exit(2); }
-          if (n.todos.length) { console.log(`New to-dos:\n${n.todos.map(c => `- ${c.title} [${c.id}]`).join('\n')}`); process.exit(0); }
-          if (timeout && Date.now() >= until) { console.log('Nothing new yet: run it again.'); process.exit(1); }
-          await new Promise(r => setTimeout(r, 3000));
-        }
-      }
       let rows = [];
       mutate(d => { rows = startAutopilot(d, { thread: ref, self: process.env.CLAUDE_CODE_SESSION_ID || null }); return print ? false : rows; });
       await runRows(rows, { run: !print && !!terminalCommand(''), json });
-      if (!json && !print) console.log('\nAutopilot is asked: it turns on when a session takes the prompt (its hook says so) and stays on, the agent waiting for new to-dos when it has done what is open, until you stop it with trace-canvas autopilot <line> --stop.');
+      if (!json && !print) console.log('\nAutopilot is asked: it turns on when a session takes the prompt (its hook says so) and stays on: the agent stops to ask what it cannot decide and goes on after your answer, until you stop it with trace-canvas autopilot <line> --stop.');
       break;
     }
     case 'history': {

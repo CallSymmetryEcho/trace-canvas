@@ -249,8 +249,8 @@ agent 用的是同一份清单：开工时用 `trace_tasks` 读目标和待办�
 
 **跑的时候**
 - 开着的时候，线上亮着 **Autopilot**，按钮变成**停止 Autopilot**。
-- 手上的待办做完了，它写一条「Autopilot 小结」，然后等新待办（`trace-canvas autopilot <线> --wait`，放在后台等，等的时候不花钱）；线上来了新待办，它就接着做。
-- 只有你关掉它才停。
+- 遇到判断不了的，它写一条「Autopilot 小结」，停下来问你；你在它的会话里回答后，它接着做，直到下一个判断不了的地方。
+- 开关一直亮着，直到你关掉。
 
 ![Autopilot 怎么做决定](docs/autopilot.zh-CN.svg)
 

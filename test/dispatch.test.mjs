@@ -176,20 +176,13 @@ test('Autopilot hands every open to-do on a line to its agent with the decision 
   assert.equal(listTasks(d, { thread: app })[0].autopilot, undefined);
   d.threads[app].autopilot.session = 's1';
   assert.equal(listTasks(d, { thread: app })[0].autopilot, true);
-  // It stays on until the person stops it: the summary only closes what was open, then the agent waits (--wait).
-  assert.match(row.prompt, /stays on until the person turns it off.*trace-canvas autopilot "\S+" --wait/);
-  const { autopilotNews } = await import('../src/ops.mjs');
-  d.threads[app].autopilot.at = now - 10;
-  d.commits[a.id].done = true;
-  assert.deepEqual(autopilotNews(d, app), { todos: [] }); // b was in the prompt: not news
-  addCommit(d, { thread: app, kind: 'note', title: 'Autopilot summary: 2 done', ts: now + 1 });
+  // It stays on until the person stops it: the agent stops to ask and goes on after the answer; its summary is not Stop.
+  assert.match(row.prompt, /stays on until the person turns it off.*stop and ask\. When the person answers, log the answer as a decision and go on/);
+  assert.doesNotMatch(row.prompt, /--wait/);
+  addCommit(d, { thread: app, kind: 'note', title: 'Autopilot summary: 2 done, 1 to ask', ts: now + 1 });
   assert.ok(d.threads[app].autopilot);
-  assert.deepEqual(autopilotNews(d, app), { todos: [] }); // b was left for the person: the agent waits
-  const c = addCommit(d, { thread: app, kind: 'task', title: 'A new one', ts: now + 2 });
-  assert.deepEqual(autopilotNews(d, app), { todos: [{ id: c.id, title: 'A new one' }] });
   stopAutopilot(d, { thread: 'App' });
   assert.equal(d.threads[app].autopilot, undefined);
-  assert.deepEqual(autopilotNews(d, app), { off: true });
 });
 
 test('an archived project is out of the to-do list and of dispatch, unless its line is named', async () => {

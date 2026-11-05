@@ -400,9 +400,12 @@ export function promptContext(input, env = process.env) {
   if (!input.session_id || cleanPrompt(input.prompt).startsWith('/')) return '';
   const d = readData(env), { threadId } = sessionThread(d, { id: input.session_id }, env);
   const th = threadId && d.threads[threadId];
-  if (!th) return '';
+  // The person answering an Autopilot agent that stopped to ask: the switch is still on, so it goes on after this.
+  const ap = Object.values(d.threads).find(t => t.autopilot && t.autopilot.session === input.session_id);
+  const apNote = ap ? ` Autopilot is still on for the line "${ap.name}" (thread ${ap.id}): if this message answers what you stopped to ask, log the answer as a decision, then go on with its open to-dos by the decision profile until the next thing you cannot decide.` : '';
+  if (!th) return apNote.trim();
   const open = Object.values(d.commits).filter(c => threadIdOfLocal(d, c) === th.id && c.kind === 'task' && !c.done && !(c.session && !c.highlight)).sort((a, b) => a.ts - b.ts);
-  return `Trace Canvas: you work on the line "${th.name}" (thread ${th.id}). If this message gives a new goal, idea or next step worth tracking, add each one now as a to-do with trace_log (kind "task", thread "${th.id}"), one short title per item; not the request in this message, which you are doing now, nor anything you will finish in this same turn${open.length ? `, and what is already open: ${open.slice(-8).map(c => firstLine(c.title, 60)).join('; ')}` : ''}.`;
+  return `Trace Canvas: you work on the line "${th.name}" (thread ${th.id}). If this message gives a new goal, idea or next step worth tracking, add each one now as a to-do with trace_log (kind "task", thread "${th.id}"), one short title per item; not the request in this message, which you are doing now, nor anything you will finish in this same turn${open.length ? `, and what is already open: ${open.slice(-8).map(c => firstLine(c.title, 60)).join('; ')}` : ''}.${apNote}`;
 }
 
 export function turnBody(lang, msg, files, todos = []) {

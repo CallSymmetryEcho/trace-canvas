@@ -211,12 +211,11 @@ export function handleHook(input, env = process.env) {
       if (handoff) s.prompted = true;
       // An Autopilot round counts as running only once its prompt reaches a session: the switch lights here, not on the click.
       // Looked for in the raw prompt: pasted in with a word or two of the person's own, the paste is shortened in `prompt`.
-      // Handed on in other words (another agent passing it along: "the person turned on autopilot for <line>"): a message
-      // that says autopilot and names a line waiting to be taken up takes it up too.
+      // Handed on in other words by another agent ("autopilot is on for twitq…, go on with its to-dos"): a message that
+      // says autopilot and carries the id of a line waiting to be taken up. The id, not the name: a person asking a
+      // session to turn Autopilot on names the line, and that session is not the one doing it.
       const raw = String(input.prompt || ''), ap = /^Autopilot \(beta\) on the Trace Canvas line .*?\(thread ([\w-]+)\)/m.exec(raw);
-      const flat = raw.replace(/\s+/g, '').toLowerCase();
-      const apTh = ap ? d.threads[ap[1]] : /autopilot/i.test(raw)
-        ? Object.values(d.threads).find(t => t.autopilot && !t.autopilot.session && (flat.includes(t.id.toLowerCase()) || (t.name.length >= 3 && flat.includes(t.name.replace(/\s+/g, '').toLowerCase())))) : null;
+      const apTh = ap ? d.threads[ap[1]] : /autopilot/i.test(raw) ? Object.values(d.threads).find(t => t.autopilot && !t.autopilot.session && raw.includes(t.id)) : null;
       if (apTh && apTh.autopilot) { apTh.autopilot = { ...apTh.autopilot, session: sid, on: Date.now() }; changed = true; }
       // The person's message to an Autopilot agent (an answer, most often) starts a new stretch for autopilotStop.
       for (const t of Object.values(d.threads)) if (t.autopilot && t.autopilot.session === sid) { t.autopilot = { ...t.autopilot, turn: Date.now(), nudged: 0 }; changed = true; }

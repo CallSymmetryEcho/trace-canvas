@@ -154,6 +154,10 @@ test('a new terminal tab or window: iTerm2 tabs or Terminal windows on macOS; on
   const env = { PATH: bin, DISPLAY: ':0', SHELL: '/bin/bash' };
   assert.deepEqual(terminalCommand('claude --resume s1', env, 'linux'), [path.join(bin, 'konsole'), ['--new-tab', '-e', '/bin/bash', '-lc', "claude --resume s1; exec '/bin/bash' -l"], env]);
   assert.deepEqual(terminalCommand('ls', { ...env, TERMINAL: 'gnome-terminal' }, 'linux')[1].slice(0, 3), ['--tab', '--', '/bin/bash']);
+  // x-terminal-emulator → gnome-terminal.wrapper: a tab in gnome-terminal, not the wrapper's new window.
+  fs.writeFileSync(path.join(bin, 'gnome-terminal.wrapper'), '#!/bin/sh\n'); fs.chmodSync(path.join(bin, 'gnome-terminal.wrapper'), 0o755);
+  fs.symlinkSync(path.join(bin, 'gnome-terminal.wrapper'), path.join(bin, 'x-terminal-emulator'));
+  assert.deepEqual(terminalCommand('ls', env, 'linux').slice(0, 2), [path.join(bin, 'gnome-terminal'), ['--tab', '--', '/bin/bash', '-lc', "ls; exec '/bin/bash' -l"]]);
   assert.equal(terminalCommand('ls', { PATH: '/nowhere', DISPLAY: ':0' }, 'linux'), null); // no terminal
   assert.equal(terminalCommand('ls', env, 'win32'), null);
 });

@@ -68,6 +68,11 @@ export function terminalCommand(cmd, env = process.env, platform = process.platf
   const shown = desktopEnv(env);
   const term = shown && [env.TERMINAL, 'x-terminal-emulator', 'konsole', 'gnome-terminal', 'xfce4-terminal', 'kitty', 'alacritty', 'wezterm', 'xterm'].filter(Boolean).map(t => [path.basename(t), which(t, env) || (path.isAbsolute(t) && t)]).find(([, p]) => p);
   if (!term) return null;
+  // x-terminal-emulator is a symlink (Debian/Ubuntu: gnome-terminal.wrapper, which turns -e into --wait, a new window
+  // each time): go by what it points to, and run that terminal itself so its new-tab flag applies.
+  let real = term[0];
+  try { real = path.basename(fs.realpathSync(term[1])).replace(/\.(wrapper|real)$/, ''); } catch {}
+  if (real !== term[0] && which(real, env)) term[0] = real, term[1] = which(real, env);
   const sh = env.SHELL || '/bin/sh', run = [sh, '-lc', `${cmd}; exec ${q(sh)} -l`];
   // A new tab where the terminal has a flag for it; a new window everywhere else.
   const lead = { konsole: ['--new-tab', '-e'], 'gnome-terminal': ['--tab', '--'], 'xfce4-terminal': ['--tab', '-x'], wezterm: ['start', '--'] }[term[0]] || ['-e'];

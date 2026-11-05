@@ -1859,7 +1859,7 @@ function liveDetail(s) {
   // A background session (claude --bg) is joined with attach; --resume would start a second copy of it.
   const here = s.kind === 'bg' ? `claude attach ${s.id}` : s.resume || `claude --resume ${s.id}`;
   // On another machine: resumed there over ssh, in its login shell; its chat, terminal and line are that machine's.
-  const cmd = s.attach ? s.attach : s.away ? `ssh -t ${s.machine} ${shq(`exec "$SHELL" -lc ${shq(`${s.cwd ? `cd ${shq(s.cwd)} && ` : ''}${here}`)}`)}` : here;
+  const cmd = s.attach ? s.attach : s.away ? sshThere(s.machine, `${s.cwd ? `cd ${shq(s.cwd)} && ` : ''}${here}`) : here;
   const opts = `<option value="">${esc(t('liveAuto'))}</option>` + orderedThreads().filter(th => (th.status !== 'merged' && inFocus(th)) || th.id === s.threadId)
     .map(th => `<option value="${esc(th.id)}" ${s.bound && th.id === s.threadId ? 'selected' : ''}>${esc(th.name)}</option>`).join('');
   const where = [[s.repo, s.branch].filter(Boolean).join(' · '), s.model].filter(Boolean).join(' · ');
@@ -3396,8 +3396,9 @@ function sessionItem(s, l, latest = '') {
   const here = `${cwd ? `cd ${shq(cwd)} && ` : ''}${s.resume || (l && l.resume) || `claude --resume ${s.id}`}`;
   // A session from another machine resumes there, over ssh (the machine names are the ssh aliases).
   // Over ssh, in the login shell there: ssh alone has a bare PATH without claude or codex.
-  const away = s.machine && S.machine && s.machine !== S.machine, cmd = away ? `ssh -t ${s.machine} ${shq(`exec "$SHELL" -lc ${shq(here)}`)}` : here;
-  const jump = away ? '' : jumpTo({ ...l, ...s, desktopId: s.desktopId || (l && l.desktopId), tty: l && l.tty }, 'btn btn-primary');
+  // Running there in tmux: attach to it, not a second copy (l.attach, from the page server).
+  const away = s.machine && S.machine && s.machine !== S.machine, cmd = l && l.attach ? l.attach : away ? sshThere(s.machine, here) : here;
+  const jump = away ? (l && l.attach ? jumpTo(l, 'btn btn-primary') : '') : jumpTo({ ...l, ...s, desktopId: s.desktopId || (l && l.desktopId), tty: l && l.tty }, 'btn btn-primary');
   const sub = [l && stLabel(st), s.agent || (l && l.agent) || 'Claude Code', away && s.machine, s.id.slice(0, 8), s.last && fmtRel(s.last)].filter(Boolean).join(' · ');
   return `<li class="st-${esc(st)}${l ? ' is-live' : ''}"${l ? ` data-act="goto-live" data-sid="${esc(s.id)}"` : ''}><span class="ldot"></span><span class="s-name">${latest ? `<span class="s-latest">${esc(t('latestOn', latest))}</span>` : ''}${esc(s.title || (l ? liveTitle(l) : s.id))}</span><span class="act">${esc(sub)}</span><span class="s-acts">${jump}<button class="btn" data-act="copy-cmd" data-cmd="${esc(cmd)}" title="${esc(cmd)}">${esc(t('copyResume'))}</button></span></li>`;
 }
@@ -4136,6 +4137,9 @@ function renderGoals() {
 const AGENT_NAMES = { claude: 'Claude Code', codex: 'Codex', gemini: 'Gemini CLI' };
 const AGENT_LAUNCH = { claude: p => `claude ${shq(p)}`, codex: p => `codex ${shq(p)}`, gemini: p => `gemini -i ${shq(p)}` };
 const shq = v => `'${String(v).replace(/'/g, `'\\''`)}'`;
+// A command on another machine, as the server's remote() (src/agents.mjs) writes it: its login shell, with ~/.local/bin
+// first on PATH, where claude's and codex's installers put them and a non-interactive login shell does not look.
+const sshThere = (machine, cmd) => `ssh -t ${machine} ${shq(`exec "$SHELL" -lc ${shq(`PATH="$HOME/.local/bin:$PATH"; ${cmd}`)}`)}`;
 function handCommand(c) {
   if (!c || !c.assignee || !AGENT_LAUNCH[c.assignee]) return '';
   const tid = tidOf(c), th = S.threads.get(tid);

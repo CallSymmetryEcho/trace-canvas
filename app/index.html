@@ -259,8 +259,8 @@ body.history-open .hist-btn span { display: inline; }
 .h-glass, .h-plaque { background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='.07'/%3E%3C/svg%3E"), linear-gradient(135deg, var(--h-sheen), transparent 42%), var(--h-glass);
   -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); border: 1px solid var(--h-edge); box-shadow: inset 0 1px 0 var(--h-hi), var(--h-shadow); }
 .h-hero { display: flex; align-items: flex-end; gap: 14px 18px; flex-wrap: wrap; margin-bottom: 18px; }
-.h-hero h2 { margin: 0; font: 700 44px/1 var(--f-display); letter-spacing: .01em; }
-.h-hero p { margin: 0 0 4px; color: var(--muted); }
+.h-hero h2 { margin: 0; font: 700 44px/1.15 var(--f-display); letter-spacing: .01em; } /* /1 cut into CJK and sat on the line below */
+.h-hero p { margin: 6px 0 4px; color: var(--muted); }
 .h-close { margin-left: 4px; }
 .h-totals { display: flex; gap: 6px 22px; flex-wrap: wrap; padding: 12px 18px; border-radius: 14px; margin-left: auto; }
 .h-totals div { display: flex; align-items: baseline; gap: 5px; } .h-totals b { font: 600 26px/1 var(--f-display); font-variant-numeric: tabular-nums; } .h-totals span { color: var(--muted); font-size: 12.5px; }
@@ -299,7 +299,7 @@ body.history-open .hist-btn span { display: inline; }
 .h-empty b { display: block; font: 600 22px var(--f-display); color: var(--ink); margin-bottom: 6px; }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .h-glass, .h-plaque { background: var(--surface); } }
 @media (prefers-reduced-motion: reduce), (hover: none) { .h-plaque, .h-cap { transition: none; } }
-@media (max-width: 760px) { .h-wrap { padding: 18px 16px 40px; } .h-hero h2 { font-size: 36px; } .h-wall { grid-template-columns: 1fr; } .h-glass, .h-plaque { -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); } .hist-btn span { display: none; } }
+@media (max-width: 760px) { .h-wrap { padding: 18px 16px 40px; } .h-hero h2 { font-size: 36px; } .h-totals { display: grid; grid-template-columns: repeat(4, 1fr); width: 100%; margin: 0; padding: 10px 12px; gap: 4px; } .h-totals div { flex-direction: column; gap: 2px; } .h-totals b { font-size: 22px; } .h-when { font-size: 11px; } .h-wall { grid-template-columns: 1fr; } .h-glass, .h-plaque { -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); } .hist-btn span { display: none; } }
 .wrap-text { width: 100%; min-height: 220px; font: inherit; font-size: 13px; line-height: 1.5; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 7px; background: var(--surface); color: var(--ink); box-sizing: border-box; }
 .card .grp-tog { --c: var(--rule); }
 .card.dragging { box-shadow: var(--shadow); cursor: grabbing; z-index: 3; }
@@ -911,7 +911,7 @@ button.gl-prog[aria-pressed="true"] { color: var(--ink); background: var(--surfa
   .gl-bar-top { justify-content: space-between; font-size: 14px; }
   .gl-bar-top .check { padding: 8px 0; }
   .gl-group { padding: 12px 14px; gap: 8px; border-radius: 12px; background: var(--surface); }
-  .gl-head { min-height: 36px; }
+  .gl-head { min-height: 36px; flex-wrap: wrap; row-gap: 2px; } .gl-prog { white-space: nowrap; }
   .gl-head b { font-size: 16px; }
   .gl-head .linkish { padding: 8px 0; font-size: 13px; }
   .gl-goal { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 14px; }
@@ -2569,6 +2569,15 @@ function groupDetail(name) {
       </div>
     </div>`;
 }
+// Autopilot on a line, for its canvas card and its Goals card (the phone's view): the chip, and a ticker with the
+// to-do in hand, an open one from after its last summary (the ones left for you then do not count); waiting otherwise.
+const apChip = th => apRun(th) ? `<span class="chip chip-auto" title="${esc(t('apTitle'))}">Autopilot</span>` : apWait(th) ? `<span class="chip chip-wait${apLost(th) ? ' is-lost' : ''}" title="${esc(t(apLost(th) ? 'apLostWhy_' + apLost(th) : 'apWait'))}">Autopilot${apLost(th) ? ' !' : '…'}</span>` : '';
+function apTickHTML(th, cs) {
+  if (!apRun(th)) return '';
+  const since = Math.max(0, ...cs.filter(c => /^Autopilot (summary|小结)/i.test(c.title || '')).map(c => c.ts));
+  const now = cs.find(c => isTodo(c) && !c.done && c.ts > since);
+  return `<div class="ap-tick"><span>${esc(now ? t('apTick', now.title) : t('apTickIdle'))}</span></div>`;
+}
 function cardHTML(th, cs, selT) {
   const isInbox = th.id === INBOX;
   const recent = cs.slice(-4).reverse();
@@ -2578,19 +2587,16 @@ function cardHTML(th, cs, selT) {
   const selC = S.sel && S.sel.type === 'commit' ? S.sel.id : null;
   const peeking = isFolded(th) && S.peek.has(th.id), shut = isFolded(th) && !peeking;
   apSeen(th);
-  // In hand: an open to-do from after its last summary (the ones left for you then do not count); waiting otherwise.
-  const apSince = apRun(th) && !shut ? Math.max(0, ...cs.filter(c => /^Autopilot (summary|小结)/i.test(c.title || '')).map(c => c.ts)) : 0;
-  const apNow = apRun(th) && !shut ? cs.find(c => isTodo(c) && !c.done && c.ts > apSince) : null;
   const cls = ['card', isInbox ? 'is-inbox' : `st-${th.status || 'active'}`, shut ? 'is-shut' : '', peeking ? 'is-peek' : '', apRun(th) ? 'ap-on' : '', selT === th.id ? 'is-sel' : '', filtering() && !anyHit ? 'is-dim' : '', S.connect && S.connect.from === th.id ? 'is-from' : '', S.multi.has(th.id) ? 'is-multi' : '', S.multi.has(th.id) && th.id === S.multiTarget ? 'is-multi-target' : ''].filter(Boolean).join(' ');
   const items = recent.length
     ? recent.map(c => `<li data-cid="${esc(c.id)}" class="${c.id === selC ? 'is-sel' : ''} ${filtering() && matches(c) ? 'hit' : ''}">${mini(c.kind, stationColor(c, th), c.done)}<span class="s-title" title="${esc(c.title)}">${esc(c.title)}</span><time class="s-time">${fmtShort(c.ts)}</time></li>`).join('')
       + (more > 0 ? `<li class="s-more"><span></span><span>${esc(t('moreEarlier', more))}</span><span></span></li>` : '')
     : `<li class="s-empty"><span></span><span>${esc(isInbox ? t('inboxEmpty') : t('noRecords'))}</span><span></span></li>`;
-  const chip = (apRun(th) ? `<span class="chip chip-auto" title="${esc(t('apTitle'))}">Autopilot</span>` : apWait(th) ? `<span class="chip chip-wait${apLost(th) ? ' is-lost' : ''}" title="${esc(t(apLost(th) ? 'apLostWhy_' + apLost(th) : 'apWait'))}">Autopilot${apLost(th) ? ' !' : '…'}</span>` : '') + (isInbox ? `<span class="chip">${esc(t('unsorted'))}</span>` : `<span class="chip chip-${th.status || 'active'}">${esc(statusLabel(th.status))}</span>`);
+  const chip = apChip(th) + (isInbox ? `<span class="chip">${esc(t('unsorted'))}</span>` : `<span class="chip chip-${th.status || 'active'}">${esc(statusLabel(th.status))}</span>`);
   const agents = cs.filter(c => c.kind === 'agent').length;
   return `<div class="${cls}${apD(th.id) != null ? ' ap-burst' : ''}" data-tid="${esc(th.id)}" style="left:${th.x || 0}px;top:${th.y || 0}px;--c:${th.color}${apD(th.id) != null ? `;--apd:${apD(th.id)}ms` : ''}">
     <div class="card-head">${isFolded(th) ? `<span class="grp-tog" data-park-tog="1" title="${esc(t(peeking ? 'peekClose' : th.status === 'done' ? 'peekOpen' : 'peekOpenParked'))}">${peeking ? '▾' : '▸'}</span>` : ''}<span class="roundel"></span><span class="card-name">${esc(th.name)}</span>${liveBadge(th.id)}${chip}</div>
-    ${apRun(th) && !shut ? `<div class="ap-tick"><span>${esc(apNow ? t('apTick', apNow.title) : t('apTickIdle'))}</span></div>` : ''}
+    ${shut ? '' : apTickHTML(th, cs)}
     <ol class="strip">${items}</ol>
     <div class="card-foot"><span>${esc(t('countRecords', cs.length))}${agents ? esc(t('countAgent', agents)) : ''}${mergedIn(th.id).length && !S.showMerged ? `<button class="linkish mi-tog" data-merged-tog="1" title="${esc(t(S.mergedOpen.has(th.id) ? 'mergedClose' : 'mergedOpen'))}">${esc(t('mergedInCount', mergedIn(th.id).length))} ${S.mergedOpen.has(th.id) ? '▾' : '▸'}</button>` : ''}</span><span>${last ? esc(t('updated', fmtRel(last.ts))) : ''}</span></div>
   </div>`;
@@ -4144,6 +4150,7 @@ function openHistory(on) {
   S.history = on; $('#history').hidden = !on; $('#hist-btn').setAttribute('aria-pressed', String(on));
   document.body.classList.toggle('history-open', on); $('#hist-label').textContent = t(on ? 'histBack' : 'histBtn');
   closeReplay();
+  if (on && S.sheet) closeSheet(); // the phone's Goals page sat over it, so History looked dead
   if (on) { select(null); S.histSig = S.commits.size + ':' + S.threads.size; renderHistory(); $('#history').scrollTop = 0; } else $('#history').innerHTML = '';
 }
 $('#hist-btn').onclick = () => openHistory(!S.history);
@@ -4196,7 +4203,8 @@ function renderGoals() {
     const showDone = S.glDone.includes(th.id), shown = showDone ? tasks.filter(c => !toReview(c)) : open;
     const pct = tasks.length ? Math.round(100 * (tasks.length - open.length) / tasks.length) : 0;
     return `<section class="gl-group" style="--c:${th.color}">
-        <div class="gl-head"><span class="roundel" style="--c:${th.color}"></span><b>${esc(th.name)}</b>${tasks.length > open.length ? `<button class="gl-prog" data-gl-done="${esc(th.id)}" aria-pressed="${showDone}" title="${esc(t(showDone ? 'goalsHideDone' : 'goalsShowDone'))}">✓ ${tasks.length - open.length}/${tasks.length} ${showDone ? '▾' : '▸'}</button>` : `<span class="gl-prog">${tasks.length - open.length}/${tasks.length}</span>`}${liveBadge(th.id)}<button class="linkish" data-goto="${esc(th.id)}">${esc(t('goalsOpenLine'))}</button></div>
+        <div class="gl-head"><span class="roundel" style="--c:${th.color}"></span><b>${esc(th.name)}</b>${tasks.length > open.length ? `<button class="gl-prog" data-gl-done="${esc(th.id)}" aria-pressed="${showDone}" title="${esc(t(showDone ? 'goalsHideDone' : 'goalsShowDone'))}">✓ ${tasks.length - open.length}/${tasks.length} ${showDone ? '▾' : '▸'}</button>` : `<span class="gl-prog">${tasks.length - open.length}/${tasks.length}</span>`}${liveBadge(th.id)}${apChip(th)}<button class="linkish" data-goto="${esc(th.id)}">${esc(t('goalsOpenLine'))}</button></div>
+        ${apRun(th) ? apTickHTML(th, byThread().get(th.id) || []) : ''}
         ${th.id === INBOX ? '' : S.glEdit === 'goal:' + th.id ? `<textarea class="gl-goal-in" data-goal="${esc(th.id)}" rows="${Math.min(6, Math.max(2, Math.ceil(goal.length / 22)))}" placeholder="${esc(t('threadGoalPh'))}">${esc(goal)}</textarea>` : `<div class="gl-goal ${goal ? '' : 'none'}" data-goal-edit="${esc(th.id)}" title="${esc(t('goalsEdit'))}">${esc(goal || t('goalsNoGoal'))}</div>`}
         ${tasks.length ? `<div class="gl-meter"><i style="width:${pct}%"></i></div>` : ''}
         ${review.length ? `<div class="gl-rv"><div class="gl-rv-head"><span>${esc(t('rvHead', review.length))}</span>${review.length > 1 ? `<button class="linkish" data-pass-all="${esc(th.id)}">${esc(t('rvPassAll'))}</button>` : ''}</div><ul class="gl-tasks">${review.map(rvRow).join('')}</ul></div>` : ''}

@@ -568,6 +568,7 @@ textarea.big-input { line-height: 1.3; }
 .md math { font-size: 1.1em; font-family: 'STIX Two Math', 'Cambria Math', 'Latin Modern Math', math; } /* a math font: brackets and roots stretch only with one (macOS has STIX Two, Windows Cambria) */ .md .md-math { overflow-x: auto; overflow-y: hidden; margin: 0 0 .7em; padding: .1em 0; }
 .md-body { background: var(--surface-2); border: 1px solid var(--rule-soft); border-radius: 8px; padding: 10px 12px; max-height: 46vh; overflow: auto; }
 body.read-page .sheet { width: min(860px, 100%); }
+.md-txt { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
 .md-read { font-size: 15px; line-height: 1.75; max-width: 72ch; margin: 0 auto; width: 100%; }
 .md-src { font-family: var(--f-mono); font-size: 11.5px; color: var(--faint); overflow-wrap: anywhere; }
 .links > div { display: flex; gap: 8px; align-items: baseline; min-width: 0; } .links > div code { flex: 1; }
@@ -1186,7 +1187,7 @@ apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent 
     dayLabel: d => `${I18N.en.week[d.getDay()]} ${d.getMonth() + 1}/${d.getDate()}`,
     monthLabel: d => `${I18N.en.months[d.getMonth()]} ${d.getFullYear()}`,
     tickDay: d => `${I18N.en.week[d.getDay()]} ${d.getDate()}`,
-    dRecord: 'Record', dTitle: 'Title', dKind: 'Type', dThread: 'Thread', dDone: 'Done', openTmux: 'Open in a terminal (tmux)', dBody: 'Details', mdEdit: 'Edit', mdDone: 'Done', mdExpand: 'Read', mdRead: 'Read', mdErr_missing: 'This file is not on this computer: it may have been moved or renamed, or it is on another machine.', mdErr_big: 'This file is over 2 MB.', mdErr_unlinked: 'No record links this file.', mdErr_type: 'Only .md files open here.', mdView: 'View', mdErr_bigImg: 'This image is over 10 MB.', dBodyPh: 'Context, a summary of what the agent produced, next steps…',
+    dRecord: 'Record', dTitle: 'Title', dKind: 'Type', dThread: 'Thread', dDone: 'Done', openTmux: 'Open in a terminal (tmux)', dBody: 'Details', mdEdit: 'Edit', mdDone: 'Done', mdExpand: 'Read', mdRead: 'Read', mdErr_missing: 'This file is not on this computer: it may have been moved or renamed, or it is on another machine.', mdErr_big: 'This file is over 2 MB.', mdErr_unlinked: 'No record links this file.', mdErr_type: 'Only .md and .txt files open here.', mdView: 'View', mdErr_bigImg: 'This image is over 10 MB.', dBodyPh: 'Context, a summary of what the agent produced, next steps…',
     dLinks: 'Links or file paths, one per line', dLinksPh: 'https://…  or  ~/Documents/plan.md', dAgent: 'Source', dAgentPh: 'me / Claude Code…', dTime: 'Time',
     forkedFromRec: 'Forked from', mergedFromThread: 'Merged from thread', forkedHere: 'Forked from here:',
     forkHere: 'Fork from here', viewThread: 'View thread', forkNamePh: 'Name of the new thread', createBranch: 'Create branch',
@@ -1367,7 +1368,7 @@ apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的
     dayLabel: d => `${d.getMonth() + 1}/${d.getDate()} 周${I18N.zh.week[d.getDay()]}`,
     monthLabel: d => `${d.getFullYear()} 年 ${d.getMonth() + 1} 月`,
     tickDay: d => `${d.getDate()} ${I18N.zh.week[d.getDay()]}`,
-    dRecord: '记录', dTitle: '标题', dKind: '类型', dThread: '所在线程', dDone: '已完成', openTmux: '在终端里打开（tmux）', dBody: '详情', mdEdit: '编辑', mdDone: '完成', mdExpand: '放大阅读', mdRead: '阅读', mdErr_missing: '这台电脑上找不到这个文件：可能已被移动或改名，或者在另一台机器上。', mdErr_big: '文件超过 2 MB。', mdErr_unlinked: '没有记录链接这个文件。', mdErr_type: '这里只能打开 .md 文件。', mdView: '查看', mdErr_bigImg: '这张图超过 10 MB。', dBodyPh: '背景、agent 的输出摘要、下一步要做什么…',
+    dRecord: '记录', dTitle: '标题', dKind: '类型', dThread: '所在线程', dDone: '已完成', openTmux: '在终端里打开（tmux）', dBody: '详情', mdEdit: '编辑', mdDone: '完成', mdExpand: '放大阅读', mdRead: '阅读', mdErr_missing: '这台电脑上找不到这个文件：可能已被移动或改名，或者在另一台机器上。', mdErr_big: '文件超过 2 MB。', mdErr_unlinked: '没有记录链接这个文件。', mdErr_type: '这里只能打开 .md 和 .txt 文件。', mdView: '查看', mdErr_bigImg: '这张图超过 10 MB。', dBodyPh: '背景、agent 的输出摘要、下一步要做什么…',
     dLinks: '链接或文件路径，每行一个', dLinksPh: 'https://…  或  ~/Documents/方案.md', dAgent: '来源', dAgentPh: '自己 / Claude Code…', dTime: '时间',
     forkedFromRec: '分叉自', mergedFromThread: '合并自线程', forkedHere: '从这里分出了',
     forkHere: '从这里分叉', viewThread: '查看线程', forkNamePh: '新线程名称', createBranch: '创建分支',
@@ -3079,8 +3080,8 @@ function threadOptions(selected, { excludeId, onlyOpen } = {}) {
   const opts = [...(S.focusGroup && selected !== INBOX ? [] : [{ id: INBOX, name: t('inbox') }]), ...orderedThreads().filter(th => th.id !== excludeId && (inFocus(th) || th.id === selected) && (!onlyOpen || th.status === 'active' || th.status === 'parked' || th.id === selected))];
   return opts.map(th => `<option value="${esc(th.id)}" ${th.id === selected ? 'selected' : ''}>${esc(th.name)}${th.status && th.status !== 'active' && th.id !== INBOX ? ` (${esc(statusLabel(th.status))})` : ''}</option>`).join('');
 }
-// A local report (a .md file a record links) gets 阅读, which shows it rendered in the reader.
-const isMdPath = l => !/^https?:\/\//i.test(l) && /\.(md|markdown)$/i.test(l.trim());
+// A local report (a .md or .txt file a record links) gets 阅读, which shows it in the reader (a .txt as it is written).
+const isMdPath = l => !/^https?:\/\//i.test(l) && /\.(md|markdown|txt)$/i.test(l.trim());
 // A local image a record links gets 查看, which opens it in the reader (loaded on the click, not before).
 const isImgPath = l => !/^https?:\/\//i.test(l) && /\.(png|jpe?g|gif|webp|svg)$/i.test(l.trim());
 function linksView(links) {
@@ -3302,7 +3303,7 @@ async function viewImage(path) {
 async function readFile(path) {
   openReader(path.split('/').pop(), null, path);
   const r = await fetch(`/api/md?path=${encodeURIComponent(path)}`, { headers: { 'X-Trace-Canvas': '1' }, cache: 'no-store' }).then(x => x.json()).catch(() => ({ error: t('syncOfflineTitle') }));
-  if (S.sheet === 'read') openReader(path.split('/').pop(), r.error ? `> ${mdErr(r.error)}` : r.text, path);
+  if (S.sheet === 'read') openReader(path.split('/').pop(), r.error ? `> ${mdErr(r.error)}` : r.text, path, !r.error && /\.txt$/i.test(path) ? `<pre class="md-txt">${esc(r.text)}</pre>` : undefined);
 }
 const delUI = q => S.ui.del
   ? `<span class="confirm">${esc(q)}</span><button class="btn btn-danger" data-act="del-confirm">${esc(t('del'))}</button><button class="btn" data-act="del-cancel">${esc(t('cancel'))}</button>`

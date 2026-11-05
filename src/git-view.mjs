@@ -107,11 +107,11 @@ export async function commitDiff(d, id, file, against = null) {
 
 const home = p => p.replace(/^~(?=\/|$)/, os.homedir());
 const linked = (d, p) => Object.values(d.commits || {}).some(c => (c.links || []).some(l => String(l).trim() === p));
-/** A local report a record links (.md or .markdown), as text for the page's reader, or an error code. Only a path some record
+/** A local report a record links (.md, .markdown or plain .txt), as text for the page's reader, or an error code. Only a path some record
  * links is read, so the page cannot read anything else; ~ is the home folder. */
 export function readLinkedMd(d, want) {
   const p = String(want || '').trim();
-  if (!/\.(md|markdown)$/i.test(p)) return { error: 'type' };
+  if (!/\.(md|markdown|txt)$/i.test(p)) return { error: 'type' };
   if (!linked(d, p)) return { error: 'unlinked' };
   try {
     const file = home(p), st = fs.statSync(file);

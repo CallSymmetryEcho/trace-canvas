@@ -24,11 +24,13 @@ test('a report reads as Markdown, and its text stays text', () => {
   assert.doesNotMatch(html, /<script>/);
 });
 
-test('the reader opens only .md files a record links', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-md-')), f = path.join(dir, 'r.md');
-  fs.writeFileSync(f, '# Report');
-  const d = { commits: { c1: { links: [f, path.join(dir, 'gone.md'), '/etc/hosts'] } } };
+test('the reader opens only .md and .txt files a record links', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-md-')), f = path.join(dir, 'r.md'), txt = path.join(dir, 'plan.txt');
+  fs.writeFileSync(f, '# Report'); fs.writeFileSync(txt, '大纲\n- Fig.1');
+  const d = { commits: { c1: { links: [f, txt, path.join(dir, 'gone.md'), '/etc/hosts', path.join(dir, 's.json')] } } };
   assert.deepEqual(readLinkedMd(d, f), { text: '# Report' });
+  assert.deepEqual(readLinkedMd(d, txt), { text: '大纲\n- Fig.1' });
+  assert.match(readLinkedMd(d, path.join(dir, 's.json')).error, /type/);
   assert.match(readLinkedMd(d, path.join(dir, 'other.md')).error, /unlinked/);
   assert.match(readLinkedMd(d, '/etc/hosts').error, /type/);
   assert.match(readLinkedMd(d, path.join(dir, 'gone.md')).error, /missing/);

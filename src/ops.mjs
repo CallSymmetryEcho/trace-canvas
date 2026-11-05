@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 // Operations shared by the MCP server and the command line:
 // putting a session on the canvas, merging threads, and merging data sets.
-import { INBOX, COLS, absorb, addCommit, createThread, findThreadByName, goalOf, hashId, lastCommit, readConfig, threadById, threadIdOf } from './store.mjs';
+import { INBOX, COLS, isTodo, absorb, addCommit, createThread, findThreadByName, goalOf, hashId, lastCommit, readConfig, threadById, threadIdOf } from './store.mjs';
 import { headline, firstLine } from './git-events.mjs';
 import { AGENT, bindSession, gitRoot, logGitEvents, repoInfo, resumeLink, sessionThread, turnBody, rel } from './hook.mjs';
 import { listLive } from './live.mjs';
@@ -30,10 +30,7 @@ export function resolveThreadRef(d, ref) {
   return t ? t.id : findThreadByName(d, ref);
 }
 
-// A to-do is a task meant to be ticked. The first instruction of a session, which hooks and
-// capture log as a task, is a record of what was asked, not a to-do; next steps Claude
-// writes as highlights are to-dos.
-export const isTodo = c => c.kind === 'task' && !(c.session && !c.highlight);
+export { isTodo }; // src/store.mjs, so the hooks count the to-dos trace_tasks lists
 
 export { goalOf } from './store.mjs';
 
@@ -220,13 +217,15 @@ export function decisionProfile(d) {
   const v = c => (c.kind === 'decision' || c.kind === 'note' ? Number(((c.title || '').match(/(?:决策画像|decision profile)\s*v(\d+)/i) || [])[1] ?? -1) : -1);
   return Object.values(d.commits).filter(c => v(c) >= 0).sort((a, b) => v(b) - v(a) || a.ts - b.ts)[0] || null;
 }
-// What the agent is told: work the line's open to-dos by the profile, log each decision with its rule, never do the
-// outward or risky things, check the switch before each to-do, and end with a summary record (which turns it off).
+// What the agent is told: clear the line's open to-dos by the profile, log each decision with its rule, never do the
+// outward or risky things, check the switch before each to-do. What it cannot decide it asks about in a Question record
+// and skips, so one question never ends the round; a to-do is its own unless a running session is on it. It stops to ask
+// (an Autopilot summary with the count and the questions together) only once nothing else is left.
 export function autopilotPrompt(d, th, tid) {
   const p = decisionProfile(d);
   const rules = p ? `Follow the decision profile, record ${p.id} (read it with trace_read_thread on its line "${(d.threads[p.thread] || {}).name || p.thread}").`
     : 'There is no decision profile yet, so follow these: H1 do the core first, nothing unasked; H2 a hand-over counts only when the other session has started on it; H3 ask before anything about permissions, credentials, start-up items, open ports, deleting, pushing or publishing; H4 ask about whatever these do not cover.';
-  return `Autopilot (beta) on the Trace Canvas line "${th.name}" (thread ${tid}): work through every open to-do on it, one at a time, as far as you can without the person; only this line's to-dos, not other lines'. First call trace_bind with thread "${tid}", read the line with trace_read_thread and its to-dos with trace_tasks (thread "${tid}"). ${rules} For every decision, log it with trace_log as "what you did · the rule it rests on". Never send email or messages to people, push, publish anything outside, or change permissions or credentials: get those ready and ask. Stop and ask the person when something touches security, is not covered by a rule, or is listed as swinging. Before each to-do call trace_tasks; if the line no longer shows autopilot: true, the person stopped it: stop there. If it shows toReview: ${REVIEW_GATE} or more, stop too: the person reviews first. When you tick a to-do, give trace_task_done a result: one line on what you did and where it is, for the person's review. A to-do with returned: was sent back by the person with that reason: do it first, by the reason. Autopilot stays on until the person turns it off. When you reach what you cannot decide, or nothing open is left that you can do, log one record whose title starts with "Autopilot summary": what you did since the last one and on which rule, where you are stuck, and what needs the person's yes; then stop and ask. When the person answers, log the answer as a decision and go on the same way, until the next thing you cannot decide. When the profile does not settle a decision, look before you ask: lessons of finished projects (memory_recall, type lesson), and the decisions on archived lines of a like project (trace_read_thread); say which you rest on.`;
+  return `Autopilot (beta) on the Trace Canvas line "${th.name}" (thread ${tid}): the goal is to clear this line's open to-dos: each one ends done and ticked, or waiting on the person with its question asked. Work through them one at a time, as far as you can without the person; only this line's to-dos, not other lines'. A to-do is yours whoever logged it and whatever its assignee says (that names a kind of agent, not someone holding it), unless another session running now (trace_live) has logged work on it on this line in the last two hours: leave that one to it. First call trace_bind with thread "${tid}", read the line with trace_read_thread and its to-dos with trace_tasks (thread "${tid}"). ${rules} For every decision, log it with trace_log as "what you did · the rule it rests on". Never send email or messages to people, push, publish anything outside, or change permissions or credentials: get those ready and leave them waiting on the person. A to-do that needs the person's yes, touches security, is not covered by a rule or is listed as swinging does not stop the round: log its question with trace_log (kind "note", title "Question: <the question> [<its id>]"), leave it open and go on with the next one. Before each to-do call trace_tasks; if the line no longer shows autopilot: true, the person stopped it: stop there. If it shows toReview: ${REVIEW_GATE} or more, stop too: the person reviews first. When you tick a to-do, give trace_task_done a result: one line on what you did and where it is, for the person's review. A to-do with returned: was sent back by the person with that reason: do it first, by the reason. Autopilot stays on until the person turns it off. Only when every open to-do is done, waiting on the person or with another running session, log one record whose title starts with "Autopilot summary" and goes on with the count, as "Autopilot summary: cleared N · M wait on you · K with others": what you did since the last one and on which rule, then all the questions together; then stop and ask. When the person answers, log the answer as a decision and go on the same way, until the line is clear or only questions are left. When the profile does not settle a decision, look before you ask: lessons of finished projects (memory_recall, type lesson), and the decisions on archived lines of a like project (trace_read_thread); say which you rest on.`;
 }
 /** Starts a round: every open to-do on the line goes to its agent with the Autopilot prompt (rows as dispatch). */
 // Autopilot pauses when this many of a line's to-dos wait for the person's review.

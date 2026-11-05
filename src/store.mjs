@@ -207,6 +207,12 @@ export function ensureThread(d, name) {
   return t ? t.id : findThreadByName(d, name) || createThread(d, { name: String(name).trim() }).id;
 }
 
+// A to-do is a task meant to be ticked. The first instruction of a session, which hooks and
+// capture log as a task, is a record of what was asked, not a to-do; next steps Claude
+// writes as highlights are to-dos.
+export const isTodo = c => c.kind === 'task' && !(c.session && !c.highlight);
+// An Autopilot agent's question on a to-do it cannot decide, naming the to-do's id: it goes on with the next one.
+export const AUTOPILOT_ASK = /^(Question|问题)\s*[:：]/i;
 // The record an Autopilot agent writes when it has done what is open, before it waits for more (src/ops.mjs).
 export const AUTOPILOT_END = /^Autopilot (summary|小结)/i;
 export function addCommit(d, { thread, kind = 'idea', title, body = '', links = [], agent = '', ts = Date.now(), parents, extra = {} }) {

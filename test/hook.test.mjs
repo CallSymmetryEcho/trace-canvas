@@ -239,10 +239,10 @@ test('an Autopilot agent that stops while it could go on is handed its next to-d
   const tid = mutate(d => { const th = createThread(d, { name: 'App' }); th.autopilot = { at: now - 9e4, session: 's1', on: now - 6e4 }; return th.id; }, s.env);
   const [a, b] = mutate(d => [addCommit(d, { thread: tid, kind: 'task', title: 'Fix login', ts: now - 5e4 }).id, addCommit(d, { thread: tid, kind: 'task', title: 'Write docs', ts: now - 4e4 }).id], s.env);
   assert.equal(autopilotStop({ session_id: 's2' }, s.env), ''); // not its agent
-  assert.match(autopilotStop({ session_id: 's1' }, s.env), new RegExp(`Autopilot is on for the line "App" \\(thread ${tid}\\): 2 to-dos open, next: Fix login \\[${a}\\]\\. .*this line's to-dos only`));
+  assert.match(autopilotStop({ session_id: 's1' }, s.env), new RegExp(`Autopilot is on for the line "App" \\(thread ${tid}\\), to clear its to-dos: 2 open, next: Fix login \\[${a}\\]\\. .*this line's to-dos only.*log "Question: `));
   assert.equal(autopilotStop({ session_id: 's1' }, s.env), ''); // pushed, nothing done since: it may stop
   mutate(d => { d.commits[a].done = true; }, s.env);
-  assert.match(autopilotStop({ session_id: 's1' }, s.env), new RegExp(`1 to-do open, next: Write docs \\[${b}\\]`)); // progress: on
+  assert.match(autopilotStop({ session_id: 's1' }, s.env), new RegExp(`1 open, next: Write docs \\[${b}\\]`)); // progress: on
   mutate(d => { addCommit(d, { thread: tid, kind: 'note', title: 'Autopilot summary: docs need your call on the tone' }); }, s.env);
   assert.equal(autopilotStop({ session_id: 's1' }, s.env), ''); // it stopped to ask
   // The person answers: a new stretch, pushed on again until its next question.
@@ -250,6 +250,24 @@ test('an Autopilot agent that stops while it could go on is handed its next to-d
   assert.match(autopilotStop({ session_id: 's1' }, s.env), /next: Write docs/);
   mutate(d => { delete d.threads[tid].autopilot; }, s.env);
   assert.equal(autopilotStop({ session_id: 's1' }, s.env), ''); // stopped by the person
+});
+
+test('the Stop hook counts the to-dos trace_tasks lists, skips those asked about, and asks for the summary when only questions are left', async () => {
+  const { autopilotStop } = await import('../src/hook.mjs');
+  const { addCommit } = await import('../src/store.mjs');
+  const s = sandbox();
+  const now = Date.now();
+  const tid = mutate(d => { const th = createThread(d, { name: 'App' }); th.autopilot = { at: now - 9e4, session: 's1', on: now - 6e4 }; return th.id; }, s.env);
+  const [a, b] = mutate(d => {
+    addCommit(d, { thread: tid, kind: 'task', title: 'Fix the login page please', ts: now - 7e4, extra: { session: 'old' } }); // a session's first instruction: not a to-do
+    return [addCommit(d, { thread: tid, kind: 'task', title: 'Pick a logo', ts: now - 5e4 }).id, addCommit(d, { thread: tid, kind: 'task', title: 'Write docs', ts: now - 4e4 }).id];
+  }, s.env);
+  assert.match(autopilotStop({ session_id: 's1' }, s.env), new RegExp(`2 open, next: Pick a logo \\[${a}\\]`));
+  mutate(d => { addCommit(d, { thread: tid, kind: 'note', title: `Question: which of the three logos? [${a}]` }); }, s.env);
+  assert.match(autopilotStop({ session_id: 's1' }, s.env), new RegExp(`2 open, next: Write docs \\[${b}\\]`)); // asked: skipped, and that was progress
+  mutate(d => { addCommit(d, { thread: tid, kind: 'note', title: '问题：文档用中文还是英文？', body: `[${b}]` }); }, s.env);
+  assert.match(autopilotStop({ session_id: 's1' }, s.env), /2 open, each with a question asked\. Log the "Autopilot summary" with the count/);
+  assert.equal(autopilotStop({ session_id: 's1' }, s.env), ''); // nothing new since: it may stop
 });
 
 test('turning Autopilot off holds its session at the next tool until the person speaks to it or a new round starts', async () => {

@@ -15,7 +15,7 @@ import { lessonsFor } from './lessons.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { dataFile, home, mutate, readConfig, readData, createThread, addCommit, lastCommit, goalOf, hashId, threadById, threadByKey, AUTOPILOT_END } from './store.mjs';
+import { dataFile, home, mutate, readConfig, readData, createThread, addCommit, lastCommit, goalOf, hashId, threadById, threadByKey, isTodo, AUTOPILOT_ASK, AUTOPILOT_END } from './store.mjs';
 import { gitEvents, redirectTargets, BASH_WRITES, EDIT_TOOLS, GIT_COMMIT, commandDir, commitMessage, headline, firstLine, cleanPrompt } from './git-events.mjs';
 import { tr } from './i18n.mjs';
 const threadIdOfLocal = (d, c) => (c && c.thread && d.threads[c.thread] ? c.thread : 'inbox');
@@ -420,10 +420,16 @@ export function autopilotStop(input, env = process.env) {
     const ap = th.autopilot, since = Math.max(ap.on || 0, ap.turn || 0);
     const cs = Object.values(d.commits).filter(c => threadIdOfLocal(d, c) === th.id);
     if (cs.some(c => c.ts > since && AUTOPILOT_END.test(c.title || ''))) return false; // it stopped to ask
-    const open = cs.filter(c => c.kind === 'task' && !c.done).sort((a, b) => a.ts - b.ts), done = cs.filter(c => c.kind === 'task' && c.done).length;
-    if (!open.length || (ap.nudged && done <= ap.doneAtNudge)) return false;
-    th.autopilot = { ...ap, nudged: (ap.nudged || 0) + 1, doneAtNudge: done };
-    reason = `Autopilot is on for the line "${th.name}" (thread ${th.id}): ${open.length} to-do${open.length === 1 ? '' : 's'} open, next: ${firstLine(open[0].title, 120)} [${open[0].id}]. Go on by the decision profile, with this line's to-dos only. If you cannot decide it, log a record titled "Autopilot summary" with your question, then stop.`;
+    // The to-dos trace_tasks lists (not a session's first instruction), less those it has asked about this round.
+    const asks = cs.filter(c => c.ts > (ap.on || 0) && AUTOPILOT_ASK.test(c.title || '')).map(c => `${c.title} ${c.body || ''}`);
+    const open = cs.filter(c => isTodo(c) && !c.done).sort((a, b) => a.ts - b.ts), todo = open.filter(c => !asks.some(a => a.includes(c.id)));
+    const progress = cs.filter(c => isTodo(c) && c.done).length + open.length - todo.length; // ticked, or asked about
+    if (!open.length || (ap.nudged && progress <= ap.doneAtNudge)) return false;
+    th.autopilot = { ...ap, nudged: (ap.nudged || 0) + 1, doneAtNudge: progress };
+    const head = `Autopilot is on for the line "${th.name}" (thread ${th.id}), to clear its to-dos: ${open.length} open`;
+    reason = todo.length
+      ? `${head}, next: ${firstLine(todo[0].title, 120)} [${todo[0].id}]. Go on by the decision profile, with this line's to-dos only. One you cannot decide: log "Question: <the question> [<its id>]" and go on with the next; write the "Autopilot summary" only when the rest all wait on the person or on another running session.`
+      : `${head}, each with a question asked. Log the "Autopilot summary" with the count (cleared N · M wait on you · K with others) and the questions together, then stop.`;
   }, env);
   return reason;
 }
@@ -449,7 +455,7 @@ export function promptContext(input, env = process.env) {
   const th = threadId && d.threads[threadId];
   // The person answering an Autopilot agent that stopped to ask: the switch is still on, so it goes on after this.
   const ap = Object.values(d.threads).find(t => t.autopilot && t.autopilot.session === input.session_id);
-  const apNote = ap ? ` Autopilot is still on for the line "${ap.name}" (thread ${ap.id}): if this message answers what you stopped to ask, log the answer as a decision, then go on with its open to-dos by the decision profile until the next thing you cannot decide.` : '';
+  const apNote = ap ? ` Autopilot is still on for the line "${ap.name}" (thread ${ap.id}): if this message answers what you stopped to ask, log the answer as a decision, then go on clearing its open to-dos by the decision profile (one you cannot decide: log "Question: … [its id]" and go on) until the line is clear or only questions are left.` : '';
   if (!th) return apNote.trim();
   const open = Object.values(d.commits).filter(c => threadIdOfLocal(d, c) === th.id && c.kind === 'task' && !c.done && !(c.session && !c.highlight)).sort((a, b) => a.ts - b.ts);
   return `Trace Canvas: you work on the line "${th.name}" (thread ${th.id}). If this message gives a new goal, idea or next step worth tracking, add each one now as a to-do with trace_log (kind "task", thread "${th.id}"), one short title per item; not the request in this message, which you are doing now, nor anything you will finish in this same turn${open.length ? `, and what is already open: ${open.slice(-8).map(c => firstLine(c.title, 60)).join('; ')}` : ''}.${apNote}`;

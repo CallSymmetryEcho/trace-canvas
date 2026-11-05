@@ -224,9 +224,9 @@ Agents use the same list. At the start of work they read the goal and the open t
 
 ## Autopilot (beta): a line's to-dos, done by your rules
 
-**Autopilot (beta)** in a line's panel (or `trace-canvas autopilot <line>`, or `/trace-canvas autopilot <line>`) runs one round: the line's agent works through every open to-do by your **decision profile** and logs each decision as "what it did · the rule it rests on", so you can follow it on the line. It never sends email or messages to people, pushes, publishes anything or changes permissions or credentials: it gets those ready and asks you. It stops to ask when something touches security, no rule covers it, or the rule is still swinging.
+**Autopilot (beta)** in a line's panel (or `trace-canvas autopilot <line>`, or `/trace-canvas autopilot <line>`) keeps a line's to-dos moving until you turn it off: the line's agent works through every open to-do by your **decision profile** and logs each decision as "what it did · the rule it rests on", so you can follow it on the line. It never sends email or messages to people, pushes, publishes anything or changes permissions or credentials: it gets those ready and asks you. It stops to ask when something touches security, no rule covers it, or the rule is still swinging.
 
-The decision profile is a decision or note on any line titled with its name and a version, such as "decision profile v1" or "决策画像 v1" (the highest version counts; later records with the same version add to it): your hard rules, the stable rules your past decisions show, what still swings, and one-offs that are not rules. Without one, Autopilot follows four basic rules. While a round runs the line shows **Autopilot** and the button reads **Stop Autopilot**; the round ends with an "Autopilot summary" record. There is no switch that keeps it on and nothing runs on a timer: each round is one click.
+The decision profile is a decision or note on any line titled with its name and a version, such as "decision profile v1" or "决策画像 v1" (the highest version counts; later records with the same version add to it): your hard rules, the stable rules your past decisions show, what still swings, and one-offs that are not rules. Without one, Autopilot follows four basic rules. While it is on the line shows **Autopilot** and the button reads **Stop Autopilot**. Each time the agent has done what is open it logs an "Autopilot summary" record and waits (`trace-canvas autopilot <line> --wait`, in the background, so waiting costs nothing); a new to-do on the line wakes it. It stops only when you turn it off.
 
 ![How Autopilot decides](docs/autopilot.svg)
 
@@ -388,7 +388,7 @@ Setup (--user for every project, --project DIR for one)
   trace-canvas mcp              Run the MCP server on stdio (Claude Code starts this)
   trace-canvas lang <en|zh>     Language of records the hooks write
   trace-canvas terminal [iterm|terminal]   macOS: open agents in iTerm2 tabs or Terminal windows (default: iTerm2 when installed)
-  trace-canvas autopilot <line> [--stop]   Autopilot (beta): one round on the line by your decision profile
+  trace-canvas autopilot <line> [--stop]   Autopilot (beta): the line's to-dos by your decision profile, until you stop it
   trace-canvas doctor           Check the setup and say how to fix each problem (also More → Check setup)
   trace-canvas where            Show where the data is stored
   trace-canvas phone            Open the canvas on your phone (Tailscale and a QR code; see docs/phone.md)

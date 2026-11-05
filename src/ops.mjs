@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 // Operations shared by the MCP server and the command line:
 // putting a session on the canvas, merging threads, and merging data sets.
-import { INBOX, COLS, absorb, addCommit, createThread, findThreadByName, goalOf, hashId, lastCommit, readConfig, threadById, threadIdOf } from './store.mjs';
+import { INBOX, COLS, absorb, addCommit, createThread, findThreadByName, goalOf, hashId, lastCommit, readConfig, threadById, threadIdOf, AUTOPILOT_END } from './store.mjs';
 import { headline, firstLine } from './git-events.mjs';
 import { AGENT, bindSession, gitRoot, logGitEvents, repoInfo, resumeLink, sessionThread, turnBody, rel } from './hook.mjs';
 import { listLive } from './live.mjs';
@@ -202,7 +202,7 @@ export function dispatch(d, { refs = [], all = false, self = null, on = '', away
   }
   return rows;
 }
-// ---------- Autopilot (beta): one round on one line ----------
+// ---------- Autopilot (beta): a line's to-dos, worked until the person turns it off ----------
 // The decision profile: a decision or note titled with it and a version ("决策画像 v0", "decision profile v2"), on any line. null when there is none yet.
 export function decisionProfile(d) {
   // The highest version wins; within a version the first record is the profile, later ones are its additions.
@@ -215,7 +215,7 @@ export function autopilotPrompt(d, th, tid) {
   const p = decisionProfile(d);
   const rules = p ? `Follow the decision profile, record ${p.id} (read it with trace_read_thread on its line "${(d.threads[p.thread] || {}).name || p.thread}").`
     : 'There is no decision profile yet, so follow these: H1 do the core first, nothing unasked; H2 a hand-over counts only when the other session has started on it; H3 ask before anything about permissions, credentials, start-up items, open ports, deleting, pushing or publishing; H4 ask about whatever these do not cover.';
-  return `Autopilot (beta) on the Trace Canvas line "${th.name}" (thread ${tid}): work through every open to-do on it, one at a time, as far as you can without the person. First call trace_bind with thread "${tid}", read the line with trace_read_thread and its to-dos with trace_tasks (thread "${tid}"). ${rules} For every decision, log it with trace_log as "what you did · the rule it rests on". Never send email or messages to people, push, publish anything outside, or change permissions or credentials: get those ready and ask. Stop and ask the person when something touches security, is not covered by a rule, or is listed as swinging. Before each to-do call trace_tasks; if the line no longer shows autopilot: true, the person stopped it: stop there. When you are done or stopped, log one record whose title starts with "Autopilot summary": what you did and on which rule, where you got stuck, and what needs the person's yes. When the profile does not settle a decision, look before you ask: lessons of finished projects (memory_recall, type lesson), and the decisions on archived lines of a like project (trace_read_thread); say which you rest on.`;
+  return `Autopilot (beta) on the Trace Canvas line "${th.name}" (thread ${tid}): work through every open to-do on it, one at a time, as far as you can without the person. First call trace_bind with thread "${tid}", read the line with trace_read_thread and its to-dos with trace_tasks (thread "${tid}"). ${rules} For every decision, log it with trace_log as "what you did · the rule it rests on". Never send email or messages to people, push, publish anything outside, or change permissions or credentials: get those ready and ask. Stop and ask the person when something touches security, is not covered by a rule, or is listed as swinging. Before each to-do call trace_tasks; if the line no longer shows autopilot: true, the person stopped it: stop there. Autopilot stays on until the person turns it off. When no open to-do is left that you can do, log one record whose title starts with "Autopilot summary": what you did since the last one and on which rule, where you got stuck, and what needs the person's yes. Then wait for new to-dos: run \`trace-canvas autopilot "${tid}" --wait\` (in the background when your tool tells you once it ends, as Claude Code's does; otherwise in the foreground with --timeout 540, again each time it ends with nothing new). It prints the new to-dos: work them the same way. When it says Autopilot is off, the person stopped it: stop there, without another summary. When the profile does not settle a decision, look before you ask: lessons of finished projects (memory_recall, type lesson), and the decisions on archived lines of a like project (trace_read_thread); say which you rest on.`;
 }
 /** Starts a round: every open to-do on the line goes to its agent with the Autopilot prompt (rows as dispatch). */
 export function startAutopilot(d, { thread, self = null }, env = process.env) {
@@ -226,6 +226,16 @@ export function startAutopilot(d, { thread, self = null }, env = process.env) {
   const rows = dispatch(d, { refs: open, self, prompt: () => autopilotPrompt(d, th, tid) }, env);
   th.autopilot = { at: Date.now() }; // asked; it runs once a session's hook takes the prompt (src/hook.mjs)
   return rows;
+}
+/** What an Autopilot agent waits for: the switch turned off ({ off }), or to-dos opened on the line since its last
+ * summary (or since it was turned on). ponytail: one added in the seconds between its last trace_tasks and its summary
+ * waits for the next one. */
+export function autopilotNews(d, tid) {
+  const th = d.threads[tid];
+  if (!th || !th.autopilot) return { off: true };
+  const cs = Object.values(d.commits).filter(c => threadIdOf(d, c) === tid);
+  const since = Math.max(th.autopilot.at || 0, ...cs.filter(c => AUTOPILOT_END.test(c.title || '')).map(c => c.ts));
+  return { todos: cs.filter(c => isTodo(c) && !c.done && c.ts > since).sort((a, b) => a.ts - b.ts).map(c => ({ id: c.id, title: c.title })) };
 }
 export function stopAutopilot(d, { thread }) {
   const tid = resolveThreadRef(d, thread), th = tid && d.threads[tid];

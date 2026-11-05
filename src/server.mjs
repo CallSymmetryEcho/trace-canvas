@@ -171,7 +171,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         broadcast('change');
         return send(res, 200, failed ? { error: failed, command: r.command } : { ok: true, command: r.command });
       }
-      // Autopilot (beta): one round on a line (trace-canvas autopilot). A stopped or new session opens in a terminal tab;
+      // Autopilot (beta) on a line, until it is turned off (trace-canvas autopilot). A stopped or new session opens in a terminal tab;
       // a running one takes the prompt only from the person or another agent, so it comes back to be copied.
       if (req.method === 'POST' && p === '/api/autopilot') {
         const body = JSON.parse(await readBody(req)), thread = String(body.thread || '');

@@ -79,14 +79,14 @@ Call `trace_tasks` (it answers for the line this session works on; pass `thread`
 3. **Your own line** means those to-dos are yours: do them after the others are handed out. Where a session **is busy**, ask the user which they want, in these words: **A** paste the message into it when it stops, or **B** start a new session with the command it prints. Never pick for them, and never say a session got the to-dos when it did not.
 4. Report one row per line: which agent got which to-dos and how it was woken. Only to-dos are handed out; if the user's new items are ideas, say so and offer to make them to-dos.
 
-## autopilot <thread>: one Autopilot (beta) round on a line
+## autopilot <thread>: Autopilot (beta) on a line, until it is turned off
 
-Only when the user asks for it by name. It hands every open to-do on the line to the line's agent with the decision profile: that agent works through them, logs each decision with the rule it rests on, never sends email or messages to people, pushes, publishes or changes permissions, stops to ask about anything risky or not covered, and ends with a record titled "Autopilot summary".
+Only when the user asks for it by name. It hands every open to-do on the line to the line's agent with the decision profile: that agent works through them, logs each decision with the rule it rests on, never sends email or messages to people, pushes, publishes or changes permissions, stops to ask about anything risky or not covered. Each time it has done what is open it logs a record titled "Autopilot summary" and waits for new to-dos; it stops only when it is turned off.
 
 1. Run `node <this skill's folder>/../bin/trace-canvas.mjs autopilot "<thread>"` (`trace-canvas autopilot` if it is on the PATH). Its rows read like dispatch's; handle them the same way (step 2 and 3 of dispatch): send the message to a running session, ask A or B for a busy one.
 2. A hand-over counts only when that session has started: check `trace_live` (it shows working on the line) or its first record, and say so if it has not.
-3. To stop a round: `… autopilot "<thread>" --stop`. The agent stops before its next to-do.
-4. If you are the agent that got an Autopilot prompt: before each to-do call `trace_tasks`; when the line no longer shows `autopilot: true`, stop and write the summary.
+3. To stop it: `… autopilot "<thread>" --stop`. The agent stops before its next to-do, or as soon as it is waiting.
+4. If you are the agent that got an Autopilot prompt: before each to-do call `trace_tasks`; when the line no longer shows `autopilot: true`, stop. When nothing open is left that you can do, log the "Autopilot summary", then run `trace-canvas autopilot "<thread>" --wait` (in the background if your tool tells you when it ends; otherwise in the foreground with `--timeout 540`, again each time it ends with nothing new). Work the to-dos it prints; when it says Autopilot is off, stop.
 
 ## retro <thread>: which work took the most back-and-forth, and what to keep
 

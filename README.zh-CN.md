@@ -224,7 +224,7 @@ agent 用的是同一份清单：开工时用 `trace_tasks` 读目标和待办�
 
 ## Autopilot（beta）：照你的规则，把一条线上的待办做完
 
-在线的面板里点 **Autopilot（beta）**，就跑一轮。也可以用 `trace-canvas autopilot <线>`，或者在会话里输入 `/trace-canvas autopilot <线>`。
+在线的面板里打开 **Autopilot（beta）**，它就一直做这条线的待办，直到你关掉。也可以用 `trace-canvas autopilot <线>`，或者在会话里输入 `/trace-canvas autopilot <线>`。
 
 **它做什么**
 - 这条线的 agent 按你的**决策画像**，把所有没做完的待办一条条做下去。
@@ -248,9 +248,9 @@ agent 用的是同一份清单：开工时用 `trace_tasks` 读目标和待办�
 - 还没有决策画像时，Autopilot 照四条基本规则做。
 
 **跑的时候**
-- 一轮跑着时，线上亮着 **Autopilot**，按钮变成**停止 Autopilot**。
-- 一轮结束时，它写一条「Autopilot 小结」。
-- 没有常开的总开关，也不会定时自己跑：点一次只跑一轮。
+- 开着的时候，线上亮着 **Autopilot**，按钮变成**停止 Autopilot**。
+- 手上的待办做完了，它写一条「Autopilot 小结」，然后等新待办（`trace-canvas autopilot <线> --wait`，放在后台等，等的时候不花钱）；线上来了新待办，它就接着做。
+- 只有你关掉它才停。
 
 ![Autopilot 怎么做决定](docs/autopilot.zh-CN.svg)
 
@@ -417,7 +417,7 @@ node bin/trace-canvas.mjs log "文献对比表完成" \
   trace-canvas mcp              以 stdio 运行 MCP 服务（由 Claude Code 启动）
   trace-canvas lang <en|zh>     hooks 写入记录的语言
   trace-canvas terminal [iterm|terminal]   macOS：agent 开在 iTerm2 标签页，还是「终端」新窗口（默认：装了 iTerm2 就用它）
-  trace-canvas autopilot <线> [--stop]   Autopilot（beta）：按决策画像在这条线上跑一轮
+  trace-canvas autopilot <线> [--stop]   Autopilot（beta）：按决策画像做这条线的待办，直到你关掉
   trace-canvas doctor           检查设置，逐项告诉你怎么修（页面上是「更多 → 检查设置」）
   trace-canvas where            显示数据存放位置
   trace-canvas phone            在手机上打开画布（Tailscale 扫码，见 docs/phone.zh-CN.md）

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.3.5 (2026-11-05)
+
+Autopilot that keeps going and hands work to helpers, reviews for agents' ticks, agents on other machines that outlive the window, and a lighter page on tablets and e-readers.
+
+### New
+
 - **Autopilot goes on by itself, in a session of its own.** When its agent stops while it could go on (no summary since your last message, to-dos still open on its line), the Stop hook hands it the next to-do, so you do not have to keep prompting it; it stops when it logs a summary to ask you, or when a push brought no progress. A line's session is kept only when it worked on nothing but this line (it keeps its memory of the line); one that also worked elsewhere gets a new session bound to the line, so other lines' to-dos stay out. The switch lights when the line's own agent starts it, and when another agent hands it on in its own words. Claude Code for now.
 - **Agents' ticks wait for your review.** A to-do an agent ticks shows under **To review** on its line in Goals, with who did it, when, and the line it gave (`trace_task_done` takes a `result`): **Pass** files it with the done ones, **Return** opens it again for that agent with your reason, first in its list and in its next session's start. The Goals button shows how many wait. Autopilot pauses when ten wait on a line. A line with nothing open or to review, quiet for a day, folds to the foot of the list; one waiting for review never does. Ticks from before this update need no review.
 - **Autopilot stays on until you turn it off.** It no longer switches off after its summary: the agent works until it reaches what it cannot decide, logs an "Autopilot summary" and asks; when you answer in its session it goes on to the next thing it cannot decide (the hook reminds it the switch is still on). Only Stop turns it off. The card's ticker says when it has stopped to ask.
@@ -15,6 +21,16 @@
 - **Agents sent to another machine keep running.** Dispatch and Autopilot start an agent for another machine in a detached tmux session there (`tc-<to-do>` for a new one, `tc-<session>` for a resumed one), then open a window attached to it: closing the window or losing the network no longer stops the agent. Each row also prints the plain `ssh -t` command for running it by hand, and the panel's resume command stays that one. A machine without tmux gets the `ssh -t` window as before, with a line saying to install tmux. This machine's agents are unchanged.
 - **Formulas in records and reports.** `$…$` in a record's details or a linked `.md` report reads as a formula in the line, `$$…$$` on lines of its own as a centred one, drawn by the browser itself (MathML: no library, works offline). Fractions, roots, scripts, Greek, operators, accents, `\left…\right`, matrices, `cases` and `aligned` are covered; a formula it cannot read shows as its source. A `$` in code, or money such as "$5 and $10", stays text.
 - **Images in the reader.** A record that links an image (png, jpg, gif, webp, svg) gets **View**, which opens it in the reader; a linked report's `![alt](path)` images show in it, a relative path taken from the report's folder. Images load only when you open them, up to 10 MB, and only ones a record or a linked report points to.
+
+- **Autopilot works in parallel and aims to clear the line.** It first logs a Plan that splits the line's to-dos into ones that must go in order and ones that stand alone; it does the ordered ones itself and hands big stand-alone ones to at most two subagents of its own, each in its own worktree, checking and merging their work before it ticks. What it cannot decide it asks about in a Question record and moves on; the summary leads with the count. A round nobody takes up within 3 minutes, or whose session has stopped, shows amber with **Hand it out again**; turning Autopilot off holds its session at its next tool until you speak to it.
+
+### Fixed
+
+- **Linux opens agents as tabs in one window.** `x-terminal-emulator` is followed to the terminal it points to, so GNOME Terminal and Konsole open a tab instead of a new window for each agent (Debian's `gnome-terminal.wrapper` turned the command into `--wait`, a window each time).
+- **Lighter on tablets and e-readers.** On a touch-only screen the looping animations (the light round an Autopilot card, the ticker, the running dots) stand still, as they do when the system asks for less motion; an idle page drew every frame, about eight times the CPU. There the canvas fits no smaller than 60% and starts at the top, so cards are readable and you pan for the rest. The page's data comes gzipped (about 3 MB down to under 1 MB, fetched again on every change).
+- **▶ Start opens the agent a to-do is handed to.** A to-do handed to Codex or Gemini starts that agent, instead of Claude Code taking it over; **Open in Terminal** shows on Linux too.
+- **An agent opened from inside another is a session of its own.** Dispatch run by an agent, a page server an agent's tools started, and AI tidy-up no longer pass on the caller's Claude Code session variables (`CLAUDECODE`, `CLAUDE_CODE_SESSION_ID`, its message socket): the new agent took itself for the caller's child, wrote no session file and could not be messaged. Settings you set yourself, such as `CLAUDE_CONFIG_DIR`, are kept.
+- **Autopilot holds up under load.** One session per round; a running round is neither taken by a second session nor started over; the Stop hook writes nothing to the line, holds at the review gate and lets your answer free the to-do; no ssh while the data is locked.
 
 ## 0.3.4 (2026-11-04)
 

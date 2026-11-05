@@ -288,3 +288,20 @@ test('turning Autopilot off holds its session at the next tool until the person 
   mutate(d => { d.threads[tid].autopilot = { at: 3 }; stopAutopilot(d, { thread: tid }); }, s.env);
   assert.equal(s.data().threads[tid].apStopped, undefined);
 });
+
+test('a to-do handed to a worker is not pushed again, and with only workers left the agent may wait for them', async () => {
+  const { autopilotStop } = await import('../src/hook.mjs');
+  const { addCommit } = await import('../src/store.mjs');
+  const { autopilotPrompt } = await import('../src/ops.mjs');
+  const s = sandbox();
+  const now = Date.now();
+  const tid = mutate(d => { const th = createThread(d, { name: 'App' }); th.autopilot = { at: now - 9e4, session: 's1', on: now - 6e4 }; return th.id; }, s.env);
+  const [a, b] = mutate(d => [addCommit(d, { thread: tid, kind: 'task', title: 'Export to CSV', ts: now - 5e4 }).id, addCommit(d, { thread: tid, kind: 'task', title: 'Dark mode', ts: now - 4e4 }).id], s.env);
+  assert.match(autopilotPrompt(s.data(), s.data().threads[tid], tid), /log the split as one decision titled "Plan: …".*subagent of your own, in its own git worktree, at most 2 at a time: log "Worker: <its title> \[<its id>\]"/);
+  mutate(d => { addCommit(d, { thread: tid, kind: 'note', title: `Worker: Export to CSV [${a}]` }); }, s.env);
+  assert.match(autopilotStop({ session_id: 's1' }, s.env), new RegExp(`next: Dark mode \\[${b}\\]`));
+  mutate(d => { addCommit(d, { thread: tid, kind: 'note', title: `并行：深色模式 [${b}]` }); }, s.env);
+  assert.equal(autopilotStop({ session_id: 's1' }, s.env), ''); // both with workers: their results wake it
+  mutate(d => { d.commits[a].done = true; addCommit(d, { thread: tid, kind: 'note', title: `Question: which palette? [${b}]` }); }, s.env);
+  assert.match(autopilotStop({ session_id: 's1' }, s.env), /1 open, each with a question asked/); // the worker came back with a question
+});

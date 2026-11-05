@@ -15,7 +15,7 @@ import { lessonsFor } from './lessons.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { dataFile, home, mutate, readConfig, readData, createThread, addCommit, lastCommit, goalOf, hashId, threadById, threadByKey, isTodo, AUTOPILOT_ASK, AUTOPILOT_END } from './store.mjs';
+import { dataFile, home, mutate, readConfig, readData, createThread, addCommit, lastCommit, goalOf, hashId, threadById, threadByKey, isTodo, AUTOPILOT_ASK, AUTOPILOT_WORKER, AUTOPILOT_END } from './store.mjs';
 import { gitEvents, redirectTargets, BASH_WRITES, EDIT_TOOLS, GIT_COMMIT, commandDir, commitMessage, headline, firstLine, cleanPrompt } from './git-events.mjs';
 import { tr } from './i18n.mjs';
 const threadIdOfLocal = (d, c) => (c && c.thread && d.threads[c.thread] ? c.thread : 'inbox');
@@ -420,11 +420,13 @@ export function autopilotStop(input, env = process.env) {
     const ap = th.autopilot, since = Math.max(ap.on || 0, ap.turn || 0);
     const cs = Object.values(d.commits).filter(c => threadIdOfLocal(d, c) === th.id);
     if (cs.some(c => c.ts > since && AUTOPILOT_END.test(c.title || ''))) return false; // it stopped to ask
-    // The to-dos trace_tasks lists (not a session's first instruction), less those it has asked about this round.
-    const asks = cs.filter(c => c.ts > (ap.on || 0) && AUTOPILOT_ASK.test(c.title || '')).map(c => `${c.title} ${c.body || ''}`);
-    const open = cs.filter(c => isTodo(c) && !c.done).sort((a, b) => a.ts - b.ts), todo = open.filter(c => !asks.some(a => a.includes(c.id)));
-    const progress = cs.filter(c => isTodo(c) && c.done).length + open.length - todo.length; // ticked, or asked about
+    // The to-dos trace_tasks lists (not a session's first instruction), less those it asked about or gave a worker this round.
+    const said = re => cs.filter(c => c.ts > (ap.on || 0) && re.test(c.title || '')).map(c => `${c.title} ${c.body || ''}`);
+    const asks = said(AUTOPILOT_ASK), handed = said(AUTOPILOT_WORKER), named = (list, c) => list.some(a => a.includes(c.id));
+    const open = cs.filter(c => isTodo(c) && !c.done).sort((a, b) => a.ts - b.ts), todo = open.filter(c => !named(asks, c) && !named(handed, c));
+    const progress = cs.filter(c => isTodo(c) && c.done).length + open.length - todo.length; // ticked, asked about or handed out
     if (!open.length || (ap.nudged && progress <= ap.doneAtNudge)) return false;
+    if (!todo.length && open.some(c => named(handed, c) && !named(asks, c))) return false; // waiting for its workers: their results wake it
     th.autopilot = { ...ap, nudged: (ap.nudged || 0) + 1, doneAtNudge: progress };
     const head = `Autopilot is on for the line "${th.name}" (thread ${th.id}), to clear its to-dos: ${open.length} open`;
     reason = todo.length

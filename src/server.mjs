@@ -287,6 +287,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
     }
   };
   const server = http.createServer(handle(false));
+  server.on('close', () => fs.unwatchFile(dataFile())); // a closed server (a test) must not keep the process alive
   return new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(port, host, () => {

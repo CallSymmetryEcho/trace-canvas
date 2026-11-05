@@ -4200,7 +4200,7 @@ function renderGoals() {
   const rvRow = c => `<li class="rv"><span class="gl-t" data-cid="${esc(c.id)}">${esc(c.title)}</span>${agentBy(c)}<time>${fmtShort(c.doneAt || c.ts)}</time>
     ${c.result ? `<div class="gl-res">${esc(c.result)}</div>` : ''}
     <div class="gl-rv-acts"><button class="btn btn-primary" data-pass="${esc(c.id)}">${esc(t('rvPass'))}</button><button class="btn" data-return="${esc(c.id)}" aria-expanded="${S.glReturn === c.id}">${esc(t('rvReturn'))}</button></div>
-    ${S.glReturn === c.id ? `<div class="gl-ret-row"><input class="gl-ret" data-ret="${esc(c.id)}" placeholder="${esc(t('rvReturnPh'))}" enterkeyhint="send"><button class="btn btn-primary" data-ret-go="${esc(c.id)}">${esc(t('rvReturnGo'))}</button></div>` : ''}</li>`;
+    ${S.glReturn === c.id ? `<div class="gl-ret-row"><input class="gl-ret" data-ret="${esc(c.id)}" value="${esc(S.glDraft['ret:' + c.id] || '')}" placeholder="${esc(t('rvReturnPh'))}" enterkeyhint="send"><button class="btn btn-primary" data-ret-go="${esc(c.id)}">${esc(t('rvReturnGo'))}</button></div>` : ''}</li>`;
   const section = ({ th, tasks, open, review, goal }) => {
     const showDone = S.glDone.includes(th.id), shown = showDone ? tasks.filter(c => !toReview(c)) : open;
     const pct = tasks.length ? Math.round(100 * (tasks.length - open.length) / tasks.length) : 0;
@@ -4227,11 +4227,11 @@ function renderGoals() {
 }
 // Return: the to-do opens again for the agent that did it, with the reason (trace_tasks and its next session start show it).
 function returnTodo(id) {
-  const c = S.commits.get(id), box = $(`.gl-ret[data-ret="${CSS.escape(id)}"]`), note = box ? box.value.trim() : '';
+  const c = S.commits.get(id), box = $(`.gl-ret[data-ret="${CSS.escape(id)}"]`), note = (box ? box.value : S.glDraft['ret:' + id] || '').trim();
   if (!c || !canWrite()) return;
   const key = agentKeyOf(c.doneBy);
   patchDoc('commits', id, { done: false, doneBy: null, doneAt: null, toReview: null, returned: { at: Date.now(), note, by: c.doneBy || '' }, ...(key ? { assignee: key } : {}) }, 0);
-  S.glReturn = null; toast(t('tReturned', c.doneBy || '')); setTimeout(renderGoals, 0);
+  S.glReturn = null; delete S.glDraft['ret:' + id]; toast(t('tReturned', c.doneBy || '')); setTimeout(renderGoals, 0);
 }
 // The command `trace-canvas hand` prints, built here too: start the assigned agent on the to-do's
 // line, in the line's folder (its repository path, else where a session on it works now).
@@ -4286,6 +4286,7 @@ sheetBody.addEventListener('change', e => {
 sheetBody.addEventListener('input', e => {
   const el = e.target;
   if (el.classList.contains('gl-add')) S.glDraft[el.dataset.thread] = el.value;
+  else if (el.classList.contains('gl-ret')) S.glDraft['ret:' + el.dataset.ret] = el.value; // a redraw (new records, the phone's keyboard closing) rebuilt the box empty and the reason went with it
   else if (!canWrite()) return;
   else if (el.dataset.title && el.value.trim()) patchDoc('commits', el.dataset.title, { title: el.value.trim() }, 600);
   else if (el.dataset.goal) patchDoc('threads', el.dataset.goal, { goal: el.value }, 700);

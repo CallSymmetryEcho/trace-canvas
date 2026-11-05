@@ -34,6 +34,12 @@ test('every instruction reminds the agent to put new goals on its line as to-dos
   assert.equal(run([], { hook_event_name: 'UserPromptSubmit', prompt: 'Next idea: export to CSV' }).hookEventName, 'UserPromptSubmit');
   assert.equal(run(['--agent', 'gemini'], { hook_event_name: 'BeforeAgent', prompt: 'And a share link' }).hookEventName, 'BeforeAgent');
   assert.equal(hookConfig('x').UserPromptSubmit[0].hooks[0].async, undefined);
+  // The Autopilot gate waits beside the live update, and refuses a tool with Claude Code's own answer.
+  assert.deepEqual(hookConfig('x').PreToolUse[0].hooks.map(h => [h.command, !!h.async]), [['x', true], ['x --gate', false]]);
+  mutate(d => { d.threads[tid].apStopped = { session: 's1', at: 1 }; }, env);
+  const deny = run(['--gate'], { hook_event_name: 'PreToolUse', tool_name: 'Bash' });
+  assert.equal(deny.permissionDecision, 'deny'); assert.match(deny.permissionDecisionReason, /turned Autopilot off/);
+  assert.equal(execFileSync(process.execPath, [BIN, 'hook', '--gate'], { input: JSON.stringify({ session_id: 's2', tool_name: 'Bash' }), env, encoding: 'utf8' }), '');
 });
 
 test('a hand-off prompt Trace Canvas wrote, or a stray keystroke, is not logged as a new to-do', () => {

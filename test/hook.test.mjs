@@ -251,3 +251,22 @@ test('an Autopilot agent that stops while it could go on is handed its next to-d
   mutate(d => { delete d.threads[tid].autopilot; }, s.env);
   assert.equal(autopilotStop({ session_id: 's1' }, s.env), ''); // stopped by the person
 });
+
+test('turning Autopilot off holds its session at the next tool until the person speaks to it or a new round starts', async () => {
+  const { autopilotGate } = await import('../src/hook.mjs');
+  const { stopAutopilot } = await import('../src/ops.mjs');
+  const s = sandbox();
+  const tid = mutate(d => { const th = createThread(d, { name: 'App' }); th.autopilot = { at: 1, session: 's1', on: 2 }; return th.id; }, s.env);
+  const gate = (sid = 's1', tool = 'Bash') => autopilotGate({ session_id: sid, tool_name: tool }, s.env);
+  assert.equal(gate(), ''); // running: tools go
+  mutate(d => stopAutopilot(d, { thread: tid }), s.env);
+  assert.match(gate(), new RegExp(`turned Autopilot off on the Trace Canvas line "App" \\(thread ${tid}\\)\\. Stop here`));
+  assert.equal(gate('s2'), ''); // another session
+  assert.equal(gate('s1', 'mcp__trace-canvas__trace_log'), ''); // it may log where it stopped
+  s.fire('UserPromptSubmit', { prompt: 'What were you doing?', prompt_id: 'q1' });
+  assert.equal(gate(), ''); // the person spoke: free again
+  assert.equal(s.data().threads[tid].apStopped, undefined);
+  // Turned off while only asked: no session to hold.
+  mutate(d => { d.threads[tid].autopilot = { at: 3 }; stopAutopilot(d, { thread: tid }); }, s.env);
+  assert.equal(s.data().threads[tid].apStopped, undefined);
+});

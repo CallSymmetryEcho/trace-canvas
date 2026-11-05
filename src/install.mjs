@@ -15,7 +15,8 @@ export function hookConfig(command) {
   return {
     SessionStart: [{ hooks: h({ timeout: 10 }) }], // prints the context a session starts with, so it can't be async
     UserPromptSubmit: [{ hooks: h({ timeout: 5 }) }], // prints the to-do reminder
-    PreToolUse: [{ hooks: h({ async: true }) }],
+    // The second one waits: it may refuse the tool, when Autopilot was turned off on the session's line (--gate).
+    PreToolUse: [{ hooks: [...h({ async: true }), { type: 'command', command: `${command} --gate`, timeout: 5 }] }],
     Notification: [{ hooks: h({ async: true }) }],
     SubagentStart: [{ hooks: h({ async: true }) }],
     SubagentStop: [{ hooks: h({ async: true }) }],

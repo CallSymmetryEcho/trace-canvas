@@ -15,7 +15,7 @@ import { lessonsFor } from './lessons.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { home, mutate, readConfig, readData, createThread, addCommit, lastCommit, goalOf, hashId, threadById, threadByKey, AUTOPILOT_END } from './store.mjs';
+import { dataFile, home, mutate, readConfig, readData, createThread, addCommit, lastCommit, goalOf, hashId, threadById, threadByKey, AUTOPILOT_END } from './store.mjs';
 import { gitEvents, redirectTargets, BASH_WRITES, EDIT_TOOLS, GIT_COMMIT, commandDir, commitMessage, headline, firstLine, cleanPrompt } from './git-events.mjs';
 import { tr } from './i18n.mjs';
 const threadIdOfLocal = (d, c) => (c && c.thread && d.threads[c.thread] ? c.thread : 'inbox');
@@ -219,6 +219,8 @@ export function handleHook(input, env = process.env) {
       if (apTh && apTh.autopilot) { apTh.autopilot = { ...apTh.autopilot, session: sid, on: Date.now() }; changed = true; }
       // The person's message to an Autopilot agent (an answer, most often) starts a new stretch for autopilotStop.
       for (const t of Object.values(d.threads)) if (t.autopilot && t.autopilot.session === sid) { t.autopilot = { ...t.autopilot, turn: Date.now(), nudged: 0 }; changed = true; }
+      // The person speaking to a session Autopilot was turned off in lets it work again (autopilotGate).
+      for (const t of Object.values(d.threads)) if (t.apStopped && t.apStopped.session === sid) { delete t.apStopped; changed = true; }
       const log = !isCommand && prompt && !handoff && !notTask(prompt) && (cfg.prompts === 'all' || (cfg.prompts === 'first' && !s.prompted) || (cfg.prompts === 'long' && prompt.length >= 60));
       if (log) {
         const t = thread(prompt);
@@ -424,6 +426,21 @@ export function autopilotStop(input, env = process.env) {
     reason = `Autopilot is on for the line "${th.name}" (thread ${th.id}): ${open.length} to-do${open.length === 1 ? '' : 's'} open, next: ${firstLine(open[0].title, 120)} [${open[0].id}]. Go on by the decision profile, with this line's to-dos only. If you cannot decide it, log a record titled "Autopilot summary" with your question, then stop.`;
   }, env);
   return reason;
+}
+
+/**
+ * Autopilot turned off is a stop, not a request: the session that ran it is refused every tool but Trace Canvas's own
+ * (PreToolUse, synchronous) until the person speaks to it or a new round starts. The reason tells it to log where it
+ * stopped and end its turn. Runs on every tool call, so the data is only parsed when it can matter. '' lets it run.
+ */
+export function autopilotGate(input, env = process.env) {
+  const sid = input.session_id, tool = String(input.tool_name || '');
+  if (!sid || tool.startsWith('mcp__trace-canvas__')) return '';
+  let raw;
+  try { raw = fs.readFileSync(dataFile(env), 'utf8'); } catch { return ''; }
+  if (!raw.includes('"apStopped"') || !raw.includes(sid)) return '';
+  const th = Object.values(JSON.parse(raw).threads || {}).find(t => t.apStopped && t.apStopped.session === sid && !(t.autopilot && t.autopilot.session === sid));
+  return th ? `The person turned Autopilot off on the Trace Canvas line "${th.name}" (thread ${th.id}). Stop here: do not go on with this to-do or start another. Log one record with trace_log on that line saying where you stopped and what is left half done, then end your turn and wait for the person.` : '';
 }
 
 export function promptContext(input, env = process.env) {

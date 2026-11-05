@@ -319,7 +319,7 @@ body.history-open .hist-btn span { display: inline; }
 .ap-row { flex-wrap: wrap; row-gap: 8px; --ap-v: #8b5cf6; }
 .ap-row > span b { font-weight: 600; }
 .ap-row > span em { font-style: normal; font-weight: 600; margin-left: 6px; color: var(--muted); }
-.ap-row.is-wait > span em { color: var(--ok); } .ap-row.is-run > span em { color: var(--ap-v); }
+.ap-row.is-wait > span em { color: var(--ok); } .ap-row.is-lost > span em { color: var(--warn); } .chip-wait.is-lost { color: var(--warn); border-color: var(--warn); animation: none; } .ap-row.is-lost { border-color: color-mix(in srgb, var(--warn) 45%, var(--rule)); } .ap-row.is-lost .ap-fill { background: var(--warn); } .ap-row.is-lost .ap-knob { animation: none; } .ap-row.is-run > span em { color: var(--ap-v); }
 .ap-row { transition: border-color .4s, background-color .4s; } .ap-row > span em { transition: color .4s; }
 .ap-row.is-run { border-color: color-mix(in srgb, var(--ap-v) 35%, var(--rule)); background-color: color-mix(in srgb, var(--ap-v) 4%, var(--surface)); }
 .ap-track { flex: 1 0 100%; position: relative; height: 23px; border-radius: 5px; --k: 23px;
@@ -1133,7 +1133,7 @@ const I18N = {
     retroStats: (r, tok) => `${r.rounds} rounds · ${r.minutes} min · ${tok} tokens · ${r.corrections} correction${r.corrections === 1 ? '' : 's'} · ${r.sessions} session${r.sessions === 1 ? '' : 's'} · difficulty ${r.difficulty}`,
     retroStuck: 'Stuck on', retroSinceLast: d => `By default: since the last retro (${d}) up to now`, retroNoLast: 'No retro on this line yet: from the start up to now', retroFrom: 'From', retroTo: 'To (empty: now)', retroAll: 'Everything', retroStart: 'Start the retro', retroRange: (a, b) => `${a} → ${b}`, retroStartOfLine: 'the start', retroClear: 'Made clear by', retroRule: 'Rule', retroApply: 'Write', retroApplied: l => `Written: ${l}`,
     retroLayers: { project: 'Project rules (CLAUDE.md, AGENTS.md)', line: 'This line', memory: 'Long-term memory' }, tRetroApplied: w => `Written to ${w}`,
-apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent to take it up (it lights when its session gets the prompt)', apOff: 'Off: turn on to have this line\'s to-dos done by your decision profile until you stop it', apTitle: 'Autopilot (beta)', apSeg_off: 'Off', apSeg_wait: 'Asked', apSeg_run: 'Running', apGo: 'Turn on', apCancel: 'Not now',
+apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent to take it up (it lights when its session gets the prompt)', apOff: 'Off: turn on to have this line\'s to-dos done by your decision profile until you stop it', apTitle: 'Autopilot (beta)', apSeg_off: 'Off', apSeg_wait: 'Asked', apSeg_run: 'Running', apLost_stale: 'Not taken up', apLost_gone: 'Stopped', apLostWhy_stale: 'Asked over 3 minutes ago and no session has taken the prompt.', apLostWhy_gone: 'Its session is no longer running (it ended or died before you turned it off).', apRetry: 'Hand it out again', apGo: 'Turn on', apCancel: 'Not now',
     apIntro: 'Until you turn it off, this line\'s agent works through the open to-dos by your decision profile and logs each decision with the rule it rests on. When it reaches something it cannot decide it stops and asks; answer it in its session and it goes on to the next thing it cannot decide.',
     apNever: 'It never sends email or messages to people, pushes, publishes anything, or changes permissions or credentials: it gets those ready and asks you.',
     apAsk: 'It stops and asks you when something touches security, no rule covers it, or the rule is still swinging.',
@@ -1315,7 +1315,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     retroStats: (r, tok) => `${r.rounds} 轮 · ${r.minutes} 分钟 · ${tok} token · 纠正 ${r.corrections} 次 · ${r.sessions} 个会话 · 难度 ${r.difficulty}`,
     retroStuck: '卡在', retroSinceLast: d => `默认：从上次复盘（${d}）到现在`, retroNoLast: '这条线还没复盘过：从头到现在', retroFrom: '从', retroTo: '到（空着就是现在）', retroAll: '全部', retroStart: '开始复盘', retroRange: (a, b) => `${a} → ${b}`, retroStartOfLine: '开头', retroClear: '说清楚的那句', retroRule: '规矩', retroApply: '写入', retroApplied: l => `已写入：${l}`,
     retroLayers: { project: '项目规矩（CLAUDE.md、AGENTS.md）', line: '这条线', memory: '长期记忆' }, tRetroApplied: w => `已写入 ${w}`,
-apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的会话收到提示后才亮起', apOff: '关着：打开后按决策画像做这条线的待办，直到你关掉', apTitle: 'Autopilot（beta）', apSeg_off: '关', apSeg_wait: '等接手', apSeg_run: '运行', apGo: '打开', apCancel: '先不了',
+apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的会话收到提示后才亮起', apOff: '关着：打开后按决策画像做这条线的待办，直到你关掉', apTitle: 'Autopilot（beta）', apSeg_off: '关', apSeg_wait: '等接手', apSeg_run: '运行', apLost_stale: '没人接手', apLost_gone: '已中断', apLostWhy_stale: '请求超过 3 分钟了，还没有会话收到提示。', apLostWhy_gone: '它的会话已经不在运行（你关掉之前就结束或崩了）。', apRetry: '重新派发', apGo: '打开', apCancel: '先不了',
     apIntro: '打开后，这条线的 agent 按你的决策画像把没做完的待办一条条做下去，每个决定都在线上写明依据哪条规则。遇到判断不了的就停下来问你；你在它的会话里回答后，它接着做，直到下一个判断不了的地方。',
     apNever: '它绝不做：发邮件或给人发消息、推送、对外发布、改权限或凭据。这些事它只准备好，然后问你。',
     apAsk: '遇到安全相关的事、没有规则覆盖的事、或者规则还在摇摆的事，它会停下来问你。',
@@ -1735,8 +1735,8 @@ async function loadLive() {
   try {
     const j = await (await fetch('/api/live', { cache: 'no-store' })).json();
     // Other machines' running sessions (read over ssh by the server) join the list, marked away with their machine.
-    S.live = [...(j.sessions || []), ...(j.away || []).flatMap(m => m.sessions || [])]; S.liveOthers = j.others || [];
-  } catch { S.live = []; S.liveOthers = []; }
+    S.live = [...(j.sessions || []), ...(j.away || []).flatMap(m => m.sessions || [])]; S.liveOthers = j.others || []; S.away = j.away || []; S.liveOk = true;
+  } catch { S.live = []; S.liveOthers = []; S.away = []; S.liveOk = false; }
   render();
 }
 async function bindLive(sid, tid) {
@@ -2035,7 +2035,7 @@ async function initStore() {
     es.addEventListener('live', () => { clearTimeout(liveRefresh); liveRefresh = setTimeout(loadLive, 120); });
     es.addEventListener('open', () => { if (S.offline) loadServer(); loadLive(); });
     // Relative times ("5 min ago") on live sessions age even when nothing is written.
-    setInterval(() => { if (S.live.length) render(); }, 30000);
+    setInterval(() => { if (S.live.length || [...S.threads.values()].some(th => th.autopilot)) render(); }, 30000);
     es.addEventListener('error', () => { S.offline = true; renderSync(); });
     return;
   }
@@ -2580,7 +2580,7 @@ function cardHTML(th, cs, selT) {
     ? recent.map(c => `<li data-cid="${esc(c.id)}" class="${c.id === selC ? 'is-sel' : ''} ${filtering() && matches(c) ? 'hit' : ''}">${mini(c.kind, stationColor(c, th), c.done)}<span class="s-title" title="${esc(c.title)}">${esc(c.title)}</span><time class="s-time">${fmtShort(c.ts)}</time></li>`).join('')
       + (more > 0 ? `<li class="s-more"><span></span><span>${esc(t('moreEarlier', more))}</span><span></span></li>` : '')
     : `<li class="s-empty"><span></span><span>${esc(isInbox ? t('inboxEmpty') : t('noRecords'))}</span><span></span></li>`;
-  const chip = (apRun(th) ? `<span class="chip chip-auto" title="${esc(t('apTitle'))}">Autopilot</span>` : apWait(th) ? `<span class="chip chip-wait" title="${esc(t('apWait'))}">Autopilot…</span>` : '') + (isInbox ? `<span class="chip">${esc(t('unsorted'))}</span>` : `<span class="chip chip-${th.status || 'active'}">${esc(statusLabel(th.status))}</span>`);
+  const chip = (apRun(th) ? `<span class="chip chip-auto" title="${esc(t('apTitle'))}">Autopilot</span>` : apWait(th) ? `<span class="chip chip-wait${apLost(th) ? ' is-lost' : ''}" title="${esc(t(apLost(th) ? 'apLostWhy_' + apLost(th) : 'apWait'))}">Autopilot${apLost(th) ? ' !' : '…'}</span>` : '') + (isInbox ? `<span class="chip">${esc(t('unsorted'))}</span>` : `<span class="chip chip-${th.status || 'active'}">${esc(statusLabel(th.status))}</span>`);
   const agents = cs.filter(c => c.kind === 'agent').length;
   return `<div class="${cls}${apD(th.id) != null ? ' ap-burst' : ''}" data-tid="${esc(th.id)}" style="left:${th.x || 0}px;top:${th.y || 0}px;--c:${th.color}${apD(th.id) != null ? `;--apd:${apD(th.id)}ms` : ''}">
     <div class="card-head">${isFolded(th) ? `<span class="grp-tog" data-park-tog="1" title="${esc(t(peeking ? 'peekClose' : th.status === 'done' ? 'peekOpen' : 'peekOpenParked'))}">${peeking ? '▾' : '▸'}</span>` : ''}<span class="roundel"></span><span class="card-name">${esc(th.name)}</span>${liveBadge(th.id)}${chip}</div>
@@ -3471,8 +3471,8 @@ function threadDetail(th) {
       ${isInbox ? `<p style="margin:0;color:var(--muted)">${esc(t('inboxDesc'))}</p>` : `
       <label class="fld"><span>${esc(t('threadName'))}</span><input id="t-name" class="big-input" value="${esc(th.name)}"></label>
       <div class="fld"><span>${esc(t('threadStatus'))}</span><div class="seg">${['active', 'parked', 'done'].map(s => `<button data-act="status" data-status="${s}" aria-pressed="${th.status === s}">${esc(statusLabel(s))}</button>`).join('')}${th.status === 'merged' ? `<button aria-pressed="true" disabled>${esc(statusLabel('merged'))}</button>` : ''}</div></div>
-      ${SERVER && !S.remote && th.status !== 'merged' ? (() => { const k = apRun(th) ? 'run' : apWait(th) ? 'wait' : 'off', i = ['off', 'wait', 'run'].indexOf(k);
-        return `<div data-k="${k}" data-tid="${esc(th.id)}" class="ap-row is-${k}${apD(th.id) != null ? ` ap-burst" style="--apd:${apD(th.id)}ms` : ''}"><span><b>${esc(t('apTitle'))}</b><em>${esc(t('apSeg_' + k))}</em><small>${esc(t(k === 'run' ? 'apOn' : k === 'wait' ? 'apWait' : 'apOff'))}</small></span>
+      ${SERVER && !S.remote && th.status !== 'merged' ? (() => { const k = apRun(th) ? 'run' : apWait(th) ? 'wait' : 'off', i = ['off', 'wait', 'run'].indexOf(k), lost = apLost(th);
+        return `<div data-k="${k}" data-tid="${esc(th.id)}" class="ap-row is-${k}${lost ? ' is-lost' : ''}${apD(th.id) != null ? ` ap-burst" style="--apd:${apD(th.id)}ms` : ''}"><span><b>${esc(t('apTitle'))}</b><em>${esc(t(lost ? 'apLost_' + lost : 'apSeg_' + k))}</em><small>${esc(t(lost ? 'apLostWhy_' + lost : k === 'run' ? 'apOn' : k === 'wait' ? 'apWait' : 'apOff'))}${lost ? ` <button class="linkish" data-act="ap-retry">${esc(t('apRetry'))}</button>` : ''}</small></span>
           <div class="ap-track" role="group" aria-label="${esc(t('apTitle'))}" style="--i:${i}"><i class="ap-dot d1" style="--d:1"></i><i class="ap-dot d2" style="--d:2"></i><i class="ap-fill"><i class="ap-v"></i></i><i class="ap-knob"></i>${['off', 'wait', 'run'].map((x, n) => `<button data-act="autopilot" data-ap="${x}" style="--b:${n}" aria-pressed="${x === k}" aria-label="${esc(t('apSeg_' + x))}" title="${esc(t('apSeg_' + x))}"></button>`).join('')}</div></div>`; })() : ''}
       <div class="fld"><span>${esc(t('threadColor'))}</span><div class="swatches">${LINE_COLORS.map(c => `<button class="swatch" data-act="color" data-color="${c}" style="--c:${c}" aria-pressed="${th.color === c}" aria-label="${esc(t('colorAria', c))}"></button>`).join('')}</div></div>
       <label class="fld"><span>${esc(t('threadGoal'))}</span><textarea id="t-goal" rows="3" placeholder="${esc(t('threadGoalPh'))}">${esc(goalOf(th))}</textarea></label>
@@ -3593,6 +3593,7 @@ detail.addEventListener('click', e => {
       else if (ls.get('tc.apIntro', false)) runAutopilot(s.id);
       else { S.apLine = s.id; openSheet('autopilot'); renderDetail(); } // the switch stays off until the round starts
       break;
+    case 'ap-retry': runAutopilot(s.id); break; // asked again: the line's session is resumed, or a new one starts
     case 'retro': S.ui = { retro: true }; render(); break;
     case 'retro-all': $('#rt-since').value = ''; $('#rt-until').value = ''; break;
     case 'retro-go': {
@@ -4382,7 +4383,19 @@ function apMove() {
   row.classList.replace('is-' + was, 'is-' + k); tr.style.setProperty('--i', steps.indexOf(k));
 }
 // Asked is not running: a round runs once a session's hook has taken its prompt (src/hook.mjs sets autopilot.session).
-const apRun = th => !!(th && th.autopilot && th.autopilot.session), apWait = th => !!(th && th.autopilot && !th.autopilot.session);
+// Lost: asked and nobody took it up within AP_TAKE ('stale'), or its session is no longer running ('gone': it ended or
+// died without being turned off). Gone only when the page can tell: this machine's live list loaded, or the other
+// machine answered; a session just taken up gets a minute for the live list to catch up.
+const AP_TAKE = 3 * 60e3; // ponytail: fixed; a slow machine starting a new session may want longer
+function apLost(th) {
+  const a = th && th.autopilot; if (!a) return '';
+  if (!a.session) return Date.now() - (a.at || 0) > AP_TAKE ? 'stale' : '';
+  if (!S.liveOk || Date.now() - (a.on || 0) < 60e3 || S.live.some(l => l.id === a.session)) return '';
+  const m = (S.sessions.find(x => x.id === a.session) || {}).machine;
+  if (m && S.machine && m !== S.machine) { const far = (S.away || []).find(x => x.machine === m); if (!far || far.error) return ''; }
+  return 'gone';
+}
+const apRun = th => !!(th && th.autopilot && th.autopilot.session) && apLost(th) !== 'gone', apWait = th => !!(th && th.autopilot) && !apRun(th);
 // The sweep plays when the round is taken up, once per round, wherever the page sees it first.
 function apSeen(th) { if (apRun(th) && th.autopilot.on > Date.now() - 5000 && S.apSeen !== th.autopilot.on) { S.apSeen = th.autopilot.on; setTimeout(() => apBurst(th.id)); } }
 const apD = tid => S.apBurst && S.apBurst.tid === tid ? S.apBurst.at - Date.now() : null; // ms into the sweep, negative

@@ -239,11 +239,15 @@ export function startAutopilot(d, { thread, self = null }, env = process.env) {
   const rows = dispatch(d, { refs: open, self, prompt: () => autopilotPrompt(d, th, tid), ownSession: true }, env), now = Date.now();
   // Asked; it runs once a session's hook takes the prompt (src/hook.mjs), or at once when the line is the caller's own.
   th.autopilot = rows.some(r => r.action === 'self') ? { at: now, session: self, on: now } : { at: now };
+  delete th.apStopped; // a new round: the session stopped last time may take it up again
   return rows;
 }
 export function stopAutopilot(d, { thread }) {
   const tid = resolveThreadRef(d, thread), th = tid && d.threads[tid];
   if (!th) throw new Error(`No line "${thread}"`);
+  // The session that was running it is held at its next tool call (autopilotGate in src/hook.mjs) until the person
+  // speaks to it or a new round starts, so turning it off stops it there, not only before its next to-do.
+  if (th.autopilot && th.autopilot.session) th.apStopped = { session: th.autopilot.session, at: Date.now() };
   delete th.autopilot;
   return th;
 }

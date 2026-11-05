@@ -177,6 +177,14 @@ async function main() {
       break;
     }
     case 'hook': {
+      // --gate (PreToolUse, synchronous): a session whose Autopilot was turned off is refused its next tool (src/hook.mjs).
+      if (flag('gate', false)) {
+        try {
+          const why = process.env.TRACE_CANVAS_DISABLE === '1' ? '' : (await import('../src/hook.mjs')).autopilotGate(JSON.parse(await readStdin()));
+          if (why) process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: why } }));
+        } catch {}
+        process.exit(0);
+      }
       // Never break the Claude Code session: swallow everything, print nothing.
       // TRACE_CANVAS_DEBUG=1 appends each event and its outcome to <data dir>/debug.log.
       // --agent codex|gemini: that CLI's payload is turned into Claude's shape first. On SessionStart

@@ -732,6 +732,7 @@ body.sheet-open .top { z-index: 80; }
   .scrim { padding: 0; }
   .sheet { width: 100%; max-height: none; height: 100%; border-radius: 0; box-shadow: none; }
   body.sheet-open:not(.goals-page) .top { z-index: 40; }
+  body.sheet-open:not(.goals-page) .scrim { z-index: 90; } /* over the full-screen detail it was opened from (Read, hand-off) */
   body.goals-page .scrim { top: var(--top-h, 0px); background: var(--bg); }
   body.goals-page .sheet { background: var(--bg); }
   body.goals-page .sheet-head { display: none; }
@@ -3272,7 +3273,7 @@ function mdHTML(src) {
 }
 // </md>
 function openReader(title, md, src, html) {
-  S.sheet = 'read'; document.body.classList.add('sheet-open', 'read-page');
+  S.sheet = 'read'; document.body.classList.add('sheet-open', 'read-page'); document.body.classList.remove('goals-page');
   for (const u of S.readBlobs || []) URL.revokeObjectURL(u);
   S.readBlobs = [];
   mdImgFrom = src || '';

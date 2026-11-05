@@ -8,13 +8,14 @@ import { replyTo } from '../src/mcp.mjs';
 import { updateLive } from '../src/live.mjs';
 import { addCommit, mutate, readData } from '../src/store.mjs';
 
-test('a reply logged for a session reaches it at its next turn, once, though its process changed', () => {
+test('a reply logged for a session reaches it at its next turn, once, though its process changed and its session ended', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-reply-'));
   const env = { ...process.env, TRACE_CANVAS_HOME: path.join(root, 'home'), CLAUDE_CONFIG_DIR: path.join(root, 'claude'), TRACE_CANVAS_LANG: 'en', TRACE_CANVAS_MAP: '' };
   delete env.TRACE_CANVAS_DISABLE; delete env.TRACE_CANVAS_THREAD;
   const sid = '8f3de6b8-578f-4fe9-b976-536f05b5a841';
   // Its process each turn: 101 sent the message and is gone, 102 runs now. The hooks noted both.
   updateLive({ hook_event_name: 'UserPromptSubmit', session_id: sid, prompt: 'fix it' }, { env, terminal: { pid: 101 } });
+  updateLive({ hook_event_name: 'SessionEnd', session_id: sid }, { env }); // the SDK ends the session every turn
   updateLive({ hook_event_name: 'UserPromptSubmit', session_id: sid, prompt: 'and?' }, { env, terminal: { pid: 102 } });
   // Through the hook itself: the same session in a third process.
   handleHook({ session_id: sid, cwd: root, hook_event_name: 'UserPromptSubmit', prompt: 'next' }, { ...env, CLAUDE_PID: '103' });

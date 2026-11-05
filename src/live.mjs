@@ -35,14 +35,20 @@ export function claudeSessions(env = process.env) {
   for (const n of names) { const r = readJson(path.join(dir, n)); if (r && r.sessionId && r.pid) out.set(r.sessionId, r); }
   return out;
 }
+const pidsFile = env => path.join(home(env), 'pids.json');
+function notePid(pid, sid, env) {
+  try {
+    fs.mkdirSync(home(env), { recursive: true });
+    const m = readJson(pidsFile(env)) || {};
+    m[pid] = sid;
+    const keys = Object.keys(m); // ponytail: the 500 highest pids (number keys sort by value), plenty for replies within a day
+    fs.writeFileSync(pidsFile(env), JSON.stringify(Object.fromEntries(keys.slice(-500).map(k => [k, m[k]]))));
+  } catch {}
+}
 /** The session a Claude Code process is or was: its sessions/<pid>.json while it runs, else the pids the hooks noted. */
 export function sessionOfPid(pid, env = process.env) {
-  pid = Number(pid);
-  for (const [sid, r] of claudeSessions(env)) if (r.pid === pid) return sid;
-  let names = [];
-  try { names = fs.readdirSync(liveDir(env)).filter(n => n.endsWith('.json') && !n.includes('.agent-')); } catch {}
-  for (const n of names) { const s = readJson(path.join(liveDir(env), n)); if (s && (s.pid === pid || (s.pids || []).includes(pid))) return s.id; }
-  return '';
+  for (const [sid, r] of claudeSessions(env)) if (r.pid === Number(pid)) return sid;
+  return (readJson(pidsFile(env)) || {})[Number(pid)] || '';
 }
 const RANK = { waiting: 0, working: 1, idle: 2 };
 // Tools that stop and wait for the person, so the session needs you while they run.
@@ -223,9 +229,10 @@ export function updateLive(input, { info = null, key = null, env = process.env, 
   if (agent) Object.assign(doc, { agent, agentKey, resume });
   if (machine) doc.machine = machine;
   if (terminal) Object.assign(doc, terminal);
-  // A session can change process every turn (the Agent SDK, Even's terminal): the pids it had, so a message's sender
-  // (cc-socks/<pid>.sock) is still found after that process is gone.
-  if (doc.pid) doc.pids = [...new Set([...(prev.pids || []), doc.pid])].slice(-30);
+  // A session can change process every turn (the Agent SDK, Even's terminal, which also ends the session each turn and
+  // so drops this file): which session each pid was, kept apart, so a message's sender (cc-socks/<pid>.sock) is still
+  // found after that process is gone.
+  if (doc.pid && doc.pid !== prev.pid) notePid(doc.pid, sid, env);
   if (info) Object.assign(doc, { repo: info.repo, branch: info.branch, root: info.root });
   if (key) doc.key = key;
   if (input.session_title) doc.title = String(input.session_title).slice(0, 120);

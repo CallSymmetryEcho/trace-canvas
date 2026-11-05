@@ -183,6 +183,14 @@ test('Autopilot hands every open to-do on a line to its agent with the decision 
   assert.ok(d.threads[app].autopilot);
   stopAutopilot(d, { thread: 'App' });
   assert.equal(d.threads[app].autopilot, undefined);
+  // A session that also works on other lines brings their to-dos along: Autopilot gets a new one instead.
+  const other = createThread(d, { name: 'Other' }).id;
+  addCommit(d, { thread: other, kind: 'agent', title: 'Did something there', ts: now, extra: { session: 's1' } });
+  const [fresh] = startAutopilot(d, { thread: 'App' }, env);
+  assert.equal(fresh.action, 'start');
+  assert.match(fresh.command, /TRACE_CANVAS_THREAD=\S+ claude .*Autopilot \(beta\)/);
+  stopAutopilot(d, { thread: 'App' });
+  delete d.commits[Object.values(d.commits).find(c => c.title === 'Did something there').id];
   // Started from the line's own agent: it is the one doing them, so it runs at once.
   const [own] = startAutopilot(d, { thread: 'App', self: 's1' }, env);
   assert.equal(own.action, 'self');

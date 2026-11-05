@@ -15,7 +15,7 @@ import { lessonsFor } from './lessons.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { home, mutate, readConfig, readData, createThread, addCommit, lastCommit, goalOf, hashId, threadById, threadByKey } from './store.mjs';
+import { home, mutate, readConfig, readData, createThread, addCommit, lastCommit, goalOf, hashId, threadById, threadByKey, AUTOPILOT_END } from './store.mjs';
 import { gitEvents, redirectTargets, BASH_WRITES, EDIT_TOOLS, GIT_COMMIT, commandDir, commitMessage, headline, firstLine, cleanPrompt } from './git-events.mjs';
 import { tr } from './i18n.mjs';
 const threadIdOfLocal = (d, c) => (c && c.thread && d.threads[c.thread] ? c.thread : 'inbox');
@@ -218,6 +218,8 @@ export function handleHook(input, env = process.env) {
       const apTh = ap ? d.threads[ap[1]] : /autopilot/i.test(raw)
         ? Object.values(d.threads).find(t => t.autopilot && !t.autopilot.session && (flat.includes(t.id.toLowerCase()) || (t.name.length >= 3 && flat.includes(t.name.replace(/\s+/g, '').toLowerCase())))) : null;
       if (apTh && apTh.autopilot) { apTh.autopilot = { ...apTh.autopilot, session: sid, on: Date.now() }; changed = true; }
+      // The person's message to an Autopilot agent (an answer, most often) starts a new stretch for autopilotStop.
+      for (const t of Object.values(d.threads)) if (t.autopilot && t.autopilot.session === sid) { t.autopilot = { ...t.autopilot, turn: Date.now(), nudged: 0 }; changed = true; }
       const log = !isCommand && prompt && !handoff && !notTask(prompt) && (cfg.prompts === 'all' || (cfg.prompts === 'first' && !s.prompted) || (cfg.prompts === 'long' && prompt.length >= 60));
       if (log) {
         const t = thread(prompt);
@@ -401,6 +403,29 @@ export function sessionStartContext(input, env = process.env) {
  * and next steps the person just gave as to-dos there, so the list keeps up without being asked.
  * The open to-dos are listed so the agent skips what is already on it.
  */
+/**
+ * Autopilot goes on without the person prompting it: when its agent stops while it could go on (no summary since the
+ * person's last message, to-dos still open on its line), the Stop hook hands it the next one ({decision: block}).
+ * Pushed once already and no to-do done since: it may stop, so it never loops. '' lets it stop.
+ */
+export function autopilotStop(input, env = process.env) {
+  const sid = input.session_id;
+  if (!sid) return '';
+  let reason = '';
+  mutate(d => {
+    const th = Object.values(d.threads).find(t => t.autopilot && t.autopilot.session === sid);
+    if (!th) return false;
+    const ap = th.autopilot, since = Math.max(ap.on || 0, ap.turn || 0);
+    const cs = Object.values(d.commits).filter(c => threadIdOfLocal(d, c) === th.id);
+    if (cs.some(c => c.ts > since && AUTOPILOT_END.test(c.title || ''))) return false; // it stopped to ask
+    const open = cs.filter(c => c.kind === 'task' && !c.done).sort((a, b) => a.ts - b.ts), done = cs.filter(c => c.kind === 'task' && c.done).length;
+    if (!open.length || (ap.nudged && done <= ap.doneAtNudge)) return false;
+    th.autopilot = { ...ap, nudged: (ap.nudged || 0) + 1, doneAtNudge: done };
+    reason = `Autopilot is on for the line "${th.name}" (thread ${th.id}): ${open.length} to-do${open.length === 1 ? '' : 's'} open, next: ${firstLine(open[0].title, 120)} [${open[0].id}]. Go on by the decision profile, with this line's to-dos only. If you cannot decide it, log a record titled "Autopilot summary" with your question, then stop.`;
+  }, env);
+  return reason;
+}
+
 export function promptContext(input, env = process.env) {
   if (!input.session_id || cleanPrompt(input.prompt).startsWith('/')) return '';
   const d = readData(env), { threadId } = sessionThread(d, { id: input.session_id }, env);

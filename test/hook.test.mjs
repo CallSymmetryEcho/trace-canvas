@@ -230,3 +230,24 @@ test('an Autopilot round lights only when its prompt reaches a session, and an o
   mutate(d => { delete d.threads[tid].autopilot; }, s.env);
   assert.doesNotMatch(promptContext({ session_id: 's1', prompt: 'Thanks' }, s.env), /Autopilot/); // Stop: no reminder
 });
+
+test('an Autopilot agent that stops while it could go on is handed its next to-do, until it asks or makes no progress', async () => {
+  const { autopilotStop } = await import('../src/hook.mjs');
+  const { addCommit } = await import('../src/store.mjs');
+  const s = sandbox();
+  const now = Date.now();
+  const tid = mutate(d => { const th = createThread(d, { name: 'App' }); th.autopilot = { at: now - 9e4, session: 's1', on: now - 6e4 }; return th.id; }, s.env);
+  const [a, b] = mutate(d => [addCommit(d, { thread: tid, kind: 'task', title: 'Fix login', ts: now - 5e4 }).id, addCommit(d, { thread: tid, kind: 'task', title: 'Write docs', ts: now - 4e4 }).id], s.env);
+  assert.equal(autopilotStop({ session_id: 's2' }, s.env), ''); // not its agent
+  assert.match(autopilotStop({ session_id: 's1' }, s.env), new RegExp(`Autopilot is on for the line "App" \\(thread ${tid}\\): 2 to-dos open, next: Fix login \\[${a}\\]\\. .*this line's to-dos only`));
+  assert.equal(autopilotStop({ session_id: 's1' }, s.env), ''); // pushed, nothing done since: it may stop
+  mutate(d => { d.commits[a].done = true; }, s.env);
+  assert.match(autopilotStop({ session_id: 's1' }, s.env), new RegExp(`1 to-do open, next: Write docs \\[${b}\\]`)); // progress: on
+  mutate(d => { addCommit(d, { thread: tid, kind: 'note', title: 'Autopilot summary: docs need your call on the tone' }); }, s.env);
+  assert.equal(autopilotStop({ session_id: 's1' }, s.env), ''); // it stopped to ask
+  // The person answers: a new stretch, pushed on again until its next question.
+  s.fire('UserPromptSubmit', { prompt: 'Plain and short', prompt_id: 'q1' });
+  assert.match(autopilotStop({ session_id: 's1' }, s.env), /next: Write docs/);
+  mutate(d => { delete d.threads[tid].autopilot; }, s.env);
+  assert.equal(autopilotStop({ session_id: 's1' }, s.env), ''); // stopped by the person
+});

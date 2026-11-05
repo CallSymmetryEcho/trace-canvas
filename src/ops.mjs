@@ -119,7 +119,7 @@ export function handTo(d, { ref, to, thread, remote = false, here = true, prompt
  * Each row has the machine its to-dos are for (`on`) when there is one. awayLive(machine) gives another machine's running
  * sessions (over ssh by default).
  */
-export function dispatch(d, { refs = [], all = false, self = null, on = '', awayLive = remoteLiveSync, prompt: promptFor = null } = {}, env = process.env) {
+export function dispatch(d, { refs = [], all = false, self = null, on = '', awayLive = remoteLiveSync, prompt: promptFor = null, ownSession = false } = {}, env = process.env) {
   const me = readConfig(env).machine, lines = new Set(), named = new Set();
   for (const ref of refs) {
     const id = d.commits[ref] ? null : findThreadLoose(d, ref);
@@ -174,7 +174,10 @@ export function dispatch(d, { refs = [], all = false, self = null, on = '', away
       groups.set(g, [...(groups.get(g) || []), c]);
     }
     for (const [g, group] of groups) {
-      const [machine, agent] = g.split('\t'), sid = pick(machine, agent), s = sid && known.get(sid);
+      // ownSession (Autopilot): the line's session only when it worked on nothing else, so it brings its memory of this
+      // line and no other line's to-dos; one that also worked elsewhere (the caller, often) gets a new session instead.
+      const [machine, agent] = g.split('\t'), picked = pick(machine, agent), only = id => Object.values(d.commits).every(c => (c.fromSession || c.session) !== id || c.kind === 'note' || threadIdOf(d, c) === tid);
+      const sid = picked && (!ownSession || only(picked)) ? picked : null, s = sid && known.get(sid);
       const todos = group.filter(c => named.has(c.id) || all || !s || !c.agent || (c.fromSession && c.fromSession !== sid)).sort((a, b) => a.ts - b.ts);
       if (!todos.length) continue;
       const away = s ? (s.machine && s.machine !== me ? s.machine : '') : (machine && machine !== me ? machine : '');
@@ -215,7 +218,7 @@ export function autopilotPrompt(d, th, tid) {
   const p = decisionProfile(d);
   const rules = p ? `Follow the decision profile, record ${p.id} (read it with trace_read_thread on its line "${(d.threads[p.thread] || {}).name || p.thread}").`
     : 'There is no decision profile yet, so follow these: H1 do the core first, nothing unasked; H2 a hand-over counts only when the other session has started on it; H3 ask before anything about permissions, credentials, start-up items, open ports, deleting, pushing or publishing; H4 ask about whatever these do not cover.';
-  return `Autopilot (beta) on the Trace Canvas line "${th.name}" (thread ${tid}): work through every open to-do on it, one at a time, as far as you can without the person. First call trace_bind with thread "${tid}", read the line with trace_read_thread and its to-dos with trace_tasks (thread "${tid}"). ${rules} For every decision, log it with trace_log as "what you did · the rule it rests on". Never send email or messages to people, push, publish anything outside, or change permissions or credentials: get those ready and ask. Stop and ask the person when something touches security, is not covered by a rule, or is listed as swinging. Before each to-do call trace_tasks; if the line no longer shows autopilot: true, the person stopped it: stop there. Autopilot stays on until the person turns it off. When you reach what you cannot decide, or nothing open is left that you can do, log one record whose title starts with "Autopilot summary": what you did since the last one and on which rule, where you are stuck, and what needs the person's yes; then stop and ask. When the person answers, log the answer as a decision and go on the same way, until the next thing you cannot decide. When the profile does not settle a decision, look before you ask: lessons of finished projects (memory_recall, type lesson), and the decisions on archived lines of a like project (trace_read_thread); say which you rest on.`;
+  return `Autopilot (beta) on the Trace Canvas line "${th.name}" (thread ${tid}): work through every open to-do on it, one at a time, as far as you can without the person; only this line's to-dos, not other lines'. First call trace_bind with thread "${tid}", read the line with trace_read_thread and its to-dos with trace_tasks (thread "${tid}"). ${rules} For every decision, log it with trace_log as "what you did · the rule it rests on". Never send email or messages to people, push, publish anything outside, or change permissions or credentials: get those ready and ask. Stop and ask the person when something touches security, is not covered by a rule, or is listed as swinging. Before each to-do call trace_tasks; if the line no longer shows autopilot: true, the person stopped it: stop there. Autopilot stays on until the person turns it off. When you reach what you cannot decide, or nothing open is left that you can do, log one record whose title starts with "Autopilot summary": what you did since the last one and on which rule, where you are stuck, and what needs the person's yes; then stop and ask. When the person answers, log the answer as a decision and go on the same way, until the next thing you cannot decide. When the profile does not settle a decision, look before you ask: lessons of finished projects (memory_recall, type lesson), and the decisions on archived lines of a like project (trace_read_thread); say which you rest on.`;
 }
 /** Starts a round: every open to-do on the line goes to its agent with the Autopilot prompt (rows as dispatch). */
 export function startAutopilot(d, { thread, self = null }, env = process.env) {
@@ -223,7 +226,7 @@ export function startAutopilot(d, { thread, self = null }, env = process.env) {
   if (!th) throw new Error(`No line "${thread}"`);
   const open = Object.values(d.commits).filter(c => isTodo(c) && !c.done && threadIdOf(d, c) === tid).map(c => c.id);
   if (!open.length) throw new Error(`"${th.name}" has no open to-dos for Autopilot`);
-  const rows = dispatch(d, { refs: open, self, prompt: () => autopilotPrompt(d, th, tid) }, env), now = Date.now();
+  const rows = dispatch(d, { refs: open, self, prompt: () => autopilotPrompt(d, th, tid), ownSession: true }, env), now = Date.now();
   // Asked; it runs once a session's hook takes the prompt (src/hook.mjs), or at once when the line is the caller's own.
   th.autopilot = rows.some(r => r.action === 'self') ? { at: now, session: self, on: now } : { at: now };
   return rows;

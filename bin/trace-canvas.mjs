@@ -201,6 +201,14 @@ async function main() {
         }
       } catch (e) { outcome = { error: String(e && e.stack || e) }; }
       if (context) process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } }));
+      // Autopilot: a Claude Code agent that stops while it could go on is handed its next to-do (src/hook.mjs).
+      // ponytail: Claude Code only; Codex's and Gemini's Stop hooks take another answer, add them when checked.
+      try {
+        if (agent === 'claude' && event === 'Stop' && process.env.TRACE_CANVAS_DISABLE !== '1') {
+          const why = (await import('../src/hook.mjs')).autopilotStop(JSON.parse(raw));
+          if (why) process.stdout.write(JSON.stringify({ decision: 'block', reason: why }));
+        }
+      } catch {}
       if (process.env.TRACE_CANVAS_DEBUG) {
         try { fs.appendFileSync(path.join(path.dirname(dataFile()), 'debug.log'), `${new Date().toISOString()} ${raw.slice(0, 4000)}\n  -> ${JSON.stringify(outcome ?? 'logged')}\n`); } catch {}
       }

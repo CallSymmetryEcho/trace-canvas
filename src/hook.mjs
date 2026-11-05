@@ -383,7 +383,8 @@ export function sessionStartContext(input, env = process.env) {
       const ls = lessonsFor([th.name, th.group, goal].filter(Boolean).join(' '));
       if (ls.length) out.push('Lessons from finished projects that may fit this line (Theatrum; memory_recall reads them in full):', ...ls.map(l => `- ${l.title} [${l.id}]`));
     }
-    if (mine.length) out.push(`Open to-dos for you (${ag.name}):`, ...mine.slice(0, 10).map(c => `- ${c.title} [${c.id}]`));
+    // A to-do the person sent back comes first, with their reason.
+    if (mine.length) out.push(`Open to-dos for you (${ag.name}):`, ...mine.sort((a, b) => !!b.returned - !!a.returned).slice(0, 10).map(c => `- ${c.title} [${c.id}]${c.returned ? ` (sent back by the person: ${c.returned.note || 'no reason given'}; do this first)` : ''}`));
     if (free.length) out.push(`${free.length} open to-do${free.length === 1 ? ' is' : 's are'} not assigned to anyone yet.`);
     const others = listLiveLocal(env).filter(s => s.id !== sid && sessionThread(d, s, env).threadId === tid);
     if (others.length) out.push(`Also working on this line now: ${others.map(s => `${s.agent || 'Claude Code'} (${s.status}${s.activity ? `: ${s.activity}` : ''})`).join('; ')}.`);

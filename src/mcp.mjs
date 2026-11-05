@@ -118,8 +118,8 @@ const TOOLS = [
   {
     name: 'trace_task_done',
     title: 'Tick a to-do',
-    description: 'Marks a to-do as done (or open again with done: false) and records who ticked it. task is the id from trace_tasks, or its title.',
-    inputSchema: { type: 'object', properties: { task: { type: 'string', description: 'Task id or title.' }, thread: { type: 'string', description: 'Thread to look in when task is a title.' }, done: { type: 'boolean', description: 'Default true.' }, agent: { type: 'string', description: 'Who ticked it. Default "Claude".' } }, required: ['task'] },
+    description: 'Marks a to-do as done (or open again with done: false) and records who ticked it. task is the id from trace_tasks, or its title. A to-do an agent ticks waits for the person\'s review; give result so they can check it.',
+    inputSchema: { type: 'object', properties: { task: { type: 'string', description: 'Task id or title.' }, thread: { type: 'string', description: 'Thread to look in when task is a title.' }, done: { type: 'boolean', description: 'Default true.' }, agent: { type: 'string', description: 'Who ticked it. Default "Claude".' }, result: { type: 'string', description: 'One or two lines for the person who reviews it: what you did and where it is (a commit, a file, a link).' } }, required: ['task'] },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
   },
   {
@@ -266,7 +266,7 @@ async function callTool(name, a = {}) {
     }
     case 'trace_task_done': {
       const done = a.done !== false;
-      const c = mutate(d => setTaskDone(d, { task: a.task, thread: a.thread, done, by: a.agent || agentOf(agentKey()).name }));
+      const c = mutate(d => setTaskDone(d, { task: a.task, thread: a.thread, done, by: a.agent || agentOf(agentKey()).name, result: a.result || '' }));
       return { text: `${done ? 'Ticked' : 'Reopened'} "${c.title}".`, data: { id: c.id, title: c.title, done: c.done, doneBy: c.doneBy || null } };
     }
     case 'trace_live': {

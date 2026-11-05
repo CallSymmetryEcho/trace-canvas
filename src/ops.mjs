@@ -51,10 +51,12 @@ export function listTasks(d, { thread, includeDone = false, assignee } = {}) {
   return ids.map(id => {
     const th = id === INBOX ? { name: 'Inbox', status: 'active' } : d.threads[id];
     const tasks = (by[id] || []).sort((a, b) => a.ts - b.ts);
-    const open = tasks.filter(c => !c.done);
+    const open = tasks.filter(c => !c.done).sort((a, b) => !!b.returned - !!a.returned), review = tasks.filter(c => c.done && c.toReview).length; // a returned one first
     return {
-      id, name: th.name, ...(th.group ? { group: th.group } : {}), goal: goalOf(th), status: th.status || 'active', ...(th.autopilot && th.autopilot.session ? { autopilot: true } : {}), done: tasks.length - open.length, total: tasks.length,
-      tasks: (includeDone ? tasks : open).map(c => ({ id: c.id, title: c.title, ...(c.assignee ? { assignee: c.assignee } : {}), ...(c.on ? { on: c.on } : {}), ...(c.done ? { done: true, doneBy: c.doneBy || null, doneAt: c.doneAt ? new Date(c.doneAt).toISOString() : null } : {}) })),
+      id, name: th.name, ...(th.group ? { group: th.group } : {}), goal: goalOf(th), status: th.status || 'active', ...(th.autopilot && th.autopilot.session ? { autopilot: true } : {}), done: tasks.length - open.length, total: tasks.length, ...(review ? { toReview: review } : {}),
+      tasks: (includeDone ? [...open, ...tasks.filter(c => c.done)] : open).map(c => ({ id: c.id, title: c.title, ...(c.assignee ? { assignee: c.assignee } : {}), ...(c.on ? { on: c.on } : {}),
+        ...(c.returned && !c.done ? { returned: c.returned.note || '(no reason given)' } : {}),
+        ...(c.done ? { done: true, doneBy: c.doneBy || null, doneAt: c.doneAt ? new Date(c.doneAt).toISOString() : null, ...(c.toReview ? { toReview: true } : {}) } : {}) })),
     };
   }).filter(r => r.total || r.goal).filter(r => only || !['done', 'merged'].includes(r.status) || r.total > r.done);
 }
@@ -77,10 +79,16 @@ export function findTodo(d, { task, thread, done = false }) {
   return hits[0];
 }
 
-export function setTaskDone(d, { task, thread, done = true, by = 'human' }) {
+// An agent's tick waits for the person's review (the Goals sheet: Pass, or Return with a reason); result is its one-line
+// account of what it did and where. The person's own tick needs none.
+export function setTaskDone(d, { task, thread, done = true, by = 'human', result = '' }) {
   const c = findTodo(d, { task, thread, done: !done });
   c.done = !!done;
-  if (done) { c.doneBy = by; c.doneAt = Date.now(); } else { delete c.doneBy; delete c.doneAt; }
+  if (done) {
+    c.doneBy = by; c.doneAt = Date.now();
+    if (by === 'human') delete c.toReview; else c.toReview = true;
+    if (result) c.result = String(result).slice(0, 500);
+  } else { delete c.doneBy; delete c.doneAt; delete c.toReview; }
   return c;
 }
 
@@ -218,9 +226,11 @@ export function autopilotPrompt(d, th, tid) {
   const p = decisionProfile(d);
   const rules = p ? `Follow the decision profile, record ${p.id} (read it with trace_read_thread on its line "${(d.threads[p.thread] || {}).name || p.thread}").`
     : 'There is no decision profile yet, so follow these: H1 do the core first, nothing unasked; H2 a hand-over counts only when the other session has started on it; H3 ask before anything about permissions, credentials, start-up items, open ports, deleting, pushing or publishing; H4 ask about whatever these do not cover.';
-  return `Autopilot (beta) on the Trace Canvas line "${th.name}" (thread ${tid}): work through every open to-do on it, one at a time, as far as you can without the person; only this line's to-dos, not other lines'. First call trace_bind with thread "${tid}", read the line with trace_read_thread and its to-dos with trace_tasks (thread "${tid}"). ${rules} For every decision, log it with trace_log as "what you did · the rule it rests on". Never send email or messages to people, push, publish anything outside, or change permissions or credentials: get those ready and ask. Stop and ask the person when something touches security, is not covered by a rule, or is listed as swinging. Before each to-do call trace_tasks; if the line no longer shows autopilot: true, the person stopped it: stop there. Autopilot stays on until the person turns it off. When you reach what you cannot decide, or nothing open is left that you can do, log one record whose title starts with "Autopilot summary": what you did since the last one and on which rule, where you are stuck, and what needs the person's yes; then stop and ask. When the person answers, log the answer as a decision and go on the same way, until the next thing you cannot decide. When the profile does not settle a decision, look before you ask: lessons of finished projects (memory_recall, type lesson), and the decisions on archived lines of a like project (trace_read_thread); say which you rest on.`;
+  return `Autopilot (beta) on the Trace Canvas line "${th.name}" (thread ${tid}): work through every open to-do on it, one at a time, as far as you can without the person; only this line's to-dos, not other lines'. First call trace_bind with thread "${tid}", read the line with trace_read_thread and its to-dos with trace_tasks (thread "${tid}"). ${rules} For every decision, log it with trace_log as "what you did · the rule it rests on". Never send email or messages to people, push, publish anything outside, or change permissions or credentials: get those ready and ask. Stop and ask the person when something touches security, is not covered by a rule, or is listed as swinging. Before each to-do call trace_tasks; if the line no longer shows autopilot: true, the person stopped it: stop there. If it shows toReview: ${REVIEW_GATE} or more, stop too: the person reviews first. When you tick a to-do, give trace_task_done a result: one line on what you did and where it is, for the person's review. A to-do with returned: was sent back by the person with that reason: do it first, by the reason. Autopilot stays on until the person turns it off. When you reach what you cannot decide, or nothing open is left that you can do, log one record whose title starts with "Autopilot summary": what you did since the last one and on which rule, where you are stuck, and what needs the person's yes; then stop and ask. When the person answers, log the answer as a decision and go on the same way, until the next thing you cannot decide. When the profile does not settle a decision, look before you ask: lessons of finished projects (memory_recall, type lesson), and the decisions on archived lines of a like project (trace_read_thread); say which you rest on.`;
 }
 /** Starts a round: every open to-do on the line goes to its agent with the Autopilot prompt (rows as dispatch). */
+// Autopilot pauses when this many of a line's to-dos wait for the person's review.
+export const REVIEW_GATE = 10;
 export function startAutopilot(d, { thread, self = null }, env = process.env) {
   const tid = resolveThreadRef(d, thread), th = tid && tid !== INBOX && d.threads[tid];
   if (!th) throw new Error(`No line "${thread}"`);

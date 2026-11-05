@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { emptyData, addCommit, createThread } from '../src/store.mjs';
-import { listTasks, setTaskDone } from '../src/ops.mjs';
+import { REVIEW_GATE, autopilotPrompt, listTasks, setTaskDone } from '../src/ops.mjs';
 
 function data() {
   const d = emptyData();
@@ -42,4 +42,35 @@ test('a to-do is ticked by title or id, records who ticked it, and can be reopen
   assert.equal(setTaskDone(d, { task: 'rewrite', thread: 'thesis-repo' }).title, 'Rewrite the tracking script');
   const back = setTaskDone(d, { task: c.id, done: false });
   assert.deepEqual([back.done, back.doneBy, back.doneAt], [false, undefined, undefined]);
+});
+
+test('an agent\'s tick waits for review with its result; the person\'s does not; a returned to-do comes first with its reason', () => {
+  const d = emptyData();
+  const th = createThread(d, { name: 'goals' });
+  const a = addCommit(d, { thread: th.id, kind: 'task', title: 'Fold old goals', ts: 1 });
+  const b = addCommit(d, { thread: th.id, kind: 'task', title: 'Write the README', ts: 2 });
+  const c = addCommit(d, { thread: th.id, kind: 'task', title: 'Add a review state', ts: 3 });
+  setTaskDone(d, { task: a.id, by: 'Claude Code', result: 'Commit abc123: folds lines quiet for a day' });
+  setTaskDone(d, { task: b.id, by: 'human' });
+  assert.equal(d.commits[a.id].toReview, true);
+  assert.equal(d.commits[a.id].result, 'Commit abc123: folds lines quiet for a day');
+  assert.equal(d.commits[b.id].toReview, undefined);
+  let row = listTasks(d, { thread: th.id, includeDone: true })[0];
+  assert.equal(row.toReview, 1);
+  assert.equal(row.tasks.find(x => x.id === a.id).toReview, true);
+  // Returned by the person (the page sets this): open again, first, with the reason.
+  Object.assign(d.commits[a.id], { done: false, doneBy: null, doneAt: null, toReview: null, returned: { at: 5, note: 'also fold merged lines', by: 'Claude Code' } });
+  row = listTasks(d, { thread: th.id })[0];
+  assert.deepEqual(row.tasks.map(x => x.id), [a.id, c.id]);
+  assert.equal(row.tasks[0].returned, 'also fold merged lines');
+  assert.equal(row.toReview, undefined);
+});
+
+test('Autopilot is told to stop when ten wait for review, to give a result, and to do a returned to-do first', () => {
+  const d = emptyData(), th = createThread(d, { name: 'x' });
+  const p = autopilotPrompt(d, th, th.id);
+  assert.equal(REVIEW_GATE, 10);
+  assert.match(p, /toReview: 10 or more, stop too/);
+  assert.match(p, /give trace_task_done a result/);
+  assert.match(p, /returned: was sent back by the person/);
 });

@@ -875,6 +875,20 @@ button.gl-prog[aria-pressed="true"] { color: var(--ink); background: var(--surfa
 .gl-tasks .gl-t:hover { text-decoration: underline; text-underline-offset: 2px; }
 .gl-tasks .gl-by { flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--muted); }
 .gl-tasks time { flex: none; font-family: var(--f-mono); font-size: 11px; color: var(--faint); }
+/* To review: a row per agent's tick, Pass and Return under it; a returned to-do carries its reason. */
+.gl-rv { border-left: 3px solid var(--accent); padding: 2px 0 4px 10px; margin: 6px 0; }
+.gl-rv-head { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; color: var(--accent); }
+.gl-rv li.rv { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 6px 0; border-top: 0; font-size: 13px; }
+.gl-rv li.rv + li.rv { border-top: 1px solid var(--rule-soft); }
+.gl-res { flex-basis: 100%; font-size: 12px; color: var(--muted); }
+.gl-rv-acts { display: flex; gap: 6px; }
+.gl-ret-row { display: flex; gap: 6px; flex-basis: 100%; }
+.gl-ret { flex: 1; min-width: 0; padding: 5px 8px; border: 1px solid var(--rule); border-radius: 7px; background: var(--surface-2); }
+.gl-ret-tag { margin-right: 6px; padding: 0 6px; border-radius: 999px; font-size: 11px; background: var(--warn); color: #fff; }
+.gl-fold-tog { display: block; margin: 10px 0 4px; font-size: 12.5px; color: var(--muted); }
+.gl-bar-top .gl-rv-n { color: var(--accent); }
+#goals-btn[data-count], #tab-goals[data-count] { position: relative; }
+#goals-btn[data-count]::before, #tab-goals[data-count]::before { content: attr(data-count); position: absolute; top: -6px; right: -6px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--accent); color: #fff; font-size: 10px; line-height: 16px; text-align: center; font-weight: 600; }
 .gl-who { flex: none; font-size: 11.5px; padding: 1px 4px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); color: var(--muted); }
 .gl-hand { flex: none; font-size: 11.5px; padding: 1px 7px; }
 .gl-add-row { display: flex; gap: 6px; }
@@ -1251,7 +1265,7 @@ apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent 
     actorHuman: 'You', actorAgent: 'Agent', liveTipTime: 'now',
     goalsBtn: 'Goals', goalsBtnTitle: 'Goals and to-dos of every line', goalsTitle: 'Goals and to-dos',
     goalsTip: 'How it fits together: the <b>inbox</b> holds loose ideas you have not thought through; a <b>to-do</b> □ belongs to a line and is a next step you or an agent can take; a line\'s <b>goal</b> is the outcome it is working towards (write it in the line\'s panel). Agents read goals and to-dos with the MCP tool <b>trace_tasks</b> and tick what they finish with <b>trace_task_done</b>, so you can see progress here without asking. Click <b>✓ done/total ▸</b> on a card to show its finished to-dos.',
-    goalsTipHide: 'Got it', goalsHelp: 'How it works', goalsView: 'Open the record', goalsEdit: 'Edit', goalsAddBtn: 'Add', goalsShowDone: 'Show the finished to-dos', goalsHideDone: 'Hide the finished to-dos', goalsSummary: (open, lines) => `${open} open to-do${open === 1 ? '' : 's'} on ${lines} line${lines === 1 ? '' : 's'}`,
+    goalsTipHide: 'Got it', goalsHelp: 'How it works', goalsView: 'Open the record', goalsEdit: 'Edit', goalsAddBtn: 'Add', goalsShowDone: 'Show the finished to-dos', goalsHideDone: 'Hide the finished to-dos', goalsSummary: (open, lines) => `${open} open to-do${open === 1 ? '' : 's'} on ${lines} line${lines === 1 ? '' : 's'}`, goalsSummaryRv: n => `${n} to review`, rvHead: n => `To review · ${n}`, rvPass: 'Pass', rvPassAll: 'Pass all', rvReturn: 'Return…', rvReturnGo: 'Return', rvReturnPh: 'Why (optional): it goes back to the agent that did it', rvReturned: 'Returned', rvReturnedBy: n => `Sent back to ${n}`, glFolded: n => `${n} line${n === 1 ? '' : 's'} folded: all done and reviewed, quiet for a day`, tPassed: n => `Passed ${n}`, tReturned: n => `Returned${n ? ` to ${n}` : ''}`, rvCountTitle: n => `${n} to-do${n === 1 ? '' : 's'} done by agents wait for your review`,
     goalsNoGoal: 'No goal yet. Tap to write one.', goalsAdd: '+ Add a to-do', goalsOpenLine: 'Open line',
     goalsOthers: n => `${n} more line${n === 1 ? ' has' : 's have'} no goal or to-do yet.`, goalsEmpty: 'No goals or to-dos yet. Open a line, write its goal, and add to-dos here or with the □ kind below.',
     goalsBy: name => `ticked by ${name}`, tTaskAdded: 'To-do added',
@@ -1432,7 +1446,7 @@ apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的
     actorHuman: '你', actorAgent: 'Agent', liveTipTime: '此刻',
     goalsBtn: '目标', goalsBtnTitle: '每条线的目标和待办', goalsTitle: '目标和待办',
     goalsTip: '怎么用：<b>收件箱</b>放还没想清楚的零散想法；<b>待办</b> □ 挂在具体的线上，是你或 agent 可以去做的下一步；线的<b>目标</b>是它要达到的结果，写在这条线的面板里。agent 用 MCP 工具 <b>trace_tasks</b> 读取目标和待办，做完用 <b>trace_task_done</b> 勾上，你在这里就能看到进度，不用去问。点卡片上的 <b>✓ 已完成/总数 ▸</b>，可以展开这张卡片已完成的待办。',
-    goalsTipHide: '知道了', goalsHelp: '怎么用？', goalsView: '查看记录', goalsEdit: '编辑', goalsAddBtn: '添加', goalsShowDone: '显示已完成的待办', goalsHideDone: '收起已完成的待办', goalsSummary: (open, lines) => `${lines} 条线上还有 ${open} 项待办`,
+    goalsTipHide: '知道了', goalsHelp: '怎么用？', goalsView: '查看记录', goalsEdit: '编辑', goalsAddBtn: '添加', goalsShowDone: '显示已完成的待办', goalsHideDone: '收起已完成的待办', goalsSummary: (open, lines) => `${lines} 条线上还有 ${open} 项待办`, goalsSummaryRv: n => `${n} 项待复核`, rvHead: n => `待复核 · ${n}`, rvPass: '通过', rvPassAll: '全部通过', rvReturn: '退回…', rvReturnGo: '退回', rvReturnPh: '退回理由（可不写），会交回给做它的 agent', rvReturned: '退回', rvReturnedBy: n => `退回给 ${n}`, glFolded: n => `已收起 ${n} 条线：都做完并复核过，一天没动静`, tPassed: n => `已通过 ${n} 项`, tReturned: n => `已退回${n ? `给 ${n}` : ''}`, rvCountTitle: n => `${n} 项 agent 做完的待办等你复核`,
     goalsNoGoal: '还没写目标，点这里填写。', goalsAdd: '+ 添加待办', goalsOpenLine: '打开这条线',
     goalsOthers: n => `另外 ${n} 条线还没有目标或待办。`, goalsEmpty: '还没有目标或待办。打开一条线写下目标，再在这里或用下方的 □ 类型添加待办。',
     goalsBy: name => `由 ${name} 勾选`, tTaskAdded: '已添加待办',
@@ -2192,7 +2206,11 @@ function renderFocus() {
 function render() { if (rq) return; rq = requestAnimationFrame(() => { rq = 0; renderAll(); }); }
 function renderAll() {
   const nQuiet = quietLines().length;
-  for (const b of [$('#goals-btn'), $('#tab-goals')]) { b.classList.toggle('has-nudge', nQuiet > 0); b.title = nQuiet ? t('quietDot', nQuiet) : ''; }
+  const nReview = [...S.commits.values()].filter(c => isTodo(c) && toReview(c) && !(S.threads.get(tidOf(c)) || {}).archived).length;
+  for (const b of [$('#goals-btn'), $('#tab-goals')]) {
+    b.classList.toggle('has-nudge', nQuiet > 0 && !nReview); b.title = nReview ? t('rvCountTitle', nReview) : nQuiet ? t('quietDot', nQuiet) : '';
+    if (nReview) b.setAttribute('data-count', nReview); else b.removeAttribute('data-count');
+  }
   $('#group-list').innerHTML = groupNames().map(g => `<option value="${esc(g)}">`).join('');
   renderSync();
   renderLive();
@@ -2203,7 +2221,7 @@ function renderAll() {
   // The goals list holds still only while a to-do is being typed: a checkbox or menu keeps focus
   // after a click, and that must not stop new to-dos from showing.
   const f = document.activeElement, adding = f && f.classList.contains('gl-add') ? f.dataset.thread : null;
-  const editing = f && f.matches('.gl-t-in, .gl-goal-in');
+  const editing = f && f.matches('.gl-t-in, .gl-goal-in, .gl-ret');
   if (S.sheet === 'goals' && !(adding && f.value) && !editing) {
     renderGoals();
     const again = adding && $(`.gl-add[data-thread="${CSS.escape(adding)}"]`);
@@ -3547,7 +3565,7 @@ detail.addEventListener('change', e => {
   if (s.type !== 'commit') return;
   if (el.id === 'd-kind') patchDoc('commits', s.id, { kind: el.value }, 0);
   else if (el.id === 'd-thread') { patchDoc('commits', s.id, { thread: el.value }, 0); toast(t('tMoved', getThread(el.value).name)); }
-  else if (el.id === 'd-done') patchDoc('commits', s.id, el.checked ? { done: true, doneBy: 'human', doneAt: Date.now() } : { done: false, doneBy: null, doneAt: null }, 0);
+  else if (el.id === 'd-done') patchDoc('commits', s.id, el.checked ? { done: true, doneBy: 'human', doneAt: Date.now(), toReview: null } : { done: false, doneBy: null, doneAt: null, toReview: null }, 0);
   else if (el.id === 'd-ts') { const n = new Date(el.value).getTime(); if (!isNaN(n)) patchDoc('commits', s.id, { ts: n }, 0); }
   el.blur();
 });
@@ -4135,43 +4153,68 @@ for (const [ev, on] of [['pointerover', true], ['pointerout', false]]) $('#histo
   const x = e.target.closest('.h-cap, .h-plaque'); if (!x) return;
   $$(`#history [data-hp="${x.dataset.hp}"]`).forEach(el => el.classList.toggle('on', on));
 });
+// A to-do an agent ticked waits for the person's review: Pass files it with the done ones, Return reopens it for the agent
+// that did it, with the reason (it comes first in that agent's list). A line with nothing open or to review, quiet for a
+// day, folds to the foot of the list; one waiting for review never does.
+const toReview = c => c.done && !!c.toReview;
+const agentKeyOf = name => (/codex/i.test(name || '') ? 'codex' : /gemini/i.test(name || '') ? 'gemini' : /claude/i.test(name || '') ? 'claude' : '');
 function renderGoals() {
-  const by = byThread();
+  const by = byThread(), dayAgo = Date.now() - 864e5;
   const groups = viewLines(() => true).map(th => {
-    const tasks = (by.get(th.id) || []).filter(isTodo);
-    const open = tasks.filter(c => !c.done);
-    return { th, tasks, open, goal: th.id === INBOX ? '' : goalOf(th) };
-  }).filter(g => (g.tasks.length || g.goal) && (!['done', 'merged'].includes(g.th.status) || g.open.length));
-  // Lines that still have open to-dos first, then the ones with a running session, then by most open.
-  groups.sort((a, b) => (b.open.length > 0) - (a.open.length > 0) || liveOn(b.th.id).length - liveOn(a.th.id).length || b.open.length - a.open.length);
+    const cs = by.get(th.id) || [], tasks = cs.filter(isTodo);
+    const open = tasks.filter(c => !c.done).sort((a, b) => !!b.returned - !!a.returned), review = tasks.filter(toReview);
+    const last = Math.max(0, ...cs.map(c => Math.max(c.ts || 0, c.doneAt || 0, c.reviewedAt || 0)));
+    return { th, tasks, open, review, goal: th.id === INBOX ? '' : goalOf(th), folded: th.id !== INBOX && !open.length && !review.length && last < dayAgo };
+  }).filter(g => (g.tasks.length || g.goal) && (!['done', 'merged'].includes(g.th.status) || g.open.length || g.review.length));
+  // To review first, then open to-dos, then a running session, then by most open.
+  groups.sort((a, b) => b.review.length - a.review.length || (b.open.length > 0) - (a.open.length > 0) || liveOn(b.th.id).length - liveOn(a.th.id).length || b.open.length - a.open.length);
   const others = orderedThreads().filter(th => inFocus(th) && !['done', 'merged'].includes(th.status)).length - groups.filter(g => g.th.id !== INBOX).length;
   let tipHidden = false;
   try { tipHidden = localStorage.getItem('tc.goalsTipHidden') === '1'; } catch {}
-  const totalOpen = groups.reduce((n, g) => n + g.open.length, 0);
+  const totalOpen = groups.reduce((n, g) => n + g.open.length, 0), totalReview = groups.reduce((n, g) => n + g.review.length, 0);
+  const agentBy = c => `<span class="gl-by"><span class="actor a-agent">${ACTOR_ICON.agent}</span>${esc(t('goalsBy', c.doneBy))}</span>`;
   const row = c => {
-    const by = c.done && c.doneBy && c.doneBy !== 'human' ? `<span class="gl-by"><span class="actor a-agent">${ACTOR_ICON.agent}</span>${esc(t('goalsBy', c.doneBy))}</span>` : '';
+    const by = c.done && c.doneBy && c.doneBy !== 'human' ? agentBy(c) : '';
     const who = c.done ? '' : `<select class="gl-who" data-who="${esc(c.id)}" title="${esc(t('goalsWho'))}"><option value="">${esc(t('goalsAnyone'))}</option>${Object.entries(AGENT_NAMES).map(([k, n]) => `<option value="${k}" ${c.assignee === k ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>${c.assignee ? `<button class="btn gl-hand" data-hand="${esc(c.id)}">${esc(t('goalsHand'))}</button>${S.mode === 'server' && S.platform === 'darwin' && !S.remote ? `<button class="btn gl-hand" data-hand-open="${esc(c.id)}">${esc(t('openInTerminal'))}</button>` : ''}` : ''}${S.start && tidOf(c) !== INBOX ? `<button class="btn gl-hand" data-start="${esc(c.id)}" title="${esc(t('startTitle'))}">${esc(t('start'))}</button>` : ''}`;
-    const title = S.glEdit === c.id ? `<input class="gl-t-in" data-title="${esc(c.id)}" value="${esc(c.title)}" enterkeyhint="done" aria-label="${esc(t('goalsEdit'))}">` : `<span class="gl-t" data-cid="${esc(c.id)}">${esc(c.title)}</span>`;
+    const ret = c.returned && !c.done ? `<span class="gl-ret-tag" title="${esc(t('rvReturnedBy', c.returned.by || ''))}">${esc(t('rvReturned'))}${c.returned.note ? `: ${esc(c.returned.note)}` : ''}</span>` : '';
+    const title = S.glEdit === c.id ? `<input class="gl-t-in" data-title="${esc(c.id)}" value="${esc(c.title)}" enterkeyhint="done" aria-label="${esc(t('goalsEdit'))}">` : `<span class="gl-t" data-cid="${esc(c.id)}">${ret}${esc(c.title)}</span>`;
     return `<li class="${c.done ? 'done' : ''} ${S.glOpen === c.id ? 'open' : ''}"><input type="checkbox" data-task="${esc(c.id)}" ${c.done ? 'checked' : ''} aria-label="${esc(c.title)}">${title}<span class="gl-acts">${who}<button class="btn gl-edit" data-edit="${esc(c.id)}">${esc(t('goalsEdit'))}</button><button class="btn gl-view" data-view-rec="${esc(c.id)}">${esc(t('goalsView'))}</button></span>${by}<time>${fmtShort(c.doneAt || c.ts)}</time></li>`;
   };
-  const body = (PHONE.matches ? `<details class="gl-help"><summary>${esc(t('goalsHelp'))}</summary><span>${t('goalsTip')}</span></details>` : tipHidden ? '' : `<div class="gl-tip"><span>${t('goalsTip')}</span><button class="btn" id="gl-tip-hide">${esc(t('goalsTipHide'))}</button></div>`)
-    + quietStrip()
-    + `<div class="gl-bar-top"><span>${esc(t('goalsSummary', totalOpen, groups.filter(g => g.open.length).length))}</span></div>`
-    + (groups.length ? groups.map(({ th, tasks, open, goal }) => {
-      const showDone = S.glDone.includes(th.id), shown = showDone ? tasks : open;
-      const pct = tasks.length ? Math.round(100 * (tasks.length - open.length) / tasks.length) : 0;
-      return `<section class="gl-group" style="--c:${th.color}">
+  // A row to review: who did it and when, its result, Pass and Return (a reason box opens under it). The title opens the record.
+  const rvRow = c => `<li class="rv"><span class="gl-t" data-cid="${esc(c.id)}">${esc(c.title)}</span>${agentBy(c)}<time>${fmtShort(c.doneAt || c.ts)}</time>
+    ${c.result ? `<div class="gl-res">${esc(c.result)}</div>` : ''}
+    <div class="gl-rv-acts"><button class="btn btn-primary" data-pass="${esc(c.id)}">${esc(t('rvPass'))}</button><button class="btn" data-return="${esc(c.id)}" aria-expanded="${S.glReturn === c.id}">${esc(t('rvReturn'))}</button></div>
+    ${S.glReturn === c.id ? `<div class="gl-ret-row"><input class="gl-ret" data-ret="${esc(c.id)}" placeholder="${esc(t('rvReturnPh'))}" enterkeyhint="send"><button class="btn btn-primary" data-ret-go="${esc(c.id)}">${esc(t('rvReturnGo'))}</button></div>` : ''}</li>`;
+  const section = ({ th, tasks, open, review, goal }) => {
+    const showDone = S.glDone.includes(th.id), shown = showDone ? tasks.filter(c => !toReview(c)) : open;
+    const pct = tasks.length ? Math.round(100 * (tasks.length - open.length) / tasks.length) : 0;
+    return `<section class="gl-group" style="--c:${th.color}">
         <div class="gl-head"><span class="roundel" style="--c:${th.color}"></span><b>${esc(th.name)}</b>${tasks.length > open.length ? `<button class="gl-prog" data-gl-done="${esc(th.id)}" aria-pressed="${showDone}" title="${esc(t(showDone ? 'goalsHideDone' : 'goalsShowDone'))}">✓ ${tasks.length - open.length}/${tasks.length} ${showDone ? '▾' : '▸'}</button>` : `<span class="gl-prog">${tasks.length - open.length}/${tasks.length}</span>`}${liveBadge(th.id)}<button class="linkish" data-goto="${esc(th.id)}">${esc(t('goalsOpenLine'))}</button></div>
         ${th.id === INBOX ? '' : S.glEdit === 'goal:' + th.id ? `<textarea class="gl-goal-in" data-goal="${esc(th.id)}" rows="${Math.min(6, Math.max(2, Math.ceil(goal.length / 22)))}" placeholder="${esc(t('threadGoalPh'))}">${esc(goal)}</textarea>` : `<div class="gl-goal ${goal ? '' : 'none'}" data-goal-edit="${esc(th.id)}" title="${esc(t('goalsEdit'))}">${esc(goal || t('goalsNoGoal'))}</div>`}
         ${tasks.length ? `<div class="gl-meter"><i style="width:${pct}%"></i></div>` : ''}
+        ${review.length ? `<div class="gl-rv"><div class="gl-rv-head"><span>${esc(t('rvHead', review.length))}</span>${review.length > 1 ? `<button class="linkish" data-pass-all="${esc(th.id)}">${esc(t('rvPassAll'))}</button>` : ''}</div><ul class="gl-tasks">${review.map(rvRow).join('')}</ul></div>` : ''}
         ${shown.length ? `<ul class="gl-tasks">${shown.map(row).join('')}</ul>` : ''}
         <div class="gl-add-row"><input class="gl-add" data-thread="${esc(th.id)}" value="${esc(S.glDraft[th.id] || '')}" placeholder="${esc(t('goalsAdd'))}" enterkeyhint="done"><button class="btn btn-primary gl-add-go" data-add="${esc(th.id)}">${esc(t('goalsAddBtn'))}</button></div>
       </section>`;
-    }).join('') : `<p>${esc(t('goalsEmpty'))}</p>`)
+  };
+  const live = groups.filter(g => !g.folded), folded = groups.filter(g => g.folded);
+  const body = (PHONE.matches ? `<details class="gl-help"><summary>${esc(t('goalsHelp'))}</summary><span>${t('goalsTip')}</span></details>` : tipHidden ? '' : `<div class="gl-tip"><span>${t('goalsTip')}</span><button class="btn" id="gl-tip-hide">${esc(t('goalsTipHide'))}</button></div>`)
+    + quietStrip()
+    + `<div class="gl-bar-top"><span>${totalReview ? `<b class="gl-rv-n">${esc(t('goalsSummaryRv', totalReview))}</b> · ` : ''}${esc(t('goalsSummary', totalOpen, groups.filter(g => g.open.length).length))}</span></div>`
+    + (groups.length ? live.map(section).join('') : `<p>${esc(t('goalsEmpty'))}</p>`)
+    + (folded.length ? `<button class="linkish gl-fold-tog" data-gl-fold aria-expanded="${!!S.glFoldOpen}">${esc(t('glFolded', folded.length))} ${S.glFoldOpen ? '▾' : '▸'}</button>${S.glFoldOpen ? folded.map(section).join('') : ''}` : '')
     + (others > 0 ? `<p>${esc(t('goalsOthers', others))}</p>` : '');
   const keep = $('#sheet-body').scrollTop; // a redraw (new data, a live update) leaves the list where the person is
   setSheet(t('goalsTitle'), body);
   $('#sheet-body').scrollTop = keep;
+}
+// Return: the to-do opens again for the agent that did it, with the reason (trace_tasks and its next session start show it).
+function returnTodo(id) {
+  const c = S.commits.get(id), box = $(`.gl-ret[data-ret="${CSS.escape(id)}"]`), note = box ? box.value.trim() : '';
+  if (!c || !canWrite()) return;
+  const key = agentKeyOf(c.doneBy);
+  patchDoc('commits', id, { done: false, doneBy: null, doneAt: null, toReview: null, returned: { at: Date.now(), note, by: c.doneBy || '' }, ...(key ? { assignee: key } : {}) }, 0);
+  S.glReturn = null; toast(t('tReturned', c.doneBy || '')); setTimeout(renderGoals, 0);
 }
 // The command `trace-canvas hand` prints, built here too: start the assigned agent on the to-do's
 // line, in the line's folder (its repository path, else where a session on it works now).
@@ -4218,7 +4261,7 @@ sheetBody.addEventListener('change', e => {
   const el = e.target;
   if (el.dataset.who && canWrite()) { patchDoc('commits', el.dataset.who, { assignee: el.value || null }, 0); setTimeout(renderGoals, 0); return; }
   if (el.dataset.task && canWrite()) {
-    patchDoc('commits', el.dataset.task, el.checked ? { done: true, doneBy: 'human', doneAt: Date.now() } : { done: false, doneBy: null, doneAt: null }, 0);
+    patchDoc('commits', el.dataset.task, el.checked ? { done: true, doneBy: 'human', doneAt: Date.now(), toReview: null } : { done: false, doneBy: null, doneAt: null, toReview: null }, 0);
     setTimeout(renderGoals, 0); // the box keeps focus, so the render loop would skip the sheet
   }
 });
@@ -4246,6 +4289,7 @@ function addTodo(tid) {
 sheetBody.addEventListener('keydown', e => {
   if (S.sheet !== 'goals' || e.key !== 'Enter' || e.isComposing) return;
   if (e.target.classList.contains('gl-add')) addTodo(e.target.dataset.thread);
+  else if (e.target.classList.contains('gl-ret')) returnTodo(e.target.dataset.ret);
   else if (e.target.classList.contains('gl-t-in')) e.target.blur();
 });
 sheetBody.addEventListener('click', e => {
@@ -4267,6 +4311,16 @@ sheetBody.addEventListener('click', e => {
   if (e.target.closest('[data-ap-copy]')) { copyText(S.apSend.prompt); return; }
   const apP = e.target.closest('[data-ap-profile]'); if (apP) { e.preventDefault(); closeSheet(); select({ type: 'commit', id: apP.dataset.apProfile }); return; }
   if (S.sheet !== 'goals') return;
+  const pass = e.target.closest('[data-pass]'), passAll = e.target.closest('[data-pass-all]');
+  if ((pass || passAll) && canWrite()) {
+    const ids = pass ? [pass.dataset.pass] : (byThread().get(passAll.dataset.passAll) || []).filter(c => isTodo(c) && toReview(c)).map(c => c.id);
+    for (const id of ids) patchDoc('commits', id, { toReview: null, reviewedAt: Date.now() }, 0);
+    toast(t('tPassed', ids.length)); setTimeout(renderGoals, 0); return;
+  }
+  const ret = e.target.closest('[data-return]'), retGo = e.target.closest('[data-ret-go]');
+  if (ret) { S.glReturn = S.glReturn === ret.dataset.return ? null : ret.dataset.return; renderGoals(); const box = $('.gl-ret', sheetBody); if (box) box.focus(); return; }
+  if (retGo) { returnTodo(retGo.dataset.retGo); return; }
+  if (e.target.closest('[data-gl-fold]')) { S.glFoldOpen = !S.glFoldOpen; renderGoals(); return; }
   if (e.target.id === 'gl-tip-hide') { try { localStorage.setItem('tc.goalsTipHidden', '1'); } catch {} renderGoals(); return; }
   const open = e.target.closest('[data-hand-open]');
   if (open) {

@@ -125,15 +125,19 @@ export function machineOwner(mapDir, machine) {
  * every 2 minutes, so what one machine logs shows on the other without anyone pressing Sync. Only once this machine has
  * synced by hand (its file exists), so the first sync stays a choice.
  */
-export function syncSoon(cli, env = process.env) {
+// now: at once, past the 2-minute wait, and the other machines are asked to pull straight after (--nudge): for
+// state another machine's page shows as it changes, such as an Autopilot switch.
+export function syncSoon(cli, env = process.env, { now = false, spawnIt = spawn } = {}) {
   const cfg = readConfig(env);
   if (!cfg.map || !fs.existsSync(path.join(cfg.map, 'canvas', `${cfg.machine}.jsonl`))) return false;
   let last = 0;
   try { last = Number(fs.readFileSync(path.join(home(env), '.sync-last'), 'utf8')) || 0; } catch {}
-  if (Date.now() - last < 120000) return false;
-  spawn(process.execPath, [cli, 'sync', '--quiet'], { detached: true, stdio: 'ignore', env }).unref();
+  if (!now && Date.now() - last < 120000) return false;
+  spawnIt(process.execPath, [cli, 'sync', '--quiet', ...(now ? ['--nudge'] : [])], { detached: true, stdio: 'ignore', env }).unref();
   return true;
 }
+// Each line's Autopilot state, to tell when it changed (the page server syncs at once then).
+export const autopilotSig = d => JSON.stringify(Object.values(d.threads || {}).filter(t => t.autopilot).map(t => [t.id, t.autopilot.at, t.autopilot.session || '']).sort());
 
 // How the last sync went, for the page: { at, failed, lastOk, others: { machine: when its file last changed } }.
 const statusFile = env => path.join(home(env), '.sync-status.json');

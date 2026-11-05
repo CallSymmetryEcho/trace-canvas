@@ -18,7 +18,7 @@ import { focusTab, launchRow, openTerminal, terminalCommand } from './agents.mjs
 import { draftLessons, rememberLesson } from './lessons.mjs';
 import { otherMachines, remoteLive } from './remote.mjs';
 import { commitDiff, commitInfo, readLinkedImage, readLinkedMd } from './git-view.mjs';
-import { runSync, syncSoon, syncStatus } from './sync.mjs';
+import { autopilotSig, runSync, syncSoon, syncStatus } from './sync.mjs';
 import { doctor } from './doctor.mjs';
 import { desktopSessions } from './desktop.mjs';
 
@@ -64,7 +64,15 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
     clearTimeout(pending[event]);
     pending[event] = setTimeout(() => { for (const res of clients) res.write(`event: ${event}\ndata: ${Date.now()}\n\n`); }, 80);
   };
-  fs.watchFile(dataFile(), { interval: 400 }, (cur, prev) => { if (cur.mtimeMs !== prev.mtimeMs) broadcast(); });
+  // An Autopilot switch that changed here (asked, taken up by a session, stopped, ended by its summary) goes to the
+  // other machines at once, not with the next 2-minute sync, so their pages show it too.
+  let apSig = autopilotSig(readData());
+  fs.watchFile(dataFile(), { interval: 400 }, (cur, prev) => {
+    if (cur.mtimeMs === prev.mtimeMs) return;
+    broadcast();
+    const sig = autopilotSig(readData());
+    if (sig !== apSig) { apSig = sig; syncSoon(CLI, process.env, { now: true }); }
+  });
   fs.mkdirSync(liveDir(), { recursive: true });
   // ponytail: fs.watch on the folder; poll its files if a platform ever drops these events.
   try { fs.watch(liveDir(), () => broadcast('live')).unref(); } catch {}

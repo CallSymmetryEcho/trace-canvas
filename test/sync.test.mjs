@@ -149,3 +149,28 @@ test('a background sync starts only on a machine that has synced before, and not
   fs.writeFileSync(path.join(home, '.sync-last'), String(Date.now()));
   assert.equal(syncSoon(cli, env), false); // synced a moment ago
 });
+
+test('an Autopilot switch that changed syncs at once and nudges the other machines; otherwise every 2 minutes', async () => {
+  const { autopilotSig, syncSoon } = await import('../src/sync.mjs');
+  const a = { threads: { t1: { id: 't1' }, t2: { id: 't2', autopilot: { at: 5 } } } };
+  const asked = autopilotSig(a);
+  a.threads.t2.autopilot.session = 's1';
+  assert.notEqual(autopilotSig(a), asked); // taken up by a session
+  const taken = autopilotSig(a);
+  a.threads.t1.name = 'renamed';
+  assert.equal(autopilotSig(a), taken); // anything else is not a change
+  delete a.threads.t2.autopilot;
+  assert.equal(autopilotSig(a), '[]');
+
+  // A throwaway home and map: never this computer's real ones.
+  const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-soon-')), map = path.join(homeDir, 'map');
+  fs.mkdirSync(path.join(map, 'canvas'), { recursive: true });
+  fs.writeFileSync(path.join(map, 'canvas', 'test-dev.jsonl'), '');
+  fs.writeFileSync(path.join(homeDir, 'config.json'), JSON.stringify({ machine: 'test-dev', map }));
+  fs.writeFileSync(path.join(homeDir, '.sync-last'), String(Date.now()));
+  const env = { ...process.env, TRACE_CANVAS_HOME: homeDir, TRACE_CANVAS_MAP: map, TRACE_CANVAS_MACHINE: 'test-dev' };
+  const runs = [], spawnIt = (bin, args) => { runs.push(args.slice(1)); return { unref() {} }; };
+  assert.equal(syncSoon('cli', env, { spawnIt }), false); // synced a moment ago
+  assert.equal(syncSoon('cli', env, { now: true, spawnIt }), true);
+  assert.deepEqual(runs, [['sync', '--quiet', '--nudge']]);
+});

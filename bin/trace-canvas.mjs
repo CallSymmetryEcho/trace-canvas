@@ -664,6 +664,13 @@ async function main() {
     case 'sync': {
       const { runSync } = await import('../src/sync.mjs');
       const r = runSync();
+      // --nudge: what this sync pushed, the other machines pull now (their own sync, over ssh), not in 2 minutes.
+      // Only after pushing changes made here, so a machine that only took them in does not nudge back.
+      if (flag('nudge', false) && r.pushed && r.changed) {
+        const { ARGS, otherMachines } = await import('../src/remote.mjs');
+        const { readData } = await import('../src/store.mjs');
+        for (const m of otherMachines(readData())) spawn('ssh', [...ARGS, m, `exec "$SHELL" -lc 'trace-canvas sync --quiet'`], { detached: true, stdio: 'ignore' }).unref();
+      }
       if (flag('quiet', false)) break;
       if (r.error) { console.error(`Sync failed: ${r.error}`); process.exit(1); }
       if (r.busy) { console.log('Another sync is running.'); break; }

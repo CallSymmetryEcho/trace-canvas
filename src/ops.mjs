@@ -185,7 +185,7 @@ export function dispatch(d, { refs = [], all = false, self = null, on = '', away
       if (!s) {
         // A new session; on another machine over ssh, from its home folder (the line's folder is this machine's).
         const cmd = handTo(d, { ref: todos[0].id, to: key, remote: key === 'claude', here: !away, prompt: promptFor && promptFor(th, tid, todos) }, env).command;
-        rows.push({ ...row, action: 'start', ...(away ? { machine: away } : {}), command: away ? remote(away, cmd) : cmd });
+        rows.push({ ...row, action: 'start', ...(away ? { machine: away, ...awayRun(away, cmd, todos[0].id) } : { command: cmd }) });
         continue;
       }
       const prompt = promptFor ? oneLine(promptFor(th, tid, todos)) : oneLine(`New to-dos on the Trace Canvas line "${th.name}" (thread ${tid}) are yours: ${todos.map((c, i) => `${i + 1}) ${c.title} [${c.id}]`).join('; ')}. Do them in order; read the line with trace_read_thread for context, tick each with trace_task_done when it is done, and log results with trace_log.`);
@@ -193,7 +193,7 @@ export function dispatch(d, { refs = [], all = false, self = null, on = '', away
       const action = sid === self ? 'self' : away ? (run ? 'busy' : 'resume') : run && key === 'claude' ? 'message' : run && run.status === 'working' ? 'busy' : 'resume';
       const wake = `${s.cwd ? `cd ${q(s.cwd)} && ` : ''}${AGENTS[key].wake(sid, prompt)}`;
       const fresh = () => { const cmd = handTo(d, { ref: todos[0].id, to: key, remote: key === 'claude', here: !away, prompt: promptFor && promptFor(th, tid, todos) }, env).command; return away ? remote(away, cmd) : cmd; };
-      rows.push({ ...row, action, session, prompt, ...(action === 'resume' ? { command: away ? remote(away, wake) : wake } : action === 'busy' ? { command: fresh() } : {}) });
+      rows.push({ ...row, action, session, prompt, ...(action === 'resume' ? (away ? awayRun(away, wake, sid.slice(0, 8)) : { command: wake }) : action === 'busy' ? { command: fresh() } : {}) });
     }
   }
   return rows;
@@ -561,6 +561,9 @@ export function listThreads(d, { query, includeDone = true } = {}) {
 // A command run on another machine over ssh (machine names are the ssh aliases), in the user's login shell there:
 // ssh alone runs it with a bare PATH (/usr/bin:/bin), without claude, codex or node.
 export const remote = (machine, cmd) => `ssh -t ${machine} ${q(`exec "$SHELL" -lc ${q(cmd)}`)}`;
+// Dispatched to another machine: it runs there in tmux session tc-<id> (a new one by its first to-do, a resumed one by
+// its session), started by launchRow; command stays the plain ssh -t, for a person to run by hand.
+const awayRun = (machine, cmd, id) => ({ command: remote(machine, cmd), tmux: { machine, name: `tc-${id}`, cmd, attach: remote(machine, `tmux attach -t tc-${id}`) } });
 // A line's sessions with their live status ('off' when not running).
 export function threadSessions(d, tid, env = process.env) {
   const live = new Map(listLive(env).map(s => [s.id, s])), me = readConfig(env).machine;

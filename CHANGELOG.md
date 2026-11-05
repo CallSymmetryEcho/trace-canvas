@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Agents sent to another machine keep running.** Dispatch and Autopilot start an agent for another machine in a detached tmux session there (`tc-<to-do>` for a new one, `tc-<session>` for a resumed one), then open a window attached to it: closing the window or losing the network no longer stops the agent. Each row also prints the plain `ssh -t` command for running it by hand, and the panel's resume command stays that one. A machine without tmux gets the `ssh -t` window as before, with a line saying to install tmux. This machine's agents are unchanged.
 - **Formulas in records and reports.** `$…$` in a record's details or a linked `.md` report reads as a formula in the line, `$$…$$` on lines of its own as a centred one, drawn by the browser itself (MathML: no library, works offline). Fractions, roots, scripts, Greek, operators, accents, `\left…\right`, matrices, `cases` and `aligned` are covered; a formula it cannot read shows as its source. A `$` in code, or money such as "$5 and $10", stays text.
 - **Images in the reader.** A record that links an image (png, jpg, gif, webp, svg) gets **View**, which opens it in the reader; a linked report's `![alt](path)` images show in it, a relative path taken from the report's folder. Images load only when you open them, up to 10 MB, and only ones a record or a linked report points to.
 

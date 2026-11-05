@@ -76,6 +76,9 @@ test('dispatch hands each line\'s new to-dos to the agent working on it, and say
   assert.equal(off.action, 'resume');
   assert.equal(off.session.machine, 'bsuper');
   assert.match(off.command, /^ssh -t bsuper 'exec "\$SHELL" -lc .*cd .*\/home\/u\/proj.* && claude --resume r1 /);
+  // It runs there in tmux, named by the session; the attach and the by-hand command are plain ssh -t.
+  assert.deepEqual([off.tmux.machine, off.tmux.name, off.tmux.attach], ['bsuper', 'tc-r1', `ssh -t bsuper 'exec "$SHELL" -lc '\\''tmux attach -t tc-r1'\\'''`]);
+  assert.match(off.tmux.cmd, /^cd .*\/home\/u\/proj.* && claude --resume r1 /);
   todo(far, 'Plot the results');
   assert.equal(dispatch(d, { refs: ['Far'], awayLive: () => ({ sessions: [{ id: 'r1', status: 'idle' }] }) }, env)[0].action, 'busy');
 
@@ -121,6 +124,7 @@ test('dispatch hands each line\'s new to-dos to the agent working on it, and say
   assert.deepEqual([lab.action, lab.machine, lab.on], ['start', 'lab', 'lab']);
   assert.match(lab.command, /^ssh -t lab 'exec "\$SHELL" -lc .*TRACE_CANVAS_THREAD=/);
   assert.doesNotMatch(lab.command, /cd /); // this machine's folder means nothing there
+  assert.equal(lab.tmux.name, `tc-${lab.todos[0].id}`); // a new one, by its first to-do
 });
 
 test('a to-do assigned to an agent goes to that agent\'s session, keeps its assignee, and skips heartbeat sessions', () => {
@@ -188,4 +192,28 @@ test('an archived project is out of the to-do list and of dispatch, unless its l
   d.threads[a].archived = Date.now();
   assert.deepEqual(listTasks(d).map(x => x.name).filter(n => n !== 'Inbox'), ['New']);
   assert.equal(listTasks(d, { thread: 'Old' })[0].tasks.length, 1);
+});
+
+test('another machine\'s agent starts in tmux there and a window watches it; without tmux, the ssh -t window as before', async () => {
+  const { launchRow, startDetached } = await import('../src/agents.mjs');
+  let got;
+  const ssh = code => (cmd, args, o, cb) => { got = args; cb(code ? Object.assign(new Error('x'), { code }) : null, '', code === 255 ? 'ssh: connect to host lab port 22: Connection refused' : ''); };
+  assert.equal(await startDetached({ machine: 'lab', name: 'tc-c1', cmd: "claude 'go'" }, ssh(0)), '');
+  assert.deepEqual(got.slice(0, 5), ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', 'lab']);
+  // What the remote login shell runs, unquoted once by it:
+  const inner = (await import('node:child_process')).execFileSync('sh', ['-c', `printf %s ${got[5].replace(/^exec "\$SHELL" -lc /, '')}`], { encoding: 'utf8' });
+  assert.equal(inner, `command -v tmux >/dev/null || exit 3; tmux has-session -t 'tc-c1' 2>/dev/null && exit 4; tmux new-session -d -s 'tc-c1' 'exec "$SHELL" -lc '\\''claude '\\''\\'\\'''\\''go'\\''\\'\\'''\\'''\\'''`);
+  assert.equal(await startDetached({ machine: 'lab', name: 'n', cmd: 'x' }, ssh(3)), 'no-tmux');
+  assert.equal(await startDetached({ machine: 'lab', name: 'n', cmd: 'x' }, ssh(4)), 'exists');
+  assert.match(await startDetached({ machine: 'lab', name: 'n', cmd: 'x' }, ssh(255)), /Connection refused/);
+
+  const opened = [], open = async c => { opened.push(c); return null; };
+  const row = { command: 'ssh -t lab plain', tmux: { machine: 'lab', name: 'tc-c1', cmd: 'x', attach: 'ssh -t lab attach' } };
+  assert.deepEqual(await launchRow(row, { open, start: async () => '' }), { detached: true });
+  assert.deepEqual(await launchRow(row, { open, start: async () => 'exists' }), { detached: true, already: true });
+  assert.deepEqual(await launchRow(row, { open: async () => 'no window', start: async () => '' }), { detached: true, noWatch: 'no window' });
+  assert.deepEqual(await launchRow(row, { open, start: async () => 'no-tmux' }), { failed: null, noTmux: true });
+  assert.deepEqual(await launchRow(row, { open, start: async () => 'refused' }), { failed: 'refused' });
+  assert.deepEqual(await launchRow({ command: 'claude here' }, { open, start: async () => { throw new Error('not for this machine'); } }), { failed: null });
+  assert.deepEqual(opened, ['ssh -t lab attach', 'ssh -t lab attach', 'ssh -t lab plain', 'claude here']);
 });

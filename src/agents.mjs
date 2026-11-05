@@ -92,6 +92,26 @@ export function openTerminal(cmd, env = process.env) {
     c.on('error', e => done(e.message)).on('spawn', () => { c.unref(); done(null); });
   });
 }
+// An agent for another machine runs there in a detached tmux session, so it keeps going when this window closes or
+// the network drops; ssh only starts it. Resolves '' when started, 'exists' when that tmux session is already there,
+// 'no-tmux' when the machine has none, or the error.
+export function startDetached({ machine, name, cmd }, run = execFile) {
+  const script = `command -v tmux >/dev/null || exit 3; tmux has-session -t ${q(name)} 2>/dev/null && exit 4; tmux new-session -d -s ${q(name)} ${q(`exec "$SHELL" -lc ${q(cmd)}`)}`;
+  return new Promise(done => run('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', machine, `exec "$SHELL" -lc ${q(script)}`], { timeout: 30e3 }, (err, out, errOut) => {
+    if (!err) return done('');
+    done(err.code === 3 ? 'no-tmux' : err.code === 4 ? 'exists' : String(errOut || err.message).trim() || `ssh exited ${err.code}`);
+  }));
+}
+/** Opens what a dispatch or Autopilot row needs. With row.tmux (another machine): starts it there in tmux, then opens
+ * a window attached to it, which may fail without failing the row; no tmux there: the plain ssh -t window, as before. */
+export async function launchRow(r, { open = openTerminal, start = startDetached } = {}) {
+  if (!r.tmux) return { failed: await open(r.command) };
+  const s = await start(r.tmux);
+  if (s === 'no-tmux') return { failed: await open(r.command), noTmux: true };
+  if (s && s !== 'exists') return { failed: s };
+  const watch = await open(r.tmux.attach);
+  return { detached: true, ...(s ? { already: true } : {}), ...(watch ? { noWatch: watch } : {}) };
+}
 // AppleScript that brings the Terminal or iTerm2 tab with this tty to the front and prints "ok",
 // or nothing when no tab has it (Go to the terminal). null for other terminals.
 export function focusScript({ tty = '', term = '' } = {}) {

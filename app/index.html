@@ -681,6 +681,12 @@ body.sheet-open .top { z-index: 80; }
   .card { transition: none; }
 }
 
+/* ---------- tablet widths (an e-reader in portrait is ~900px): the top bar stays one line ---------- */
+@media (max-width: 1100px) {
+  .brand-sub { display: none; }
+  .search { flex: 1 1 120px; min-width: 90px; }
+  .hist-btn span { display: none; }
+}
 /* ---------- narrow screens ---------- */
 @media (max-width: 760px) {
   .brand-sub, .sync-text { display: none; }
@@ -2830,10 +2836,10 @@ function renderGit() {
     cols[k].push({ lo, hi }); lane.set(id, k);
   }
   const nCols = Math.max(1, cols.length);
-  // A phone keeps the graph to about two fifths of the screen so the titles stay readable, and gives each
-  // row two lines (ROW matches .g-row's height in the narrow-screen CSS).
+  // The graph keeps to about two fifths of the screen so the titles stay readable (many lanes on a tablet pushed
+  // the rows off its edge); a phone also gives each row two lines (ROW matches .g-row's height in the narrow-screen CSS).
   const phone = PHONE.matches, ROW = phone ? 52 : 44, PADX = phone ? 10 : 16;
-  const LW = phone ? Math.max(9, Math.min(22, Math.floor((innerWidth * 0.42 - 2 * PADX) / Math.max(1, nCols - 1)))) : 28;
+  const LW = Math.max(9, Math.min(phone ? 22 : 28, Math.floor((innerWidth * 0.42 - 2 * PADX) / Math.max(1, nCols - 1))));
   const lx = i => PADX + i * LW, ry = i => i * ROW + ROW / 2;
   const gw = PADX * 2 + (nCols - 1) * LW;
   const selT = selThreadId();
@@ -3767,7 +3773,7 @@ menu.addEventListener('click', e => {
   $$('.menu-row.open', menu).forEach(r => r.classList.remove('open'));
   row.classList.toggle('open', open);
 });
-moreBtn.addEventListener('click', e => { e.stopPropagation(); menu.hidden = !menu.hidden; if (!menu.hidden) menuState(); moreBtn.setAttribute('aria-expanded', String(!menu.hidden)); });
+moreBtn.addEventListener('click', e => { e.stopPropagation(); menu.hidden = !menu.hidden; if (!menu.hidden) { menuState(); menu.style.right = ''; const x = menu.getBoundingClientRect().left; if (x < 8) menu.style.right = `${x - 8}px`; } moreBtn.setAttribute('aria-expanded', String(!menu.hidden)); });
 document.addEventListener('click', e => { if (!menu.hidden && !e.target.closest('.menu-wrap')) closeMenu(); });
 // Syncs with the other machines through the location map repository (POST /api/sync, src/sync.mjs).
 async function syncNow() {

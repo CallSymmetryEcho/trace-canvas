@@ -83,8 +83,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .sync[data-mode="offline"]::before { background: var(--danger); }
 .brand-sub:empty { display: none; }
 /* Language: both choices always visible, the current one filled, like the view tabs */
-.menu .k b { font-weight: 400; }
-.menu .k b.lang-on { font-weight: 700; color: var(--ink); }
 .sync[data-mode="local"]::before { background: #E0A100; }
 .sync[data-mode="ro"]::before { background: var(--inbox); }
 .tabs { display: flex; gap: 2px; padding: 2px; background: var(--surface-2); border: 1px solid var(--rule); border-radius: var(--r); }
@@ -127,6 +125,16 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .menu button { display: flex; width: 100%; justify-content: space-between; gap: 12px; text-align: left; padding: 8px 10px; border: 0; border-radius: 6px; background: transparent; cursor: pointer; font-size: 13px; }
 .menu button:hover { background: var(--surface-2); }
 .menu hr { border: 0; border-top: 1px solid var(--rule-soft); margin: 4px 0; }
+/* A row of chips: a label, then its choices; a filled chip is on. */
+.menu { min-width: 300px; }
+.menu-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 5px 10px; font-size: 13px; }
+.menu-row[hidden] { display: none; }
+.menu .seg { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
+.menu .seg button { width: auto; padding: 3px 10px; border: 1px solid var(--rule); border-radius: 999px; font-size: 12px; color: var(--muted); background: transparent; }
+.menu .seg button[hidden] { display: none; }
+.menu .seg button:hover { background: var(--surface-2); color: var(--ink); }
+.menu .seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.menu .menu-hot { color: var(--accent); font-weight: 600; }
 .menu .k { color: var(--faint); font-family: var(--f-mono); font-size: 11px; }
 
 /* ---------- main ---------- */
@@ -217,6 +225,9 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .card.is-shut { width: auto; max-width: 252px; border-style: dashed; opacity: .75; }
 .card.is-shut .strip, .card.is-shut .card-foot { display: none; }
 .card.is-shut .card-head { padding-bottom: 10px; }
+/* A folded line opened to look at floats over its neighbours until folded again. */
+.card.is-peek { z-index: 6; box-shadow: var(--shadow); }
+.card .mi-tog { font: inherit; color: inherit; text-decoration: underline dotted; text-underline-offset: 2px; }
 /* A done line folds too, in the ok colour with a check, so it reads apart from a parked (dashed, grey) one. */
 .card.is-shut.st-done { border-style: solid; border-color: var(--ok); }
 .card.st-done .card-name::before { content: '✓ '; color: var(--ok); }
@@ -925,25 +936,20 @@ button.gl-prog[aria-pressed="true"] { color: var(--ink); background: var(--surfa
     <div class="menu-wrap">
       <button class="btn" id="more-btn" aria-haspopup="true" aria-expanded="false" data-i18n="more">More</button>
       <div class="menu" id="menu" hidden>
+        <button data-menu="update" id="update-item" class="menu-hot" hidden><span id="update-label"></span></button>
         <button data-menu="ai" id="ai-item" hidden data-i18n-title="aiBtnTitle"><span data-i18n="aiBtn">AI tidy-up</span></button>
-        <button data-menu="new-thread"><span data-i18n="menuNewThread">New thread</span> <span class="k">N</span></button>
-        <button data-menu="toggle-done"><span id="toggle-done-label"></span></button>
-        <button data-menu="toggle-merged"><span id="toggle-merged-label"></span></button>
-        <button data-menu="focus" data-i18n="menuFocus">Focus on a group…</button>
-        <button data-menu="theme"><span id="theme-label"></span></button>
-        <button data-menu="lang" lang="en"><span>Language · 语言</span> <span class="k"><b id="lang-en">EN</b> · <b id="lang-zh" lang="zh-CN">中文</b></span></button>
+        <!-- A row holds the entries of one kind; a filled chip is on (shown, chosen). -->
+        <div class="menu-row"><span data-i18n="menuShow">Show</span><span class="seg"><button data-menu="toggle-done" id="done-chip" data-i18n="chipDone">Finished</button><button data-menu="toggle-merged" id="merged-chip" data-i18n="chipMerged">Merged</button></span></div>
+        <div class="menu-row"><span data-i18n="menuThemeL">Theme</span><span class="seg" id="theme-seg"></span></div>
+        <div class="menu-row" lang="en"><span>Language · 语言</span><span class="seg"><button data-menu="lang" data-lang="en" id="lang-en">EN</button><button data-menu="lang" data-lang="zh" id="lang-zh" lang="zh-CN">中文</button></span></div>
+        <div class="menu-row" id="machines-row" hidden><span data-i18n="menuMachines">Other machines</span><span class="seg"><button data-menu="sync" id="sync-item" hidden data-i18n="chipSync" data-i18n-title="menuSync">Sync</button><button data-menu="away" id="away-item" hidden data-i18n="chipAway">Sessions</button><button data-menu="away-git" id="away-git-item" hidden data-i18n="chipAwayGit">Changes</button><button data-menu="phone" id="phone-item" hidden data-i18n="chipPhone" data-i18n-title="menuPhone">Phone</button></span></div>
         <hr>
+        <button data-menu="focus" data-i18n="menuFocus">Focus and fold groups…</button>
         <button data-menu="agent" data-i18n="menuAgent">Connect an AI agent</button>
         <button data-menu="io" data-i18n="menuIO">Import / export</button>
-        <button data-menu="sync" id="sync-item" hidden data-i18n="menuSync">Sync with other machines</button>
-        <button data-menu="away" id="away-item" hidden><span id="away-label"></span></button>
-        <button data-menu="away-git" id="away-git-item" hidden><span id="away-git-label"></span></button>
-        <button data-menu="update" id="update-item" hidden><span id="update-label"></span></button>
-        <button data-menu="phone" id="phone-item" hidden data-i18n="menuPhone">Open on your phone</button>
         <button data-menu="clear-examples" id="clear-ex-item" hidden data-i18n="menuClearEx">Clear example data</button>
         <hr>
-        <button data-menu="doctor" id="doctor-item" hidden data-i18n="menuDoctor">Check setup</button>
-        <button data-menu="help" data-i18n="menuHelp">Shortcuts and help</button>
+        <div class="menu-row"><span data-i18n="menuHelpL">Help</span><span class="seg"><button data-menu="help" data-i18n="chipHelp">Shortcuts and how-to</button><button data-menu="doctor" id="doctor-item" hidden data-i18n="menuDoctor">Check setup</button></span></div>
       </div>
     </div>
   </header>
@@ -1086,9 +1092,9 @@ const I18N = {
     exChip: 'Example data', exClear: 'Clear', exChipTitle: 'Records added to show how the views work',
     searchPh: 'Search records…', aiBtn: 'AI tidy-up', aiBtnTitle: 'Claude reads every line and suggests merges, lines to wrap up and to-dos already done; you click each one',
     langGroup: 'Language', more: 'More',
-    menuNewThread: 'New thread', menuHideDone: 'Hide finished threads', menuShowDone: 'Show finished threads', quietLabel: 'Gone quiet', quietDays: n => `${n}d`, quietDot: n => `${n} line${n === 1 ? ' has' : 's have'} gone quiet`, quietAsk: (n, u) => `Nothing for ${n} days, where it usually moves every ${u === 1 ? 'day' : `${u} days`}. Finished?`, quietAskOpen: (n, k) => `Nothing for ${n} days, with ${k} to-do${k === 1 ? '' : 's'} still open. Park it for now?`, quietStill: 'Still on it', menuShowMerged: 'Show merged threads', menuHideMerged: 'Fold merged threads', mergedInCount: n => ` · ${n} merged in`, mergedInLabel: 'Merged in',
+    menuNewThread: 'New thread', menuHideDone: 'Hide finished threads', menuShowDone: 'Show finished threads', quietLabel: 'Gone quiet', quietDays: n => `${n}d`, quietDot: n => `${n} line${n === 1 ? ' has' : 's have'} gone quiet`, quietAsk: (n, u) => `Nothing for ${n} days, where it usually moves every ${u === 1 ? 'day' : `${u} days`}. Finished?`, quietAskOpen: (n, k) => `Nothing for ${n} days, with ${k} to-do${k === 1 ? '' : 's'} still open. Park it for now?`, quietStill: 'Still on it', menuShowMerged: 'Show merged threads', menuHideMerged: 'Fold merged threads', menuShow: 'Show', chipDone: 'Finished', chipMerged: 'Merged', menuThemeL: 'Theme', menuMachines: 'Other machines', chipSync: 'Sync', chipAway: 'Sessions', chipAwayGit: 'Changes', chipPhone: 'Phone', menuHelpL: 'Help', chipHelp: 'Shortcuts and how-to', peekOpen: 'Show its stations (it stays finished)', peekOpenParked: 'Show its stations (it stays parked)', peekClose: 'Fold it again', mergedOpen: 'Show the lines merged into it', mergedClose: 'Fold them again', mergedInCount: n => ` · ${n} merged in`, mergedInLabel: 'Merged in',
     arrange: 'Arrange', arrangeTitle: 'Lay the lines out by group, forks next to the lines they came from', tArranged: 'Arranged', tUndo: 'Undo',
-    groupLabel: 'Group', groupName: 'Name', groupLines: 'Lines in this group', groupCount: n => `${n} line${n === 1 ? '' : 's'}`, groupArrange: 'Arrange this group', groupFocus: 'Focus on this group', menuFocus: 'Focus on a group…', menuTheme: n => `Theme: ${n}`, theme_auto: 'match the system', theme_light: 'light', theme_dark: 'dark', theme_mist: 'mist', focusTitle: 'Focus on a group', focusLabel: 'Focus', focusPick: 'Change', focusExit: 'Leave focus', groupFold: 'Fold this group', foldedLabel: 'Folded', foldOpenAll: 'Unfold all', foldOpen: 'Unfold', foldedChip: n => `${n} line${n === 1 ? '' : 's'} · folded`, fromMachines: ms => `from ${ms.join(', ')}`, fromTitle: (m, n) => `${n} record${n === 1 ? '' : 's'} written on ${m}`, foldTitle: 'Fold groups', foldIntro: 'Folded groups stay out of every view (the canvas keeps a small chip for each) until you unfold them. Focus still works on any group.', foldShown: 'Shown', tFolded: g => `Folded "${g}"`, unpark: 'Unfold: make it active again', histBtn: 'History', histBack: '← Back to the workspace', histTitle: 'Finished projects, archived', histSub: 'Projects you finished, one plaque each.', histProjects: 'projects', histLines: 'lines', histStations: 'stations', histDecisions: 'decisions', histSessions: 'sessions', histDays: n => `${n} day${n === 1 ? '' : 's'}`, histArchived: 'Archived', histArchivedOn: d => `Archived ${d}`, histRestore: 'Restore', histReplay: 'Replay', histLessons: 'Draw lessons', histLessonsMore: 'More lessons', histLessonsN: n => `${n} lesson${n === 1 ? '' : 's'} remembered`, lsHead: g => `Lessons from "${g}"`, lsWait: 'Your local claude is reading the project\'s decisions and wrap-ups… (a minute or two)', lsNone: 'Nothing worth keeping came out of it.', lsP: 'Tick the ones worth keeping: they go to long-term memory (Theatrum), and a new line that fits gets them when it starts. Unticked ones are dropped.', lsSave: 'Remember the ticked ones', lsPickOne: 'Tick at least one', lsSaved: n => `${n} lesson${n === 1 ? '' : 's'} remembered`, lsSomeFailed: (n, e) => `${n} remembered; the rest failed: ${e}`, histPlay: 'Play', histPause: 'Pause', histAgain: 'Play again', histEmptyHead: 'Nothing on the wall yet', histEmpty: 'When a project is finished, open its group and press Archive this project: it leaves the workspace and gets a plaque here.', archiveBtn: 'Archive this project', archiveHead: g => `Archive "${g}"`, archiveP: 'Its lines leave every view, the live bar and dispatch, and the project gets a plaque on the History wall. Restore brings it back.', archiveOpen: n => `${n} to-do${n === 1 ? '' : 's'} still open`, archiveLive: n => `${n} session${n === 1 ? '' : 's'} still running`, archiveClean: 'Nothing open or running: ready for the wall.', archiveGo: 'Archive', tArchived: g => `"${g}" is on the History wall`, tRestored: g => `"${g}" is back in the workspace`, apTick: x => `Autopilot · working on: ${x}`, apTickIdle: 'Autopilot · wrapping up the round', reopen: 'Unfold: reopen it', wrapHead: 'Wrap up this line', wrapP: 'A done line folds like a parked one and leaves the other views. This wrap-up becomes its last station; edit it first.', wrapSave: 'Save and mark done', wrapSkip: 'Done, no wrap-up', wrapRec: n => `Wrap-up: ${n}`, wrapGoal: 'Goal: ', wrapSpan: (a, b, n, s) => `${a} – ${b} · ${n} records · ${s} sessions`, wrapDec: 'Key decisions:', wrapTodos: (d, n) => `To-dos done: ${d}/${n}`, wrapOpen: 'Left open:', wrapOut: 'Outputs and where they are kept:\n- ', tUnparked: n => `"${n}" is active again`,
+    groupLabel: 'Group', groupName: 'Name', groupLines: 'Lines in this group', groupCount: n => `${n} line${n === 1 ? '' : 's'}`, groupArrange: 'Arrange this group', groupFocus: 'Focus on this group', menuFocus: 'Focus and fold groups…', menuTheme: n => `Theme: ${n}`, theme_auto: 'match the system', theme_light: 'light', theme_dark: 'dark', theme_mist: 'mist', focusTitle: 'Focus on a group', focusLabel: 'Focus', focusPick: 'Change', focusExit: 'Leave focus', groupFold: 'Fold this group', foldedLabel: 'Folded', foldOpenAll: 'Unfold all', foldOpen: 'Unfold', foldedChip: n => `${n} line${n === 1 ? '' : 's'} · folded`, fromMachines: ms => `from ${ms.join(', ')}`, fromTitle: (m, n) => `${n} record${n === 1 ? '' : 's'} written on ${m}`, foldTitle: 'Fold groups', foldIntro: 'Folded groups stay out of every view (the canvas keeps a small chip for each) until you unfold them. Focus still works on any group.', foldShown: 'Shown', tFolded: g => `Folded "${g}"`, unpark: 'Unfold: make it active again', histBtn: 'History', histBack: '← Back to the workspace', histTitle: 'Finished projects, archived', histSub: 'Projects you finished, one plaque each.', histProjects: 'projects', histLines: 'lines', histStations: 'stations', histDecisions: 'decisions', histSessions: 'sessions', histDays: n => `${n} day${n === 1 ? '' : 's'}`, histArchived: 'Archived', histArchivedOn: d => `Archived ${d}`, histRestore: 'Restore', histReplay: 'Replay', histLessons: 'Draw lessons', histLessonsMore: 'More lessons', histLessonsN: n => `${n} lesson${n === 1 ? '' : 's'} remembered`, lsHead: g => `Lessons from "${g}"`, lsWait: 'Your local claude is reading the project\'s decisions and wrap-ups… (a minute or two)', lsNone: 'Nothing worth keeping came out of it.', lsP: 'Tick the ones worth keeping: they go to long-term memory (Theatrum), and a new line that fits gets them when it starts. Unticked ones are dropped.', lsSave: 'Remember the ticked ones', lsPickOne: 'Tick at least one', lsSaved: n => `${n} lesson${n === 1 ? '' : 's'} remembered`, lsSomeFailed: (n, e) => `${n} remembered; the rest failed: ${e}`, histPlay: 'Play', histPause: 'Pause', histAgain: 'Play again', histEmptyHead: 'Nothing on the wall yet', histEmpty: 'When a project is finished, open its group and press Archive this project: it leaves the workspace and gets a plaque here.', archiveBtn: 'Archive this project', archiveHead: g => `Archive "${g}"`, archiveP: 'Its lines leave every view, the live bar and dispatch, and the project gets a plaque on the History wall. Restore brings it back.', archiveOpen: n => `${n} to-do${n === 1 ? '' : 's'} still open`, archiveLive: n => `${n} session${n === 1 ? '' : 's'} still running`, archiveClean: 'Nothing open or running: ready for the wall.', archiveGo: 'Archive', tArchived: g => `"${g}" is on the History wall`, tRestored: g => `"${g}" is back in the workspace`, apTick: x => `Autopilot · working on: ${x}`, apTickIdle: 'Autopilot · wrapping up the round', reopen: 'Unfold: reopen it', wrapHead: 'Wrap up this line', wrapP: 'A done line folds like a parked one and leaves the other views. This wrap-up becomes its last station; edit it first.', wrapSave: 'Save and mark done', wrapSkip: 'Done, no wrap-up', wrapRec: n => `Wrap-up: ${n}`, wrapGoal: 'Goal: ', wrapSpan: (a, b, n, s) => `${a} – ${b} · ${n} records · ${s} sessions`, wrapDec: 'Key decisions:', wrapTodos: (d, n) => `To-dos done: ${d}/${n}`, wrapOpen: 'Left open:', wrapOut: 'Outputs and where they are kept:\n- ', tUnparked: n => `"${n}" is active again`,
     focusIntro: 'Every view then shows only the lines of the group you pick: the canvas, the branches, the timeline and the goals. It stays on, also after a reload, until you leave it.',
     focusNoGroups: 'No groups yet. Select lines on the canvas and press Group, or fill in a group in a line\'s panel.', groupUngroup: 'Ungroup',
     threadGroup: 'Group', threadGroupPh: 'None', multiGroup: 'Group', multiGroupPh: 'Group name', tGroupNeedName: 'Type a group name first',
@@ -1268,9 +1274,9 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     exChip: '示例数据', exClear: '清除', exChipTitle: '这些是演示各个视图用的示例数据',
     searchPh: '搜索记录…', aiBtn: 'AI 梳理', aiBtnTitle: 'Claude 通看所有线路，建议合并、收尾和勾掉已做完的待办，每条由你点了才做',
     langGroup: '语言', more: '更多',
-    menuNewThread: '新建线程', menuHideDone: '隐藏已完成的线程', menuShowDone: '显示已完成的线程', quietLabel: '安静了', quietDays: n => `${n} 天`, quietDot: n => `${n} 条线安静了`, quietAsk: (n, u) => `${n} 天没动静，平时${u === 1 ? '每天' : ` ${u} 天`}一更。做完了吗？`, quietAskOpen: (n, k) => `${n} 天没动静，还有 ${k} 项待办。先搁置？`, quietStill: '还在做', menuShowMerged: '显示已合并的线程', menuHideMerged: '收起已合并的线程', mergedInCount: n => ` · 已并入 ${n} 条`, mergedInLabel: '已并入',
+    menuNewThread: '新建线程', menuHideDone: '隐藏已完成的线程', menuShowDone: '显示已完成的线程', quietLabel: '安静了', quietDays: n => `${n} 天`, quietDot: n => `${n} 条线安静了`, quietAsk: (n, u) => `${n} 天没动静，平时${u === 1 ? '每天' : ` ${u} 天`}一更。做完了吗？`, quietAskOpen: (n, k) => `${n} 天没动静，还有 ${k} 项待办。先搁置？`, quietStill: '还在做', menuShowMerged: '显示已合并的线程', menuHideMerged: '收起已合并的线程', menuShow: '显示', chipDone: '已完成', chipMerged: '已合并', menuThemeL: '主题', menuMachines: '其他电脑', chipSync: '同步', chipAway: '会话', chipAwayGit: '改动', chipPhone: '手机', menuHelpL: '帮助', chipHelp: '快捷键与用法', peekOpen: '展开看看（仍是已完成）', peekOpenParked: '展开看看（仍是搁置）', peekClose: '收起', mergedOpen: '展开并入这条线的线程', mergedClose: '收起', mergedInCount: n => ` · 已并入 ${n} 条`, mergedInLabel: '已并入',
     arrange: '整理', arrangeTitle: '按分组排好线程，分叉排在原线旁边', tArranged: '已整理', tUndo: '撤销',
-    groupLabel: '分组', groupName: '名称', groupLines: '组里的线', groupCount: n => `${n} 条线`, groupArrange: '整理这一组', groupFocus: '专注这一组', menuFocus: '专注某个分组…', menuTheme: n => `主题：${n}`, theme_auto: '跟随系统', theme_light: '浅色', theme_dark: '深色', theme_mist: '雾蓝', focusTitle: '专注模式', focusLabel: '专注', focusPick: '换一个', focusExit: '退出专注', groupFold: '折叠这一组', foldedLabel: '已折叠', foldOpenAll: '全部展开', foldOpen: '展开', foldedChip: n => `${n} 条线 · 已折叠`, fromMachines: ms => `来自 ${ms.join('、')}`, fromTitle: (m, n) => `${n} 条记录写在 ${m} 上`, foldTitle: '折叠分组', foldIntro: '折叠的分组不会出现在任何视图里（画布上只留一个小条），直到你展开。专注仍然可以选任何分组。', foldShown: '显示中', tFolded: g => `已折叠「${g}」`, unpark: '展开：恢复为进行中', histBtn: '历史', histBack: '← 回到工作区', histTitle: '做完并归档的项目', histSub: '做完的项目，一个项目一块牌子。', histProjects: '个项目', histLines: '条线', histStations: '站', histDecisions: '个决定', histSessions: '个会话', histDays: n => `${n} 天`, histArchived: '已归档', histArchivedOn: d => `归档于 ${d}`, histRestore: '恢复', histReplay: '回放', histLessons: '提炼经验', histLessonsMore: '再提炼', histLessonsN: n => `${n} 条经验已记住`, lsHead: g => `从「${g}」学到的`, lsWait: '本机的 claude 正在读这个项目的决定和收尾总结……（一两分钟）', lsNone: '没提炼出值得留下的经验。', lsP: '勾选值得留下的：它们会写进长期记忆（Theatrum），相关的新线开工时会带上。没勾的直接丢掉。', lsSave: '记住勾选的', lsPickOne: '至少勾一条', lsSaved: n => `记住了 ${n} 条经验`, lsSomeFailed: (n, e) => `记住了 ${n} 条，其余失败：${e}`, histPlay: '播放', histPause: '暂停', histAgain: '再放一遍', histEmptyHead: '墙上还空着', histEmpty: '一个项目做完后，打开它的分组，点「归档这个项目」：它会离开工作区，在这里得到一块牌子。', archiveBtn: '归档这个项目', archiveHead: g => `归档「${g}」`, archiveP: '它的线会从所有视图、实时栏和分派里移走，项目在历史墙上得到一块牌子。随时可以恢复。', archiveOpen: n => `还有 ${n} 项待办没做完`, archiveLive: n => `还有 ${n} 个会话在跑`, archiveClean: '没有没做完的待办，也没有在跑的会话，可以上墙了。', archiveGo: '归档', tArchived: g => `「${g}」已经挂上历史墙`, tRestored: g => `「${g}」已回到工作区`, apTick: x => `Autopilot · 正在做：${x}`, apTickIdle: 'Autopilot · 正在收尾这一轮', reopen: '展开：重新打开', wrapHead: '收尾这条线', wrapP: '完成的线会像搁置一样折叠，并从其他视图里隐去。下面的收尾总结会成为它的最后一站，先改好再保存。', wrapSave: '保存并完成', wrapSkip: '直接完成，不写总结', wrapRec: n => `收尾总结：${n}`, wrapGoal: '目标：', wrapSpan: (a, b, n, s) => `${a} – ${b} · ${n} 条记录 · ${s} 个会话`, wrapDec: '关键决定：', wrapTodos: (d, n) => `完成的待办：${d}/${n}`, wrapOpen: '没做完的：', wrapOut: '产出和存放位置：\n- ', tUnparked: n => `「${n}」恢复为进行中`,
+    groupLabel: '分组', groupName: '名称', groupLines: '组里的线', groupCount: n => `${n} 条线`, groupArrange: '整理这一组', groupFocus: '专注这一组', menuFocus: '专注与折叠分组…', menuTheme: n => `主题：${n}`, theme_auto: '跟随系统', theme_light: '浅色', theme_dark: '深色', theme_mist: '雾蓝', focusTitle: '专注模式', focusLabel: '专注', focusPick: '换一个', focusExit: '退出专注', groupFold: '折叠这一组', foldedLabel: '已折叠', foldOpenAll: '全部展开', foldOpen: '展开', foldedChip: n => `${n} 条线 · 已折叠`, fromMachines: ms => `来自 ${ms.join('、')}`, fromTitle: (m, n) => `${n} 条记录写在 ${m} 上`, foldTitle: '折叠分组', foldIntro: '折叠的分组不会出现在任何视图里（画布上只留一个小条），直到你展开。专注仍然可以选任何分组。', foldShown: '显示中', tFolded: g => `已折叠「${g}」`, unpark: '展开：恢复为进行中', histBtn: '历史', histBack: '← 回到工作区', histTitle: '做完并归档的项目', histSub: '做完的项目，一个项目一块牌子。', histProjects: '个项目', histLines: '条线', histStations: '站', histDecisions: '个决定', histSessions: '个会话', histDays: n => `${n} 天`, histArchived: '已归档', histArchivedOn: d => `归档于 ${d}`, histRestore: '恢复', histReplay: '回放', histLessons: '提炼经验', histLessonsMore: '再提炼', histLessonsN: n => `${n} 条经验已记住`, lsHead: g => `从「${g}」学到的`, lsWait: '本机的 claude 正在读这个项目的决定和收尾总结……（一两分钟）', lsNone: '没提炼出值得留下的经验。', lsP: '勾选值得留下的：它们会写进长期记忆（Theatrum），相关的新线开工时会带上。没勾的直接丢掉。', lsSave: '记住勾选的', lsPickOne: '至少勾一条', lsSaved: n => `记住了 ${n} 条经验`, lsSomeFailed: (n, e) => `记住了 ${n} 条，其余失败：${e}`, histPlay: '播放', histPause: '暂停', histAgain: '再放一遍', histEmptyHead: '墙上还空着', histEmpty: '一个项目做完后，打开它的分组，点「归档这个项目」：它会离开工作区，在这里得到一块牌子。', archiveBtn: '归档这个项目', archiveHead: g => `归档「${g}」`, archiveP: '它的线会从所有视图、实时栏和分派里移走，项目在历史墙上得到一块牌子。随时可以恢复。', archiveOpen: n => `还有 ${n} 项待办没做完`, archiveLive: n => `还有 ${n} 个会话在跑`, archiveClean: '没有没做完的待办，也没有在跑的会话，可以上墙了。', archiveGo: '归档', tArchived: g => `「${g}」已经挂上历史墙`, tRestored: g => `「${g}」已回到工作区`, apTick: x => `Autopilot · 正在做：${x}`, apTickIdle: 'Autopilot · 正在收尾这一轮', reopen: '展开：重新打开', wrapHead: '收尾这条线', wrapP: '完成的线会像搁置一样折叠，并从其他视图里隐去。下面的收尾总结会成为它的最后一站，先改好再保存。', wrapSave: '保存并完成', wrapSkip: '直接完成，不写总结', wrapRec: n => `收尾总结：${n}`, wrapGoal: '目标：', wrapSpan: (a, b, n, s) => `${a} – ${b} · ${n} 条记录 · ${s} 个会话`, wrapDec: '关键决定：', wrapTodos: (d, n) => `完成的待办：${d}/${n}`, wrapOpen: '没做完的：', wrapOut: '产出和存放位置：\n- ', tUnparked: n => `「${n}」恢复为进行中`,
     focusIntro: '选一个分组后，画布、分支、时间线和目标都只显示这个组里的线。刷新后也保持，直到你退出。',
     focusNoGroups: '还没有分组。在画布上选中几条线点「编组」，或者在线面板里填写分组。', groupUngroup: '解散分组',
     threadGroup: '分组', threadGroupPh: '无', multiGroup: '编组', multiGroupPh: '分组名称', tGroupNeedName: '先填分组名称',
@@ -1461,7 +1467,7 @@ function applyStatic() {
   $$('[data-i18n-ph]').forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
   $$('[data-i18n-title]').forEach(el => { el.title = t(el.dataset.i18nTitle); });
   $$('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', t(el.dataset.i18nAria)); });
-  for (const l of ['en', 'zh']) $(`#lang-${l}`).classList.toggle('lang-on', l === LANG);
+  if (typeof menuState === 'function' && $('#theme-seg')) try { menuState(); } catch {}
 }
 function setLang(l) {
   LANG = l === 'zh' ? 'zh' : 'en';
@@ -1491,6 +1497,7 @@ const S = {
   mode: 'loading', readOnly: false, offline: false, got: new Set(), dragId: null,
   ai: null, sheet: null,
   live: [], liveOthers: [], sessions: [], machine: '', glDone: ls.get('tc.glDone', []), multiGroup: '', dragMembers: null, focusGroup: ls.get('tc.focusGroup', null), folded: ls.get('tc.folded', []), platform: '',
+  peek: new Set(ls.get('tc.peek', [])), mergedOpen: new Set(ls.get('tc.mergedOpen', [])), // folded lines opened to look at; lines whose merged-in lines show
 };
 
 // Sync trouble (it failed, or another machine has been quiet for over a day) is only a dot: on More and on the
@@ -1553,7 +1560,7 @@ function byThread() {
 }
 function orderedThreads() { return [...S.threads.values()].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)); }
 // A merged line folds into the line it merged into: hidden unless More → Show merged lines; its records stay where they are.
-function isHidden(th) { if (th.archived) return true; return th.status === 'merged' ? !S.showMerged || S.hideDone : S.hideDone && th.status === 'done'; }
+function isHidden(th) { if (th.archived) return true; return th.status === 'merged' ? !(S.showMerged || S.mergedOpen.has(th.mergedInto)) || S.hideDone : S.hideDone && th.status === 'done'; }
 const mergedIn = id => orderedThreads().filter(x => x.status === 'merged' && x.mergedInto === id);
 // Focus mode: every view shows only one group's lines (More → Focus on a group, or the group's panel). Kept per device.
 // What every view shows: in focus mode one group's lines; otherwise every line but those of folded groups.
@@ -1984,8 +1991,8 @@ async function loadServer() {
     S.sessions = data.sessions || [];
     S.machine = data.machine || ''; S.platform = data.platform || ''; S.remote = !!data.remote; S.start = !!data.start;
     // Other machines' sessions in the live bar: offered once the canvas knows another machine (sync).
-    S.awayLive = !!data.awayLive; $('#away-item').hidden = !(data.machines || []).length; $('#away-label').textContent = t('menuAway', S.awayLive);
-    S.awayGit = data.awayGit !== false; $('#away-git-item').hidden = !(data.machines || []).length; $('#away-git-label').textContent = t('menuAwayGit', S.awayGit);
+    S.awayLive = !!data.awayLive; $('#away-item').hidden = !(data.machines || []).length;
+    S.awayGit = data.awayGit !== false; $('#away-git-item').hidden = !(data.machines || []).length;
     // A newer version: offered under More, and the More button carries a dot.
     S.sync = data.sync || null; showSync();
     S.update = data.update || null; $('#update-item').hidden = !S.update; $('#update-label').textContent = S.update ? t('menuUpdate', S.update.behind) : ''; $('#more-btn').classList.toggle('has-update', !!S.update);
@@ -2196,11 +2203,7 @@ function renderAll() {
   renderCaptureThreads();
   $('#ex-banner').hidden = !(loaded() && hasExamples());
   $('#clear-ex-item').hidden = !hasExamples();
-  $('#toggle-done-label').textContent = S.hideDone ? t('menuShowDone') : t('menuHideDone');
-  $('#toggle-merged-label').textContent = S.showMerged ? t('menuHideMerged') : t('menuShowMerged');
-  $('#theme-label').textContent = t('menuTheme', t('theme_' + themeNow()));
-  $('#away-label').textContent = t('menuAway', !!S.awayLive);
-  $('#away-git-label').textContent = t('menuAwayGit', S.awayGit !== false);
+  menuState();
   if (S.view === 'canvas') renderCanvas();
   else if (S.view === 'git') renderGit();
   else if (S.view === 'agents') renderAgents();
@@ -2540,10 +2543,10 @@ function cardHTML(th, cs, selT) {
   const last = cs[cs.length - 1];
   const anyHit = !filtering() || cs.some(matches);
   const selC = S.sel && S.sel.type === 'commit' ? S.sel.id : null;
-  const shut = isFolded(th);
+  const peeking = isFolded(th) && S.peek.has(th.id), shut = isFolded(th) && !peeking;
   apSeen(th);
   const apNow = apRun(th) && !shut ? cs.find(c => isTodo(c) && !c.done) : null;
-  const cls = ['card', isInbox ? 'is-inbox' : `st-${th.status || 'active'}`, shut ? 'is-shut' : '', apRun(th) ? 'ap-on' : '', selT === th.id ? 'is-sel' : '', filtering() && !anyHit ? 'is-dim' : '', S.connect && S.connect.from === th.id ? 'is-from' : '', S.multi.has(th.id) ? 'is-multi' : '', S.multi.has(th.id) && th.id === S.multiTarget ? 'is-multi-target' : ''].filter(Boolean).join(' ');
+  const cls = ['card', isInbox ? 'is-inbox' : `st-${th.status || 'active'}`, shut ? 'is-shut' : '', peeking ? 'is-peek' : '', apRun(th) ? 'ap-on' : '', selT === th.id ? 'is-sel' : '', filtering() && !anyHit ? 'is-dim' : '', S.connect && S.connect.from === th.id ? 'is-from' : '', S.multi.has(th.id) ? 'is-multi' : '', S.multi.has(th.id) && th.id === S.multiTarget ? 'is-multi-target' : ''].filter(Boolean).join(' ');
   const items = recent.length
     ? recent.map(c => `<li data-cid="${esc(c.id)}" class="${c.id === selC ? 'is-sel' : ''} ${filtering() && matches(c) ? 'hit' : ''}">${mini(c.kind, stationColor(c, th), c.done)}<span class="s-title" title="${esc(c.title)}">${esc(c.title)}</span><time class="s-time">${fmtShort(c.ts)}</time></li>`).join('')
       + (more > 0 ? `<li class="s-more"><span></span><span>${esc(t('moreEarlier', more))}</span><span></span></li>` : '')
@@ -2551,10 +2554,10 @@ function cardHTML(th, cs, selT) {
   const chip = (apRun(th) ? `<span class="chip chip-auto" title="${esc(t('apTitle'))}">Autopilot</span>` : apWait(th) ? `<span class="chip chip-wait" title="${esc(t('apWait'))}">Autopilot…</span>` : '') + (isInbox ? `<span class="chip">${esc(t('unsorted'))}</span>` : `<span class="chip chip-${th.status || 'active'}">${esc(statusLabel(th.status))}</span>`);
   const agents = cs.filter(c => c.kind === 'agent').length;
   return `<div class="${cls}${apD(th.id) != null ? ' ap-burst' : ''}" data-tid="${esc(th.id)}" style="left:${th.x || 0}px;top:${th.y || 0}px;--c:${th.color}${apD(th.id) != null ? `;--apd:${apD(th.id)}ms` : ''}">
-    <div class="card-head">${shut ? `<span class="grp-tog" data-park-tog="1" title="${esc(t(th.status === 'done' ? 'reopen' : 'unpark'))}">▸</span>` : ''}<span class="roundel"></span><span class="card-name">${esc(th.name)}</span>${liveBadge(th.id)}${chip}</div>
+    <div class="card-head">${isFolded(th) ? `<span class="grp-tog" data-park-tog="1" title="${esc(t(peeking ? 'peekClose' : th.status === 'done' ? 'peekOpen' : 'peekOpenParked'))}">${peeking ? '▾' : '▸'}</span>` : ''}<span class="roundel"></span><span class="card-name">${esc(th.name)}</span>${liveBadge(th.id)}${chip}</div>
     ${apRun(th) && !shut ? `<div class="ap-tick"><span>${esc(apNow ? t('apTick', apNow.title) : t('apTickIdle'))}</span></div>` : ''}
     <ol class="strip">${items}</ol>
-    <div class="card-foot"><span>${esc(t('countRecords', cs.length))}${agents ? esc(t('countAgent', agents)) : ''}${mergedIn(th.id).length && !S.showMerged ? esc(t('mergedInCount', mergedIn(th.id).length)) : ''}</span><span>${last ? esc(t('updated', fmtRel(last.ts))) : ''}</span></div>
+    <div class="card-foot"><span>${esc(t('countRecords', cs.length))}${agents ? esc(t('countAgent', agents)) : ''}${mergedIn(th.id).length && !S.showMerged ? `<button class="linkish mi-tog" data-merged-tog="1" title="${esc(t(S.mergedOpen.has(th.id) ? 'mergedClose' : 'mergedOpen'))}">${esc(t('mergedInCount', mergedIn(th.id).length))} ${S.mergedOpen.has(th.id) ? '▾' : '▸'}</button>` : ''}</span><span>${last ? esc(t('updated', fmtRel(last.ts))) : ''}</span></div>
   </div>`;
 }
 function border(R, c, toward, gap) {
@@ -2705,7 +2708,10 @@ function endPointer(e) {
       return;
     }
     if (S.connect) { connectTap(g.id); return; }
-    if (g.target.closest && g.target.closest('[data-park-tog]')) { patchDoc('threads', g.id, { status: 'active' }, 0); toast(t('tUnparked', getThread(g.id).name)); return; }
+    // Opening a folded line, or the lines merged into it, is for looking: its status stays (the line panel changes it).
+    const tog = (set, key) => { if (S[set].has(g.id)) S[set].delete(g.id); else S[set].add(g.id); ls.set(key, [...S[set]]); render(); };
+    if (g.target.closest && g.target.closest('[data-park-tog]')) { tog('peek', 'tc.peek'); return; }
+    if (g.target.closest && g.target.closest('[data-merged-tog]')) { tog('mergedOpen', 'tc.mergedOpen'); return; }
     if ((g.multiKey || S.selectMode) && g.id !== INBOX) { toggleMulti(g.id); return; }
     const li = g.target.closest && g.target.closest('li[data-cid]');
     if (li) select({ type: 'commit', id: li.dataset.cid });
@@ -3707,6 +3713,17 @@ $('#q').addEventListener('input', e => { clearTimeout(qTimer); qTimer = setTimeo
 
 const menu = $('#menu'), moreBtn = $('#more-btn');
 function closeMenu() { menu.hidden = true; moreBtn.setAttribute('aria-expanded', 'false'); }
+// The menu's chips show what is on; the other machines' row shows when any of its entries does.
+function menuState() {
+  const on = (id, v, title) => { const b = $('#' + id); b.setAttribute('aria-pressed', String(!!v)); if (title) b.title = title; };
+  on('done-chip', !S.hideDone, S.hideDone ? t('menuShowDone') : t('menuHideDone'));
+  on('merged-chip', S.showMerged, S.showMerged ? t('menuHideMerged') : t('menuShowMerged'));
+  on('away-item', S.awayLive, t('menuAway', !!S.awayLive));
+  on('away-git-item', S.awayGit !== false, t('menuAwayGit', S.awayGit !== false));
+  $('#theme-seg').innerHTML = THEMES.map(th => `<button data-menu="theme" data-theme="${th}" aria-pressed="${th === themeNow()}">${esc(t('theme_' + th))}</button>`).join('');
+  for (const l of ['en', 'zh']) $('#lang-' + l).setAttribute('aria-pressed', String(l === LANG));
+  $('#machines-row').hidden = ['sync-item', 'away-item', 'away-git-item', 'phone-item'].every(id => $('#' + id).hidden);
+}
 moreBtn.addEventListener('click', e => { e.stopPropagation(); menu.hidden = !menu.hidden; moreBtn.setAttribute('aria-expanded', String(!menu.hidden)); });
 document.addEventListener('click', e => { if (!menu.hidden && !e.target.closest('.menu-wrap')) closeMenu(); });
 // Syncs with the other machines through the location map repository (POST /api/sync, src/sync.mjs).
@@ -3717,14 +3734,14 @@ async function syncNow() {
 }
 menu.addEventListener('click', e => {
   const b = e.target.closest('[data-menu]'); if (!b) return;
-  closeMenu();
   const k = b.dataset.menu;
-  if (k === 'lang') { setLang(LANG === 'zh' ? 'en' : 'zh'); menu.hidden = false; return; }
-  if (k === 'ai') { menu.hidden = true; openSheet('ai'); return; }
-  if (k === 'theme') { ls.set('tc.theme', THEMES[(THEMES.indexOf(themeNow()) + 1) % THEMES.length]); applyTheme(); render(); menu.hidden = false; return; }
-  if (k === 'new-thread') { setView('canvas'); createThreadAndEdit(); }
-  else if (k === 'toggle-done') { S.hideDone = !S.hideDone; ls.set('tc.hideDone', S.hideDone); render(); }
-  else if (k === 'toggle-merged') { S.showMerged = !S.showMerged; ls.set('tc.showMerged', S.showMerged); render(); }
+  // A chip that switches something keeps the menu open, so the change shows on it.
+  if (k === 'lang') { setLang(b.dataset.lang); menuState(); return; }
+  if (k === 'theme') { ls.set('tc.theme', b.dataset.theme); applyTheme(); render(); return; }
+  if (k === 'toggle-done') { S.hideDone = !S.hideDone; ls.set('tc.hideDone', S.hideDone); render(); return; }
+  if (k === 'toggle-merged') { S.showMerged = !S.showMerged; ls.set('tc.showMerged', S.showMerged); render(); return; }
+  closeMenu();
+  if (k === 'ai') { openSheet('ai'); return; }
   else if (k === 'clear-examples') { if (canWrite()) clearExamples(); }
   else if (k === 'sync') { if (syncTrouble().length) openSheet('sync'); else syncNow(); }
   else if (k === 'update') {
@@ -3732,11 +3749,11 @@ menu.addEventListener('click', e => {
     postJSON('/api/update', {}).then(r => { if (r.error) return toast(r.error); toast(t('tUpdating')); setTimeout(() => location.reload(), 6000); });
   }
   else if (k === 'away') {
-    S.awayLive = !S.awayLive; $('#away-label').textContent = t('menuAway', S.awayLive);
+    S.awayLive = !S.awayLive; menuState(); menu.hidden = false;
     postJSON('/api/config', { awayLive: S.awayLive }).then(() => { toast(t('tAway', S.awayLive)); loadLive(); });
   }
   else if (k === 'away-git') {
-    S.awayGit = !S.awayGit; $('#away-git-label').textContent = t('menuAwayGit', S.awayGit);
+    S.awayGit = !S.awayGit; menuState(); menu.hidden = false;
     postJSON('/api/config', { awayGit: S.awayGit }).then(() => toast(t('tAwayGit', S.awayGit)));
   }
   else openSheet(k);

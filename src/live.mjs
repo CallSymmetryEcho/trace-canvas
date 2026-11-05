@@ -90,12 +90,16 @@ function codexTurnOver(file) {
 // A Codex session's hooks run under its app-server daemon, which has no terminal; the terminal is the one where
 // `codex resume <id>` runs, found by its command line, with its TERM_PROGRAM (ps -E). One scan, only when needed.
 // ponytail: a session started as plain `codex` has no id on its command line and stays without the button.
-export function codexTerminals(run = execFileSync) {
-  const m = new Map();
+export function codexTerminals(run = execFileSync, platform = process.platform, environ = pid => fs.readFileSync(`/proc/${pid}/environ`, 'utf8')) {
+  const m = new Map(), linux = platform === 'linux'; // Linux's ps has no -E: the environment is in /proc
   try {
-    for (const l of run('ps', ['-A', '-E', '-ww', '-o', 'tty=,command='], { encoding: 'utf8', timeout: 2000, maxBuffer: 32 << 20 }).split('\n')) {
-      const r = /^\s*(ttys?\d+|pts\/\d+)\s+\S*codex\s+resume\s+([\w-]{20,})/.exec(l);
-      const v = k => (new RegExp(`\\s${k}=(\\S+)`).exec(l) || [])[1] || '';
+    for (const l of run('ps', ['-A', ...(linux ? [] : ['-E']), '-ww', '-o', 'pid=,tty=,command='], { encoding: 'utf8', timeout: 2000, maxBuffer: 32 << 20, stdio: ['ignore', 'pipe', 'ignore'] }).split('\n')) {
+      const r = /^\s*(\d+)\s+(ttys?\d+|pts\/\d+)\s+(?:\S*node\s+)?\S*codex(?:\.js)?\s+resume\s+([\w-]{20,})/.exec(l); // npm's is `node …/codex`
+      if (!r) continue;
+      let env = l;
+      if (linux) try { env = ' ' + environ(r[1]).split('\0').join(' '); } catch { env = ''; }
+      const v = k => (new RegExp(`\\s${k}=(\\S+)`).exec(env) || [])[1] || '';
+      r.splice(1, 1); // [line, tty, id] as before
       if (r && !m.has(r[2])) m.set(r[2], { tty: '/dev/' + r[1], term: v('TERM_PROGRAM'), ...tmuxOf({ TMUX: v('TMUX'), TMUX_PANE: v('TMUX_PANE') }) });
     }
   } catch {}

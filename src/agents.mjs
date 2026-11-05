@@ -159,6 +159,7 @@ const tmuxBin = (has = p => fs.existsSync(p)) => ['/opt/homebrew/bin/tmux', '/us
 // A process's environment: /proc on Linux, ps -E on a Mac (values cut at the first space, enough for these keys).
 async function envOf(pid) {
   try { return Object.fromEntries(fs.readFileSync(`/proc/${pid}/environ`, 'utf8').split('\0').map(l => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)])); } catch {}
+  if (process.platform !== 'darwin') return {}; // ps -E is macOS's; elsewhere /proc was the way
   return Object.fromEntries(((await run('ps', ['-E', '-ww', '-o', 'command=', '-p', String(pid)])) || '').split(/\s+/).filter(w => /^[A-Z_][A-Z0-9_]*=/.test(w)).map(w => [w.slice(0, w.indexOf('=')), w.slice(w.indexOf('=') + 1)]));
 }
 /**

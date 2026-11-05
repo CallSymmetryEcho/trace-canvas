@@ -218,9 +218,16 @@ test('systemdUnit: a user service, a system service, and a terminal scope', asyn
 
 test('a Codex session gets the terminal of its `codex resume` process; others are left alone', async () => {
   const { codexTerminals, withCodexTerm } = await import('../src/live.mjs');
-  const ps = () => ['?? /x/codex app-server --listen unix://', 'ttys016 codex resume 01a17cb7-78a8-7e52-96ac-bba24c5b6922 TERM=xterm TERM_PROGRAM=iTerm.app HOME=/u',
-    'ttys020 codex resume 01a1a88d-812f-7bc1-bc92-f15b98dfd166 TMUX=/tmp/tmux-501/default,123,0 TMUX_PANE=%4 TERM_PROGRAM=tmux', 'ttys002 vim notes'].join('\n');
-  const m = codexTerminals(ps);
+  let asked;
+  const ps = (cmd, args) => (asked = args, ['  7 ?? /x/codex app-server --listen unix://', ' 16 ttys016 codex resume 01a17cb7-78a8-7e52-96ac-bba24c5b6922 TERM=xterm TERM_PROGRAM=iTerm.app HOME=/u',
+    ' 20 ttys020 codex resume 01a1a88d-812f-7bc1-bc92-f15b98dfd166 TMUX=/tmp/tmux-501/default,123,0 TMUX_PANE=%4 TERM_PROGRAM=tmux', ' 2 ttys002 vim notes'].join('\n'));
+  const m = codexTerminals(ps, 'darwin');
+  assert.ok(asked.includes('-E'));
+  // Linux: ps has no -E (it fails: "unsupported SysV option"); the environment comes from /proc.
+  const lps = (cmd, args) => (asked = args, ' 31 pts/3 node /usr/bin/codex resume 01a1a88d-812f-7bc1-bc92-f15b98dfd166\n 32 pts/4 vim x');
+  const lm = codexTerminals(lps, 'linux', pid => (pid === '31' ? 'TERM=xterm\0TERM_PROGRAM=tmux\0TMUX=/tmp/tmux-1000/default,5,0\0TMUX_PANE=%2\0' : ''));
+  assert.ok(!asked.includes('-E'));
+  assert.deepEqual([...lm], [['01a1a88d-812f-7bc1-bc92-f15b98dfd166', { tty: '/dev/pts/3', term: 'tmux', tmux: '/tmp/tmux-1000/default', pane: '%2' }]]);
   assert.deepEqual([...m], [['01a17cb7-78a8-7e52-96ac-bba24c5b6922', { tty: '/dev/ttys016', term: 'iTerm.app', tmux: '', pane: '' }],
     ['01a1a88d-812f-7bc1-bc92-f15b98dfd166', { tty: '/dev/ttys020', term: 'tmux', tmux: '/tmp/tmux-501/default', pane: '%4' }]]);
   let scans = 0;

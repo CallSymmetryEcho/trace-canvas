@@ -112,6 +112,32 @@ export async function launchRow(r, { open = openTerminal, start = startDetached 
   const watch = await open(r.tmux.attach);
   return { detached: true, ...(s ? { already: true } : {}), ...(watch ? { noWatch: watch } : {}) };
 }
+// tmux is often not on the page server's PATH (a login item, a systemd service).
+const tmuxBin = (has = p => fs.existsSync(p)) => ['/opt/homebrew/bin/tmux', '/usr/local/bin/tmux', '/usr/bin/tmux'].find(has) || 'tmux';
+// A process's environment: /proc on Linux, ps -E on a Mac (values cut at the first space, enough for these keys).
+async function envOf(pid) {
+  try { return Object.fromEntries(fs.readFileSync(`/proc/${pid}/environ`, 'utf8').split('\0').map(l => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)])); } catch {}
+  return Object.fromEntries(((await run('ps', ['-E', '-ww', '-o', 'command=', '-p', String(pid)])) || '').split(/\s+/).filter(w => /^[A-Z_][A-Z0-9_]*=/.test(w)).map(w => [w.slice(0, w.indexOf('=')), w.slice(w.indexOf('=') + 1)]));
+}
+/**
+ * Go to a session that runs in tmux: tmux shows its pane, then the terminal tab attached to that tmux session comes
+ * forward (found from the tmux client's own environment, so iTerm2, Terminal, GNOME Terminal or Konsole). With no
+ * terminal attached, a new tab attaches to it. false when the pane is gone.
+ */
+export async function focusTmux({ socket, pane }, { exec = run, open = openTerminal, env = envOf, focus = focusTab } = {}) {
+  const t = (...a) => exec(tmuxBin(), ['-S', socket, ...a]);
+  const ses = ((await t('display-message', '-p', '-t', pane, '#{session_name}')) || '').trim();
+  if (!ses) return false;
+  await t('select-window', '-t', pane);
+  await t('select-pane', '-t', pane);
+  for (const l of ((await t('list-clients', '-t', ses, '-F', '#{client_tty}\t#{client_pid}')) || '').split('\n').filter(Boolean)) {
+    const [tty, pid] = l.split('\t'), e = await env(pid);
+    const term = e.TERM_PROGRAM || (e.GNOME_TERMINAL_SCREEN ? 'gnome-terminal' : e.KONSOLE_DBUS_SESSION ? 'konsole' : '');
+    const tab = term === 'gnome-terminal' ? e.GNOME_TERMINAL_SCREEN || '' : term === 'konsole' ? [e.KONSOLE_DBUS_SERVICE, e.KONSOLE_DBUS_WINDOW, e.KONSOLE_DBUS_SESSION].join(' ') : '';
+    if (await focus({ tty, term, tab })) return true;
+  }
+  return !(await open(`${q(tmuxBin())} -S ${q(socket)} attach -t ${q(ses)}`));
+}
 // AppleScript that brings the Terminal or iTerm2 tab with this tty to the front and prints "ok",
 // or nothing when no tab has it (Go to the terminal). null for other terminals.
 export function focusScript({ tty = '', term = '' } = {}) {
@@ -130,7 +156,8 @@ const SEARCH = ['org.gnome.Terminal', '/org/gnome/Terminal/SearchProvider', 'org
  * ponytail: with several GNOME Terminal windows open only the tab is selected (its window asks for attention);
  * Konsole's /Windows/N is taken to be its /konsole/MainWindow_N; Wayland raises nothing past what the app does.
  */
-export async function focusTab({ tty = '', term = '', tab = '' } = {}) {
+export async function focusTab({ tty = '', term = '', tab = '', tmux = '', pane = '' } = {}) {
+  if (tmux && pane) return focusTmux({ socket: tmux, pane });
   const script = focusScript({ tty, term });
   if (script) return (await run('osascript', ['-e', script]) || '').trim() === 'ok';
   if (term === 'gnome-terminal') {

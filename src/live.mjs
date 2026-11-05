@@ -80,7 +80,8 @@ export function codexTerminals(run = execFileSync) {
   try {
     for (const l of run('ps', ['-A', '-E', '-ww', '-o', 'tty=,command='], { encoding: 'utf8', timeout: 2000, maxBuffer: 32 << 20 }).split('\n')) {
       const r = /^\s*(ttys?\d+|pts\/\d+)\s+\S*codex\s+resume\s+([\w-]{20,})/.exec(l);
-      if (r && !m.has(r[2])) m.set(r[2], { tty: '/dev/' + r[1], term: (/\sTERM_PROGRAM=(\S+)/.exec(l) || [])[1] || '' });
+      const v = k => (new RegExp(`\\s${k}=(\\S+)`).exec(l) || [])[1] || '';
+      if (r && !m.has(r[2])) m.set(r[2], { tty: '/dev/' + r[1], term: v('TERM_PROGRAM'), ...tmuxOf({ TMUX: v('TMUX'), TMUX_PANE: v('TMUX_PANE') }) });
     }
   } catch {}
   return m;
@@ -90,9 +91,13 @@ export function withCodexTerm(scan = codexTerminals) {
   return s => {
     if (!s || s.agentKey !== 'codex' || s.tty) return s;
     const t = (found ||= scan()).get(s.id);
-    return t ? { ...s, ...t, tab: '' } : s;
+    // Not found: the hook's tmux pane, if any, is the daemon's, not this session's.
+    return t ? { ...s, ...t, tab: '' } : s.pane ? { ...s, tmux: '', pane: '' } : s;
   };
 }
+// Inside tmux the tab is tmux's, not the terminal's: its server's socket and the pane, so the page can switch tmux to
+// the pane and bring forward whichever terminal is attached to it (focusTmux).
+export const tmuxOf = env => (env.TMUX && /^%\d+$/.test(env.TMUX_PANE || '') ? { tmux: String(env.TMUX).split(',')[0], pane: env.TMUX_PANE } : { tmux: '', pane: '' });
 // Running sessions, the ones that need you first, then the busiest. Each carries its subagents.
 export function listLive(env, now = Date.now()) {
   let names = [];
@@ -191,7 +196,7 @@ export function terminalOf(env = process.env, pid = process.pid) {
   // GNOME Terminal and Konsole set no TERM_PROGRAM, but name the tab for their D-Bus interfaces (focusTab).
   const gnome = env.GNOME_TERMINAL_SCREEN, konsole = env.KONSOLE_DBUS_SESSION && [env.KONSOLE_DBUS_SERVICE, env.KONSOLE_DBUS_WINDOW, env.KONSOLE_DBUS_SESSION].join(' ');
   const term = String(env.TERM_PROGRAM || (gnome ? 'gnome-terminal' : konsole ? 'konsole' : ''));
-  return { tty, term, tab: String((term === 'gnome-terminal' && gnome) || (term === 'konsole' && konsole) || ''), pid: agent }; // pid 0: not found, the 12-hour rule applies
+  return { tty, term, tab: String((term === 'gnome-terminal' && gnome) || (term === 'konsole' && konsole) || ''), pid: agent, ...tmuxOf(env) }; // pid 0: not found, the 12-hour rule applies
 }
 
 /**

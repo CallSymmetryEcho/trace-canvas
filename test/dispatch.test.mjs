@@ -183,6 +183,10 @@ test('Autopilot hands every open to-do on a line to its agent with the decision 
   assert.ok(d.threads[app].autopilot);
   stopAutopilot(d, { thread: 'App' });
   assert.equal(d.threads[app].autopilot, undefined);
+  // Started from the line's own agent: it is the one doing them, so it runs at once.
+  const [own] = startAutopilot(d, { thread: 'App', self: 's1' }, env);
+  assert.equal(own.action, 'self');
+  assert.equal(d.threads[app].autopilot.session, 's1');
 });
 
 test('an archived project is out of the to-do list and of dispatch, unless its line is named', async () => {

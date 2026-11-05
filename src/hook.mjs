@@ -211,7 +211,12 @@ export function handleHook(input, env = process.env) {
       if (handoff) s.prompted = true;
       // An Autopilot round counts as running only once its prompt reaches a session: the switch lights here, not on the click.
       // Looked for in the raw prompt: pasted in with a word or two of the person's own, the paste is shortened in `prompt`.
-      const ap = /^Autopilot \(beta\) on the Trace Canvas line .*?\(thread ([\w-]+)\)/m.exec(String(input.prompt || '')), apTh = ap && d.threads[ap[1]];
+      // Handed on in other words (another agent passing it along: "the person turned on autopilot for <line>"): a message
+      // that says autopilot and names a line waiting to be taken up takes it up too.
+      const raw = String(input.prompt || ''), ap = /^Autopilot \(beta\) on the Trace Canvas line .*?\(thread ([\w-]+)\)/m.exec(raw);
+      const flat = raw.replace(/\s+/g, '').toLowerCase();
+      const apTh = ap ? d.threads[ap[1]] : /autopilot/i.test(raw)
+        ? Object.values(d.threads).find(t => t.autopilot && !t.autopilot.session && (flat.includes(t.id.toLowerCase()) || (t.name.length >= 3 && flat.includes(t.name.replace(/\s+/g, '').toLowerCase())))) : null;
       if (apTh && apTh.autopilot) { apTh.autopilot = { ...apTh.autopilot, session: sid, on: Date.now() }; changed = true; }
       const log = !isCommand && prompt && !handoff && !notTask(prompt) && (cfg.prompts === 'all' || (cfg.prompts === 'first' && !s.prompted) || (cfg.prompts === 'long' && prompt.length >= 60));
       if (log) {

@@ -217,6 +217,12 @@ test('an Autopilot round lights only when its prompt reaches a session, and an o
   mutate(d => { d.threads[tid].autopilot = { at: Date.now() }; }, s.env);
   s.fire('UserPromptSubmit', { prompt: `<pasted_content id="6cbc">\nAutopilot (beta) on the Trace Canvas line "App" (thread ${tid}): work\n</pasted_content id="6cbc">\n\n why not the rest`, prompt_id: 'p4' });
   assert.equal(s.data().threads[tid].autopilot.session, 's1');
+  // Handed on in other words by another agent: "autopilot" and the line's id or name take it up as well.
+  mutate(d => { d.threads[tid].autopilot = { at: Date.now() }; }, s.env);
+  s.fire('UserPromptSubmit', { prompt: 'Fix the App login please', prompt_id: 'p5' });
+  assert.equal(s.data().threads[tid].autopilot.session, undefined); // the name alone is not it
+  s.fire('UserPromptSubmit', { prompt: 'Codex 交接：用户刚要求“开autopilot继续做待办”，请接续 App 线上归你的待办', prompt_id: 'p6' });
+  assert.equal(s.data().threads[tid].autopilot.session, 's1');
   // It stopped to ask; the person's answer in that session carries the reminder that the switch is still on.
   const { promptContext } = await import('../src/hook.mjs');
   assert.match(promptContext({ session_id: 's1', prompt: 'Use the second option' }, s.env), new RegExp(`Autopilot is still on for the line "App" \\(thread ${tid}\\): if this message answers what you stopped to ask, log the answer as a decision, then go on`));

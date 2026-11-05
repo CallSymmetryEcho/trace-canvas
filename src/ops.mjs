@@ -223,8 +223,9 @@ export function startAutopilot(d, { thread, self = null }, env = process.env) {
   if (!th) throw new Error(`No line "${thread}"`);
   const open = Object.values(d.commits).filter(c => isTodo(c) && !c.done && threadIdOf(d, c) === tid).map(c => c.id);
   if (!open.length) throw new Error(`"${th.name}" has no open to-dos for Autopilot`);
-  const rows = dispatch(d, { refs: open, self, prompt: () => autopilotPrompt(d, th, tid) }, env);
-  th.autopilot = { at: Date.now() }; // asked; it runs once a session's hook takes the prompt (src/hook.mjs)
+  const rows = dispatch(d, { refs: open, self, prompt: () => autopilotPrompt(d, th, tid) }, env), now = Date.now();
+  // Asked; it runs once a session's hook takes the prompt (src/hook.mjs), or at once when the line is the caller's own.
+  th.autopilot = rows.some(r => r.action === 'self') ? { at: now, session: self, on: now } : { at: now };
   return rows;
 }
 export function stopAutopilot(d, { thread }) {

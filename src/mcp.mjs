@@ -6,7 +6,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { addCommit, dataFile, ensureThread, importText, INBOX, mutate, readConfig, readData, threadById, threadIdOf } from './store.mjs';
 import { sessionThread, whereFind } from './hook.mjs';
-import { agentKey, agentOf } from './agents.mjs';
+import { agentEnv, agentKey, agentOf } from './agents.mjs';
 import { bindLiveSession, captureSession, detachThread, forkThread, listTasks, listThreads, liveSessions, mergeDataset, mergeThreads, readThread, setTaskDone } from './ops.mjs';
 import { currentSessionId, describeSession, findTranscript, findTranscripts, parseTranscript } from './transcript.mjs';
 
@@ -159,7 +159,7 @@ async function healthy(url) {
 async function ensureServer() {
   const url = `http://localhost:${port()}/`;
   if (await healthy(url)) return { url, started: false };
-  spawn(process.execPath, [CLI, 'serve', '--no-open', '--port', String(port())], { detached: true, stdio: 'ignore', env: process.env }).unref();
+  spawn(process.execPath, [CLI, 'serve', '--no-open', '--port', String(port())], { detached: true, stdio: 'ignore', env: agentEnv(process.env) }).unref();
   for (let i = 0; i < 40; i++) { await sleep(150); if (await healthy(url)) return { url, started: true }; }
   throw new Error(`The page did not start on port ${port()}. Run: node "${CLI}" serve`);
 }

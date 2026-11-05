@@ -158,6 +158,10 @@ test('a new terminal tab or window: iTerm2 tabs or Terminal windows on macOS; on
   fs.writeFileSync(path.join(bin, 'gnome-terminal.wrapper'), '#!/bin/sh\n'); fs.chmodSync(path.join(bin, 'gnome-terminal.wrapper'), 0o755);
   fs.symlinkSync(path.join(bin, 'gnome-terminal.wrapper'), path.join(bin, 'x-terminal-emulator'));
   assert.deepEqual(terminalCommand('ls', env, 'linux').slice(0, 2), [path.join(bin, 'gnome-terminal'), ['--tab', '--', '/bin/bash', '-lc', "ls; exec '/bin/bash' -l"]]);
+  // Opened from inside an agent: the new one must not inherit who the caller is (it would be the caller's child).
+  const caller = { ...env, CLAUDECODE: '1', CLAUDE_PID: '9', CLAUDE_CODE_SESSION_ID: 'caller', CLAUDE_CODE_CHILD_SESSION: '1', CLAUDE_CODE_ENTRYPOINT: 'sdk-ts', CLAUDE_CODE_MESSAGING_SOCKET: '/s', CLAUDE_CODE_MESSAGING_TOKEN: 't', CLAUDE_CONFIG_DIR: '/cfg', CLAUDE_CODE_USE_BEDROCK: '1' };
+  const given = terminalCommand('ls', caller, 'linux')[2];
+  assert.deepEqual(Object.keys(given).filter(k => /^CLAUDE/.test(k)).sort(), ['CLAUDE_CODE_USE_BEDROCK', 'CLAUDE_CONFIG_DIR']);
   assert.equal(terminalCommand('ls', { PATH: '/nowhere', DISPLAY: ':0' }, 'linux'), null); // no terminal
   assert.equal(terminalCommand('ls', env, 'win32'), null);
 });

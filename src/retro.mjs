@@ -11,6 +11,7 @@ import { lineDir, sessionList } from './ops.mjs';
 import { findTranscript, parseTranscript } from './transcript.mjs';
 import { onPath } from './install.mjs';
 import { remotePrompts } from './remote.mjs';
+import { agentEnv } from './agents.mjs';
 import { tr } from './i18n.mjs';
 
 const MAX_PROMPTS = 400;
@@ -138,7 +139,7 @@ export function askAgent(prompt, { timeout = 600000, env = process.env } = {}) {
   const outFile = codex ? path.join(os.tmpdir(), `trace-canvas-ask-${process.pid}-${Date.now()}.txt`) : null;
   const [cmd, args] = codex ? ['codex', ['exec', '--skip-git-repo-check', '-s', 'read-only', '-o', outFile]] : ['claude', ['-p', '--output-format', 'text']];
   return new Promise((resolve, reject) => {
-    const child = spawn(cmd, args, { cwd: os.tmpdir(), env: { ...env, TRACE_CANVAS_DISABLE: '1' }, stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawn(cmd, args, { cwd: os.tmpdir(), env: { ...agentEnv(env), TRACE_CANVAS_DISABLE: '1' }, stdio: ['pipe', 'pipe', 'pipe'] });
     let out = '', err = '';
     const timer = setTimeout(() => { child.kill('SIGTERM'); reject(new Error('timeout')); }, timeout);
     child.stdout.on('data', c => { out += c; });

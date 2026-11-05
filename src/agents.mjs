@@ -34,7 +34,14 @@ export const macTerminal = (env = process.env, has = p => fs.existsSync(p)) => {
 
 // The desktop session's display, for a server started over ssh, which has none: borrowed from the desktop shell's own
 // environment (this user's processes only). env itself when it has a display; null when there is no desktop.
+// What a running Claude Code puts in its children's environment to say who they are. An agent opened from inside one
+// (dispatch run by an agent: gnome-terminal --tab hands the new tab the caller's environment) would think itself that
+// session's child: no session file, unreachable by messages, the hooks taking it for the caller. Settings a person
+// sets (CLAUDE_CONFIG_DIR, CLAUDE_CODE_USE_BEDROCK…) are kept.
+const SESSION_VAR = /^(CLAUDECODE|CLAUDE_PID|CLAUDE_EFFORT|CLAUDE_CODE_(SESSION_\w+|CHILD_SESSION|ENTRYPOINT|EXECPATH|MESSAGING_\w+|BRIDGE_\w+|SSE_PORT))$/;
+export const agentEnv = env => Object.fromEntries(Object.entries(env).filter(([k]) => !SESSION_VAR.test(k)));
 function desktopEnv(env) {
+  env = agentEnv(env);
   if (env.DISPLAY || env.WAYLAND_DISPLAY) return env;
   const KEEP = ['DISPLAY', 'WAYLAND_DISPLAY', 'XAUTHORITY', 'DBUS_SESSION_BUS_ADDRESS', 'XDG_RUNTIME_DIR'];
   for (const pid of fs.existsSync('/proc') ? fs.readdirSync('/proc').filter(p => /^\d+$/.test(p)) : []) {

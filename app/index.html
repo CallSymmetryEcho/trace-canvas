@@ -129,13 +129,13 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .menu { min-width: 300px; }
 .menu-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 5px 10px; font-size: 13px; }
 .menu-row[hidden] { display: none; }
-.menu-row.stack { flex-direction: column; align-items: stretch; gap: 6px; }
-.menu-row.stack .seg { justify-content: flex-start; }
-.menu .seg { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
-.menu .seg button { width: auto; padding: 3px 10px; border: 1px solid var(--rule); border-radius: 999px; font-size: 12px; color: var(--muted); background: transparent; }
-.menu .seg button[hidden] { display: none; }
-.menu .seg button:hover { background: var(--surface-2); color: var(--ink); }
-.menu .seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.menu-row.stack { align-items: flex-start; } /* long chips: one per line, right-aligned */
+.menu-row.stack .chips { flex-direction: column; align-items: flex-end; }
+.menu .chips { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
+.menu .chips button { width: auto; padding: 3px 10px; border: 1px solid var(--rule); border-radius: 999px; font-size: 12px; color: var(--muted); background: transparent; }
+.menu .chips button[hidden] { display: none; }
+.menu .chips button:hover { background: var(--surface-2); color: var(--ink); }
+.menu .chips button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
 .menu .menu-hot { color: var(--accent); font-weight: 600; }
 .menu .k { color: var(--faint); font-family: var(--f-mono); font-size: 11px; }
 
@@ -941,10 +941,10 @@ button.gl-prog[aria-pressed="true"] { color: var(--ink); background: var(--surfa
         <button data-menu="update" id="update-item" class="menu-hot" hidden><span id="update-label"></span></button>
         <button data-menu="ai" id="ai-item" hidden data-i18n-title="aiBtnTitle"><span data-i18n="aiBtn">AI tidy-up</span></button>
         <!-- A row holds the entries of one kind; a filled chip is on (shown, chosen). -->
-        <div class="menu-row"><span data-i18n="menuShow">Show</span><span class="seg"><button data-menu="toggle-done" id="done-chip" data-i18n="chipDone">Finished</button><button data-menu="toggle-merged" id="merged-chip" data-i18n="chipMerged">Merged</button></span></div>
-        <div class="menu-row"><span data-i18n="menuThemeL">Theme</span><span class="seg" id="theme-seg"></span></div>
-        <div class="menu-row" lang="en"><span>Language · 语言</span><span class="seg"><button data-menu="lang" data-lang="en" id="lang-en">EN</button><button data-menu="lang" data-lang="zh" id="lang-zh" lang="zh-CN">中文</button></span></div>
-        <div class="menu-row stack" id="machines-row" hidden><span data-i18n="menuMachines">Other computers</span><span class="seg"><button data-menu="sync" id="sync-item" hidden data-i18n="chipSync" data-i18n-title="menuSync">Sync now</button><button data-menu="away" id="away-item" hidden data-i18n="chipAway">Show their sessions</button><button data-menu="away-git" id="away-git-item" hidden data-i18n="chipAwayGit">Read their changes over ssh</button></span></div>
+        <div class="menu-row"><span data-i18n="menuShow">Show</span><span class="chips"><button data-menu="toggle-done" id="done-chip" data-i18n="chipDone">Finished</button><button data-menu="toggle-merged" id="merged-chip" data-i18n="chipMerged">Merged</button></span></div>
+        <div class="menu-row"><span data-i18n="menuThemeL">Theme</span><span class="chips" id="theme-seg"></span></div>
+        <div class="menu-row" lang="en"><span>Language · 语言</span><span class="chips"><button data-menu="lang" data-lang="en" id="lang-en">EN</button><button data-menu="lang" data-lang="zh" id="lang-zh" lang="zh-CN">中文</button></span></div>
+        <div class="menu-row stack" id="machines-row" hidden><span data-i18n="menuMachines">Other computers</span><span class="chips"><button data-menu="sync" id="sync-item" hidden data-i18n="chipSync" data-i18n-title="menuSync">Sync now</button><button data-menu="away" id="away-item" hidden data-i18n="chipAway">Show their sessions</button><button data-menu="away-git" id="away-git-item" hidden data-i18n="chipAwayGit">Read their changes over ssh</button></span></div>
         <button data-menu="phone" id="phone-item" hidden data-i18n="menuPhone">Open on your phone</button>
         <hr>
         <button data-menu="focus" data-i18n="menuFocus">Focus and fold groups…</button>
@@ -952,7 +952,7 @@ button.gl-prog[aria-pressed="true"] { color: var(--ink); background: var(--surfa
         <button data-menu="io" data-i18n="menuIO">Import / export</button>
         <button data-menu="clear-examples" id="clear-ex-item" hidden data-i18n="menuClearEx">Clear example data</button>
         <hr>
-        <div class="menu-row"><span data-i18n="menuHelpL">Help</span><span class="seg"><button data-menu="help" data-i18n="chipHelp">Shortcuts and how-to</button><button data-menu="doctor" id="doctor-item" hidden data-i18n="menuDoctor">Check setup</button></span></div>
+        <div class="menu-row"><span data-i18n="menuHelpL">Help</span><span class="chips"><button data-menu="help" data-i18n="chipHelp">Shortcuts and how-to</button><button data-menu="doctor" id="doctor-item" hidden data-i18n="menuDoctor">Check setup</button></span></div>
       </div>
     </div>
   </header>

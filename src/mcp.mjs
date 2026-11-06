@@ -245,7 +245,25 @@ async function callTool(name, a = {}) {
         return addCommit(d, { thread, kind, title: a.title, body: a.body || '', links: Array.isArray(a.links) ? a.links : [], agent: a.agent || agentOf(agentKey()).name, extra: { ...(a.assignee ? { assignee: a.assignee } : {}), ...(a.on ? { on: String(a.on) } : {}), ...(from ? { fromSession: from } : {}), ...(to ? { to } : {}) } });
       });
       const where = c.thread === INBOX ? 'the inbox' : `"${readData().threads[c.thread].name}"`;
-      return { text: dup ? `Already an open to-do on ${where}.` : `Logged to ${where}.`, data: { id: c.id, thread: c.thread, ...(dup ? { existing: true } : {}) } };
+      // on: the to-do is dispatched now, as `trace-canvas dispatch <id> --on <machine>` would (it used to be only stored,
+      // so nothing started until someone ran dispatch by hand). A failed dispatch never loses the record.
+      let sent = null;
+      if (a.on && !dup && c.kind === 'task' && c.thread !== INBOX) {
+        try {
+          const { dispatch, awayCache } = await import('./ops.mjs'), { launchRow } = await import('./agents.mjs');
+          const ask = { refs: [c.id], on: String(a.on), self: from, awayLive: awayCache() };
+          try { dispatch(readData(), ask); } catch {} // other machines read over ssh outside the data lock (src/ops.mjs)
+          const rows = mutate(d => dispatch(d, ask));
+          for (const r of rows) if (r.command && r.action !== 'busy') Object.assign(r, await launchRow(r));
+          sent = rows.map(r => ({ action: r.action, ...(r.on ? { on: r.on } : {}), ...(r.session ? { session: r.session.id } : {}), ...(r.failed ? { failed: r.failed, command: r.command } : {}),
+            ...(r.tmux ? { attach: r.tmux.attach } : {}), ...(r.action === 'message' || r.action === 'busy' ? { prompt: r.prompt } : {}), ...(r.action === 'busy' ? { command: r.command } : {}) }));
+        } catch (e) { sent = [{ action: 'error', failed: e.message }]; }
+      }
+      const say = !sent ? '' : sent.map(s => s.failed ? ` Not started on ${s.on || 'its machine'}: ${s.failed}${s.command ? `; run it by hand: ${s.command}` : ''}.`
+        : s.action === 'message' ? ` A session runs it here (${s.session}): send it this message: ${s.prompt}`
+          : s.action === 'busy' ? ` Its session ${s.session} is busy: give it this when it stops, or start a new one with: ${s.command}`
+            : s.action === 'self' ? ' It is yours: this session is the line\'s agent.' : ` ${s.action === 'start' ? 'A new session' : `Session ${s.session}`} ${s.action === 'start' ? 'started' : 'resumed'} on ${s.on}${s.attach ? `; watch it: ${s.attach}` : ''}.`).join('') || ' Nothing to dispatch.';
+      return { text: (dup ? `Already an open to-do on ${where}.` : `Logged to ${where}.`) + say, data: { id: c.id, thread: c.thread, ...(dup ? { existing: true } : {}), ...(sent ? { dispatched: sent } : {}) } };
     }
     case 'trace_import_data': {
       const text = a.path ? fs.readFileSync(a.path, 'utf8') : String(a.json || '');

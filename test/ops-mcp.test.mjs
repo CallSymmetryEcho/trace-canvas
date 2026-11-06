@@ -144,6 +144,13 @@ test('the MCP server speaks JSON-RPC over stdio and captures the current session
     await call('tools/call', { name: 'trace_log', arguments: { title: 'Ask the advisor about the sampling frame', thread: 'Advisor meeting', kind: 'task' } });
     const again = await call('tools/call', { name: 'trace_log', arguments: { title: '  ask the advisor about  the sampling frame', thread: 'Advisor meeting', kind: 'task' } });
     assert.match(again.result.content[0].text, /^Already an open to-do on "Advisor meeting"/);
+    // on: dispatched at once, not only stored; a machine that cannot be reached says so, and the to-do stays.
+    const away = await call('tools/call', { name: 'trace_log', arguments: { title: 'Read the slides on the laptop', thread: 'Advisor meeting', kind: 'task', on: 'tc-test.invalid' } });
+    const [row] = away.result.structuredContent.dispatched;
+    assert.equal(row.action, 'start');
+    assert.equal(row.on, 'tc-test.invalid');
+    assert.ok(row.failed, 'an unreachable machine is reported');
+    assert.match(away.result.content[0].text, /^Logged to "Advisor meeting"\. Not started on tc-test\.invalid: /);
     // Without a thread, the session's own line; all: true for every line.
     const mine = await call('tools/call', { name: 'trace_tasks', arguments: {} });
     assert.deepEqual(mine.result.structuredContent.threads.map(r => r.name), ['Methods chapter draft']);

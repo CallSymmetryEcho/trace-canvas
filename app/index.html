@@ -563,7 +563,9 @@ textarea.big-input { line-height: 1.3; }
 .md hr { border: 0; border-top: 1px solid var(--rule); margin: 1em 0; }
 .md a { color: var(--accent); } .md .md-ref { text-decoration: underline dotted var(--faint); text-underline-offset: 3px; }
 .md .tbl { overflow-x: auto; margin: 0 0 .7em; } .md table { border-collapse: collapse; font-size: .93em; margin: 0; }
-.md th, .md td { border: 1px solid var(--rule); padding: 4px 8px; text-align: left; vertical-align: top; } .md th { background: var(--surface-2); }
+.md th, .md td { border: 1px solid var(--rule); padding: 4px 8px; text-align: left; vertical-align: top; }
+/* A table wider than the screen scrolls in its .tbl box instead of squeezing every column until words break letter by letter (a phone). */
+.md th, .md td { min-width: 6em; } .md td:has(code) { min-width: 10em; } .md td.long { min-width: 13em; } .md th { background: var(--surface-2); }
 .md img { display: block; max-width: 100%; height: auto; margin: .5em auto; border-radius: 6px; } .md .md-img-err { color: var(--muted); font-size: .92em; }
 .md math { font-size: 1.1em; font-family: 'STIX Two Math', 'Cambria Math', 'Latin Modern Math', math; } /* a math font: brackets and roots stretch only with one (macOS has STIX Two, Windows Cambria) */ .md .md-math { overflow-x: auto; overflow-y: hidden; margin: 0 0 .7em; padding: .1em 0; }
 .md-body { background: var(--surface-2); border: 1px solid var(--rule-soft); border-radius: 8px; padding: 10px 12px; max-height: 46vh; overflow: auto; }
@@ -3249,7 +3251,7 @@ function mdHTML(src) {
     if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(l)) { out.push('<hr>'); i++; continue; }
     if (/\|/.test(l) && i + 1 < L.length && /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/.test(L[i + 1])) {
       const head = cells(l), rows = []; for (i += 2; i < L.length && /\|/.test(L[i]) && L[i].trim(); i++) rows.push(cells(L[i]));
-      out.push(`<div class="tbl"><table><thead><tr>${head.map(c => `<th>${mdInline(c)}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${r.map(c => `<td>${mdInline(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`); continue;
+      out.push(`<div class="tbl"><table><thead><tr>${head.map(c => `<th>${mdInline(c)}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${r.map(c => `<td${c.length > 30 ? ' class="long"' : ''}>${mdInline(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`); continue;
     }
     if (/^\s*>/.test(l)) {
       const q = []; for (; i < L.length && /^\s*>/.test(L[i]); i++) q.push(L[i].replace(/^\s*>\s?/, ''));

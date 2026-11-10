@@ -3983,7 +3983,7 @@ function openSheet(kind) {
   } else if (kind === 'phone') {
     setSheet(t('phoneTitle'), `<p>${esc(t('phoneIntro'))}</p><div class="phone-qr">${qrSvg(S.phoneUrl, 5)}</div><div class="l-cmd"><code>${esc(S.phoneUrl)}</code><button class="btn" data-copy-phone>${esc(t('copy'))}</button></div><p>${esc(t('phoneAfter'))}</p>`);
   } else if (kind === 'ai') runAI();
-  else if (kind === 'goals') renderGoals();
+  else if (kind === 'goals') { S.glOrder = null; renderGoals(); }
   else if (kind === 'focus') {
     const gs = groupNames();
     setSheet(t('focusTitle'), `<p>${esc(t('focusIntro'))}</p>` + (gs.length
@@ -4198,6 +4198,10 @@ function renderGoals() {
   }).filter(g => (g.tasks.length || g.goal) && (!['done', 'merged'].includes(g.th.status) || g.open.length || g.review.length));
   // To review first, then open to-dos, then a running session, then by most open.
   groups.sort((a, b) => b.review.length - a.review.length || (b.open.length > 0) - (a.open.length > 0) || liveOn(b.th.id).length - liveOn(a.th.id).length || b.open.length - a.open.length);
+  // That order is settled when the page opens: passing a review or a session starting must not move a line out of view
+  // under the person (it re-sorts the next time Goals opens). A line new since then goes first.
+  if (S.glOrder) groups.sort((a, b) => S.glOrder.indexOf(a.th.id) - S.glOrder.indexOf(b.th.id));
+  S.glOrder = groups.map(g => g.th.id);
   const others = orderedThreads().filter(th => inFocus(th) && !['done', 'merged'].includes(th.status)).length - groups.filter(g => g.th.id !== INBOX).length;
   let tipHidden = false;
   try { tipHidden = localStorage.getItem('tc.goalsTipHidden') === '1'; } catch {}
@@ -4240,10 +4244,12 @@ function renderGoals() {
   // alone slid the list down under the person: lines above gain to-dos, reorder when a session starts, an Autopilot tick comes.
   const top = sb.getBoundingClientRect().top, below = el => el.getBoundingClientRect().bottom > top;
   const anchor = S.sheet === 'goals' && ([...sb.querySelectorAll('li[data-k]')].find(below) || [...sb.querySelectorAll('section[data-k]')].find(below));
-  const key = anchor && anchor.dataset.k, off = anchor ? anchor.getBoundingClientRect().top - top : 0, keep = sb.scrollTop;
+  // The row may go (passed, ticked): then its line holds its place instead.
+  const sec = anchor && anchor.closest('section[data-k]'), keep = sb.scrollTop, offOf = el => el.getBoundingClientRect().top - top;
+  const marks = [anchor, sec].filter(Boolean).map(el => [el.dataset.k, offOf(el)]);
   setSheet(t('goalsTitle'), body);
-  const again = key && sb.querySelector(`[data-k="${CSS.escape(key)}"]`);
-  sb.scrollTop = again ? sb.scrollTop + again.getBoundingClientRect().top - top - off : keep;
+  const hit = marks.map(([k, off]) => [sb.querySelector(`[data-k="${CSS.escape(k)}"]`), off]).find(([el]) => el);
+  sb.scrollTop = hit ? sb.scrollTop + offOf(hit[0]) - hit[1] : keep;
 }
 // Return: the to-do opens again for the agent that did it, with the reason (trace_tasks and its next session start show it).
 function returnTodo(id) {

@@ -219,6 +219,15 @@ export const REVIEW_GATE = 10;
 export const AUTOPILOT_WORKER = /^(Worker|并行)\s*[:：]/i;
 // The record an Autopilot agent writes when it has done what is open, before it waits for more (src/ops.mjs).
 export const AUTOPILOT_END = /^Autopilot (summary|小结)/i;
+// Self-iteration (evolve): each round ends in one decision titled "Evolve round N: kept|reverted · …" (src/ops.mjs evolveRules).
+export const EVOLVE_ROUND = /^(Evolve round|自迭代\s*第?)\s*\d+/i;
+/** A line's self-iteration settings as given (the page or the API): the measure is required, the budget is capped. */
+export function evolveConfig(e) {
+  if (!e || typeof e !== 'object') return null;
+  const metric = String(e.metric || '').trim().slice(0, 600), num = (v, lo, hi, dflt) => Math.min(hi, Math.max(lo, Math.round(Number(v)) || dflt));
+  if (!metric) throw new Error('Self-iteration needs a measure: how a round is judged better or worse');
+  return { metric, rounds: num(e.rounds, 1, 20, 5), hours: num(e.hours, 1, 168, 24), limits: String(e.limits || '').trim().slice(0, 600) };
+}
 export function addCommit(d, { thread, kind = 'idea', title, body = '', links = [], agent = '', ts = Date.now(), parents, extra = {} }) {
   const tid = thread === INBOX ? INBOX : (threadById(d, thread) || { id: INBOX }).id;
   const prev = lastCommit(d, tid);

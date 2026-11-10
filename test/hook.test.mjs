@@ -270,6 +270,30 @@ test('the Stop hook counts the to-dos trace_tasks lists, skips those asked about
   assert.equal(autopilotStop({ session_id: 's1' }, s.env), ''); // nothing new since: it may stop
 });
 
+test('the Stop hook keeps a self-iterating line going round after round, and lets it stop when the budget is spent or two rounds kept nothing', async () => {
+  const { autopilotStop } = await import('../src/hook.mjs');
+  const { addCommit } = await import('../src/store.mjs');
+  const s = sandbox();
+  const now = Date.now(), stop = () => autopilotStop({ session_id: 's1' }, s.env);
+  const tid = mutate(d => { const th = createThread(d, { name: 'Promo' }); th.autopilot = { at: now - 9e4, session: 's1', on: now - 6e4, evolve: { metric: 'views after 48 h', rounds: 3, hours: 24, until: now + 36e5 } }; return th.id; }, s.env);
+  const round = (title, dt) => mutate(d => { addCommit(d, { thread: tid, kind: 'decision', title, ts: now - dt }); }, s.env);
+  assert.match(stop(), /self-iteration is on for the line "Promo".*0 of 3 rounds done.*cleared\. Measure by "views after 48 h", log "Evolve round 1: kept\|reverted/);
+  assert.equal(stop(), ''); // nudged, nothing since: it may stop
+  round('Evolve round 1: kept · 120 → 180 views', 5e4);
+  assert.match(stop(), /1 of 3 rounds done.*"Evolve round 2/); // a round is progress
+  round('Evolve round 2: reverted · 180 → 150', 4e4);
+  assert.match(stop(), /2 of 3 rounds done/);
+  round('Evolve round 3: kept · 150 → 200', 3e4);
+  assert.equal(stop(), ''); // budget spent
+  mutate(d => { d.threads[tid].autopilot.evolve.rounds = 9; }, s.env);
+  round('Evolve round 4: reverted · 200 → 190', 2e4);
+  round('Evolve round 5: reverted · 200 → 180', 1e4);
+  assert.equal(stop(), ''); // two rounds in a row kept nothing
+  mutate(d => { d.threads[tid].autopilot.evolve.rounds = 3; d.threads[tid].autopilot.evolve.until = now - 1; }, s.env);
+  const a = mutate(d => addCommit(d, { thread: tid, kind: 'task', title: 'Evolve: try a 15 s cut' }).id, s.env);
+  assert.match(stop(), new RegExp(`1 open, next: Evolve: try a 15 s cut \\[${a}\\]`)); // its own to-dos are done like any other
+});
+
 test('turning Autopilot off holds its session at the next tool until the person speaks to it or a new round starts', async () => {
   const { autopilotGate } = await import('../src/hook.mjs');
   const { stopAutopilot } = await import('../src/ops.mjs');

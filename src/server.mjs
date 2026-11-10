@@ -184,8 +184,9 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
           if (body.stop) { mutate(d => stopAutopilot(d, { thread })); broadcast('change'); return send(res, 200, { ok: true }); }
           // Other machines are read over ssh in a dry run first, never under the data lock (awayCache in src/ops.mjs).
           const awayLive = awayCache();
-          try { startAutopilot(readData(), { thread, awayLive }); } catch {}
-          const rows = mutate(d => startAutopilot(d, { thread, awayLive }));
+          const evolve = body.evolve || null;
+          try { startAutopilot(readData(), { thread, awayLive, evolve }); } catch {}
+          const rows = mutate(d => startAutopilot(d, { thread, awayLive, evolve }));
           for (const r of rows) if (r.command && r.action !== 'busy') Object.assign(r, await launchRow(r));
           broadcast('change');
           return send(res, 200, { rows });

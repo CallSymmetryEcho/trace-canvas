@@ -197,6 +197,29 @@ test('Autopilot hands every open to-do on a line to its agent with the decision 
   assert.equal(d.threads[app].autopilot.session, 's1');
 });
 
+test('self-iteration needs a measure, starts a line with nothing open on a first to-do, and tells the agent its rounds and budget', async () => {
+  const { startAutopilot } = await import('../src/ops.mjs');
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-evolve-'));
+  const env = { ...process.env, TRACE_CANVAS_HOME: path.join(tmp, 'home'), TRACE_CANVAS_DESKTOP_DIR: path.join(tmp, 'desk'), TRACE_CANVAS_LANG: 'en', TRACE_CANVAS_MACHINE: machineName() };
+  const d = emptyData(), now = Date.now();
+  const promo = createThread(d, { name: 'Promo' }).id;
+  d.threads[promo].goal = 'More people try the canvas';
+  d.sessions.s1 = { id: 's1', thread: promo, agent: 'Claude Code', cwd: tmp, last: now - 7e6 };
+  addCommit(d, { thread: promo, kind: 'agent', title: 'Made video 32', agent: 'Claude Code', ts: now - 7e6, extra: { session: 's1' } });
+  assert.throws(() => startAutopilot(d, { thread: 'Promo', evolve: { metric: ' ' } }, env), /needs a measure/);
+  assert.throws(() => startAutopilot(d, { thread: 'Promo' }, env), /no open to-dos/); // plain Autopilot still needs some
+  const [row] = startAutopilot(d, { thread: 'Promo', evolve: { metric: 'views after 48 h', rounds: 99, hours: 0, limits: 'no posting' } }, env);
+  const seed = Object.values(d.commits).find(c => c.kind === 'task' && /^Evolve: measure/.test(c.title));
+  assert.ok(seed, 'a first to-do to measure and set the first round');
+  assert.deepEqual(row.todos.map(c => c.id), [seed.id]);
+  const ev = d.threads[promo].autopilot.evolve;
+  assert.equal(ev.rounds, 20); // capped
+  assert.equal(ev.hours, 24); // 0 is not a budget: the default
+  assert.ok(ev.until > now);
+  assert.deepEqual(d.threads[promo].evolve, { metric: 'views after 48 h', rounds: 20, hours: 24, limits: 'no posting' }); // kept for next time
+  assert.match(row.prompt, /Self-iteration is on.*The goal: More people try the canvas\. The measure .*: views after 48 h\..*"Evolve round N: kept.*at most 20 rounds.*two rounds in a row kept nothing.*Limits set by the person: no posting\..*publishing, posting.*stay the person's/);
+});
+
 test('an archived project is out of the to-do list and of dispatch, unless its line is named', async () => {
   const { listTasks } = await import('../src/ops.mjs');
   const d = emptyData();

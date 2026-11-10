@@ -1143,7 +1143,7 @@ const I18N = {
     retroStats: (r, tok) => `${r.rounds} rounds · ${r.minutes} min · ${tok} tokens · ${r.corrections} correction${r.corrections === 1 ? '' : 's'} · ${r.sessions} session${r.sessions === 1 ? '' : 's'} · difficulty ${r.difficulty}`,
     retroStuck: 'Stuck on', retroSinceLast: d => `By default: since the last retro (${d}) up to now`, retroNoLast: 'No retro on this line yet: from the start up to now', retroFrom: 'From', retroTo: 'To (empty: now)', retroAll: 'Everything', retroStart: 'Start the retro', retroRange: (a, b) => `${a} → ${b}`, retroStartOfLine: 'the start', retroClear: 'Made clear by', retroRule: 'Rule', retroApply: 'Write', retroApplied: l => `Written: ${l}`,
     retroLayers: { project: 'Project rules (CLAUDE.md, AGENTS.md)', line: 'This line', memory: 'Long-term memory' }, tRetroApplied: w => `Written to ${w}`,
-apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent to take it up (it lights when its session gets the prompt)', apOff: 'Off: turn on to have this line\'s to-dos done by your decision profile until you stop it', apTitle: 'Autopilot (beta)', apSeg_off: 'Off', apSeg_wait: 'Asked', apSeg_run: 'Running', apLost_stale: 'Not taken up', apLost_gone: 'Stopped', apLostWhy_stale: 'Asked over 3 minutes ago and no session has taken the prompt.', apLostWhy_gone: 'Its session is no longer running (it ended or died before you turned it off).', apRetry: 'Hand it out again', apGo: 'Turn on', apCancel: 'Not now',
+apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent to take it up (it lights when its session gets the prompt)', apOff: 'Off: turn on to have this line\'s to-dos done by your decision profile until you stop it', apTitle: 'Autopilot (beta)', apSeg_off: 'Off', apSeg_wait: 'Asked', apSeg_run: 'Running', apLost_stale: 'Not taken up', apLost_gone: 'Stopped', apLostWhy_stale: 'Asked over 3 minutes ago and no session has taken the prompt.', apLostWhy_gone: 'Its session is no longer running (it ended or died before you turned it off).', apRetry: 'Hand it out again', apGo: 'Turn on', apCancel: 'Not now', evBtn: 'Self-iterate…', evTitle: 'Self-iteration (beta)', evIntro: 'Autopilot that does not stop when the to-dos run out: each round it measures, sets 1-3 to-dos of its own toward the goal, does them, measures again, keeps what moved the measure and undoes what did not. Publishing, posting, sending and spending still wait for you, and ten ticked to-dos waiting for review still pause it.', evGoal: 'Goal (the line\'s)', evNoGoal: 'No goal yet: write one on the line first, it is what the rounds aim at.', evMetric: 'Measure: how a round is judged better or worse', evMetricPh: 'e.g. views and likes per video after 48 h on Bilibili, 小红书 and X', evRounds: 'Rounds at most', evHours: 'Hours at most', evLimits: 'Limits', evLimitsPh: 'e.g. no posting; I watch every finished video before it goes out', evGo: 'Start self-iterating', evNeedMetric: 'Write the measure first', evRun: (k, n) => `Self-iterating · ${k}/${n} rounds`, evMeasure: m => `Measure: ${m}`,
     apIntro: 'Until you turn it off, this line\'s agent works through the open to-dos by your decision profile and logs each decision with the rule it rests on. When it reaches something it cannot decide it stops and asks; answer it in its session and it goes on to the next thing it cannot decide.',
     apNever: 'It never sends email or messages to people, pushes, publishes anything, or changes permissions or credentials: it gets those ready and asks you.',
     apAsk: 'It stops and asks you when something touches security, no rule covers it, or the rule is still swinging.',
@@ -1325,7 +1325,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     retroStats: (r, tok) => `${r.rounds} 轮 · ${r.minutes} 分钟 · ${tok} token · 纠正 ${r.corrections} 次 · ${r.sessions} 个会话 · 难度 ${r.difficulty}`,
     retroStuck: '卡在', retroSinceLast: d => `默认：从上次复盘（${d}）到现在`, retroNoLast: '这条线还没复盘过：从头到现在', retroFrom: '从', retroTo: '到（空着就是现在）', retroAll: '全部', retroStart: '开始复盘', retroRange: (a, b) => `${a} → ${b}`, retroStartOfLine: '开头', retroClear: '说清楚的那句', retroRule: '规矩', retroApply: '写入', retroApplied: l => `已写入：${l}`,
     retroLayers: { project: '项目规矩（CLAUDE.md、AGENTS.md）', line: '这条线', memory: '长期记忆' }, tRetroApplied: w => `已写入 ${w}`,
-apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的会话收到提示后才亮起', apOff: '关着：打开后按决策画像做这条线的待办，直到你关掉', apTitle: 'Autopilot（beta）', apSeg_off: '关', apSeg_wait: '等接手', apSeg_run: '运行', apLost_stale: '没人接手', apLost_gone: '已中断', apLostWhy_stale: '请求超过 3 分钟了，还没有会话收到提示。', apLostWhy_gone: '它的会话已经不在运行（你关掉之前就结束或崩了）。', apRetry: '重新派发', apGo: '打开', apCancel: '先不了',
+apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的会话收到提示后才亮起', apOff: '关着：打开后按决策画像做这条线的待办，直到你关掉', apTitle: 'Autopilot（beta）', apSeg_off: '关', apSeg_wait: '等接手', apSeg_run: '运行', apLost_stale: '没人接手', apLost_gone: '已中断', apLostWhy_stale: '请求超过 3 分钟了，还没有会话收到提示。', apLostWhy_gone: '它的会话已经不在运行（你关掉之前就结束或崩了）。', apRetry: '重新派发', apGo: '打开', apCancel: '先不了', evBtn: '自迭代…', evTitle: '自迭代（beta）', evIntro: '待办做完也不停的 Autopilot：每轮先量现状，自己定 1 到 3 条朝目标走的待办，做完再量一次，让衡量结果变好的就留下，没变好的就撤回。发布、发帖、发消息、花钱照样等你；做完待审的攒到 10 条也会停下等你看。', evGoal: '目标（这条线的）', evNoGoal: '这条线还没有目标：先在线上写一个，每一轮都朝它走。', evMetric: '衡量标准：凭什么判断这一轮更好还是更差', evMetricPh: '比如：每条视频发出 48 小时后在 B站、小红书、X 的播放和点赞', evRounds: '最多几轮', evHours: '最多几小时', evLimits: '禁区', evLimitsPh: '比如：不发帖；成片我看过才能发', evGo: '开始自迭代', evNeedMetric: '先写衡量标准', evRun: (k, n) => `自迭代 · 第 ${k}/${n} 轮`, evMeasure: m => `衡量：${m}`,
     apIntro: '打开后，这条线的 agent 按你的决策画像把没做完的待办一条条做下去，每个决定都在线上写明依据哪条规则。遇到判断不了的就停下来问你；你在它的会话里回答后，它接着做，直到下一个判断不了的地方。',
     apNever: '它绝不做：发邮件或给人发消息、推送、对外发布、改权限或凭据。这些事它只准备好，然后问你。',
     apAsk: '遇到安全相关的事、没有规则覆盖的事、或者规则还在摇摆的事，它会停下来问你。',
@@ -2575,7 +2575,10 @@ function groupDetail(name) {
 }
 // Autopilot on a line, for its canvas card and its Goals card (the phone's view): the chip, and a ticker with the
 // to-do in hand, an open one from after its last summary (the ones left for you then do not count); waiting otherwise.
-const apChip = th => apRun(th) ? `<span class="chip chip-auto" title="${esc(t('apTitle'))}">Autopilot</span>` : apWait(th) ? `<span class="chip chip-wait${apLost(th) ? ' is-lost' : ''}" title="${esc(t(apLost(th) ? 'apLostWhy_' + apLost(th) : 'apWait'))}">Autopilot${apLost(th) ? ' !' : '…'}</span>` : '';
+// Self-iteration rounds logged since this Autopilot round began (EVOLVE_ROUND in src/store.mjs).
+const evRounds = th => [...S.commits.values()].filter(c => tidOf(c) === th.id && c.kind === 'decision' && c.ts > (th.autopilot.on || th.autopilot.at || 0) && /^(Evolve round|自迭代\s*第?)\s*\d+/i.test(c.title || '')).length;
+const evLabel = th => th.autopilot && th.autopilot.evolve ? t('evRun', Math.min(evRounds(th) + 1, th.autopilot.evolve.rounds), th.autopilot.evolve.rounds) : '';
+const apChip = th => apRun(th) ? `<span class="chip chip-auto" title="${esc(evLabel(th) || t('apTitle'))}">Autopilot${evLabel(th) ? ' · ' + esc(evLabel(th)) : ''}</span>` : apWait(th) ? `<span class="chip chip-wait${apLost(th) ? ' is-lost' : ''}" title="${esc(t(apLost(th) ? 'apLostWhy_' + apLost(th) : 'apWait'))}">Autopilot${apLost(th) ? ' !' : '…'}</span>` : '';
 function apTickHTML(th, cs) {
   if (!apRun(th)) return '';
   const since = Math.max(0, ...cs.filter(c => /^Autopilot (summary|小结)/i.test(c.title || '')).map(c => c.ts));
@@ -3488,7 +3491,7 @@ function threadDetail(th) {
       <label class="fld"><span>${esc(t('threadName'))}</span><input id="t-name" class="big-input" value="${esc(th.name)}"></label>
       <div class="fld"><span>${esc(t('threadStatus'))}</span><div class="seg">${['active', 'parked', 'done'].map(s => `<button data-act="status" data-status="${s}" aria-pressed="${th.status === s}">${esc(statusLabel(s))}</button>`).join('')}${th.status === 'merged' ? `<button aria-pressed="true" disabled>${esc(statusLabel('merged'))}</button>` : ''}</div></div>
       ${SERVER && !S.remote && th.status !== 'merged' ? (() => { const k = apRun(th) ? 'run' : apWait(th) ? 'wait' : 'off', i = ['off', 'wait', 'run'].indexOf(k), lost = apLost(th);
-        return `<div data-k="${k}" data-tid="${esc(th.id)}" class="ap-row is-${k}${lost ? ' is-lost' : ''}${apD(th.id) != null ? ` ap-burst" style="--apd:${apD(th.id)}ms` : ''}"><span><b>${esc(t('apTitle'))}</b><em>${esc(t(lost ? 'apLost_' + lost : 'apSeg_' + k))}</em><small>${esc(t(lost ? 'apLostWhy_' + lost : k === 'run' ? 'apOn' : k === 'wait' ? 'apWait' : 'apOff'))}${lost ? ` <button class="linkish" data-act="ap-retry">${esc(t('apRetry'))}</button>` : ''}</small></span>
+        return `<div data-k="${k}" data-tid="${esc(th.id)}" class="ap-row is-${k}${lost ? ' is-lost' : ''}${apD(th.id) != null ? ` ap-burst" style="--apd:${apD(th.id)}ms` : ''}"><span><b>${esc(t('apTitle'))}</b><em>${esc(t(lost ? 'apLost_' + lost : 'apSeg_' + k))}</em><small>${esc(t(lost ? 'apLostWhy_' + lost : k === 'run' ? 'apOn' : k === 'wait' ? 'apWait' : 'apOff'))}${lost ? ` <button class="linkish" data-act="ap-retry">${esc(t('apRetry'))}</button>` : ''}${k === 'off' ? ` <button class="linkish" data-act="evolve-open">${esc(t('evBtn'))}</button>` : evLabel(th) ? `<br><b>${esc(evLabel(th))}</b> · ${esc(t('evMeasure', th.autopilot.evolve.metric))}` : ''}</small></span>
           <div class="ap-track" role="group" aria-label="${esc(t('apTitle'))}" style="--i:${i}"><i class="ap-dot d1" style="--d:1"></i><i class="ap-dot d2" style="--d:2"></i><i class="ap-fill"><i class="ap-v"></i></i><i class="ap-knob"></i>${['off', 'wait', 'run'].map((x, n) => `<button data-act="autopilot" data-ap="${x}" style="--b:${n}" aria-pressed="${x === k}" aria-label="${esc(t('apSeg_' + x))}" title="${esc(t('apSeg_' + x))}"></button>`).join('')}</div></div>`; })() : ''}
       <div class="fld"><span>${esc(t('threadColor'))}</span><div class="swatches">${LINE_COLORS.map(c => `<button class="swatch" data-act="color" data-color="${c}" style="--c:${c}" aria-pressed="${th.color === c}" aria-label="${esc(t('colorAria', c))}"></button>`).join('')}</div></div>
       <label class="fld"><span>${esc(t('threadGoal'))}</span><textarea id="t-goal" rows="3" placeholder="${esc(t('threadGoalPh'))}">${esc(goalOf(th))}</textarea></label>
@@ -3610,7 +3613,8 @@ detail.addEventListener('click', e => {
       else if (ls.get('tc.apIntro', false)) runAutopilot(s.id);
       else { S.apLine = s.id; openSheet('autopilot'); renderDetail(); } // the switch stays off until the round starts
       break;
-    case 'ap-retry': runAutopilot(s.id); break; // asked again: the line's session is resumed, or a new one starts
+    case 'ap-retry': runAutopilot(s.id, getThread(s.id).autopilot && getThread(s.id).autopilot.evolve); break;
+    case 'evolve-open': S.apLine = s.id; openSheet('evolve'); break; // asked again: the line's session is resumed, or a new one starts
     case 'retro': S.ui = { retro: true }; render(); break;
     case 'retro-all': $('#rt-since').value = ''; $('#rt-until').value = ''; break;
     case 'retro-go': {
@@ -3956,6 +3960,15 @@ function openSheet(kind) {
     setSheet(t('apTitle'), `<p>${esc(t('apIntro'))}</p><p>${esc(t('apNever'))}</p><p>${esc(t('apAsk'))}</p><p>${esc(t('apEnd'))}</p>
       <p>${p ? `<a href="#" data-ap-profile="${esc(p.id)}">${esc(t('apProfile'))}: ${esc(p.title)}</a>` : esc(t('apNoProfile'))} · <a href="${svg}" target="_blank" rel="noopener">${esc(t('apDiagram'))}</a></p>
       <div class="d-actions"><button class="btn btn-primary" data-ap-go>${esc(t('apGo'))}</button><button class="btn" data-ap-cancel>${esc(t('apCancel'))}</button></div>`);
+  } else if (kind === 'evolve') {
+    // Self-iteration: the measure is required; the budget and limits are kept on the line for next time (th.evolve).
+    const th = getThread(S.apLine), e = th.evolve || {}, goal = goalOf(th);
+    setSheet(t('evTitle'), `<p>${esc(t('evIntro'))}</p>
+      <div class="fld"><span>${esc(t('evGoal'))}</span><p>${esc(goal || t('evNoGoal'))}</p></div>
+      <label class="fld"><span>${esc(t('evMetric'))}</span><textarea id="ev-metric" rows="2" placeholder="${esc(t('evMetricPh'))}">${esc(e.metric || '')}</textarea></label>
+      <div style="display:flex;gap:12px"><label class="fld"><span>${esc(t('evRounds'))}</span><input id="ev-rounds" type="number" min="1" max="20" value="${e.rounds || 5}"></label><label class="fld"><span>${esc(t('evHours'))}</span><input id="ev-hours" type="number" min="1" max="168" value="${e.hours || 24}"></label></div>
+      <label class="fld"><span>${esc(t('evLimits'))}</span><textarea id="ev-limits" rows="2" placeholder="${esc(t('evLimitsPh'))}">${esc(e.limits || '')}</textarea></label>
+      <div class="d-actions"><button class="btn btn-primary" data-ev-go>${esc(t('evGo'))}</button><button class="btn" data-ap-cancel>${esc(t('apCancel'))}</button></div>`);
   } else if (kind === 'wrap') {
     // Marking a line done: a wrap-up drafted from the line itself (goal, span, key decisions, to-dos), edited by the person.
     setSheet(t('wrapHead'), `<p>${esc(t('wrapP'))}</p>${getThread(S.wrapLine).group ? '' : `<p>${esc(t('wrapSolo'))}</p>`}<textarea id="wrap-text" class="wrap-text">${esc(wrapDraft(getThread(S.wrapLine)))}</textarea>
@@ -4340,6 +4353,11 @@ sheetBody.addEventListener('click', e => {
   if (e.target.closest('[data-copy-phone]')) { copyText(S.phoneUrl); return; }
   if (e.target.closest('[data-sync-now]')) { closeSheet(); syncNow(); return; }
   if (e.target.closest('[data-ap-go]')) { ls.set('tc.apIntro', true); closeSheet(); runAutopilot(S.apLine); return; }
+  if (e.target.closest('[data-ev-go]')) {
+    const v = id => $(id).value.trim(), metric = v('#ev-metric');
+    if (!metric) { toast(t('evNeedMetric')); $('#ev-metric').focus(); return; }
+    closeSheet(); runAutopilot(S.apLine, { metric, rounds: v('#ev-rounds'), hours: v('#ev-hours'), limits: v('#ev-limits') }); return;
+  }
   if (e.target.closest('[data-ap-cancel]')) { closeSheet(); return; }
   if (e.target.closest('[data-ls-save]')) {
     const L = S.lessons, pick = $$('[data-ls]').filter(x => x.checked).map(x => L.list[Number(x.dataset.ls)]);
@@ -4401,10 +4419,10 @@ sheetBody.addEventListener('click', e => {
 // ▶ Start (/api/start): a Claude Code session on the line on the computer, with Remote Control on, so it
 // shows in the Claude app; a line that already has one running points at that session instead.
 // Autopilot (beta): starts a round on the line. A session that is open right now gets the prompt from the person.
-function runAutopilot(tid) {
-  postJSON('/api/autopilot', { thread: tid }).then(r => {
+function runAutopilot(tid, evolve = null) {
+  postJSON('/api/autopilot', { thread: tid, ...(evolve ? { evolve } : {}) }).then(r => {
     if (r.error) { renderDetail(); return toast(r.error); }
-    getThread(tid).autopilot = { at: Date.now() }; renderDetail(); render(); // waiting until a session takes it
+    getThread(tid).autopilot = { at: Date.now(), ...(evolve ? { evolve: { ...evolve, rounds: Number(evolve.rounds) || 5 } } : {}) }; renderDetail(); render(); // waiting until a session takes it
     const r0 = (r.rows || [])[0];
     if (!r0) return;
     if (r0.failed) return toast(r0.failed);

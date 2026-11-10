@@ -15,7 +15,7 @@ import { lessonsFor } from './lessons.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { dataFile, home, mutate, readConfig, readData, createThread, addCommit, lastCommit, goalOf, hashId, threadById, threadByKey, isTodo, REVIEW_GATE, AUTOPILOT_ASK, AUTOPILOT_WORKER, AUTOPILOT_END } from './store.mjs';
+import { dataFile, home, mutate, readConfig, readData, createThread, addCommit, lastCommit, goalOf, hashId, threadById, threadByKey, isTodo, REVIEW_GATE, AUTOPILOT_ASK, AUTOPILOT_WORKER, AUTOPILOT_END, EVOLVE_ROUND } from './store.mjs';
 import { gitEvents, redirectTargets, BASH_WRITES, EDIT_TOOLS, GIT_COMMIT, commandDir, commitMessage, headline, firstLine, cleanPrompt } from './git-events.mjs';
 import { tr } from './i18n.mjs';
 const threadIdOfLocal = (d, c) => (c && c.thread && d.threads[c.thread] ? c.thread : 'inbox');
@@ -432,12 +432,18 @@ export function autopilotStop(input, env = process.env) {
     const said = (re, from) => cs.filter(c => c.ts > from && re.test(c.title || '')).map(c => `${c.title} ${c.body || ''}`);
     const asks = said(AUTOPILOT_ASK, since), handed = said(AUTOPILOT_WORKER, ap.on || 0), named = (list, c) => list.some(a => a.includes(c.id));
     const open = cs.filter(c => isTodo(c) && !c.done).sort((a, b) => a.ts - b.ts), todo = open.filter(c => !named(asks, c) && !named(handed, c));
-    const progress = cs.filter(c => isTodo(c) && c.done).length + open.length - todo.length; // ticked, asked about or handed out
-    if (!open.length || (st.apNudged && progress <= st.apDoneAtNudge)) return '';
+    // Self-iteration: with rounds and time left, a cleared line is not the end; a logged round counts as progress.
+    const ev = ap.evolve, done = cs.filter(c => c.kind === 'decision' && c.ts > (ap.on || 0) && EVOLVE_ROUND.test(c.title || '')).sort((a, b) => a.ts - b.ts), rounds = done.length;
+    const stuck = rounds >= 2 && done.slice(-2).every(c => /revert|撤回|没保留/i.test(c.title)); // two rounds in a row kept nothing
+    const evolving = !!ev && rounds < ev.rounds && Date.now() < ev.until && !stuck;
+    const progress = cs.filter(c => isTodo(c) && c.done).length + open.length - todo.length + rounds; // ticked, asked about, handed out, rounds
+    if ((!open.length && !evolving) || (st.apNudged && progress <= st.apDoneAtNudge)) return '';
     if (!todo.length && open.some(c => named(handed, c) && !named(asks, c))) return ''; // waiting for its workers: their results wake it
     saveState(sid, { ...st, apNudged: (st.apNudged || 0) + 1, apDoneAtNudge: progress }, env);
     const head = `Autopilot is on for the line "${th.name}" (thread ${th.id}), to clear its to-dos: ${open.length} open`;
-    reason = todo.length
+    reason = !todo.length && evolving
+      ? `Autopilot self-iteration is on for the line "${th.name}" (thread ${th.id}): ${rounds} of ${ev.rounds} rounds done, its to-dos are ${open.length ? 'all waiting on the person' : 'cleared'}. Measure by "${firstLine(ev.metric, 200)}", log "Evolve round ${rounds + 1}: kept|reverted · <before → after>" for the round just done if not yet logged, then set the next 1-3 "Evolve: …" to-dos that should move the measure and do them. Stop with the "Autopilot summary" only when two rounds in a row kept nothing or the next step needs the person.`
+      : todo.length
       ? `${head}, next: ${firstLine(todo[0].title, 120)} [${todo[0].id}]. Go on by the decision profile, with this line's to-dos only. One you cannot decide: log "Question: <the question> [<its id>]" and go on with the next; write the "Autopilot summary" only when the rest all wait on the person or on another running session.`
       : `${head}, each with a question asked. Log the "Autopilot summary" with the count (cleared N · M wait on you · K with others) and the questions together, then stop.`;
   }

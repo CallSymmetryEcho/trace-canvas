@@ -4208,17 +4208,17 @@ function renderGoals() {
     const who = c.done ? '' : `<select class="gl-who" data-who="${esc(c.id)}" title="${esc(t('goalsWho'))}"><option value="">${esc(t('goalsAnyone'))}</option>${Object.entries(AGENT_NAMES).map(([k, n]) => `<option value="${k}" ${c.assignee === k ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>${c.assignee ? `<button class="btn gl-hand" data-hand="${esc(c.id)}">${esc(t('goalsHand'))}</button>${S.mode === 'server' && S.start && !S.remote ? `<button class="btn gl-hand" data-hand-open="${esc(c.id)}">${esc(t('openInTerminal'))}</button>` : ''}` : ''}${S.start && tidOf(c) !== INBOX ? `<button class="btn gl-hand" data-start="${esc(c.id)}" title="${esc(t('startTitle'))}">${esc(t('start'))}</button>` : ''}`;
     const ret = c.returned && !c.done ? `<span class="gl-ret-tag" title="${esc(t('rvReturnedBy', c.returned.by || ''))}">${esc(t('rvReturned'))}${c.returned.note ? `: ${esc(c.returned.note)}` : ''}</span>` : '';
     const title = S.glEdit === c.id ? `<input class="gl-t-in" data-title="${esc(c.id)}" value="${esc(c.title)}" enterkeyhint="done" aria-label="${esc(t('goalsEdit'))}">` : `<span class="gl-t" data-cid="${esc(c.id)}">${ret}${esc(c.title)}</span>`;
-    return `<li class="${c.done ? 'done' : ''} ${S.glOpen === c.id ? 'open' : ''}"><input type="checkbox" data-task="${esc(c.id)}" ${c.done ? 'checked' : ''} aria-label="${esc(c.title)}">${title}<span class="gl-acts">${who}<button class="btn gl-edit" data-edit="${esc(c.id)}">${esc(t('goalsEdit'))}</button><button class="btn gl-view" data-view-rec="${esc(c.id)}">${esc(t('goalsView'))}</button></span>${by}<time>${fmtShort(c.doneAt || c.ts)}</time></li>`;
+    return `<li data-k="${esc(c.id)}" class="${c.done ? 'done' : ''} ${S.glOpen === c.id ? 'open' : ''}"><input type="checkbox" data-task="${esc(c.id)}" ${c.done ? 'checked' : ''} aria-label="${esc(c.title)}">${title}<span class="gl-acts">${who}<button class="btn gl-edit" data-edit="${esc(c.id)}">${esc(t('goalsEdit'))}</button><button class="btn gl-view" data-view-rec="${esc(c.id)}">${esc(t('goalsView'))}</button></span>${by}<time>${fmtShort(c.doneAt || c.ts)}</time></li>`;
   };
   // A row to review: who did it and when, its result, Pass and Return (a reason box opens under it). The title opens the record.
-  const rvRow = c => `<li class="rv"><span class="gl-t" data-cid="${esc(c.id)}">${esc(c.title)}</span>${agentBy(c)}<time>${fmtShort(c.doneAt || c.ts)}</time>
+  const rvRow = c => `<li data-k="${esc(c.id)}" class="rv"><span class="gl-t" data-cid="${esc(c.id)}">${esc(c.title)}</span>${agentBy(c)}<time>${fmtShort(c.doneAt || c.ts)}</time>
     ${c.result ? `<div class="gl-res">${esc(c.result)}</div>` : ''}
     <div class="gl-rv-acts"><button class="btn btn-primary" data-pass="${esc(c.id)}">${esc(t('rvPass'))}</button><button class="btn" data-return="${esc(c.id)}" aria-expanded="${S.glReturn === c.id}">${esc(t('rvReturn'))}</button></div>
     ${S.glReturn === c.id ? `<div class="gl-ret-row"><input class="gl-ret" data-ret="${esc(c.id)}" value="${esc(S.glDraft['ret:' + c.id] || '')}" placeholder="${esc(t('rvReturnPh'))}" enterkeyhint="send"><button class="btn btn-primary" data-ret-go="${esc(c.id)}">${esc(t('rvReturnGo'))}</button></div>` : ''}</li>`;
   const section = ({ th, tasks, open, review, goal }) => {
     const showDone = S.glDone.includes(th.id), shown = showDone ? tasks.filter(c => !toReview(c)) : open;
     const pct = tasks.length ? Math.round(100 * (tasks.length - open.length) / tasks.length) : 0;
-    return `<section class="gl-group" style="--c:${th.color}">
+    return `<section class="gl-group" data-k="g:${esc(th.id)}" style="--c:${th.color}">
         <div class="gl-head"><span class="roundel" style="--c:${th.color}"></span><b>${esc(th.name)}</b>${tasks.length > open.length ? `<button class="gl-prog" data-gl-done="${esc(th.id)}" aria-pressed="${showDone}" title="${esc(t(showDone ? 'goalsHideDone' : 'goalsShowDone'))}">✓ ${tasks.length - open.length}/${tasks.length} ${showDone ? '▾' : '▸'}</button>` : `<span class="gl-prog">${tasks.length - open.length}/${tasks.length}</span>`}${liveBadge(th.id)}${apChip(th)}<button class="linkish" data-goto="${esc(th.id)}">${esc(t('goalsOpenLine'))}</button></div>
         ${apRun(th) ? apTickHTML(th, byThread().get(th.id) || []) : ''}
         ${th.id === INBOX ? '' : S.glEdit === 'goal:' + th.id ? `<textarea class="gl-goal-in" data-goal="${esc(th.id)}" rows="${Math.min(6, Math.max(2, Math.ceil(goal.length / 22)))}" placeholder="${esc(t('threadGoalPh'))}">${esc(goal)}</textarea>` : `<div class="gl-goal ${goal ? '' : 'none'}" data-goal-edit="${esc(th.id)}" title="${esc(t('goalsEdit'))}">${esc(goal || t('goalsNoGoal'))}</div>`}
@@ -4229,15 +4229,21 @@ function renderGoals() {
       </section>`;
   };
   const live = groups.filter(g => !g.folded), folded = groups.filter(g => g.folded);
-  const body = (PHONE.matches ? `<details class="gl-help"><summary>${esc(t('goalsHelp'))}</summary><span>${t('goalsTip')}</span></details>` : tipHidden ? '' : `<div class="gl-tip"><span>${t('goalsTip')}</span><button class="btn" id="gl-tip-hide">${esc(t('goalsTipHide'))}</button></div>`)
+  const sb = $('#sheet-body'), help = !!$('.gl-help[open]', sb);
+  const body = (PHONE.matches ? `<details class="gl-help"${help ? ' open' : ''}><summary>${esc(t('goalsHelp'))}</summary><span>${t('goalsTip')}</span></details>` : tipHidden ? '' : `<div class="gl-tip"><span>${t('goalsTip')}</span><button class="btn" id="gl-tip-hide">${esc(t('goalsTipHide'))}</button></div>`)
     + quietStrip()
     + `<div class="gl-bar-top"><span>${totalReview ? `<b class="gl-rv-n">${esc(t('goalsSummaryRv', totalReview))}</b> · ` : ''}${esc(t('goalsSummary', totalOpen, groups.filter(g => g.open.length).length))}</span></div>`
     + (groups.length ? live.map(section).join('') : `<p>${esc(t('goalsEmpty'))}</p>`)
     + (folded.length ? `<button class="linkish gl-fold-tog" data-gl-fold aria-expanded="${!!S.glFoldOpen}">${esc(t('glFolded', folded.length))} ${S.glFoldOpen ? '▾' : '▸'}</button>${S.glFoldOpen ? folded.map(section).join('') : ''}` : '')
     + (others > 0 ? `<p>${esc(t('goalsOthers', others))}</p>` : '');
-  const keep = $('#sheet-body').scrollTop; // a redraw (new data, a live update) leaves the list where the person is
+  // A redraw (new data, a live update) keeps the row at the top of the view where it was on screen. Keeping scrollTop
+  // alone slid the list down under the person: lines above gain to-dos, reorder when a session starts, an Autopilot tick comes.
+  const top = sb.getBoundingClientRect().top, below = el => el.getBoundingClientRect().bottom > top;
+  const anchor = S.sheet === 'goals' && ([...sb.querySelectorAll('li[data-k]')].find(below) || [...sb.querySelectorAll('section[data-k]')].find(below));
+  const key = anchor && anchor.dataset.k, off = anchor ? anchor.getBoundingClientRect().top - top : 0, keep = sb.scrollTop;
   setSheet(t('goalsTitle'), body);
-  $('#sheet-body').scrollTop = keep;
+  const again = key && sb.querySelector(`[data-k="${CSS.escape(key)}"]`);
+  sb.scrollTop = again ? sb.scrollTop + again.getBoundingClientRect().top - top - off : keep;
 }
 // Return: the to-do opens again for the agent that did it, with the reason (trace_tasks and its next session start show it).
 function returnTodo(id) {

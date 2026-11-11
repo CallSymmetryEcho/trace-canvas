@@ -4,11 +4,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { addCommit, dataFile, ensureThread, importText, INBOX, mutate, readConfig, readData, threadById, threadIdOf } from './store.mjs';
+import { addCommit, dataFile, ensureThread, findThreadByName, importText, INBOX, mutate, readConfig, readData, threadById, threadIdOf } from './store.mjs';
 import { sessionThread, whereFind } from './hook.mjs';
 import { agentEnv, agentKey, agentOf } from './agents.mjs';
 import { sessionOfPid } from './live.mjs';
 import { bindLiveSession, captureSession, detachThread, forkThread, listTasks, listThreads, liveSessions, mergeDataset, mergeThreads, readThread, setTaskDone } from './ops.mjs';
+import { precedents } from './precedents.mjs';
 import { currentSessionId, describeSession, findTranscript, findTranscripts, parseTranscript } from './transcript.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -155,6 +156,13 @@ const TOOLS = [
     title: 'Open the canvas',
     description: 'Starts the local Trace Canvas page if it is not running and returns its address. open_browser opens it in the default browser.',
     inputSchema: { type: 'object', properties: { open_browser: { type: 'boolean' }, view: { type: 'string', enum: ['canvas', 'git', 'timeline'] } } },
+    annotations: { readOnlyHint: true },
+  },
+  {
+    name: 'trace_precedents',
+    title: 'Like cases before',
+    description: 'Finds past cases like query on every line (or one): decisions with the rule they rest on, Questions with the person\'s answer, and to-dos agents ticked with the person\'s review (passed, returned with the reason, or pending). Use it when unsure whether to act or ask: say which case you follow.',
+    inputSchema: { type: 'object', properties: { query: { type: 'string' }, thread: { type: 'string' }, limit: { type: 'number' } }, required: ['query'] },
     annotations: { readOnlyHint: true },
   },
   {
@@ -320,6 +328,12 @@ async function callTool(name, a = {}) {
       if (!a.unbind && !String(a.thread || '').trim()) throw new Error('Pass thread, or unbind: true');
       const t = mutate(d => bindLiveSession(d, { sessionId, thread: a.unbind ? null : a.thread, agent: agentKey() }));
       return { text: t ? `Session ${sessionId} is on "${t.name}" now.` : `Session ${sessionId} follows its repository/branch line again.`, data: { sessionId, thread: t ? { id: t.id, name: t.name } : null } };
+    }
+    case 'trace_precedents': {
+      const d = readData(), tid = a.thread ? (threadById(d, a.thread) || {}).id || findThreadByName(d, a.thread) || '-' : undefined;
+      const rows = precedents(d, a.query, { limit: Math.min(20, Number(a.limit) || 8), thread: tid });
+      const text = rows.map(c => `[${c.id}] ${c.line} · ${c.type}${c.rule ? ` (${c.rule})` : ''}\n  case: ${c.situation}\n  did: ${c.action}\n  then: ${c.outcome}`).join('\n');
+      return { text: text || 'No like case on the canvas.', data: { cases: rows } };
     }
     case 'trace_where': {
       const rows = whereFind(readConfig(), a.query, a.machine || '');

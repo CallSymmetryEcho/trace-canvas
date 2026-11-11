@@ -101,6 +101,8 @@ Live sessions
   trace-canvas group <thread>... --name G | --clear   Put lines in a group (on the canvas they sit in one frame)
   trace-canvas folder <line> <folder> [--remove]   Sessions working in that folder of a repository go to this line
                                                    (one repository, several lines); --remove gives it back
+  trace-canvas cases [--thread T] [query]          Decisions, Questions + answers, reviews as JSON lines {situation, rule,
+                                                   action, outcome}; with a query, the closest few (as trace_precedents)
   trace-canvas tokens [--days 7]                   How much of recent Claude Code sessions' tokens went to Trace Canvas
   trace-canvas retro <thread> [--since T | --all] [--until T]
                                                    Rank the line's work by back-and-forth (rounds, time, tokens)
@@ -422,6 +424,16 @@ async function main() {
       if (!ref) { console.error('Usage: trace-canvas done <task id or title> [--thread T] [--agent A] [--undo]'); process.exit(1); }
       const c = mutate(d => setTaskDone(d, { task: ref, thread: thread || undefined, done: !undo, by: agent || 'human' }));
       console.log(`${undo ? 'Reopened' : 'Ticked'} "${c.title}"`);
+      break;
+    }
+    case 'cases': {
+      // trace-canvas cases [--thread T] [query]: decisions, Questions with answers and reviews as JSON lines
+      // ({situation, rule, action, outcome}); with a query, only the closest ones (what trace_precedents gives an agent).
+      const { cases, precedents } = await import('../src/precedents.mjs');
+      const { findThreadByName, threadById } = await import('../src/store.mjs');
+      const d = readData(), t = str(flag('thread', '')), limit = Number(flag('limit', 8)) || 8, q = argv.join(' ').trim();
+      const thread = t ? (threadById(d, t) || {}).id || findThreadByName(d, t) || '-' : undefined;
+      for (const c of q ? precedents(d, q, { thread, limit }) : cases(d, { thread })) console.log(JSON.stringify(c));
       break;
     }
     case 'live': {

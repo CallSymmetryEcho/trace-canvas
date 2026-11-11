@@ -16,7 +16,9 @@ function sandbox(t) {
   const userDir = path.join(root, 'user'), bin = path.join(root, 'bin');
   fs.mkdirSync(bin);
   // The setup test must not register real MCP servers or change this user's settings.
-  for (const agent of ['claude', 'codex']) {
+  // setup writes the trace-canvas command next to the first user-owned node on the PATH: a stand-in node here keeps it
+  // in the sandbox, or every test run rewrites the real one to run this checkout.
+  for (const agent of ['claude', 'codex', 'node']) {
     fs.writeFileSync(path.join(bin, agent), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
   }
   const run = (...args) => execFileSync(process.execPath, ['--input-type=module', '-e', `

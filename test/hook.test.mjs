@@ -270,6 +270,18 @@ test('the Stop hook counts the to-dos trace_tasks lists, skips those asked about
   assert.equal(autopilotStop({ session_id: 's1' }, s.env), ''); // nothing new since: it may stop
 });
 
+test('a round left as a reply for a session it could not reach is taken up at that session\'s next turn, once', async () => {
+  const { addCommit } = await import('../src/store.mjs');
+  const s = sandbox();
+  const tid = mutate(d => { const th = createThread(d, { name: 'Promo' }); th.autopilot = { at: Date.now() }; return th.id; }, s.env);
+  mutate(d => { addCommit(d, { thread: tid, kind: 'note', title: 'Self-iteration is on: take it up', body: `Autopilot (beta) on the Trace Canvas line "Promo" (thread ${tid}): the goal is …`, extra: { to: 'other' } }); }, s.env);
+  s.fire('UserPromptSubmit', { prompt: 'Video 32 looks good', prompt_id: 'r0' });
+  assert.equal(s.data().threads[tid].autopilot.session, undefined); // left for another session
+  mutate(d => { addCommit(d, { thread: tid, kind: 'note', title: 'Self-iteration is on: take it up', body: `Autopilot (beta) on the Trace Canvas line "Promo" (thread ${tid}): the goal is …`, extra: { to: 's1' } }); }, s.env);
+  s.fire('UserPromptSubmit', { prompt: 'Video 32 looks good', prompt_id: 'r1' });
+  assert.equal(s.data().threads[tid].autopilot.session, 's1');
+});
+
 test('the Stop hook keeps a self-iterating line going round after round, and lets it stop when the budget is spent or two rounds kept nothing', async () => {
   const { autopilotStop } = await import('../src/hook.mjs');
   const { addCommit } = await import('../src/store.mjs');

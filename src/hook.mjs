@@ -216,7 +216,10 @@ export function handleHook(input, env = process.env) {
       // Handed on in other words by another agent ("autopilot is on for twitq…, go on with its to-dos"): a message that
       // says autopilot and carries the id of a line waiting to be taken up. The id, not the name: a person asking a
       // session to turn Autopilot on names the line, and that session is not the one doing it.
-      const raw = String(input.prompt || ''), ap = /^Autopilot \(beta\) on the Trace Canvas line .*?\(thread ([\w-]+)\)/m.exec(raw);
+      // Or left for this session as a reply (trace_log to:) when nothing could type it in: taken up at its next turn, where the
+      // reply reaches it (promptContext, after this). Only an undelivered one, so an old round is not taken up again.
+      const left = Object.values(d.commits).filter(c => c.to && !c.deliveredAt && sid.startsWith(c.to)).map(c => `${c.title}\n${c.body || ''}`);
+      const raw = [String(input.prompt || ''), ...left].join('\n'), ap = /^Autopilot \(beta\) on the Trace Canvas line .*?\(thread ([\w-]+)\)/m.exec(raw);
       const apTh = ap ? d.threads[ap[1]] : /autopilot/i.test(raw) ? Object.values(d.threads).find(t => t.autopilot && !t.autopilot.session && raw.includes(t.id)) : null;
       // A round another session already holds stays with it (a prompt pasted twice): two agents on one line, one of them ungated.
       if (apTh && apTh.autopilot && (!apTh.autopilot.session || apTh.autopilot.session === sid)) { apTh.autopilot = { ...apTh.autopilot, session: sid, on: Date.now() }; changed = true; }

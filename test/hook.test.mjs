@@ -280,6 +280,10 @@ test('a round left as a reply for a session it could not reach is taken up at th
   mutate(d => { addCommit(d, { thread: tid, kind: 'note', title: 'Self-iteration is on: take it up', body: `Autopilot (beta) on the Trace Canvas line "Promo" (thread ${tid}): the goal is …`, extra: { to: 's1' } }); }, s.env);
   s.fire('UserPromptSubmit', { prompt: 'Video 32 looks good', prompt_id: 'r1' });
   assert.equal(s.data().threads[tid].autopilot.session, 's1');
+  // Its whole prompt reaches the session (other replies are cut at 600 characters).
+  const { takeReplies } = await import('../src/hook.mjs');
+  mutate(d => { addCommit(d, { thread: tid, kind: 'note', title: 'Round', body: `Autopilot (beta) on the Trace Canvas line "Promo" (thread ${tid}): ${'rule '.repeat(300)}END`, extra: { to: 's1' } }); }, s.env);
+  assert.match(takeReplies('s1', s.env), /END/);
 });
 
 test('the Stop hook keeps a self-iterating line going round after round, and lets it stop when the budget is spent or two rounds kept nothing', async () => {

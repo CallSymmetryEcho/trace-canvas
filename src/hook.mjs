@@ -470,11 +470,13 @@ export function autopilotGate(input, env = process.env) {
 
 // Replies other sessions logged for this one (trace_log to): handed over once, at its next turn. A session whose
 // process changes every turn (the Agent SDK) has a new messaging name each time, so a SendMessage reply misses it.
+// A reply that hands over an Autopilot round carries its whole prompt (the rules are the point); others stay short.
+const AUTOPILOT_PROMPT = /^Autopilot \(beta\) on the Trace Canvas line /;
 export function takeReplies(sid, env = process.env, now = Date.now()) {
   const mine = c => c.to && !c.deliveredAt && sid.startsWith(c.to);
   if (!Object.values(readData(env).commits).some(mine)) return '';
   const got = mutate(d => Object.values(d.commits).filter(mine).sort((a, b) => a.ts - b.ts).map(c => { c.deliveredAt = now; return c; }), env);
-  return got.length ? `Replies other sessions left for you on Trace Canvas: ${got.map(c => `[${c.id}] ${firstLine(c.title, 160)}${c.body ? ` — ${String(c.body).replace(/\s+/g, ' ').slice(0, 600)}` : ''}`).join(' | ')}` : '';
+  return got.length ? `Replies other sessions left for you on Trace Canvas: ${got.map(c => `[${c.id}] ${firstLine(c.title, 160)}${c.body ? ` — ${String(c.body).replace(/\s+/g, ' ').slice(0, AUTOPILOT_PROMPT.test(c.body) ? 8000 : 600)}` : ''}`).join(' | ')}` : '';
 }
 
 export function promptContext(input, env = process.env) {

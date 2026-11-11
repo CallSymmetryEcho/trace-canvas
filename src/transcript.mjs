@@ -183,6 +183,26 @@ export function canvasTokens(file) {
   return r;
 }
 
+/** Tokens a session used since a time (ms), from the usage on its replies: fresh input (input + cache writes), cache
+ * reads, output; its subagents (Claude Code keeps them in <session>/subagents/) counted apart, each one once. */
+export function sessionTokens(file, since = 0) {
+  const sum = f => {
+    const r = { calls: 0, fresh: 0, cached: 0, output: 0 }, seen = new Set();
+    let text = ''; try { text = fs.readFileSync(f, 'utf8'); } catch { return r; }
+    for (const line of text.split('\n')) {
+      let j; try { j = JSON.parse(line); } catch { continue; }
+      const m = j.message || {}, u = m.usage;
+      if (j.type !== 'assistant' || !u || seen.has(m.id) || Date.parse(j.timestamp || 0) < since) continue;
+      seen.add(m.id); r.calls++;
+      r.fresh += (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0); r.cached += u.cache_read_input_tokens || 0; r.output += u.output_tokens || 0;
+    }
+    return r;
+  };
+  const dir = path.join(file.replace(/\.jsonl$/, ''), 'subagents');
+  let subs = []; try { subs = fs.readdirSync(dir).filter(f => f.endsWith('.jsonl')).map(f => sum(path.join(dir, f))).filter(r => r.calls); } catch {}
+  return { main: sum(file), subagents: subs };
+}
+
 // A short description of a session for listings.
 export function describeSession(file) {
   const s = parseTranscript(file);

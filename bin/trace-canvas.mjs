@@ -104,6 +104,7 @@ Live sessions
   trace-canvas cases [--thread T] [query]          Decisions, Questions + answers, reviews as JSON lines {situation, rule,
                                                    action, outcome}; with a query, the closest few (as trace_precedents)
   trace-canvas tokens [--days 7]                   How much of recent Claude Code sessions' tokens went to Trace Canvas
+  trace-canvas tokens --thread T [--since TIME]    Tokens each session on a line used since its Autopilot round began, subagents apart
   trace-canvas retro <thread> [--since T | --all] [--until T]
                                                    Rank the line's work by back-and-forth (rounds, time, tokens)
                                                    and suggest rules, using your local claude or codex; by default
@@ -480,6 +481,31 @@ async function main() {
       break;
     }
     case 'tokens': {
+      // trace-canvas tokens --thread T [--since TIME]: what each session on a line used since the Autopilot round began
+      // (or TIME), its own and its subagents' (workers') apart, so a summary can say what the round cost.
+      const line = str(flag('thread', ''));
+      if (line) {
+        const { findTranscript, sessionTokens } = await import('../src/transcript.mjs');
+        const { threadSessions } = await import('../src/ops.mjs');
+        const { findThreadByName, threadById } = await import('../src/store.mjs');
+        const d = readData(), th = threadById(d, line) || d.threads[findThreadByName(d, line)];
+        if (!th) { console.error(`No line "${line}"`); process.exit(1); }
+        const sinceArg = str(flag('since', '')), since = sinceArg ? (/^\d+$/.test(sinceArg) ? Number(sinceArg) : Date.parse(sinceArg)) : (th.autopilot && th.autopilot.on) || 0;
+        const k = n => n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : `${Math.round(n / 1e3)}k`, tot = r => r.fresh + r.cached + r.output, all = { fresh: 0, cached: 0, output: 0 };
+        const add = r => { all.fresh += r.fresh; all.cached += r.cached; all.output += r.output; };
+        console.log(`Since ${since ? new Date(since).toISOString() : 'the start'} on "${th.name}" (fresh input · cache reads · output):`);
+        for (const s of threadSessions(d, th.id)) {
+          const f = findTranscript({ sessionId: s.id });
+          if (!f) continue;
+          const { main, subagents } = sessionTokens(f, since);
+          if (!main.calls && !subagents.length) continue;
+          const w = subagents.reduce((a, r) => ({ fresh: a.fresh + r.fresh, cached: a.cached + r.cached, output: a.output + r.output }), { fresh: 0, cached: 0, output: 0 });
+          add(main); add(w);
+          console.log(`  ${s.id.slice(0, 8)} itself ${k(main.fresh)} · ${k(main.cached)} · ${k(main.output)} = ${k(tot(main))}${subagents.length ? `; ${subagents.length} subagent${subagents.length === 1 ? '' : 's'} ${k(w.fresh)} · ${k(w.cached)} · ${k(w.output)} = ${k(tot(w))}` : ''}`);
+        }
+        console.log(`  total ${k(all.fresh)} · ${k(all.cached)} · ${k(all.output)} = ${k(tot(all))}`);
+        break;
+      }
       // trace-canvas tokens [--days 7]: how much of recent Claude Code sessions' tokens went to Trace Canvas.
       const { canvasTokens, projectsRoot } = await import('../src/transcript.mjs');
       const { fmtTokens } = await import('../src/i18n.mjs');

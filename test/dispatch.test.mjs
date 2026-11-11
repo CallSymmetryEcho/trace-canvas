@@ -178,6 +178,7 @@ test('Autopilot hands every open to-do on a line to its agent with the decision 
   assert.equal(listTasks(d, { thread: app })[0].autopilot, true);
   // It stays on until the person stops it: the agent stops to ask and goes on after the answer; its summary is not Stop.
   assert.match(row.prompt, /stays on until the person turns it off.*stop and ask\. When the person answers, log the answer as a decision naming the to-do's id.* and go on.*like cases on the canvas \(trace_precedents/);
+  assert.match(row.prompt, /what the round cost \(run `trace-canvas tokens --thread tm[a-z0-9]+`/);
   assert.doesNotMatch(row.prompt, /--wait/);
   addCommit(d, { thread: app, kind: 'note', title: 'Autopilot summary: 2 done, 1 to ask', ts: now + 1 });
   assert.ok(d.threads[app].autopilot);

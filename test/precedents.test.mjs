@@ -28,3 +28,17 @@ test('cases: decisions with rules, questions paired with the answer naming the t
   assert.equal(p[0].id, 'cbbbbbbbbbbbb3');
   assert.deepEqual(precedents(d, '   '), []);
 });
+
+test('sessionTokens: a session\'s usage since a time, each reply once, its subagents apart', async () => {
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path');
+  const { sessionTokens } = await import('../src/transcript.mjs');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tok-')), f = path.join(dir, 's1.jsonl');
+  const reply = (id, at, u) => JSON.stringify({ type: 'assistant', timestamp: new Date(at).toISOString(), message: { id, usage: u } });
+  const u = { input_tokens: 10, cache_creation_input_tokens: 5, cache_read_input_tokens: 100, output_tokens: 7 };
+  fs.writeFileSync(f, [reply('m0', 1000, u), reply('m1', 5000, u), reply('m1', 5000, u), reply('m2', 6000, u), 'not json'].join('\n'));
+  fs.mkdirSync(path.join(dir, 's1', 'subagents'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 's1', 'subagents', 'agent-a.jsonl'), reply('w1', 7000, u));
+  const r = sessionTokens(f, 2000);
+  assert.deepEqual(r.main, { calls: 2, fresh: 30, cached: 200, output: 14 });
+  assert.deepEqual(r.subagents, [{ calls: 1, fresh: 15, cached: 100, output: 7 }]);
+});

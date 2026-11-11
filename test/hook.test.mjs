@@ -337,7 +337,7 @@ test('a to-do handed to a worker is not pushed again, and with only workers left
   const now = Date.now();
   const tid = mutate(d => { const th = createThread(d, { name: 'App' }); th.autopilot = { at: now - 9e4, session: 's1', on: now - 6e4 }; return th.id; }, s.env);
   const [a, b] = mutate(d => [addCommit(d, { thread: tid, kind: 'task', title: 'Export to CSV', ts: now - 5e4 }).id, addCommit(d, { thread: tid, kind: 'task', title: 'Dark mode', ts: now - 4e4 }).id], s.env);
-  assert.match(autopilotPrompt(s.data(), s.data().threads[tid], tid), /log the split as one decision titled "Plan: …".*subagent of your own, in its own git worktree, at most 2 at a time: log "Worker: <its title> \[<its id>\]"/);
+  assert.match(autopilotPrompt(s.data(), s.data().threads[tid], tid), /log the split as one decision titled "Plan: …".*subagent of your own, in its own git worktree, at most 2 at a time: log "Worker: <its title> \[<its id>\]".*naming the id of every to-do.*never as uncommitted changes/);
   mutate(d => { addCommit(d, { thread: tid, kind: 'note', title: `Worker: Export to CSV [${a}]` }); }, s.env);
   assert.match(autopilotStop({ session_id: 's1' }, s.env), new RegExp(`next: Dark mode \\[${b}\\]`));
   mutate(d => { addCommit(d, { thread: tid, kind: 'note', title: `并行：深色模式 [${b}]` }); }, s.env);

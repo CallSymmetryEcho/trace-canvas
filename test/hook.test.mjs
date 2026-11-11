@@ -5,7 +5,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { handleHook, headline, redirectTargets, whereFind } from '../src/hook.mjs';
-import { readData, mutate, createThread } from '../src/store.mjs';
+import { readData, mutate, createThread, addCommit } from '../src/store.mjs';
+import { fileURLToPath } from 'node:url';
+
+const BIN = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'trace-canvas.mjs');
 
 function sandbox(lang = 'en') {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-test-'));
@@ -368,4 +371,30 @@ test('Autopilot under review: a second session does not take a running round, th
   s.fire('UserPromptSubmit', { prompt: 'Go on.', prompt_id: 'q10' });
   mutate(d => { for (let i = 0; i < 10; i++) { const c = addCommit(d, { thread: tid, kind: 'task', title: `Done ${i}`, ts: now - 4e4 }); c.done = true; c.toReview = true; } }, s.env);
   assert.equal(autopilotStop({ session_id: 's1' }, s.env), '');
+});
+
+test('Codex and Gemini take up a round, are pushed on when they stop, and are held at the next tool once Autopilot is off, each in its own hook shape', async () => {
+  const { stopAutopilot } = await import('../src/ops.mjs');
+  const s = sandbox();
+  const env = { ...s.env, TRACE_CANVAS_DESKTOP_DIR: path.join(s.root, 'desktop'), TRACE_CANVAS_MAP: '' };
+  delete env.TRACE_CANVAS_THREAD;
+  const run = (agent, sid, payload) => { const out = execFileSync(process.execPath, [BIN, 'hook', '--agent', agent], { input: JSON.stringify({ session_id: sid, cwd: s.repo, ...payload }), env, encoding: 'utf8' }); return out ? JSON.parse(out) : null; };
+  for (const [agent, sid, ask, stop, tool, shell, own] of [['codex', 'c1', 'UserPromptSubmit', 'Stop', 'PreToolUse', 'Bash', 'mcp__trace-canvas__trace_log'], ['gemini', 'g1', 'BeforeAgent', 'AfterAgent', 'BeforeTool', 'run_shell_command', 'mcp_trace-canvas_trace_log']]) {
+    const tid = mutate(d => { const th = createThread(d, { name: agent }); th.autopilot = { at: Date.now() }; addCommit(d, { thread: th.id, kind: 'task', title: 'Fix login' }); return th.id; }, env);
+    run(agent, sid, { hook_event_name: ask, prompt: `Autopilot (beta) on the Trace Canvas line "${agent}" (thread ${tid}): the goal is to clear` });
+    assert.equal(readData(env).threads[tid].autopilot.session, sid); // the switch lights with this session
+    if (agent === 'codex') assert.equal(run(agent, sid, { hook_event_name: 'Interrupt' }), null); // the person pressed Esc: no push
+    const push = run(agent, sid, { hook_event_name: stop, last_assistant_message: 'Done.', prompt_response: 'Done.' });
+    assert.equal(push.decision, 'block');
+    assert.match(push.reason, /next: Fix login/);
+    // Gemini fires BeforeAgent again with the push as the prompt: not the person speaking, so the no-progress exit holds.
+    run(agent, sid, { hook_event_name: ask, prompt: push.reason });
+    assert.equal(run(agent, sid, { hook_event_name: stop, last_assistant_message: 'Still on it.' }), null);
+    assert.ok(!Object.values(readData(env).commits).some(c => /^Autopilot is on/.test(c.title)));
+    mutate(d => stopAutopilot(d, { thread: tid }), env);
+    const deny = run(agent, sid, { hook_event_name: tool, tool_name: shell, tool_input: { command: 'ls' } });
+    const why = agent === 'gemini' ? (assert.equal(deny.decision, 'deny'), deny.reason) : (assert.equal(deny.hookSpecificOutput.permissionDecision, 'deny'), deny.hookSpecificOutput.permissionDecisionReason);
+    assert.match(why, /turned Autopilot off/);
+    assert.equal(run(agent, sid, { hook_event_name: tool, tool_name: own, tool_input: { title: 'Stopped at login' } }), null); // it may log where it stopped
+  }
 });

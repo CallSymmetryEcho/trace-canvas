@@ -151,7 +151,9 @@ const LIVE_EVENTS = [...LOG_EVENTS, 'SessionStart', 'PreToolUse', 'Notification'
 // The openings of the prompts Trace Canvas itself writes to hand a line over (src/ops.mjs, app/index.html).
 // Keystrokes typed into the session rather than asked of it (":q", "login", "ok"): never a to-do.
 export const notTask = prompt => { const p = String(prompt || '').trim(); return p.length < 3 || (!/\s/.test(p) && (/^:/.test(p) || /^(login|logout|exit|quit|clear|yes|no|ok|okay)$/i.test(p))); };
-export const HANDOFF = /^(Autopilot \(beta\) on the Trace Canvas line|You are taking over the Trace Canvas line|New to-dos on the Trace Canvas line|Read the Trace Canvas line|读 Trace Canvas 上的线)/;
+export const HANDOFF = /^(Autopilot \(beta\) on the Trace Canvas line|You are taking over the Trace Canvas line|New to-dos on the Trace Canvas line|Read the Trace Canvas line|读 Trace Canvas 上的线|Autopilot (self-iteration )?is on for the line)/;
+// autopilotStop's own push. Gemini CLI fires BeforeAgent again with it as the prompt: that is not the person speaking.
+const NUDGE = /^Autopilot (self-iteration )?is on for the line /;
 
 export function handleHook(input, env = process.env) {
   if (!input || typeof input !== 'object') return { skipped: 'no input' };
@@ -225,9 +227,10 @@ export function handleHook(input, env = process.env) {
       if (apTh && apTh.autopilot && (!apTh.autopilot.session || apTh.autopilot.session === sid)) { apTh.autopilot = { ...apTh.autopilot, session: sid, on: Date.now() }; changed = true; }
       // The person's message to an Autopilot agent (an answer, most often) starts a new stretch for autopilotStop. Kept in the
       // session's own state, not on the line: a write there would sync over the person turning it off on another machine.
-      if (Object.values(d.threads).some(t => t.autopilot && t.autopilot.session === sid)) { state.apTurn = Date.now(); state.apNudged = 0; }
+      const person = !NUDGE.test(prompt);
+      if (person && Object.values(d.threads).some(t => t.autopilot && t.autopilot.session === sid)) { state.apTurn = Date.now(); state.apNudged = 0; }
       // The person speaking to a session Autopilot was turned off in lets it work again (autopilotGate).
-      for (const t of Object.values(d.threads)) if (t.apStopped && t.apStopped.session === sid) { delete t.apStopped; changed = true; }
+      if (person) for (const t of Object.values(d.threads)) if (t.apStopped && t.apStopped.session === sid) { delete t.apStopped; changed = true; }
       const log = !isCommand && prompt && !handoff && !notTask(prompt) && (cfg.prompts === 'all' || (cfg.prompts === 'first' && !s.prompted) || (cfg.prompts === 'long' && prompt.length >= 60));
       if (log) {
         const t = thread(prompt);
@@ -460,7 +463,7 @@ export function autopilotStop(input, env = process.env) {
  */
 export function autopilotGate(input, env = process.env) {
   const sid = input.session_id, tool = String(input.tool_name || '');
-  if (!sid || tool.startsWith('mcp__trace-canvas__')) return '';
+  if (!sid || /^mcp__?trace-canvas_/.test(tool)) return ''; // Claude and Codex: mcp__trace-canvas__x, Gemini: mcp_trace-canvas_x
   let raw;
   try { raw = fs.readFileSync(dataFile(env), 'utf8'); } catch { return ''; }
   if (!raw.includes('"apStopped"') || !raw.includes(sid)) return '';
@@ -482,7 +485,7 @@ export function takeReplies(sid, env = process.env, now = Date.now()) {
 export function promptContext(input, env = process.env) {
   if (!input.session_id || cleanPrompt(input.prompt).startsWith('/')) return '';
   const replies = takeReplies(input.session_id, env);
-  return [replies, lineContext(input, env)].filter(Boolean).join('\n');
+  return [replies, NUDGE.test(cleanPrompt(input.prompt)) ? '' : lineContext(input, env)].filter(Boolean).join('\n');
 }
 function lineContext(input, env) {
   const d = readData(env), { threadId } = sessionThread(d, { id: input.session_id }, env);

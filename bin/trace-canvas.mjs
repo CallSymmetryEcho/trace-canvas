@@ -216,12 +216,17 @@ async function main() {
         }
       } catch (e) { outcome = { error: String(e && e.stack || e) }; }
       if (context) process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } }));
-      // Autopilot: a Claude Code agent that stops while it could go on is handed its next to-do (src/hook.mjs).
-      // ponytail: Claude Code only; Codex's and Gemini's Stop hooks take another answer, add them when checked.
+      // Autopilot: an agent that stops while it could go on is handed its next to-do (src/hook.mjs). Claude Code's and
+      // Codex's Stop and Gemini's AfterAgent all take {decision: block, reason} and go on with the reason as the next
+      // message (not Codex's Interrupt: the person pressed Esc). Codex and Gemini have no second, waiting PreToolUse hook
+      // (--gate), so their one tool hook refuses the tool itself: Codex with Claude's answer, Gemini with its own.
       try {
-        if (agent === 'claude' && event === 'Stop' && process.env.TRACE_CANVAS_DISABLE !== '1') {
-          const why = (await import('../src/hook.mjs')).autopilotStop(JSON.parse(raw));
-          if (why) process.stdout.write(JSON.stringify({ decision: 'block', reason: why }));
+        if (process.env.TRACE_CANVAS_DISABLE !== '1' && raw.trim()) {
+          const { autopilotStop, autopilotGate } = await import('../src/hook.mjs'), p = JSON.parse(raw);
+          const stop = (event === 'Stop' || event === 'AfterAgent') && autopilotStop(p);
+          if (stop) process.stdout.write(JSON.stringify({ decision: 'block', reason: stop }));
+          const gate = agent !== 'claude' && (event === 'PreToolUse' || event === 'BeforeTool') && autopilotGate(p);
+          if (gate) process.stdout.write(JSON.stringify(agent === 'gemini' ? { decision: 'deny', reason: gate } : { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: gate } }));
         }
       } catch {}
       if (process.env.TRACE_CANVAS_DEBUG) {

@@ -8,7 +8,7 @@ import os from 'node:os';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { readConfig } from './store.mjs';
-import { listLive } from './live.mjs';
+import { listLive, tmuxBin } from './live.mjs';
 
 export const q = s => `'${String(s).replace(/'/g, `'\\''`)}'`; // POSIX shell quoting
 
@@ -38,8 +38,9 @@ export const macTerminal = (env = process.env, has = p => fs.existsSync(p)) => {
 // What a running Claude Code puts in its children's environment to say who they are. An agent opened from inside one
 // (dispatch run by an agent: gnome-terminal --tab hands the new tab the caller's environment) would think itself that
 // session's child: no session file, unreachable by messages, the hooks taking it for the caller. Settings a person
-// sets (CLAUDE_CONFIG_DIR, CLAUDE_CODE_USE_BEDROCK…) are kept.
-const SESSION_VAR = /^(CLAUDECODE|CLAUDE_PID|CLAUDE_EFFORT|CLAUDE_CODE_(SESSION_\w+|CHILD_SESSION|ENTRYPOINT|EXECPATH|MESSAGING_\w+|BRIDGE_\w+|SSE_PORT))$/;
+// sets (CLAUDE_CONFIG_DIR, CLAUDE_CODE_USE_BEDROCK…) are kept. TMUX and TMUX_PANE too: a terminal opened from a tmux
+// pane would hand them to every tab, which then looked to be in that pane (tmuxOf).
+const SESSION_VAR = /^(TMUX|TMUX_PANE|CLAUDECODE|CLAUDE_PID|CLAUDE_EFFORT|CLAUDE_CODE_(SESSION_\w+|CHILD_SESSION|ENTRYPOINT|EXECPATH|MESSAGING_\w+|BRIDGE_\w+|SSE_PORT))$/;
 export const agentEnv = env => Object.fromEntries(Object.entries(env).filter(([k]) => !SESSION_VAR.test(k)));
 function desktopEnv(env) {
   env = agentEnv(env);
@@ -82,7 +83,7 @@ export function agentScreen(env = process.env) {
   return s ? s.tab : '';
 }
 export function terminalCommand(cmd, env = process.env, platform = process.platform, screen = null) {
-  if (platform === 'darwin') return ['osascript', ['-e', (macTerminal(env) === 'iterm' ? itermScript : terminalScript)(typeable(cmd))], env];
+  if (platform === 'darwin') return ['osascript', ['-e', (macTerminal(env) === 'iterm' ? itermScript : terminalScript)(typeable(cmd))], agentEnv(env)];
   if (platform !== 'linux') return null;
   const shown = desktopEnv(env);
   const term = shown && [env.TERMINAL, 'x-terminal-emulator', 'konsole', 'gnome-terminal', 'xfce4-terminal', 'kitty', 'alacritty', 'wezterm', 'xterm'].filter(Boolean).map(t => [path.basename(t), which(t, env) || (path.isAbsolute(t) && t)]).find(([, p]) => p);
@@ -125,8 +126,12 @@ export const remote = (machine, cmd) => `ssh -t ${machine} ${q(`exec "$SHELL" -l
 export function tmuxAttach(s) {
   if (!s.machine || !(s.pane || (s.term === 'tmux' && /^\/dev\/(pts\/|ttys?)\d+$/.test(s.tty || '')))) return '';
   const t = s.tmux ? `tmux -S ${q(s.tmux)}` : 'tmux';
+  const tty = /^\/dev\/(pts\/|ttys?)\d+$/.test(s.tty || '') ? s.tty : '';
   const find = s.pane ? q(s.pane) : `"$(${t} list-panes -a -F '#{pane_tty} #{pane_id}' | awk '$1=="${s.tty}"{print $2}')"`;
-  return remote(s.machine, `p=${find}; [ -n "$p" ] && ${t} has-session -t "$p" 2>/dev/null || { echo 'Its tmux pane is gone.'; exit 1; }; ${t} select-window -t "$p"; ${t} select-pane -t "$p"; exec ${t} attach -t "$p"`);
+  // The pane must still be the session's (its tty): a pane number is reused after tmux restarts, and one inherited
+  // from an outer tmux (tmuxOf) belongs to another program.
+  const own = s.pane && tty ? ` && [ "$(${t} display-message -p -t "$p" '#{pane_tty}')" = ${q(tty)} ]` : '';
+  return remote(s.machine, `p=${find}; [ -n "$p" ] && ${t} has-session -t "$p" 2>/dev/null${own} || { echo 'It does not run in tmux any more (its pane is gone or is another program).'; exit 1; }; ${t} select-window -t "$p"; ${t} select-pane -t "$p"; exec ${t} attach -t "$p"`);
 }
 // An agent for another machine runs there in a detached tmux session, so it keeps going when this window closes or
 // the network drops; ssh only starts it. Resolves '' when started, 'exists' when that tmux session is already there,
@@ -157,7 +162,6 @@ export async function launchRow(r, { open = openTerminal, start = startDetached 
   return { detached: true, ...(s ? { already: true } : {}), ...(watch ? { noWatch: watch } : {}) };
 }
 // tmux is often not on the page server's PATH (a login item, a systemd service).
-const tmuxBin = (has = p => fs.existsSync(p)) => ['/opt/homebrew/bin/tmux', '/usr/local/bin/tmux', '/usr/bin/tmux'].find(has) || 'tmux';
 // A process's environment: /proc on Linux, ps -E on a Mac (values cut at the first space, enough for these keys).
 async function envOf(pid) {
   try { return Object.fromEntries(fs.readFileSync(`/proc/${pid}/environ`, 'utf8').split('\0').map(l => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)])); } catch {}
@@ -169,10 +173,10 @@ async function envOf(pid) {
  * forward (found from the tmux client's own environment, so iTerm2, Terminal, GNOME Terminal or Konsole). With no
  * terminal attached, a new tab attaches to it. false when the pane is gone.
  */
-export async function focusTmux({ socket, pane }, { exec = run, open = openTerminal, env = envOf, focus = focusTab } = {}) {
+export async function focusTmux({ socket, pane, tty = '' }, { exec = run, open = openTerminal, env = envOf, focus = focusTab } = {}) {
   const t = (...a) => exec(tmuxBin(), ['-S', socket, ...a]);
-  const ses = ((await t('display-message', '-p', '-t', pane, '#{session_name}')) || '').trim();
-  if (!ses) return false;
+  const [ses, own] = ((await t('display-message', '-p', '-t', pane, '#{session_name}\t#{pane_tty}')) || '').trim().split('\t');
+  if (!ses || (tty && own !== tty)) return false; // the pane is now another program's (tmuxAttach)
   await t('select-window', '-t', pane);
   await t('select-pane', '-t', pane);
   for (const l of ((await t('list-clients', '-t', ses, '-F', '#{client_tty}\t#{client_pid}')) || '').split('\n').filter(Boolean)) {
@@ -202,7 +206,7 @@ const SEARCH = ['org.gnome.Terminal', '/org/gnome/Terminal/SearchProvider', 'org
  * Konsole's /Windows/N is taken to be its /konsole/MainWindow_N; Wayland raises nothing past what the app does.
  */
 export async function focusTab({ tty = '', term = '', tab = '', tmux = '', pane = '' } = {}) {
-  if (tmux && pane) return focusTmux({ socket: tmux, pane });
+  if (tmux && pane) return focusTmux({ socket: tmux, pane, tty });
   const script = focusScript({ tty, term });
   if (script) return (await run('osascript', ['-e', script]) || '').trim() === 'ok';
   if (term === 'gnome-terminal') {

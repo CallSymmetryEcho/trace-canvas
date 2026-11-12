@@ -89,6 +89,33 @@ test('a session bound through the tools says which agent and machine it is, befo
   assert.equal(execFileSync('sh', ['-c', `printf %s ${cmd.slice('ssh -t bsuperstation '.length)}`], { encoding: 'utf8' }), `exec "$SHELL" -lc 'PATH="$HOME/.local/bin:$PATH"; codex resume cx9'`);
 });
 
+test('a session resumes from the folder it started in, not one it cd-ed into later, here and from another machine', () => {
+  const s = sandbox(), env = { ...s.env, TRACE_CANVAS_MACHINE: 'mac' };
+  const drafts = path.join(s.repo, 'emails', 'drafts');
+  fs.mkdirSync(drafts, { recursive: true });
+  // Claude Code keeps the conversation under the folder it started in, whatever the session cd-s into afterwards.
+  const transcript = path.join(s.root, 'projects', s.repo.replace(/[^a-zA-Z0-9]/g, '-'), 's7.jsonl');
+  const fire = (ev, cwd, extra = {}) => handleHook({ session_id: 's7', cwd, transcript_path: transcript, hook_event_name: ev, ...extra }, env);
+  fire('UserPromptSubmit', drafts, { prompt: 'Draft the email' }); // first seen already inside: found by the transcript
+  assert.equal(readData(env).sessions.s7.cwd, s.repo);
+  fire('PostToolUse', drafts, { tool_name: 'Edit', tool_use_id: 'u1', tool_input: { file_path: path.join(drafts, 'a.md') } });
+  fire('Stop', '/tmp', { last_assistant_message: 'Done' }); // cd-ed somewhere else: still its own folder
+  assert.equal(readData(env).sessions.s7.cwd, s.repo);
+  // An older record with the folder it cd-ed into is set right by its next event.
+  mutate(d => { d.sessions.s7.cwd = drafts; }, env);
+  fire('Stop', drafts, { last_assistant_message: 'Sent' });
+  const d = readData(env), tid = d.sessions.s7.thread;
+  assert.equal(d.sessions.s7.cwd, s.repo);
+  // bsuperstation has none of the Mac's transcripts: it goes by the synced folder, resumed over ssh on the Mac.
+  const cmd = threadSessions(d, tid, { ...s.env, TRACE_CANVAS_MACHINE: 'bsuperstation' }).find(x => x.id === 's7').command;
+  assert.equal(execFileSync('sh', ['-c', `printf %s ${cmd.slice('ssh -t mac '.length)}`], { encoding: 'utf8' }),
+    `exec "$SHELL" -lc 'PATH="$HOME/.local/bin:$PATH"; cd '\\''${s.repo}'\\'' && claude --resume s7'`);
+  // Codex finds a session by its id anywhere: the folder first noted stays.
+  handleHook({ session_id: 'c8', cwd: s.repo, transcript_path: path.join(s.root, 'rollout-c8.jsonl'), hook_event_name: 'UserPromptSubmit', prompt: 'Sort the receipts by date', _agent: 'codex' }, env);
+  handleHook({ session_id: 'c8', cwd: drafts, transcript_path: path.join(s.root, 'rollout-c8.jsonl'), hook_event_name: 'Stop', last_assistant_message: 'ok', _agent: 'codex' }, env);
+  assert.equal(readData(env).sessions.c8.cwd, s.repo);
+});
+
 test('a part of a line name finds the line when only one line has it', () => {
   const d = emptyData();
   const ocr = createThread(d, { name: 'tripsplit · receipt-ocr' }).id;

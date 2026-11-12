@@ -155,6 +155,17 @@ export const HANDOFF = /^(Autopilot \(beta\) on the Trace Canvas line|You are ta
 // autopilotStop's own push. Gemini CLI fires BeforeAgent again with it as the prompt: that is not the person speaking.
 const NUDGE = /^Autopilot (self-iteration )?is on for the line /;
 
+// The folder a session resumes from. Claude Code keeps a conversation under the folder it started in
+// (~/.claude/projects/<that path, each character other than a letter or digit as ->), and a later cd does not move it,
+// so `cd <where it is now> && claude --resume` did not find it: that folder is cwd or one above it. Otherwise the
+// folder first noted (Codex and Gemini find a session by its id anywhere).
+// ponytail: Claude Code shortens a folder name past 200 characters; such a session keeps its first folder.
+export function sessionDir(cwd, prev, transcript = '') {
+  const want = path.basename(path.dirname(String(transcript || ''))), enc = p => p.replace(/[^a-zA-Z0-9]/g, '-');
+  if (prev && enc(prev) === want) return prev;
+  for (let p = cwd; p; p = path.dirname(p) === p ? '' : path.dirname(p)) if (enc(p) === want) return p;
+  return prev || cwd;
+}
 export function handleHook(input, env = process.env) {
   if (!input || typeof input !== 'object') return { skipped: 'no input' };
   if (env.TRACE_CANVAS_DISABLE === '1') return { skipped: 'disabled' };
@@ -178,7 +189,8 @@ export function handleHook(input, env = process.env) {
   const info = ev !== 'SessionEnd' && relevantTool && !(quick && known) ? repoInfo(cwd) : null;
   // The session's terminal tab and agent process, looked up until the process is found (Go to the terminal; live while it runs).
   // A new process for the same session (the Agent SDK starts one each turn): its pid, so replies to it still find it.
-  const terminal = ev === 'SessionEnd' ? null : !(known && 'pid' in known) ? terminalOf(env)
+  // A pane noted before tmuxOf checked its tty may be inherited from another program's pane: looked up once more.
+  const terminal = ev === 'SessionEnd' ? null : !(known && 'pid' in known) || (known.pane && !known.tmuxChecked) ? terminalOf(env)
     : +env.CLAUDE_PID && known.pid !== +env.CLAUDE_PID ? { pid: +env.CLAUDE_PID } : null;
   // The repository a commit landed in, which is often not cwd's (`cd other && git commit`).
   const bashCmd = ev === 'PostToolUse' && input.tool_name === 'Bash' ? String((input.tool_input || {}).command || '') : '';
@@ -199,7 +211,10 @@ export function handleHook(input, env = process.env) {
     // The session's entry outlives this process: the desktop app ends sessions and resumes them
     // under the same id, and a resumed session stays on its line and does not log a first prompt again.
     const s = d.sessions[sid] || adoptSession(d, sid, state);
-    const touch = () => { d.sessions[sid] = Object.assign(s, { id: sid, agent: ag.name, agentKey: input._agent || 'claude', resume: ag.resume(sid), cwd, machine: cfg.machine, last: Date.now() }); changed = true; };
+    // A folder noted by an older version (the one the session had cd-ed into) is set right by its next event.
+    const dir = sessionDir(cwd, s.cwd, input.transcript_path);
+    if (d.sessions[sid] && s.cwd && dir !== s.cwd) { s.cwd = dir; changed = true; }
+    const touch = () => { d.sessions[sid] = Object.assign(s, { id: sid, agent: ag.name, agentKey: input._agent || 'claude', resume: ag.resume(sid), cwd: dir, machine: cfg.machine, last: Date.now() }); changed = true; };
     const thread = prompt => {
       const t = (s.bound && threadById(d, s.thread)) || resolveThread(d, info, { cfg, sid, prevThreadId: s.thread, promptForName: prompt || state.lastPrompt, agent: ag.name, cwd });
       s.thread = t.id; touch(); return t;

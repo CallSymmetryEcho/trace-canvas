@@ -12,7 +12,7 @@ import { mutate, readData } from '../src/store.mjs';
 function sandbox(sid = 's1') {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-live-'));
   const env = { ...process.env, TRACE_CANVAS_HOME: path.join(root, 'home'), TRACE_CANVAS_LANG: 'en', TRACE_CANVAS_DESKTOP_DIR: path.join(root, 'desktop') };
-  delete env.TRACE_CANVAS_DISABLE;
+  delete env.TRACE_CANVAS_DISABLE; delete env.TMUX; delete env.TMUX_PANE; // the tests may run in tmux
   const repo = path.join(root, 'thesis');
   fs.mkdirSync(repo);
   const git = (...a) => execFileSync('git', ['-C', repo, ...a], { stdio: 'pipe', env: { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' } });
@@ -61,6 +61,16 @@ test('a session notes its terminal once: the tty it runs in and the terminal app
   s.env.TERM_PROGRAM = 'other';
   s.fire('UserPromptSubmit', { prompt: 'go on' });
   assert.equal(s.live().term, 'Apple_Terminal');
+});
+
+test('a pane noted before its tty was checked is looked up once more: an iTerm2 tab that inherited TMUX loses it', () => {
+  const s = sandbox();
+  s.env.TERM_PROGRAM = 'iTerm.app'; s.env.TMUX = '/nonexistent/tc-sock,1,0'; s.env.TMUX_PANE = '%0'; // no such server: not its pane
+  s.fire('SessionStart', { source: 'startup' });
+  assert.deepEqual([s.live().pane, s.live().tmuxChecked], ['', true]);
+  updateLive({ session_id: 's1' }, { env: s.env, terminal: { pid: 1, tmux: '/tmp/tmux-501/default', pane: '%0', tmuxChecked: undefined } }); // as older versions wrote it
+  s.fire('UserPromptSubmit', { prompt: 'go on' });
+  assert.deepEqual([s.live().pane, s.live().tmux, s.live().tmuxChecked], ['', '', true]);
 });
 
 test('MCP tools show their short name in the activity line', () => {
@@ -221,11 +231,11 @@ test('a Codex session gets the terminal of its `codex resume` process; others ar
   let asked;
   const ps = (cmd, args) => (asked = args, ['  7 ?? /x/codex app-server --listen unix://', ' 16 ttys016 codex resume 01a17cb7-78a8-7e52-96ac-bba24c5b6922 TERM=xterm TERM_PROGRAM=iTerm.app HOME=/u',
     ' 20 ttys020 codex resume 01a1a88d-812f-7bc1-bc92-f15b98dfd166 TMUX=/tmp/tmux-501/default,123,0 TMUX_PANE=%4 TERM_PROGRAM=tmux', ' 2 ttys002 vim notes'].join('\n'));
-  const m = codexTerminals(ps, 'darwin');
+  const m = codexTerminals(ps, 'darwin', undefined, () => '/dev/ttys020');
   assert.ok(asked.includes('-E'));
   // Linux: ps has no -E (it fails: "unsupported SysV option"); the environment comes from /proc.
   const lps = (cmd, args) => (asked = args, ' 31 pts/3 node /usr/bin/codex resume 01a1a88d-812f-7bc1-bc92-f15b98dfd166\n 32 pts/4 vim x');
-  const lm = codexTerminals(lps, 'linux', pid => (pid === '31' ? 'TERM=xterm\0TERM_PROGRAM=tmux\0TMUX=/tmp/tmux-1000/default,5,0\0TMUX_PANE=%2\0' : ''));
+  const lm = codexTerminals(lps, 'linux', pid => (pid === '31' ? 'TERM=xterm\0TERM_PROGRAM=tmux\0TMUX=/tmp/tmux-1000/default,5,0\0TMUX_PANE=%2\0' : ''), () => '/dev/pts/3');
   assert.ok(!asked.includes('-E'));
   assert.deepEqual([...lm], [['01a1a88d-812f-7bc1-bc92-f15b98dfd166', { tty: '/dev/pts/3', term: 'tmux', tmux: '/tmp/tmux-1000/default', pane: '%2' }]]);
   assert.deepEqual([...m], [['01a17cb7-78a8-7e52-96ac-bba24c5b6922', { tty: '/dev/ttys016', term: 'iTerm.app', tmux: '', pane: '' }],
@@ -241,21 +251,30 @@ test('a Codex session gets the terminal of its `codex resume` process; others ar
 
 test('inside tmux the session keeps its tmux socket and pane', async () => {
   const { tmuxOf } = await import('../src/live.mjs');
-  assert.deepEqual(tmuxOf({ TMUX: '/private/tmp/tmux-501/default,11266,0', TMUX_PANE: '%3' }), { tmux: '/private/tmp/tmux-501/default', pane: '%3' });
-  assert.deepEqual(tmuxOf({ TERM_PROGRAM: 'iTerm.app' }), { tmux: '', pane: '' });
+  const env = { TMUX: '/private/tmp/tmux-501/default,11266,0', TMUX_PANE: '%3' }, asked = [];
+  const paneTty = (socket, pane) => (asked.push([socket, pane]), '/dev/ttys004');
+  assert.deepEqual(tmuxOf(env, '/dev/ttys004', paneTty), { tmux: '/private/tmp/tmux-501/default', pane: '%3' });
+  assert.deepEqual(asked, [['/private/tmp/tmux-501/default', '%3']]);
+  assert.deepEqual(tmuxOf({ TERM_PROGRAM: 'iTerm.app' }, '/dev/ttys004', paneTty), { tmux: '', pane: '' });
+  // An iTerm2 tab whose TMUX came from the pane iTerm2 was started in: that pane has another tty, so not in tmux.
+  assert.deepEqual(tmuxOf(env, '/dev/ttys006', paneTty), { tmux: '', pane: '' });
+  assert.deepEqual(tmuxOf(env, '/dev/ttys004', () => { throw new Error('no server'); }), { tmux: '', pane: '' });
+  assert.deepEqual(tmuxOf(env, '', paneTty), { tmux: '', pane: '' });
 });
 
 test('Go to the terminal in tmux: tmux shows the pane, the attached terminal tab comes forward, else a new tab attaches', async () => {
   const { focusTmux } = await import('../src/agents.mjs');
   const calls = [], clients = { value: '/dev/ttys009\t555\n' };
-  const exec = async (bin, args) => { calls.push(args.slice(2).join(' ')); return args[2] === 'display-message' ? (args[5] === '%3' ? 'work\n' : '') : args[2] === 'list-clients' ? clients.value : ''; };
+  const exec = async (bin, args) => { calls.push(args.slice(2).join(' ')); return args[2] === 'display-message' ? (args[5] === '%3' ? 'work\t/dev/ttys003\n' : '') : args[2] === 'list-clients' ? clients.value : ''; };
   const focused = [], opened = [];
   const opts = { exec, env: async pid => (pid === '555' ? { TERM_PROGRAM: 'iTerm.app' } : {}), focus: async t => { focused.push(t); return true; }, open: async c => { opened.push(c); return null; } };
   assert.equal(await focusTmux({ socket: '/tmp/s', pane: '%3' }, opts), true);
-  assert.deepEqual(calls, ['display-message -p -t %3 #{session_name}', 'select-window -t %3', 'select-pane -t %3', 'list-clients -t work -F #{client_tty}\t#{client_pid}']);
+  assert.deepEqual(calls, ['display-message -p -t %3 #{session_name}\t#{pane_tty}', 'select-window -t %3', 'select-pane -t %3', 'list-clients -t work -F #{client_tty}\t#{client_pid}']);
   assert.deepEqual(focused, [{ tty: '/dev/ttys009', term: 'iTerm.app', tab: '' }]);
   clients.value = '';
   assert.equal(await focusTmux({ socket: '/tmp/s', pane: '%3' }, opts), true);
   assert.match(opened[0], / -S '\/tmp\/s' attach -t 'work'$/);
   assert.equal(await focusTmux({ socket: '/tmp/s', pane: '%9' }, opts), false); // the pane is gone
+  assert.equal(await focusTmux({ socket: '/tmp/s', pane: '%3', tty: '/dev/ttys003' }, opts), true);
+  assert.equal(await focusTmux({ socket: '/tmp/s', pane: '%3', tty: '/dev/ttys006' }, opts), false); // the pane is another program's
 });

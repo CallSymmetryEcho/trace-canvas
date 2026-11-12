@@ -90,7 +90,7 @@ function codexTurnOver(file) {
 // A Codex session's hooks run under its app-server daemon, which has no terminal; the terminal is the one where
 // `codex resume <id>` runs, found by its command line, with its TERM_PROGRAM (ps -E). One scan, only when needed.
 // ponytail: a session started as plain `codex` has no id on its command line and stays without the button.
-export function codexTerminals(run = execFileSync, platform = process.platform, environ = pid => fs.readFileSync(`/proc/${pid}/environ`, 'utf8')) {
+export function codexTerminals(run = execFileSync, platform = process.platform, environ = pid => fs.readFileSync(`/proc/${pid}/environ`, 'utf8'), paneTty = paneTtyOf) {
   const m = new Map(), linux = platform === 'linux'; // Linux's ps has no -E: the environment is in /proc
   try {
     for (const l of run('ps', ['-A', ...(linux ? [] : ['-E']), '-ww', '-o', 'pid=,tty=,command='], { encoding: 'utf8', timeout: 2000, maxBuffer: 32 << 20, stdio: ['ignore', 'pipe', 'ignore'] }).split('\n')) {
@@ -100,7 +100,7 @@ export function codexTerminals(run = execFileSync, platform = process.platform, 
       if (linux) try { env = ' ' + environ(r[1]).split('\0').join(' '); } catch { env = ''; }
       const v = k => (new RegExp(`\\s${k}=(\\S+)`).exec(env) || [])[1] || '';
       r.splice(1, 1); // [line, tty, id] as before
-      if (r && !m.has(r[2])) m.set(r[2], { tty: '/dev/' + r[1], term: v('TERM_PROGRAM'), ...tmuxOf({ TMUX: v('TMUX'), TMUX_PANE: v('TMUX_PANE') }) });
+      if (r && !m.has(r[2])) m.set(r[2], { tty: '/dev/' + r[1], term: v('TERM_PROGRAM'), ...tmuxOf({ TMUX: v('TMUX'), TMUX_PANE: v('TMUX_PANE') }, '/dev/' + r[1], paneTty) });
     }
   } catch {}
   return m;
@@ -116,7 +116,17 @@ export function withCodexTerm(scan = codexTerminals) {
 }
 // Inside tmux the tab is tmux's, not the terminal's: its server's socket and the pane, so the page can switch tmux to
 // the pane and bring forward whichever terminal is attached to it (focusTmux).
-export const tmuxOf = env => (env.TMUX && /^%\d+$/.test(env.TMUX_PANE || '') ? { tmux: String(env.TMUX).split(',')[0], pane: env.TMUX_PANE } : { tmux: '', pane: '' });
+// A program started from a tmux pane hands TMUX and TMUX_PANE on: iTerm2 opened from one gives them to every tab it
+// opens, so those sessions looked to be in that pane and Open in terminal attached to another agent. Only a pane whose
+// tty is the session's own counts.
+export const tmuxBin = (has = p => fs.existsSync(p)) => ['/opt/homebrew/bin/tmux', '/usr/local/bin/tmux', '/usr/bin/tmux'].find(has) || 'tmux';
+const paneTtyOf = (socket, pane) => execFileSync(tmuxBin(), ['-S', socket, 'display-message', '-p', '-t', pane, '#{pane_tty}'], { encoding: 'utf8', timeout: 2000, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+export function tmuxOf(env, tty, paneTty = paneTtyOf) {
+  if (!env.TMUX || !/^%\d+$/.test(env.TMUX_PANE || '')) return { tmux: '', pane: '' };
+  const socket = String(env.TMUX).split(',')[0];
+  let own = ''; try { own = paneTty(socket, env.TMUX_PANE); } catch {}
+  return tty && own === tty ? { tmux: socket, pane: env.TMUX_PANE } : { tmux: '', pane: '' };
+}
 // Running sessions, the ones that need you first, then the busiest. Each carries its subagents.
 export function listLive(env, now = Date.now()) {
   let names = [];
@@ -198,7 +208,7 @@ export function activityOf(rawTool, input = {}) {
  * hook or the nearest ancestor that has one (the agent's), the app (TERM_PROGRAM) and, on Linux, the tab.
  * tty is '' when there is none, as for the desktop apps' sessions.
  */
-export function terminalOf(env = process.env, pid = process.pid) {
+export function terminalOf(env = process.env, pid = process.pid, paneTty = paneTtyOf) {
   const procs = new Map();
   try {
     for (const l of execFileSync('ps', ['-A', '-o', 'pid=,ppid=,tty=,comm='], { encoding: 'utf8', timeout: 2000 }).split('\n')) {
@@ -215,7 +225,7 @@ export function terminalOf(env = process.env, pid = process.pid) {
   // GNOME Terminal and Konsole set no TERM_PROGRAM, but name the tab for their D-Bus interfaces (focusTab).
   const gnome = env.GNOME_TERMINAL_SCREEN, konsole = env.KONSOLE_DBUS_SESSION && [env.KONSOLE_DBUS_SERVICE, env.KONSOLE_DBUS_WINDOW, env.KONSOLE_DBUS_SESSION].join(' ');
   const term = String(env.TERM_PROGRAM || (gnome ? 'gnome-terminal' : konsole ? 'konsole' : ''));
-  return { tty, term, tab: String((term === 'gnome-terminal' && gnome) || (term === 'konsole' && konsole) || ''), pid: agent, ...tmuxOf(env) }; // pid 0: not found, the 12-hour rule applies
+  return { tty, term, tab: String((term === 'gnome-terminal' && gnome) || (term === 'konsole' && konsole) || ''), pid: agent, ...tmuxOf(env, tty, paneTty), tmuxChecked: true }; // pid 0: not found, the 12-hour rule applies
 }
 
 /**

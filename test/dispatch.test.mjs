@@ -265,8 +265,14 @@ test('another machine\'s session in tmux opens by its pane, or for an older reco
   const { execFileSync } = await import('node:child_process');
   const inner = cmd => execFileSync('sh', ['-c', `printf %s ${execFileSync('sh', ['-c', `printf %s ${cmd.replace(/^ssh -t \S+ /, '')}`], { encoding: 'utf8' }).replace(/^exec "\$SHELL" -lc /, '')}`], { encoding: 'utf8' });
   assert.equal(inner(tmuxAttach({ machine: 'bs', term: 'tmux', tty: '/dev/pts/8', tmux: '/tmp/tmux-1000/default', pane: '%0' })),
-    `PATH="$HOME/.local/bin:$PATH"; p='%0'; [ -n "$p" ] && tmux -S '/tmp/tmux-1000/default' has-session -t "$p" 2>/dev/null || { echo 'Its tmux pane is gone.'; exit 1; }; tmux -S '/tmp/tmux-1000/default' select-window -t "$p"; tmux -S '/tmp/tmux-1000/default' select-pane -t "$p"; exec tmux -S '/tmp/tmux-1000/default' attach -t "$p"`);
+    `PATH="$HOME/.local/bin:$PATH"; p='%0'; [ -n "$p" ] && tmux -S '/tmp/tmux-1000/default' has-session -t "$p" 2>/dev/null && [ "$(tmux -S '/tmp/tmux-1000/default' display-message -p -t "$p" '#{pane_tty}')" = '/dev/pts/8' ] || { echo 'It does not run in tmux any more (its pane is gone or is another program).'; exit 1; }; tmux -S '/tmp/tmux-1000/default' select-window -t "$p"; tmux -S '/tmp/tmux-1000/default' select-pane -t "$p"; exec tmux -S '/tmp/tmux-1000/default' attach -t "$p"`);
   assert.match(inner(tmuxAttach({ machine: 'bs', term: 'tmux', tty: '/dev/pts/8' })), /^PATH=.*; p="\$\(tmux list-panes -a -F '#\{pane_tty\} #\{pane_id\}' \| awk '\$1=="\/dev\/pts\/8"\{print \$2\}'\)"; .*exec tmux attach -t "\$p"$/);
+  // Pane %0 now has another tty (a Codex there; this session runs in an iTerm2 tab): it says so, it does not attach.
+  const script = inner(tmuxAttach({ machine: 'mac', term: 'iTerm.app', tty: '/dev/ttys006', tmux: '/tmp/s', pane: '%0' }));
+  const fake = pty => `tmux() { case "$3" in has-session) return 0;; display-message) echo ${pty};; attach) echo ATTACHED;; esac; }; `;
+  const sh = pty => { try { return execFileSync('sh', ['-c', fake(pty) + script.replace('exec tmux', 'tmux')], { encoding: 'utf8' }); } catch (e) { return e.stdout; } };
+  assert.match(sh('/dev/ttys001'), /does not run in tmux any more/);
+  assert.match(sh('/dev/ttys006'), /ATTACHED/);
   assert.equal(tmuxAttach({ machine: 'bs', term: 'iTerm.app', tty: '/dev/ttys001' }), ''); // not in tmux
   assert.equal(tmuxAttach({ machine: 'bs', term: 'tmux', tty: '/dev/pts/8; rm -rf ~' }), ''); // only a real tty goes in
 });

@@ -104,19 +104,34 @@ test('an Antigravity (agy) session is recorded from its own payloads: the first 
   fire('PostToolUse', { toolCall: { name: 'write_file', args: { Path: path.join(s.repo, 'export.js'), Content: 'x' } } });
   fire('PreInvocation', { invocationNum: 1, initialNumSteps: 3 });
   fs.writeFileSync(at.transcriptPath, [{ source: 'MODEL', type: 'PLANNER_RESPONSE', content: 'Working on it.' }, { source: 'MODEL', type: 'GENERIC', content: 'tool output' },
-    { source: 'MODEL', type: 'PLANNER_RESPONSE', content: 'The CSV export is in export.js.' }, { source: 'MODEL', type: 'PLANNER_RESPONSE', tool_calls: [] }].map(e => JSON.stringify(e)).join('\n') + '\n');
+    { source: 'MODEL', type: 'PLANNER_RESPONSE', content: 'The CSV export is in export.js. ' + 'It reads the rows from the table, quotes every field and writes a header line first.' }, { source: 'MODEL', type: 'PLANNER_RESPONSE', tool_calls: [] }].map(e => JSON.stringify(e)).join('\n') + '\n');
   fire('Stop', { terminationReason: 'NO_TOOL_CALL' });
   const live = readLive('ag1', s.env);
   assert.deepEqual([live.agent, live.agentKey, live.resume], ['Antigravity', 'agy', 'agy --conversation ag1']);
   const cs = Object.values(readData(s.env).commits);
   assert.deepEqual(cs.filter(c => c.title === 'Add a CSV export').map(c => c.agent), ['Antigravity']); // once, not per model call
-  assert.ok(cs.some(c => c.kind === 'agent' && c.title === 'The CSV export is in export.js.' && c.agent === 'Antigravity')); // its reply, read from the transcript
-  // A turn where it logged its result itself (trace_log) adds no second record.
-  fire('PreInvocation', { invocationNum: 0, lastUserInput: 'Summarize the video' });
-  fire('PostToolUse', { toolCall: { name: 'call_mcp_tool', args: { ServerName: 'trace-canvas', ToolName: 'trace_log', Arguments: {} } } });
-  fs.appendFileSync(at.transcriptPath, JSON.stringify({ source: 'MODEL', type: 'PLANNER_RESPONSE', content: 'Logged the summary.' }) + '\n');
+  // Its reply (read from the transcript) is the result of the to-do its prompt became, ticked for review; no card of its own.
+  const todo = cs.find(c => c.title === 'Add a CSV export');
+  assert.deepEqual([todo.done, todo.toReview, todo.doneBy, todo.result.slice(0, 31)], [true, true, 'Antigravity', 'The CSV export is in export.js.']);
+  // A long reply: 1500 characters on the to-do, the whole of it in a .md file the to-do links.
+  const long = 'Summary. ' + 'x'.repeat(3000);
+  fire('PreInvocation', { invocationNum: 0, lastUserInput: 'Summarize the video in detail' });
+  fs.appendFileSync(at.transcriptPath, JSON.stringify({ source: 'MODEL', type: 'PLANNER_RESPONSE', content: long }) + '\n');
   fire('Stop', {});
-  assert.ok(!Object.values(readData(s.env).commits).some(c => c.title === 'Logged the summary.'));
+  const sum = Object.values(readData(s.env).commits).find(c => c.title === 'Summarize the video in detail');
+  assert.equal(sum.result.length, 1501);
+  assert.ok(!Object.values(readData(s.env).commits).some(c => c.kind === 'agent' && c.title.startsWith('Summary.'))); // no card of its own
+  assert.equal(fs.readFileSync(sum.links.find(l => l.endsWith('.md')), 'utf8').trim(), long);
+  // Not kept: a turn that logged its result itself (trace_log), or a reply under 100 characters.
+  fire('PreInvocation', { invocationNum: 0, lastUserInput: 'Log the summary yourself' });
+  fire('PostToolUse', { toolCall: { name: 'call_mcp_tool', args: { ServerName: 'trace-canvas', ToolName: 'trace_log', Arguments: {} } } });
+  fs.appendFileSync(at.transcriptPath, JSON.stringify({ source: 'MODEL', type: 'PLANNER_RESPONSE', content: 'Logged. ' + 'y'.repeat(200) }) + '\n');
+  fire('Stop', {});
+  fire('PreInvocation', { invocationNum: 0, lastUserInput: 'What time is it there?' });
+  fs.appendFileSync(at.transcriptPath, JSON.stringify({ source: 'MODEL', type: 'PLANNER_RESPONSE', content: 'Noon.' }) + '\n');
+  fire('Stop', {});
+  const after = Object.values(readData(s.env).commits);
+  assert.ok(!after.some(c => (c.title === 'Log the summary yourself' || c.title === 'What time is it there?') && c.result));
 });
 
 test('agy hooks are one named hook in its hooks.json, others kept, and installing twice changes nothing', () => {

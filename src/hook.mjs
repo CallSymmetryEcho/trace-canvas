@@ -246,10 +246,11 @@ export function handleHook(input, env = process.env) {
       if (person && Object.values(d.threads).some(t => t.autopilot && t.autopilot.session === sid)) { state.apTurn = Date.now(); state.apNudged = 0; }
       // The person speaking to a session Autopilot was turned off in lets it work again (autopilotGate).
       if (person) for (const t of Object.values(d.threads)) if (t.apStopped && t.apStopped.session === sid) { delete t.apStopped; changed = true; }
+      state.turnPrompt = !isCommand && prompt && !handoff && !notTask(prompt) ? prompt : '';
       const log = !isCommand && prompt && !handoff && !notTask(prompt) && (cfg.prompts === 'all' || (cfg.prompts === 'first' && !s.prompted) || (cfg.prompts === 'long' && prompt.length >= 60));
       if (log) {
         const t = thread(prompt);
-        addCommit(d, { thread: t.id, kind: 'task', title: firstLine(prompt, 120), body: prompt.slice(0, 3000), agent: ag.name, links: [ag.resume(sid)], extra: { session: sid, actor: 'human' } });
+        state.turnTask = addCommit(d, { thread: t.id, kind: 'task', title: firstLine(prompt, 120), body: prompt.slice(0, 3000), agent: ag.name, links: [ag.resume(sid)], extra: { session: sid, actor: 'human' } }).id;
         s.prompted = true;
         if (!s.title) s.title = firstLine(prompt, 120);
       }
@@ -286,14 +287,29 @@ export function handleHook(input, env = process.env) {
       const files = state.turnFiles, todos = state.turnTodos;
       const acted = files.length > 0 || (state.turnActions || 0) > 0;
       // Claude Code logs its own results (its skill and the session's context say how). Codex, Gemini and Antigravity
-      // often answer without doing so, so a reply from a turn that logged nothing itself is recorded for them.
-      const own = !!msg && (input._agent || 'claude') !== 'claude' && !state.turnLogged;
-      const log = own || (cfg.turns === 'all' ? !!(msg || acted) : cfg.turns === 'changes' ? acted : false);
+      // often answer without doing so: when such a turn logged nothing itself, its reply becomes the result of the to-do
+      // its prompt became, ticked for the person's review, instead of a card of its own. The first 1500 characters go on
+      // the to-do and the whole reply into a .md file it links (the reader opens it), so data.json stays small. A prompt
+      // that was not a to-do (a command, "ok") or a reply under 100 characters is not kept.
+      const keep = (input._agent || 'claude') !== 'claude' && !state.turnLogged && msg.length >= 100;
+      // Only a session's first prompt is a to-do by default: a later one that got a real answer becomes one now.
+      let task = keep && d.commits[state.turnTask];
+      if (keep && !task && state.turnPrompt) task = addCommit(d, { thread: thread(state.turnPrompt).id, kind: 'task', title: firstLine(state.turnPrompt, 120), body: state.turnPrompt.slice(0, 3000), agent: ag.name, links: [ag.resume(sid)], extra: { session: sid, actor: 'human' } });
+      if (task && !task.done) {
+        task.result = msg.length > 1500 ? msg.slice(0, 1500) + '…' : msg;
+        if (msg.length > 1500) {
+          const file = path.join(home(env), 'replies', `${task.id}.md`);
+          try { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, msg + '\n'); task.links = [...(task.links || []), file]; } catch {}
+        }
+        Object.assign(task, { done: true, doneBy: ag.name, doneAt: Date.now(), toReview: true });
+        changed = true;
+      }
+      const log = cfg.turns === 'all' ? !!(msg || acted) : cfg.turns === 'changes' ? acted : false;
       if (log) {
         const t = thread(state.lastPrompt);
-        addCommit(d, { thread: t.id, kind: 'agent', title: headline(msg) || tr(cfg.lang, 'turnChanged', files.length), body: turnBody(cfg.lang, msg, files, todos, own ? 8000 : 1500), agent: ag.name, links: [ag.resume(sid)], extra: { session: sid, files: files.slice(0, 50) } });
+        addCommit(d, { thread: t.id, kind: 'agent', title: headline(msg) || tr(cfg.lang, 'turnChanged', files.length), body: turnBody(cfg.lang, msg, files, todos), agent: ag.name, links: [ag.resume(sid)], extra: { session: sid, files: files.slice(0, 50) } });
       }
-      state.turnFiles = []; state.turnTodos = []; state.turnActions = 0; state.turnLogged = false;
+      state.turnFiles = []; state.turnTodos = []; state.turnActions = 0; state.turnLogged = false; state.turnTask = ''; state.turnPrompt = '';
     } else if (ev === 'SessionEnd') {
       const th = threadById(d, s.thread), tid = th ? th.id : null;
       if (d.sessions[sid]) { s.last = Date.now(); changed = true; }
@@ -517,8 +533,8 @@ function lineContext(input, env) {
   return `Trace Canvas: you work on the line "${th.name}" (thread ${th.id}). If this message gives a new goal, idea or next step worth tracking, add each one now as a to-do with trace_log (kind "task", thread "${th.id}"), one short title per item; not the request in this message, which you are doing now, nor anything you will finish in this same turn${open.length ? `, and what is already open: ${open.slice(-8).map(c => firstLine(c.title, 60)).join('; ')}` : ''}.${apNote}`;
 }
 
-export function turnBody(lang, msg, files, todos = [], max = 1500) {
-  return [String(msg || '').slice(0, max),
+export function turnBody(lang, msg, files, todos = []) {
+  return [String(msg || '').slice(0, 1500),
     files.length ? `${tr(lang, 'filesLabel')}:\n${files.slice(0, 30).map(f => '- ' + f).join('\n')}${files.length > 30 ? `\n- … +${files.length - 30}` : ''}` : '',
     todos.length ? `${tr(lang, 'todosLabel')}:\n${todos.map(x => '- ' + x).join('\n')}` : ''].filter(Boolean).join('\n\n');
 }

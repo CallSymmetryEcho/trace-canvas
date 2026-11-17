@@ -103,11 +103,20 @@ test('an Antigravity (agy) session is recorded from its own payloads: the first 
   assert.equal(mcp.tool_name, 'mcp__trace-canvas__trace_log'); // the Autopilot gate lets its own tools through
   fire('PostToolUse', { toolCall: { name: 'write_file', args: { Path: path.join(s.repo, 'export.js'), Content: 'x' } } });
   fire('PreInvocation', { invocationNum: 1, initialNumSteps: 3 });
+  fs.writeFileSync(at.transcriptPath, [{ source: 'MODEL', type: 'PLANNER_RESPONSE', content: 'Working on it.' }, { source: 'MODEL', type: 'GENERIC', content: 'tool output' },
+    { source: 'MODEL', type: 'PLANNER_RESPONSE', content: 'The CSV export is in export.js.' }, { source: 'MODEL', type: 'PLANNER_RESPONSE', tool_calls: [] }].map(e => JSON.stringify(e)).join('\n') + '\n');
   fire('Stop', { terminationReason: 'NO_TOOL_CALL' });
   const live = readLive('ag1', s.env);
   assert.deepEqual([live.agent, live.agentKey, live.resume], ['Antigravity', 'agy', 'agy --conversation ag1']);
   const cs = Object.values(readData(s.env).commits);
   assert.deepEqual(cs.filter(c => c.title === 'Add a CSV export').map(c => c.agent), ['Antigravity']); // once, not per model call
+  assert.ok(cs.some(c => c.kind === 'agent' && c.title === 'The CSV export is in export.js.' && c.agent === 'Antigravity')); // its reply, read from the transcript
+  // A turn where it logged its result itself (trace_log) adds no second record.
+  fire('PreInvocation', { invocationNum: 0, lastUserInput: 'Summarize the video' });
+  fire('PostToolUse', { toolCall: { name: 'call_mcp_tool', args: { ServerName: 'trace-canvas', ToolName: 'trace_log', Arguments: {} } } });
+  fs.appendFileSync(at.transcriptPath, JSON.stringify({ source: 'MODEL', type: 'PLANNER_RESPONSE', content: 'Logged the summary.' }) + '\n');
+  fire('Stop', {});
+  assert.ok(!Object.values(readData(s.env).commits).some(c => c.title === 'Logged the summary.'));
 });
 
 test('agy hooks are one named hook in its hooks.json, others kept, and installing twice changes nothing', () => {

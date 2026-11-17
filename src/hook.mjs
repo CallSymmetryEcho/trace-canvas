@@ -258,6 +258,7 @@ export function handleHook(input, env = process.env) {
       if (th && th.history && historyDue(th.id, env)) due = th.id;
     } else if (ev === 'PostToolUse') {
       const tool = input.tool_name, ti = input.tool_input || {}, out = input.tool_response || {};
+      if (/^mcp_+trace-canvas_+trace_(log|task_done)$/.test(String(tool))) state.turnLogged = true;
       if (EDIT_TOOLS.has(tool)) {
         // Codex's apply_patch can touch several files at once (normalize puts them in `files`).
         for (const f of ti.files || [ti.file_path || ti.notebook_path || out.filePath].filter(Boolean)) {
@@ -284,12 +285,15 @@ export function handleHook(input, env = process.env) {
       const msg = String(input.last_assistant_message || '').trim();
       const files = state.turnFiles, todos = state.turnTodos;
       const acted = files.length > 0 || (state.turnActions || 0) > 0;
-      const log = cfg.turns === 'all' ? !!(msg || acted) : cfg.turns === 'changes' ? acted : false;
+      // Claude Code logs its own results (its skill and the session's context say how). Codex, Gemini and Antigravity
+      // often answer without doing so, so a reply from a turn that logged nothing itself is recorded for them.
+      const own = !!msg && (input._agent || 'claude') !== 'claude' && !state.turnLogged;
+      const log = own || (cfg.turns === 'all' ? !!(msg || acted) : cfg.turns === 'changes' ? acted : false);
       if (log) {
         const t = thread(state.lastPrompt);
-        addCommit(d, { thread: t.id, kind: 'agent', title: headline(msg) || tr(cfg.lang, 'turnChanged', files.length), body: turnBody(cfg.lang, msg, files, todos), agent: ag.name, links: [ag.resume(sid)], extra: { session: sid, files: files.slice(0, 50) } });
+        addCommit(d, { thread: t.id, kind: 'agent', title: headline(msg) || tr(cfg.lang, 'turnChanged', files.length), body: turnBody(cfg.lang, msg, files, todos, own ? 8000 : 1500), agent: ag.name, links: [ag.resume(sid)], extra: { session: sid, files: files.slice(0, 50) } });
       }
-      state.turnFiles = []; state.turnTodos = []; state.turnActions = 0;
+      state.turnFiles = []; state.turnTodos = []; state.turnActions = 0; state.turnLogged = false;
     } else if (ev === 'SessionEnd') {
       const th = threadById(d, s.thread), tid = th ? th.id : null;
       if (d.sessions[sid]) { s.last = Date.now(); changed = true; }
@@ -513,8 +517,8 @@ function lineContext(input, env) {
   return `Trace Canvas: you work on the line "${th.name}" (thread ${th.id}). If this message gives a new goal, idea or next step worth tracking, add each one now as a to-do with trace_log (kind "task", thread "${th.id}"), one short title per item; not the request in this message, which you are doing now, nor anything you will finish in this same turn${open.length ? `, and what is already open: ${open.slice(-8).map(c => firstLine(c.title, 60)).join('; ')}` : ''}.${apNote}`;
 }
 
-export function turnBody(lang, msg, files, todos = []) {
-  return [String(msg || '').slice(0, 1500),
+export function turnBody(lang, msg, files, todos = [], max = 1500) {
+  return [String(msg || '').slice(0, max),
     files.length ? `${tr(lang, 'filesLabel')}:\n${files.slice(0, 30).map(f => '- ' + f).join('\n')}${files.length > 30 ? `\n- … +${files.length - 30}` : ''}` : '',
     todos.length ? `${tr(lang, 'todosLabel')}:\n${todos.map(x => '- ' + x).join('\n')}` : ''].filter(Boolean).join('\n\n');
 }

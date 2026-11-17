@@ -243,11 +243,24 @@ function commandOf(c) {
 
 // Antigravity CLI (agy): camelCase fields, a conversationId for the session, PreInvocation before every model call
 // (invocationNum 0 is the person's message) and one toolCall {name, args}. Payloads seen from agy 1.5.9.
+// agy's Stop carries no reply: it is the transcript's last model response with text (JSON lines, newest last).
+function agyReply(file) {
+  try {
+    const st = fs.statSync(file), n = Math.min(st.size, 512 * 1024), buf = Buffer.alloc(n), fd = fs.openSync(file, 'r');
+    try { fs.readSync(fd, buf, 0, n, st.size - n); } finally { fs.closeSync(fd); }
+    for (const line of buf.toString('utf8').split('\n').reverse()) {
+      if (!line.includes('"PLANNER_RESPONSE"')) continue;
+      try { const e = JSON.parse(line); if (e.source === 'MODEL' && e.content) return String(e.content); } catch {} // the first line may be cut
+    }
+  } catch {}
+  return '';
+}
 function fromAgy(out) {
   const ev = out.hookEventName, tc = out.toolCall || {}, a = tc.args || {};
   Object.assign(out, { session_id: out.conversationId, transcript_path: out.transcriptPath, cwd: out.cwd || (out.workspacePaths || [])[0] });
   out.hook_event_name = ev === 'PreInvocation' ? (out.invocationNum === 0 ? 'UserPromptSubmit' : 'PreInvocation') : ev;
   if (out.hook_event_name === 'UserPromptSubmit') out.prompt = out.lastUserInput || '';
+  if (ev === 'Stop') out.last_assistant_message = agyReply(out.transcriptPath);
   if (ev === 'PreToolUse' || ev === 'PostToolUse') {
     const file = a.Path || a.TargetFile || a.AbsolutePath;
     if (tc.name === 'call_mcp_tool') { out.tool_name = `mcp__${a.ServerName}__${a.ToolName}`; out.tool_input = a.Arguments || {}; }

@@ -909,7 +909,7 @@ button.gl-prog[aria-pressed="true"] { color: var(--ink); background: var(--surfa
 .gl-rv-head { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; color: var(--accent); }
 .gl-rv li.rv { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 6px 0; border-top: 0; font-size: 13px; }
 .gl-rv li.rv + li.rv { border-top: 1px solid var(--rule-soft); }
-.gl-res { flex-basis: 100%; font-size: 12px; color: var(--muted); }
+.gl-res { flex-basis: 100%; font-size: 12px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line; } /* an agent's reply as a result can be long: the whole one is in its linked file */
 .gl-rv-acts { display: flex; gap: 6px; }
 .gl-ret-row { display: flex; gap: 6px; flex-basis: 100%; }
 .gl-ret { flex: 1; min-width: 0; padding: 5px 8px; border: 1px solid var(--rule); border-radius: 7px; background: var(--surface-2); }

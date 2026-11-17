@@ -15,7 +15,7 @@ import { lessonsFor } from './lessons.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { dataFile, home, mutate, readConfig, readData, createThread, addCommit, lastCommit, goalOf, hashId, threadById, threadByKey, isTodo, REVIEW_GATE, AUTOPILOT_ASK, AUTOPILOT_WORKER, AUTOPILOT_END, EVOLVE_ROUND } from './store.mjs';
+import { dataFile, home, mutate, readConfig, readData, createThread, addCommit, lastCommit, goalOf, hashId, threadById, threadByKey, isTodo, AUTOPILOT_ASK, AUTOPILOT_WORKER, AUTOPILOT_END, EVOLVE_ROUND } from './store.mjs';
 import { gitEvents, redirectTargets, BASH_WRITES, EDIT_TOOLS, GIT_COMMIT, commandDir, commitMessage, headline, firstLine, cleanPrompt } from './git-events.mjs';
 import { tr } from './i18n.mjs';
 const threadIdOfLocal = (d, c) => (c && c.thread && d.threads[c.thread] ? c.thread : 'inbox');
@@ -463,9 +463,8 @@ export function autopilotStop(input, env = process.env) {
   if (!th) return '';
   const st = loadState(sid, env), ap = th.autopilot, since = Math.max(ap.on || 0, st.apTurn || 0);
   const cs = Object.values(d.commits).filter(c => threadIdOfLocal(d, c) === th.id);
-  // Stopped to ask, or held at the review gate (its prompt says to write the summary there).
+  // Stopped to ask. To-dos waiting for review do not hold it: it clears the line, the person reviews them together.
   if (cs.some(c => c.ts > since && AUTOPILOT_END.test(c.title || ''))) return '';
-  if (cs.filter(c => isTodo(c) && c.done && c.toReview).length >= REVIEW_GATE) return '';
   let reason = '';
   {
     // The to-dos trace_tasks lists (not a session's first instruction), less those it asked about since the person last spoke

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { emptyData, addCommit, createThread } from '../src/store.mjs';
-import { REVIEW_GATE, autopilotPrompt, listTasks, setTaskDone } from '../src/ops.mjs';
+import { autopilotPrompt, listTasks, setTaskDone } from '../src/ops.mjs';
 
 function data() {
   const d = emptyData();
@@ -66,11 +66,11 @@ test('an agent\'s tick waits for review with its result; the person\'s does not;
   assert.equal(row.toReview, undefined);
 });
 
-test('Autopilot is told to stop when ten wait for review, to give a result, and to do a returned to-do first', () => {
+test('Autopilot is told not to stop for to-dos waiting for review, to give a result, and to do a returned to-do first', () => {
   const d = emptyData(), th = createThread(d, { name: 'x' });
   const p = autopilotPrompt(d, th, th.id);
-  assert.equal(REVIEW_GATE, 10);
-  assert.match(p, /toReview: 10 or more, the person reviews first: log the "Autopilot summary" saying so, then stop/);
+  assert.match(p, /waiting for the person's review \(toReview\) do not stop you/);
+  assert.doesNotMatch(p, /reviews first/);
   assert.match(p, /give trace_task_done a result/);
   assert.match(p, /returned: was sent back by the person/);
 });

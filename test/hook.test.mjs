@@ -367,10 +367,10 @@ test('Autopilot under review: a second session does not take a running round, th
   assert.equal(autopilotStop({ session_id: 's1' }, s.env), '');
   s.fire('UserPromptSubmit', { prompt: 'Blue.', prompt_id: 'q9' });
   assert.match(autopilotStop({ session_id: 's1' }, s.env), new RegExp(`next: Pick a colour \\[${a}\\]`));
-  // Ten agent-ticked to-dos waiting for review: it is not pushed on.
+  // Any number of agent-ticked to-dos waiting for review does not hold it: it clears the line first.
   s.fire('UserPromptSubmit', { prompt: 'Go on.', prompt_id: 'q10' });
-  mutate(d => { for (let i = 0; i < 10; i++) { const c = addCommit(d, { thread: tid, kind: 'task', title: `Done ${i}`, ts: now - 4e4 }); c.done = true; c.toReview = true; } }, s.env);
-  assert.equal(autopilotStop({ session_id: 's1' }, s.env), '');
+  mutate(d => { for (let i = 0; i < 30; i++) { const c = addCommit(d, { thread: tid, kind: 'task', title: `Done ${i}`, ts: now - 4e4 }); c.done = true; c.toReview = true; } }, s.env);
+  assert.match(autopilotStop({ session_id: 's1' }, s.env), /next: Pick a colour/);
 });
 
 test('Codex and Gemini take up a round, are pushed on when they stop, and are held at the next tool once Autopilot is off, each in its own hook shape', async () => {

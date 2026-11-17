@@ -99,7 +99,7 @@ const TOOLS = [
     name: 'trace_log',
     title: 'Log one record',
     description: 'Adds one record to a thread (created if the name is new) or to the inbox.',
-    inputSchema: { type: 'object', properties: { title: { type: 'string' }, kind: KIND, thread: { type: 'string' }, body: { type: 'string' }, links: { type: 'array', items: { type: 'string' } }, agent: { type: 'string' }, assignee: { type: 'string', enum: ['claude', 'codex', 'gemini'], description: 'Hand this to-do to an agent (kind defaults to task).' }, on: { type: 'string', description: 'The machine to do this to-do on (as the canvas names machines): dispatch gives it to the latest session on that machine for its line, or starts one there.' }, to: { type: 'string', description: 'A reply for one session, shown to it at the start of its next turn even when its process (and its messaging name) changed meanwhile: its session id, the from= of the cross-session message you answer (the socket path or pid, even if gone), or the id of a record it logged. Use it when SendMessage cannot reach the sender, or alongside it.' } }, required: ['title'] },
+    inputSchema: { type: 'object', properties: { title: { type: 'string' }, kind: KIND, thread: { type: 'string' }, body: { type: 'string' }, links: { type: 'array', items: { type: 'string' } }, agent: { type: 'string' }, assignee: { type: 'string', enum: ['claude', 'codex', 'gemini', 'agy'], description: 'Hand this to-do to an agent (kind defaults to task).' }, on: { type: 'string', description: 'The machine to do this to-do on (as the canvas names machines): dispatch gives it to the latest session on that machine for its line, or starts one there.' }, to: { type: 'string', description: 'A reply for one session, shown to it at the start of its next turn even when its process (and its messaging name) changed meanwhile: its session id, the from= of the cross-session message you answer (the socket path or pid, even if gone), or the id of a record it logged. Use it when SendMessage cannot reach the sender, or alongside it.' } }, required: ['title'] },
     annotations: { readOnlyHint: false, destructiveHint: false },
   },
   {
@@ -127,7 +127,7 @@ const TOOLS = [
     name: 'trace_tasks',
     title: 'Goals and to-dos',
     description: 'Returns the goal and the to-dos of the thread this session works on (or of another thread, or of all), with how many are done. Read it before working on a thread; tick to-dos with trace_task_done when they are finished.',
-    inputSchema: { type: 'object', properties: { thread: { type: 'string', description: 'Thread id or name; omit for the thread this session works on.' }, all: { type: 'boolean', description: 'Every thread instead of this session\'s.' }, include_done: { type: 'boolean', description: 'Also list finished to-dos (default false).' }, mine: { type: 'boolean', description: 'Only the to-dos assigned to you.' }, assignee: { type: 'string', enum: ['claude', 'codex', 'gemini'] } } },
+    inputSchema: { type: 'object', properties: { thread: { type: 'string', description: 'Thread id or name; omit for the thread this session works on.' }, all: { type: 'boolean', description: 'Every thread instead of this session\'s.' }, include_done: { type: 'boolean', description: 'Also list finished to-dos (default false).' }, mine: { type: 'boolean', description: 'Only the to-dos assigned to you.' }, assignee: { type: 'string', enum: ['claude', 'codex', 'gemini', 'agy'] } } },
     annotations: { readOnlyHint: true },
   },
   {

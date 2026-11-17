@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { addCommit, dataFile, ensureThread, home, importText, INBOX, mutate, readConfig, readData, writeConfig } from '../src/store.mjs';
 import { execFileSync } from 'node:child_process';
 import { handleHook, python3, readStdin } from '../src/hook.mjs';
-import { agentFiles, allowSafeTools, codexHooks, codexWritable, geminiHooks, hookCommand, install, installAgentMcp, installMcp, installSkill, linkCommand, onPath, settingsPath, uninstall } from '../src/install.mjs';
+import { agentFiles, agyAllowSafeTools, allowSafeTools, codexHooks, installAgy, codexWritable, geminiHooks, hookCommand, install, installAgentMcp, installMcp, installSkill, linkCommand, onPath, settingsPath, uninstall } from '../src/install.mjs';
 import { normalize } from '../src/agents.mjs';
 import { systemdUnit } from '../src/live.mjs';
 import { doctor, tailscaleSelf } from '../src/doctor.mjs';
@@ -85,7 +85,7 @@ Goals and to-dos
   trace-canvas tasks [--thread T] [--all]          Each thread's goal and open to-dos (--all: finished too)
   trace-canvas done <task> [--thread T] [--agent A] [--undo]
                                                    Tick a to-do by id or title (--undo reopens it)
-  trace-canvas hand <to-do|thread> --to claude|codex|gemini
+  trace-canvas hand <to-do|thread> --to claude|codex|gemini|agy
                                                    Assign it and print the command that starts the agent on it
   trace-canvas autopilot <line> [--stop] [--print]   Autopilot (beta): until you stop it, the line's agent works every open
                                                    to-do by the decision profile and asks only what it must
@@ -199,7 +199,7 @@ async function main() {
         raw = await readStdin();
         if (raw.trim()) {
           const payload = JSON.parse(raw), input = normalize(agent, payload);
-          event = payload.hook_event_name; // the CLI's own name for it, which its output must repeat
+          event = payload.hook_event_name || payload.hookEventName; // the CLI's own name for it, which its output must repeat
           // The switch lit (or let go) here reaches the other machines at once, also where no page server runs (an ssh or tmux box).
           const apSig = input.hook_event_name === 'UserPromptSubmit' && process.env.TRACE_CANVAS_DISABLE !== '1' && (await import('../src/sync.mjs')).autopilotSig;
           const sig0 = apSig && apSig(readData());
@@ -215,18 +215,19 @@ async function main() {
           }
         }
       } catch (e) { outcome = { error: String(e && e.stack || e) }; }
-      if (context) process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } }));
+      // Antigravity takes context as a system message step; any other output from its tool hook would decide the tool.
+      if (context) process.stdout.write(JSON.stringify(agent === 'agy' ? { injectSteps: [{ systemMessage: { systemMessage: context } }] } : { hookSpecificOutput: { hookEventName: event, additionalContext: context } }));
       // Autopilot: an agent that stops while it could go on is handed its next to-do (src/hook.mjs). Claude Code's and
       // Codex's Stop and Gemini's AfterAgent all take {decision: block, reason} and go on with the reason as the next
       // message (not Codex's Interrupt: the person pressed Esc). Codex and Gemini have no second, waiting PreToolUse hook
       // (--gate), so their one tool hook refuses the tool itself: Codex with Claude's answer, Gemini with its own.
       try {
         if (process.env.TRACE_CANVAS_DISABLE !== '1' && raw.trim()) {
-          const { autopilotStop, autopilotGate } = await import('../src/hook.mjs'), p = JSON.parse(raw);
+          const { autopilotStop, autopilotGate } = await import('../src/hook.mjs'), p = agent === 'agy' ? normalize(agent, JSON.parse(raw)) : JSON.parse(raw);
           const stop = (event === 'Stop' || event === 'AfterAgent') && autopilotStop(p);
-          if (stop) process.stdout.write(JSON.stringify({ decision: 'block', reason: stop }));
+          if (stop) process.stdout.write(JSON.stringify({ decision: agent === 'agy' ? 'continue' : 'block', reason: stop }));
           const gate = agent !== 'claude' && (event === 'PreToolUse' || event === 'BeforeTool') && autopilotGate(p);
-          if (gate) process.stdout.write(JSON.stringify(agent === 'gemini' ? { decision: 'deny', reason: gate } : { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: gate } }));
+          if (gate) process.stdout.write(JSON.stringify(agent === 'gemini' || agent === 'agy' ? { decision: 'deny', reason: gate } : { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: gate } }));
         }
       } catch {}
       if (process.env.TRACE_CANVAS_DEBUG) {
@@ -329,7 +330,7 @@ async function main() {
       const { handTo } = await import('../src/ops.mjs');
       const to = str(flag('to', '')), thread = str(flag('thread', ''));
       const ref = argv.join(' ').trim();
-      if (!ref || !to) { console.error('Usage: trace-canvas hand <to-do or thread> --to claude|codex|gemini [--thread T]'); process.exit(1); }
+      if (!ref || !to) { console.error('Usage: trace-canvas hand <to-do or thread> --to claude|codex|gemini|agy [--thread T]'); process.exit(1); }
       const r = mutate(d => handTo(d, { ref, to, thread: thread || undefined }));
       console.error(r.todo ? `"${r.todo.title}" is assigned to ${to}. Run this to start it:` : `Run this to start ${to} on "${r.thread.name}":`);
       console.log(r.command);
@@ -669,13 +670,14 @@ async function main() {
         console.log(`4. This computer is "${machine}"${cfg.map ? `; the canvas syncs through ${cfg.map} with trace-canvas sync` : ''}`);
       }
       // --agents claude,codex,gemini also wires the other CLIs (user scope only); missing ones are skipped.
-      const others = str(flag('agents', '')).split(',').map(x => x.trim()).filter(x => x === 'codex' || x === 'gemini');
+      const others = str(flag('agents', '')).split(',').map(x => x.trim()).filter(x => x === 'codex' || x === 'gemini' || x === 'agy');
       for (const a of s.user ? others : []) {
         if (!onPath(a)) { console.log(`   ${a}: not found on PATH, skipped${a === 'gemini' ? ' (install a current @google/gemini-cli, then run setup again)' : ''}`); continue; }
         const f = agentFiles(os.homedir())[a], cmd = hookCommand(SELF, a);
-        install(f, cmd, a === 'codex' ? codexHooks(cmd) : geminiHooks(cmd));
+        if (a === 'agy') installAgy(f, cmd); else install(f, cmd, a === 'codex' ? codexHooks(cmd) : geminiHooks(cmd));
         const r = installAgentMcp(a, SELF);
         console.log(`   ${a}: hooks in ${f}; MCP ${r.ok ? 'registered' : `not registered, run: ${r.hint}`}`);
+        if (a === 'agy') console.log(`   agy: the Trace Canvas tools that only add records or read are allowed in ${agyAllowSafeTools()}; start a new agy session to load the hooks.`);
         if (a === 'codex') {
           console.log(`   codex: skill installed at ${installSkill(s, SKILL_DIR, 'codex')}; invoke it with $trace-canvas.`);
           const toml = path.join(os.homedir(), '.codex', 'config.toml');

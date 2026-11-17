@@ -19,6 +19,8 @@ export const AGENTS = {
   codex: { name: 'Codex', resume: id => `codex resume ${id}`, wake: (id, p) => `codex resume ${id} ${q(p)}`, launch: p => `codex ${q(p)}` },
   // ponytail: Gemini's resume flag is unverified until a current gemini-cli is installed.
   gemini: { name: 'Gemini CLI', resume: id => `gemini --resume ${id}`, wake: (id, p) => `gemini --resume ${id} -i ${q(p)}`, launch: p => `gemini -i ${q(p)}` },
+  // Antigravity CLI (agy, 1.5): its conversation id is the session id.
+  agy: { name: 'Antigravity', resume: id => `agy --conversation ${id}`, wake: (id, p) => `agy --conversation ${id} -i ${q(p)}`, launch: p => `agy -i ${q(p)}` },
 };
 export const agentOf = key => AGENTS[key] || AGENTS.claude;
 // AppleScript that runs cmd in a new Terminal window and brings it forward (macOS, "Open in Terminal").
@@ -239,12 +241,43 @@ function commandOf(c) {
   return String(i >= 0 && c[i + 1] != null ? c[i + 1] : c.join(' '));
 }
 
+// Antigravity CLI (agy): camelCase fields, a conversationId for the session, PreInvocation before every model call
+// (invocationNum 0 is the person's message) and one toolCall {name, args}. Payloads seen from agy 1.5.9.
+// agy's Stop carries no reply: it is the transcript's last model response with text (JSON lines, newest last).
+function agyReply(file) {
+  try {
+    const st = fs.statSync(file), n = Math.min(st.size, 512 * 1024), buf = Buffer.alloc(n), fd = fs.openSync(file, 'r');
+    try { fs.readSync(fd, buf, 0, n, st.size - n); } finally { fs.closeSync(fd); }
+    for (const line of buf.toString('utf8').split('\n').reverse()) {
+      if (!line.includes('"PLANNER_RESPONSE"')) continue;
+      try { const e = JSON.parse(line); if (e.source === 'MODEL' && e.content) return String(e.content); } catch {} // the first line may be cut
+    }
+  } catch {}
+  return '';
+}
+function fromAgy(out) {
+  const ev = out.hookEventName, tc = out.toolCall || {}, a = tc.args || {};
+  Object.assign(out, { session_id: out.conversationId, transcript_path: out.transcriptPath, cwd: out.cwd || (out.workspacePaths || [])[0] });
+  out.hook_event_name = ev === 'PreInvocation' ? (out.invocationNum === 0 ? 'UserPromptSubmit' : 'PreInvocation') : ev;
+  if (out.hook_event_name === 'UserPromptSubmit') out.prompt = out.lastUserInput || '';
+  if (ev === 'Stop') out.last_assistant_message = agyReply(out.transcriptPath);
+  if (ev === 'PreToolUse' || ev === 'PostToolUse') {
+    const file = a.Path || a.TargetFile || a.AbsolutePath;
+    if (tc.name === 'call_mcp_tool') { out.tool_name = `mcp__${a.ServerName}__${a.ToolName}`; out.tool_input = a.Arguments || {}; }
+    else if (a.CommandLine != null) { out.tool_name = 'Bash'; out.tool_input = { command: String(a.CommandLine) }; }
+    else if (file && /write|edit|replace/.test(tc.name || '')) { out.tool_name = 'Edit'; out.tool_input = { file_path: file }; }
+    else { out.tool_name = tc.name || ''; out.tool_input = a; }
+  }
+  return out;
+}
+
 /** Turns one hook payload from the `key` CLI into the shape handleHook expects; `_agent` says whose it is. */
 export function normalize(key, input) {
   if (!input || typeof input !== 'object') return input;
   const k = AGENTS[key] ? key : 'claude';
   const out = { ...input, _agent: k };
   if (k === 'claude') return out;
+  if (k === 'agy') return fromAgy(out);
   let ev = input.hook_event_name;
   if (k === 'gemini') {
     ev = GEMINI_EVENTS[ev] || ev;

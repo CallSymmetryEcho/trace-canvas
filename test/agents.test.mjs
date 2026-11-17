@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { focusScript, focusTab, normalize, terminalScript } from '../src/agents.mjs';
 import { handleHook, sessionStartContext, sessionThread } from '../src/hook.mjs';
 import { readLive, terminalOf, updateLive } from '../src/live.mjs';
-import { codexHooks, codexWritable, install } from '../src/install.mjs';
+import { codexHooks, codexWritable, install, installAgy } from '../src/install.mjs';
 import { handTo, listTasks } from '../src/ops.mjs';
 import { addCommit, createThread, emptyData, mutate, readData } from '../src/store.mjs';
 
@@ -90,6 +90,36 @@ test('setup puts the data folder on the Codex sandbox writable list, once, where
   codexWritable(f, '/h');
   assert.equal(fs.readFileSync(f, 'utf8'), '[sandbox_workspace_write]\nwritable_roots = ["/h", "/data"]\n');
   assert.ok(fs.existsSync(f + '.bak'));
+});
+
+test('an Antigravity (agy) session is recorded from its own payloads: the first PreInvocation is the prompt, later ones are not', () => {
+  const s = sandbox(), at = { conversationId: 'ag1', cwd: s.repo, transcriptPath: path.join(s.root, 'ag1.jsonl'), lastUserInput: 'Add a CSV export' };
+  const fire = (ev, extra = {}) => handleHook(normalize('agy', { ...at, hookEventName: ev, ...extra }), s.env);
+  fire('SessionStart');
+  fire('PreInvocation', { invocationNum: 0, initialNumSteps: 1 });
+  const run = normalize('agy', { ...at, hookEventName: 'PreToolUse', toolCall: { id: 'c1', name: 'run_command', args: { CommandLine: 'git commit -am "CSV export"' } } });
+  assert.deepEqual([run.session_id, run.tool_name, run.tool_input.command], ['ag1', 'Bash', 'git commit -am "CSV export"']);
+  const mcp = normalize('agy', { ...at, hookEventName: 'PreToolUse', toolCall: { name: 'call_mcp_tool', args: { ServerName: 'trace-canvas', ToolName: 'trace_log', Arguments: {} } } });
+  assert.equal(mcp.tool_name, 'mcp__trace-canvas__trace_log'); // the Autopilot gate lets its own tools through
+  fire('PostToolUse', { toolCall: { name: 'write_file', args: { Path: path.join(s.repo, 'export.js'), Content: 'x' } } });
+  fire('PreInvocation', { invocationNum: 1, initialNumSteps: 3 });
+  fire('Stop', { terminationReason: 'NO_TOOL_CALL' });
+  const live = readLive('ag1', s.env);
+  assert.deepEqual([live.agent, live.agentKey, live.resume], ['Antigravity', 'agy', 'agy --conversation ag1']);
+  const cs = Object.values(readData(s.env).commits);
+  assert.deepEqual(cs.filter(c => c.title === 'Add a CSV export').map(c => c.agent), ['Antigravity']); // once, not per model call
+});
+
+test('agy hooks are one named hook in its hooks.json, others kept, and installing twice changes nothing', () => {
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tc-agy-')), 'hooks.json');
+  fs.writeFileSync(file, JSON.stringify({ 'lint-checker': { PostToolUse: [{ matcher: 'run_command', hooks: [{ command: './lint.sh' }] }] } }));
+  const cmd = 'node "/x/trace-canvas.mjs" hook --agent agy';
+  installAgy(file, cmd); const once = fs.readFileSync(file, 'utf8'); installAgy(file, cmd);
+  assert.equal(fs.readFileSync(file, 'utf8'), once);
+  const h = JSON.parse(once);
+  assert.equal(h['lint-checker'].PostToolUse[0].hooks[0].command, './lint.sh');
+  assert.equal(h['trace-canvas'].SessionStart[0].command, cmd); // flat events list handlers directly
+  assert.equal(h['trace-canvas'].PreToolUse[0].matcher, '*');
 });
 
 test('Codex hooks go after everyone else\'s, in seconds, and installing twice changes nothing', () => {

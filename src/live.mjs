@@ -220,7 +220,7 @@ export function terminalOf(env = process.env, pid = process.pid, paneTty = paneT
   for (let p = pid, n = 0; procs.has(p) && p > 1 && n < 8 && !(tty && agent); p = procs.get(p).ppid, n++) {
     const { tty: t, comm } = procs.get(p);
     if (!tty && /^(ttys?\d+|pts\/\d+)$/.test(t)) tty = '/dev/' + t;
-    if (!agent && /^(claude|codex|gemini)(\s|$)/i.test(path.basename(comm))) agent = p; // "claude bg-spare" for a claude --bg session
+    if (!agent && /^(claude|codex|gemini|agy)(\s|$)/i.test(path.basename(comm))) agent = p; // "claude bg-spare" for a claude --bg session
   }
   // GNOME Terminal and Konsole set no TERM_PROGRAM, but name the tab for their D-Bus interfaces (focusTab).
   const gnome = env.GNOME_TERMINAL_SCREEN, konsole = env.KONSOLE_DBUS_SESSION && [env.KONSOLE_DBUS_SERVICE, env.KONSOLE_DBUS_WINDOW, env.KONSOLE_DBUS_SESSION].join(' ');

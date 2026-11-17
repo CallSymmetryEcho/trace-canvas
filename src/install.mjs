@@ -43,7 +43,31 @@ export function geminiHooks(command) {
     AfterTool: [{ hooks: h() }], Notification: [{ hooks: h() }], SessionEnd: [{ hooks: h(10000) }],
   };
 }
-export const agentFiles = home => ({ codex: path.join(home, '.codex', 'hooks.json'), gemini: path.join(home, '.gemini', 'settings.json') });
+// Antigravity CLI (agy, ~/.gemini/config/hooks.json): one named hook holding every event, timeouts in seconds, and
+// it waits for each one (no async). SessionStart, PreInvocation and Stop list handlers directly; tool events match.
+// agy's own agent may not edit this file (its guardrails), so setup writes it.
+export function agyHooks(command) {
+  const h = (timeout = 5) => [{ type: 'command', command, timeout }];
+  return { SessionStart: h(10), PreInvocation: h(), PreToolUse: [{ matcher: '*', hooks: h() }], PostToolUse: [{ matcher: '*', hooks: h() }], Stop: h(10) };
+}
+export function installAgy(file, command) {
+  const raw = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+  if (raw) fs.writeFileSync(file + '.bak', raw);
+  const s = raw.trim() ? JSON.parse(raw) : {};
+  s['trace-canvas'] = agyHooks(command);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify(s, null, 2) + '\n');
+}
+// agy asks before every MCP tool; the same safe ones as Claude Code's are allowed in its settings (mcp(server/tool)).
+export function agyAllowSafeTools(home = os.homedir()) {
+  const file = path.join(home, '.gemini', 'antigravity-cli', 'settings.json'), s = readSettings(file);
+  s.permissions = s.permissions || {};
+  s.permissions.allow = [...new Set([...(s.permissions.allow || []), ...SAFE_TOOLS.map(t => `mcp(trace-canvas/${t.split('__').pop()})`)])];
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify(s, null, 2) + '\n');
+  return file;
+}
+export const agentFiles = home => ({ codex: path.join(home, '.codex', 'hooks.json'), gemini: path.join(home, '.gemini', 'settings.json'), agy: path.join(home, '.gemini', 'config', 'hooks.json') });
 
 export function settingsPath({ user, project }) {
   if (user) return path.join(os.homedir(), '.claude', 'settings.json');
@@ -114,9 +138,9 @@ export function installAgentMcp(agent, cli, home = os.homedir()) {
     try { execFileSync('codex', ['mcp', 'add', 'trace-canvas', '--env', 'TRACE_CANVAS_AGENT=codex', '--', NODE, cli, 'mcp'], { stdio: 'pipe' }); return { ok: true }; }
     catch (e) { return { ok: false, hint: `codex mcp add trace-canvas --env TRACE_CANVAS_AGENT=codex -- "${NODE}" "${cli}" mcp` }; }
   }
-  const file = agentFiles(home).gemini;
+  const file = agent === 'agy' ? path.join(home, '.gemini', 'config', 'mcp_config.json') : agentFiles(home).gemini;
   const s = fs.existsSync(file) && fs.readFileSync(file, 'utf8').trim() ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
-  s.mcpServers = { ...(s.mcpServers || {}), 'trace-canvas': { command: NODE, args: [cli, 'mcp'], env: { TRACE_CANVAS_AGENT: 'gemini' } } };
+  s.mcpServers = { ...(s.mcpServers || {}), 'trace-canvas': { command: NODE, args: [cli, 'mcp'], env: { TRACE_CANVAS_AGENT: agent } } };
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify(s, null, 2) + '\n');
   return { ok: true };

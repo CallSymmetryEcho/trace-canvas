@@ -63,7 +63,11 @@ test('an agent\'s tick waits for review with its result; the person\'s does not;
   row = listTasks(d, { thread: th.id })[0];
   assert.deepEqual(row.tasks.map(x => x.id), [a.id, c.id]);
   assert.equal(row.tasks[0].returned, 'also fold merged lines');
+  assert.equal(row.tasks[0].returns, undefined); // once: no count
   assert.equal(row.toReview, undefined);
+  // Sent back a third time: the count shows, and the prompt says not to try it again.
+  d.commits[a.id].returned = { at: 9, note: 'still wrong', by: 'Claude Code', n: 3 };
+  assert.equal(listTasks(d, { thread: th.id })[0].tasks[0].returns, 3);
 });
 
 test('Autopilot is told not to stop for to-dos waiting for review, to give a result, and to do a returned to-do first', () => {
@@ -73,4 +77,5 @@ test('Autopilot is told not to stop for to-dos waiting for review, to give a res
   assert.doesNotMatch(p, /reviews first/);
   assert.match(p, /give trace_task_done a result/);
   assert.match(p, /returned: was sent back by the person/);
+  assert.match(p, /returns: 3 or more has failed that often: do not try it again, log its Question/);
 });

@@ -212,6 +212,8 @@ export function ensureThread(d, name) {
 // writes as highlights are to-dos.
 export const isTodo = c => c.kind === 'task' && !(c.session && !c.highlight);
 // An Autopilot agent's question on a to-do it cannot decide, naming the to-do's id: it goes on with the next one.
+// A to-do sent back this many times is not tried again: the agent asks the person how to change it.
+export const RETURN_LIMIT = 3;
 export const AUTOPILOT_ASK = /^(Question|问题)\s*[:：]/i;
 // A to-do an Autopilot agent handed to a subagent of its own (a worker), naming its id: the agent checks and ticks it later.
 export const AUTOPILOT_WORKER = /^(Worker|并行)\s*[:：]/i;

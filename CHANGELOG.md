@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+## 0.3.6 (2026-11-17)
+
+Antigravity joins the agents, Autopilot that keeps improving a line by a measure you give, ticks that show how they were checked, and a History wall that takes in every finished line.
+
+### New
+
+- **Antigravity CLI (agy) works with Trace Canvas.** `trace-canvas setup --user --agents agy` writes its hooks and points its MCP at Trace Canvas; its sessions land on their line, its prompts become to-dos, and to-dos can be handed to it (it resumes with `--conversation`).
+- **An agent's answer is the result of its to-do.** When Codex, Gemini or Antigravity answer without logging, the reply goes on the to-do its prompt became, ticked for your review: the first 1500 characters on the to-do, the whole reply in a linked `.md` the reader opens. Commands, "ok" and replies under 100 characters are not kept.
+- **Autopilot self-iteration (beta).** A fourth step on Autopilot's switch, Self-iterating: when a line's to-dos run out it goes on toward the goal by a measure you give. Each round it measures, sets and does 1–3 to-dos of its own, measures again and keeps or undoes what it changed ("Evolve round N: kept · before → after"), within the rounds and hours you allow; it stops after two rounds that kept nothing, and anything outward still waits for you.
+- **Autopilot reaches Codex and Gemini.** Their Stop / AfterAgent hook hands the agent its next to-do, and their tool hook holds it once Autopilot is off.
+- **Autopilot clears the line before you review.** It no longer pauses when ten ticks wait for review: it does every open to-do, then you review them together.
+- **Ticks carry their evidence.** `trace_task_done` takes `evidence`: how the agent checked it (the test it ran and what it showed, a screenshot) or why it could not. Goals shows it above Pass and Return, or "No check given".
+- **Three returns and it asks.** Each Return is counted (Goals shows ×n); a to-do sent back three times is not tried again: Autopilot asks you how to change it.
+- **Autopilot looks up like cases before it asks.** `trace_precedents` (and `trace-canvas cases`) finds past decisions with their rule, Questions with your answer, and ticks you passed or returned.
+- **What a round cost.** `trace-canvas tokens --thread T` counts each session on the line since its round began, subagents apart, and the Autopilot summary gives those lines.
+- **Replies reach sessions whose process changes every turn** (the Agent SDK, remote terminals): `trace_log` takes `to` and the session gets the reply at its next turn. An Autopilot round left as such a reply is taken up there, whole.
+- **`trace_log` with `on:` dispatches at once**, and says whether it started, resumed, messaged or could not start the agent.
+- **Every finished line reaches History.** A line in a group goes in as soon as it is marked done, under its group's plaque (In progress while others still run, Archived once all are in); a line in no group gets a plaque of its own.
+- **The reader opens `.txt` files** a record links, as written.
+- **Claude Code's Code Mode is recorded** like any session: each tool call of its script reaches the hooks, MCP calls included.
+
+### Fixed
+
+- **Goals stays put.** A redraw no longer slides the list under you, passing a review no longer throws its line out of view, and a half-typed return reason survives a redraw.
+- **Phone and tablet.** The reader's wide tables scroll instead of breaking words; Read opens over the record it came from; Autopilot shows on the Goals card; History opens over Goals; on tablet widths the top bar stays one line.
+- **Other machines.** Dispatch to another machine's tmux no longer reports a failure for an agent that started; Open in a terminal (tmux) attaches to the right agent and resume uses the folder the session started in; on Linux a Codex session's terminal is found again and GNOME Terminal opens every agent as a tab in one window.
+- **Tests no longer rewrite your `trace-canvas` command** (they ran setup with the real PATH).
+
 ## 0.3.5 (2026-11-05)
 
 Autopilot that keeps going and hands work to helpers, reviews for agents' ticks, agents on other machines that outlive the window, and a lighter page on tablets and e-readers.

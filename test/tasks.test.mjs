@@ -54,6 +54,12 @@ test('an agent\'s tick waits for review with its result; the person\'s does not;
   setTaskDone(d, { task: b.id, by: 'human' });
   assert.equal(d.commits[a.id].toReview, true);
   assert.equal(d.commits[a.id].result, 'Commit abc123: folds lines quiet for a day');
+  assert.equal(d.commits[a.id].evidence, undefined); // none given
+  setTaskDone(d, { task: c.id, by: 'Codex', result: 'Added it', evidence: 'npm test: 12 pass' });
+  assert.equal(d.commits[c.id].evidence, 'npm test: 12 pass');
+  setTaskDone(d, { task: c.id, done: false }); setTaskDone(d, { task: c.id, by: 'Codex', result: 'Again' });
+  assert.equal(d.commits[c.id].evidence, undefined); // a new tick does not keep the old check
+  setTaskDone(d, { task: c.id, done: false });
   assert.equal(d.commits[b.id].toReview, undefined);
   let row = listTasks(d, { thread: th.id, includeDone: true })[0];
   assert.equal(row.toReview, 1);
@@ -76,6 +82,7 @@ test('Autopilot is told not to stop for to-dos waiting for review, to give a res
   assert.match(p, /waiting for the person's review \(toReview\) do not stop you/);
   assert.doesNotMatch(p, /reviews first/);
   assert.match(p, /give trace_task_done a result/);
+  assert.match(p, /and evidence: how you checked it works/);
   assert.match(p, /returned: was sent back by the person/);
   assert.match(p, /returns: 3 or more has failed that often: do not try it again, log its Question/);
 });

@@ -395,7 +395,9 @@ body.history-open .hist-btn span { display: inline; }
 .chip-done { background: var(--surface-2); }
 .chip-merged { background: var(--surface-2); }
 .strip { list-style: none; margin: 0; padding: 2px 10px 4px 4px; position: relative; }
-.strip::before { content: ""; position: absolute; left: 14.5px; top: 12px; bottom: 12px; width: 3px; border-radius: 2px; background: var(--c); }
+.strip::before { content: ""; position: absolute; left: 14.5px; top: var(--st-top, 12px); bottom: 12px; width: 3px; border-radius: 2px; background: var(--c); transform-origin: bottom; }
+.st-seg { position: absolute; left: 14.5px; top: 12px; width: 3px; border-radius: 2px; background: var(--c); transform-origin: bottom; pointer-events: none; }
+.st-ripple { position: absolute; left: 5px; top: 50%; width: 12px; height: 12px; margin-top: -6px; border-radius: 50%; border: 2px solid var(--rc); box-sizing: border-box; pointer-events: none; opacity: 0; }
 .is-inbox .strip::before { background: repeating-linear-gradient(to bottom, var(--c) 0 4px, transparent 4px 8px); }
 .strip li { position: relative; display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 6px; padding: 3px 0; border-radius: 6px; cursor: pointer; }
 .strip li:hover .s-title { color: var(--ink); text-decoration: underline; text-decoration-color: var(--faint); text-underline-offset: 2px; }
@@ -2316,7 +2318,8 @@ function renderAll() {
   $('#ex-banner').hidden = !(loaded() && hasExamples());
   $('#clear-ex-item').hidden = !hasExamples();
   menuState();
-  if (S.view === 'canvas') renderCanvas();
+  const fresh = freshRecords();
+  if (S.view === 'canvas') { renderCanvas(); keepMoving(); playFresh(fresh); }
   else if (S.view === 'git') renderGit();
   else if (S.view === 'agents') renderAgents();
   else renderTimeline();
@@ -2363,6 +2366,84 @@ function applyCam() {
   vp.style.backgroundSize = `${24 * z}px ${24 * z}px`;
   vp.style.backgroundPosition = `${x}px ${y}px`;
   $('#zoom-reset').textContent = Math.round(z * 100) + '%';
+}
+/* ---- motion: only transform and opacity, and none under reduced motion or on a touch screen ---- */
+const CALM = matchMedia('(prefers-reduced-motion: reduce), (hover: none)');
+// A spring as a CSS linear() curve (overshoots about 13%, then settles); browsers without linear() get a back-out bezier.
+const SPRING = (s => CSS.supports('transition-timing-function', s) ? s : 'cubic-bezier(.34,1.4,.64,1)')('linear(' + Array.from({ length: 41 }, (_, i) => i === 40 ? 1 : (1 - Math.exp(-7 * i / 40) * Math.cos(11 * i / 40)).toFixed(3)).join(',') + ')');
+const EASE_OUT = 'cubic-bezier(.3,.7,.4,1)';
+// render() rewrites the cards' HTML, which would cut an animation short: each one is kept as how to find
+// (or make) its element, and after every redraw it is put back on the new element at its original start time.
+let moving = [];
+function motion(make, frames, opts, done) {
+  const now = document.timeline.currentTime, m = { make, frames, opts, done, start: now, end: now + (opts.delay || 0) + opts.duration };
+  if (play(m)) moving.push(m);
+}
+function play(m) {
+  const el = m.make(); if (!el) return false;
+  const a = el.animate(m.frames, m.opts);
+  a.startTime = m.start;
+  if (m.done) a.onfinish = () => m.done(el);
+  return true;
+}
+function keepMoving() {
+  const now = document.timeline.currentTime;
+  moving = moving.filter(m => now < m.end && play(m));
+}
+const POP = [{ transform: 'scale(0)' }, { transform: 'scale(1)' }], GROW = [{ transform: 'scaleY(0)' }, { transform: 'scaleY(1)' }];
+const liOf = id => cardsEl.querySelector(`li[data-cid="${CSS.escape(id)}"]`);
+// Records already drawn: a render after a data refresh animates only the ones that arrived since (null until the first load).
+let seenRecs = null;
+function freshRecords() {
+  if (!loaded()) return [];
+  const first = !seenRecs, fresh = first ? null : [...S.commits.keys()].filter(id => !seenRecs.has(id));
+  seenRecs = new Set(S.commits.keys());
+  return fresh; // null: the first draw of this page
+}
+function playFresh(fresh) {
+  if (CALM.matches || (fresh && !fresh.length)) return;
+  if (!fresh) return intro();
+  if (fresh.length > 6) return; // ponytail: a sync that brings a batch at once lands still; one action, one motion
+  for (const id of fresh) if (liOf(id) && S.commits.has(id)) arrive(id, S.commits.get(id));
+}
+// A new station: the line grows to it from the station before, then it springs in with a ripple of its own colour (a decision's is bigger).
+function arrive(id, c) {
+  const li = liOf(id), prev = li.nextElementSibling;
+  let wait = 0;
+  if (li === li.parentElement.firstElementChild && prev && prev.dataset.cid) { grow(id); wait = 300; }
+  motion(() => liOf(id)?.querySelector('.g'), POP, { duration: 420, delay: wait, easing: SPRING, fill: 'backwards' });
+  const big = c.kind === 'decision';
+  motion(() => {
+    const at = liOf(id); if (!at) return null;
+    const r = document.createElement('i');
+    r.className = 'st-ripple';
+    r.style.setProperty('--rc', stationColor(c, getThread(tidOf(c))));
+    return at.appendChild(r);
+  }, [{ transform: 'scale(.6)', opacity: 0 }, { transform: 'scale(1)', opacity: .75, offset: .12 }, { transform: `scale(${big ? 4.2 : 2.6})`, opacity: 0 }],
+  { duration: big ? 820 : 640, delay: wait, easing: 'ease-out', fill: 'both' }, r => r.remove());
+}
+// The strip's bar starts at the station before; a segment draws from it up to the new one, then the bar takes over again.
+function grow(id) {
+  motion(() => {
+    const li = liOf(id), prev = li && li.nextElementSibling; if (!prev) return null;
+    const strip = li.parentElement, bot = prev.offsetTop + prev.offsetHeight / 2;
+    strip.style.setProperty('--st-top', bot + 'px');
+    const seg = document.createElement('i');
+    seg.className = 'st-seg';
+    seg.style.height = Math.max(0, bot - 12) + 'px';
+    return strip.appendChild(seg);
+  }, GROW, { duration: 300, easing: EASE_OUT }, seg => { seg.parentElement?.style.removeProperty('--st-top'); seg.remove(); });
+}
+// The page's first draw: the lines grow in the order they were started, each from its oldest station up, all within a second.
+function intro() {
+  const start = el => getThread(el.dataset.tid).createdAt || 0;
+  const cards = [...cardsEl.children].filter(el => el.querySelector('li[data-cid]')).sort((a, b) => start(a) - start(b));
+  const step = Math.min(60, 450 / Math.max(1, cards.length));
+  cards.forEach((el, i) => {
+    const d = i * step, tid = el.dataset.tid, ids = [...el.querySelectorAll('li[data-cid]')].map(li => li.dataset.cid).reverse();
+    motion(() => cardsEl.querySelector(`.card[data-tid="${CSS.escape(tid)}"] .strip`), GROW, { pseudoElement: '::before', duration: 300, delay: d, easing: EASE_OUT, fill: 'backwards' });
+    ids.forEach((id, j) => motion(() => liOf(id)?.querySelector('.g'), POP, { duration: 240, delay: d + 60 + j * (200 / ids.length), easing: SPRING, fill: 'backwards' }));
+  });
 }
 function selThreadId() {
   if (!S.sel) return null;

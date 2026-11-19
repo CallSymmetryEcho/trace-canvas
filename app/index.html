@@ -916,13 +916,18 @@ body.sheet-open .top { z-index: 80; }
 .gx-bar i { background: var(--ok); } .gx-bar u { background: var(--danger); }
 .gx-quiet { opacity: .6; } .gx-quiet .gx-bar { background: none; }
 .gx-role { margin-left: 6px; padding: 0 5px; border: 1px solid var(--rule); border-radius: 8px; font: 10.5px var(--f-body); font-style: normal; color: var(--muted); }
-.gx-diff { margin: 2px 0 8px; padding: 8px 0; max-height: 380px; overflow: auto; font: 11.5px/1.5 var(--f-mono); background: var(--rule-soft); border-radius: 6px; white-space: pre-wrap; overflow-wrap: anywhere; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
-.gx-diff span { display: block; padding: 0 10px 0 calc(10px + 1.4em); text-indent: -1.4em; } /* a wrapped line hangs under its first row */
+.gx-diff { margin: 2px 0 8px; padding: 0 0 8px; max-height: 380px; overflow: auto; font: 11.5px/1.5 var(--f-mono); background: var(--rule-soft); border-radius: 6px; white-space: pre-wrap; overflow-wrap: anywhere; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+.gx-diff span { display: block; position: relative; padding: 0 10px 0 calc(var(--gw, 0ch) + 18px + 1.4em); text-indent: -1.4em; } /* a wrapped line hangs under its first row */
+.gx-diff span[data-n]::before { content: attr(data-n); position: absolute; left: 6px; width: var(--gw); text-indent: 0; text-align: right; color: var(--muted); opacity: .75; font-variant-numeric: tabular-nums; -webkit-user-select: none; user-select: none; }
+/* Where a hunk is: its scope in bold on a band of its own, then its line. */
+.gx-diff .h { margin: 6px 0 2px; padding: 3px 10px; text-indent: 0; background: var(--accent-soft); border-left: 3px solid var(--accent); font-family: var(--f-mono); }
+.gx-diff .h:first-child { margin-top: 0; }
+.gx-diff .h strong { font-weight: 700; color: var(--ink); margin-right: 8px; } .gx-diff .h u { text-decoration: none; color: var(--muted); font-family: var(--f-body); }
+.gx-diff .x { color: var(--muted); }
 .gx-diff b { font-weight: 600; background: color-mix(in srgb, currentColor 16%, transparent); border-radius: 2px; }
 /* Added and removed lines are a row colour and a bold sign; the code keeps its own colours (hlLine): keyword, string, comment, number.
    Each is at least 4.5:1 on the plain, the added and the removed row of every theme. */
 .gx-diff .a { background: color-mix(in srgb, var(--ok) 15%, transparent); } .gx-diff .d { background: color-mix(in srgb, var(--danger) 13%, transparent); }
-.gx-diff .h { color: var(--muted); }
 .gx-diff em { font-style: normal; font-weight: 700; } .gx-diff i { font-style: normal; }
 .gx-diff .hk { color: var(--hl-k); } .gx-diff .hs { color: var(--hl-s); } .gx-diff .hc { color: var(--hl-c); font-style: italic; } .gx-diff .hn { color: var(--hl-n); }
 :root { --hl-k: #5B21B6; --hl-s: #7C4300; --hl-c: #4F5963; --hl-n: #075580; }
@@ -1370,7 +1375,7 @@ apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent 
     livePrompt: 'Latest instruction', liveThread: 'Thread', liveAuto: 'Automatic (repository and branch)', liveNow: 'Now on',
     liveResume: 'Resume in a terminal', openChat: 'Open the chat', openChatWeb: 'Open on claude.ai', goTerm: 'Go to its terminal', tNoTerm: 'Its terminal tab is no longer open', liveRunning: 'Running now', lineSessions: 'Sessions on this line', loggedIn: 'Logged in',
     gxChanges: 'Changes', gxLoading: 'Reading from git…', gxNoRepo: 'This repository is not on this computer.', gxNoRepoOn: m => `This repository is on ${m}, not on this computer.`, gxNoCommit: 'This commit is no longer in its repository (rewritten or cleaned up).',
-    gxRole_test: 'test', gxRole_doc: 'docs', gxRole_gen: 'generated', gxFiles: n => `${n} file${n === 1 ? '' : 's'}`, gxMore: n => `${n} more`, gxQuiet: n => `${n} binary or generated`, gxBinary: 'binary',
+    gxLine: n => `line ${n}`, gxRole_test: 'test', gxRole_doc: 'docs', gxRole_gen: 'generated', gxFiles: n => `${n} file${n === 1 ? '' : 's'}`, gxMore: n => `${n} more`, gxQuiet: n => `${n} binary or generated`, gxBinary: 'binary',
     gxCompare: 'Compare with', gxThisOnly: 'this commit only', gxOtherRepo: 'That station is in another repository.', gxTruncated: 'Cut at 200 KB.',
     gxLater: 'Committed later in', gxUncommitted: 'Not committed yet.', copyResume: 'Copy resume command', lineSessionsHint: 'Resume one to keep working on this line instead of starting a new session.', liveBadge: (n, w) => `${n} running${w ? `, ${w} need${w === 1 ? 's' : ''} you` : ''}`,
     tBound: n => `Bound to “${n}”`, tUnbound: 'Back to the repository and branch line',
@@ -1552,7 +1557,7 @@ apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的
     livePrompt: '最近的指令', liveThread: '所属线', liveAuto: '自动（按仓库和分支）', liveNow: '当前在',
     liveResume: '在终端里恢复', openChat: '打开对话', openChatWeb: '在 claude.ai 打开', goTerm: '跳到终端', tNoTerm: '它的终端标签页已经关了', liveRunning: '正在运行', lineSessions: '这条线上的会话', loggedIn: '记在这个会话里',
     gxChanges: '改动', gxLoading: '正在从 git 读取…', gxNoRepo: '这台电脑上没有这个仓库。', gxNoRepoOn: m => `这个仓库在 ${m} 上，这台电脑上没有。`, gxNoCommit: '仓库里已经没有这个提交，可能被改写或清理了。',
-    gxRole_test: '测试', gxRole_doc: '文档', gxRole_gen: '生成', gxFiles: n => `${n} 个文件`, gxMore: n => `还有 ${n} 个`, gxQuiet: n => `${n} 个二进制或生成文件`, gxBinary: '二进制',
+    gxLine: n => `第 ${n} 行`, gxRole_test: '测试', gxRole_doc: '文档', gxRole_gen: '生成', gxFiles: n => `${n} 个文件`, gxMore: n => `还有 ${n} 个`, gxQuiet: n => `${n} 个二进制或生成文件`, gxBinary: '二进制',
     gxCompare: '对比', gxThisOnly: '只看这次提交', gxOtherRepo: '那个站点不在同一个仓库。', gxTruncated: '超过 200 KB，已截断。',
     gxLater: '之后提交于', gxUncommitted: '尚未提交。', copyResume: '复制恢复命令', lineSessionsHint: '恢复其中一个就能接着在这条线上做，不用新开会话。', liveBadge: (n, w) => `${n} 个运行中${w ? `，${w} 个等你` : ''}`,
     tBound: n => `已绑定到「${n}」`, tUnbound: '已改回按仓库和分支自动归线',
@@ -3661,10 +3666,18 @@ function diffHTML(r, path) {
   // Code is coloured by its language (hlLine): the file's, or for a page the part the hunk sits in (r.hunks, src/git-view.mjs hunkPlaces).
   // Added and removed lines are told apart by their row's background, so the colours of the code stay free.
   const LONG = 240, AROUND = 60, sign = l => (l[0] === '+' || l[0] === '-' ? l[0] : ''), ext = hlLang(path), mark = l => `<em>${esc(l[0] || ' ')}</em>`;
-  let lang = ext, hk = -1;
-  const out = lines.map(l => {
-    if (l.startsWith('@@')) { hk++; lang = (r.hunks && r.hunks[hk] && r.hunks[hk].lang) || ext; return esc(l); }
+  // Each line carries its number in the file (a removed line its old one), drawn in a gutter by CSS so it is not copied with the code.
+  // A hunk opens with where it is: the function, class, test, CSS rule or heading around it (r.hunks), else git's own guess, and its line.
+  let lang = ext, hk = -1, o = 0, n = 0, wide = 1;
+  const nums = [], out = lines.map((l, i) => {
+    if (l.startsWith('@@')) {
+      const m = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@ ?(.*)$/.exec(l) || [0, 0, 0, ''], at = (r.hunks && r.hunks[++hk]) || {};
+      o = +m[1]; n = +m[2]; lang = at.lang || ext;
+      const scope = at.scope || m[3].trim();
+      return `${scope ? `<strong>${esc(scope.length > 90 ? scope.slice(0, 90) + ' …' : scope)}</strong>` : ''}<u>${esc(t('gxLine', n))}</u>`;
+    }
     if (l[0] === '\\') return esc(l);
+    nums[i] = l[0] === '-' ? o++ : (l[0] === '+' || o++, n++); wide = Math.max(wide, String(nums[i]).length);
     return mark(l) + hlLine(l.length > LONG ? l.slice(1, LONG) : l.slice(1), lang) + (l.length > LONG ? ' …' : '');
   });
   for (let i = 0; i + 1 < lines.length; i++) {
@@ -3677,7 +3690,7 @@ function diffHTML(r, path) {
       return mark(l) + esc((from > 1 ? '… ' : '') + l.slice(from, p)) + `<b>${esc(mid.length > 600 ? mid.slice(0, 600) + ' …' : mid)}</b>` + esc(l.slice(end, to) + (to < l.length ? ' …' : '')); };
     out[i] = cut(a); out[i + 1] = cut(b); i++;
   }
-  return `<pre class="gx-diff">${lines.map((l, i) => `<span class="${l[0] === '+' ? 'a' : l[0] === '-' ? 'd' : l.startsWith('@@') || l[0] === '\\' ? 'h' : ''}">${out[i] || ' '}</span>`).join('')}</pre>${r.truncated ? `<p class="gx-note">${esc(t('gxTruncated'))}</p>` : ''}`;
+  return `<pre class="gx-diff" style="--gw:${wide}ch">${lines.map((l, i) => `<span class="${l[0] === '+' ? 'a' : l[0] === '-' ? 'd' : l.startsWith('@@') ? 'h' : l[0] === '\\' ? 'x' : ''}"${nums[i] ? ` data-n="${nums[i]}"` : ''}>${out[i] || ' '}</span>`).join('')}</pre>${r.truncated ? `<p class="gx-note">${esc(t('gxTruncated'))}</p>` : ''}`;
 }
 function changesHTML(c) {
   if (S.mode !== 'server') return '';

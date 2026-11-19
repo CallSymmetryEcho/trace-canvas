@@ -106,7 +106,8 @@ const JS_SCOPE = [
   [/^(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s*\*?\s*([\w$]+)/, m => `function ${m[1]}`],
   [/^(?:export\s+)?(?:default\s+)?class\s+([\w$]+)/, m => `class ${m[1]}`],
   [/^(?:test|it|describe)\(\s*(['"`])(.+?)\1/, m => `test: ${m[2]}`],
-  [/^(?:export\s+)?(?:const|let|var)\s+([\w$]+)\s*=/, m => m[1]],
+  // A name given to a function, or to an object or list written over several lines; any other assignment is just a statement.
+  [/^(?:export\s+)?(?:const|let|var)\s+([\w$]+)\s*=\s*(?:(?:async\s+)?function\b|(?:async\s*)?(?:\([^)]*\)|[\w$]+)\s*=>|[[{]\s*$)/, m => m[1]],
   [/^([\w$]+)\s*:\s*(?:async\s+)?(?:function\b|\([^)]*\)\s*=>|[\w$]+\s*=>)/, m => m[1]],
   [/^(?:static\s+|async\s+|get\s+|set\s+)*([\w$]+)\s*\([^)]*\)\s*\{\s*$/, m => (/^(if|for|while|switch|catch|function|return|with)$/.test(m[1]) ? null : `${m[1]}()`)],
 ];

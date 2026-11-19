@@ -139,6 +139,8 @@ test('each hunk of a diff is placed in its file: the language of that part of a 
   assert.deepEqual(at(16), { lang: 'js', scope: 'function draw' });      // through the if, to the function
   assert.deepEqual(at(21), { lang: 'js', scope: 'render()' });
   assert.deepEqual(at(24), { lang: 'js', scope: null });                 // a top-level statement has no scope
+  const fn = "const TOOLS = [\n  {\n    name: 'x',\n  },\n];\nfunction call(a) {\n  const c = mutate(d => {\n    d.x = 1;\n  });\n}\nconst pick = (a) => {\n  return a;\n};\n";
+  assert.deepEqual([3, 8, 12].map(n => at(n, 'src/mcp.mjs', fn).scope), ['TOOLS', 'function call', 'pick']); // a plain assignment on the way up is not a scope
   assert.equal(at(2, 'a.py', 'class A:\n    def run(self):\n        x = 1\n        return x\n').scope, 'def run');
   assert.equal(at(4, 'README.md', '# Title\n\n## Install\ntext\n').scope, 'Install');
   assert.equal(at(3, 't.test.mjs', "test('adds up', () => {\n  const a = 1;\n  assert.equal(a, 1);\n});\n").scope, 'test: adds up');

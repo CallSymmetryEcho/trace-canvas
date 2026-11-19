@@ -543,7 +543,12 @@ async function main() {
       if (!behind) { console.log(`Up to date (${before}).`); break; }
       const news = git('log', '--oneline', '--no-merges', '-20', 'HEAD..@{u}');
       if (check) { console.log(`${behind} new commit${behind === 1 ? '' : 's'}:\n${news}\nGet them with: trace-canvas update`); break; }
-      try { git('merge', '--ff-only', '-q', '@{u}'); } catch (e) { console.error(`Could not update: ${why(e)}`); process.exit(1); }
+      try { git('merge', '--ff-only', '-q', '@{u}'); } catch (e) {
+        // git's last line is only "Aborting": name the files in the way instead.
+        const files = String((e && e.stderr) || '').split('\n').filter(l => l.startsWith('\t')).map(l => l.trim());
+        console.error(files.length ? `Could not update: local changes in ${files.join(', ')} are in the way (commit or stash them, then update again)` : `Could not update: ${why(e)}`);
+        process.exit(1);
+      }
       console.log(`Updated ${before} → ${git('rev-parse', '--short', 'HEAD')}:\n${news}`);
       for (const d of [path.join(os.homedir(), '.claude', 'skills', 'trace-canvas'), path.join(os.homedir(), '.agents', 'skills', 'trace-canvas')]) {
         try { if (!fs.lstatSync(d).isSymbolicLink()) fs.copyFileSync(path.join(root, 'skill', 'SKILL.md'), path.join(d, 'SKILL.md')); } catch {}

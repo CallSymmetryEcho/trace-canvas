@@ -405,8 +405,8 @@ body.history-open .hist-btn span { display: inline; }
 .strip li.is-sel::after { content: ""; position: absolute; left: 5px; top: 50%; width: 12px; height: 12px; margin-top: -6px; border-radius: 50%; border: 2px solid var(--c); box-sizing: border-box; pointer-events: none; animation: st-breathe 2.4s ease-in-out var(--ph, 0s) infinite; }
 @keyframes st-breathe { 0%, 100% { transform: scale(1.15); opacity: .55; } 50% { transform: scale(1.7); opacity: .12; } }
 @media (prefers-reduced-motion: reduce), (hover: none) { .strip::before { transition: none; } .strip li.is-sel::after { animation: none; transform: scale(1.3); opacity: .4; } }
-.far .strip li:not(.key):not(.is-sel) .s-title, .far .strip li:not(.key):not(.is-sel) .s-time, .far .strip .s-more, .far .card-foot { opacity: 0; }
-.far .strip li:not(.key):not(.is-sel) .g { opacity: .4; }
+.far .strip li:not(.key):not(.is-sel):not(:first-child) .s-title, .far .strip li:not(.key):not(.is-sel):not(:first-child) .s-time, .far .strip .s-more, .far .card-foot { opacity: 0; }
+.far .strip li:not(.key):not(.is-sel):not(:first-child) .g { opacity: .4; }
 @media (prefers-reduced-motion: reduce) { .strip li .s-title, .strip li .s-time, .strip li .g, .strip .s-more, .card-foot { transition: none; } }
 .strip li[data-cid]:active .g { transform: scale(.82); }
 /* a line with a session working on it: a point of light runs slowly up to its head (instead of the badge blinking) */
@@ -1253,7 +1253,7 @@ const I18N = {
     focusNoGroups: 'No groups yet. Select lines on the canvas and press Group, or fill in a group in a line\'s panel.', groupUngroup: 'Ungroup',
     threadGroup: 'Group', threadGroupPh: 'None', multiGroup: 'Group', multiGroupPh: 'Group name', tGroupNeedName: 'Type a group name first',
     tGrouped: (n, g) => `${n} line${n === 1 ? '' : 's'} in "${g}"`, tUngrouped: 'Group dissolved; the lines stay',
-    menuSync: 'Sync with other machines', menuAway: on => `Other machines' sessions: ${on ? 'shown' : 'off'}`, menuUpdate: n => `Update to the newest version (${n} new)`, tUpdating: 'Updating… the page reloads in a moment', tUpdateHere: 'Run trace-canvas update on the computer that runs the canvas', menuAwayGit: on => `Other machines' changes: ${on ? 'read over ssh' : 'off'}`, tAwayGit: on => on ? 'A commit made on another machine, with no clone here, is read from that machine over ssh' : 'Other machines\' changes are no longer read over ssh', tAway: on => on ? 'The live bar now shows sessions running on your other machines (read over ssh every 15 s)' : 'Other machines\' sessions are off', menuPhone: 'Open on your phone', phoneTitle: 'Open on your phone',
+    menuSync: 'Sync with other machines', menuAway: on => `Other machines' sessions: ${on ? 'shown' : 'off'}`, menuUpdate: n => `Update to the newest version (${n} new)`, tUpdating: 'Updating… the page reloads in a moment', tUpdateFail: e => `Not updated: ${e}`, tUpdateHere: 'Run trace-canvas update on the computer that runs the canvas', menuAwayGit: on => `Other machines' changes: ${on ? 'read over ssh' : 'off'}`, tAwayGit: on => on ? 'A commit made on another machine, with no clone here, is read from that machine over ssh' : 'Other machines\' changes are no longer read over ssh', tAway: on => on ? 'The live bar now shows sessions running on your other machines (read over ssh every 15 s)' : 'Other machines\' sessions are off', menuPhone: 'Open on your phone', phoneTitle: 'Open on your phone',
     phoneIntro: 'Scan this with the phone camera. The phone needs Tailscale, signed in to the same account as this computer. The address carries a key: keep it to yourself.',
     phoneAfter: 'On the phone you can read every line, add ideas and to-dos with the box at the bottom (pick a line, or start with #line name), and copy a prompt for an agent from a line\'s panel.',
     start: '▶ Start', startTitle: 'Start a Claude Code session on this line on your computer, with Remote Control on, so you can follow and approve it in the Claude app', startShow: 'Show it',
@@ -1436,7 +1436,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     focusNoGroups: '还没有分组。在画布上选中几条线点「编组」，或者在线面板里填写分组。', groupUngroup: '解散分组',
     threadGroup: '分组', threadGroupPh: '无', multiGroup: '编组', multiGroupPh: '分组名称', tGroupNeedName: '先填分组名称',
     tGrouped: (n, g) => `${n} 条线已放进「${g}」`, tUngrouped: '分组已解散，线都还在',
-    menuSync: '和其他电脑同步', menuAway: on => `其他电脑的会话：${on ? '显示中' : '已关闭'}`, menuUpdate: n => `更新到最新版（${n} 个新改动）`, tUpdating: '正在更新，页面一会儿会自己刷新', tUpdateHere: '在运行画布的那台电脑上执行 trace-canvas update', menuAwayGit: on => `其他电脑的提交改动：${on ? '通过 ssh 读取' : '已关闭'}`, tAwayGit: on => on ? '这台电脑上没有克隆的提交，会通过 ssh 到它所在的电脑上读改动' : '不再通过 ssh 读其他电脑的提交改动', tAway: on => on ? '实时栏会显示其他电脑上正在跑的会话（每 15 秒通过 ssh 读一次）' : '已关闭其他电脑的会话', menuPhone: '在手机上打开', phoneTitle: '在手机上打开',
+    menuSync: '和其他电脑同步', menuAway: on => `其他电脑的会话：${on ? '显示中' : '已关闭'}`, menuUpdate: n => `更新到最新版（${n} 个新改动）`, tUpdating: '正在更新，页面一会儿会自己刷新', tUpdateFail: e => `没有更新：${e}`, tUpdateHere: '在运行画布的那台电脑上执行 trace-canvas update', menuAwayGit: on => `其他电脑的提交改动：${on ? '通过 ssh 读取' : '已关闭'}`, tAwayGit: on => on ? '这台电脑上没有克隆的提交，会通过 ssh 到它所在的电脑上读改动' : '不再通过 ssh 读其他电脑的提交改动', tAway: on => on ? '实时栏会显示其他电脑上正在跑的会话（每 15 秒通过 ssh 读一次）' : '已关闭其他电脑的会话', menuPhone: '在手机上打开', phoneTitle: '在手机上打开',
     phoneIntro: '用手机相机扫这个二维码。手机要装 Tailscale，并登录和这台电脑相同的账号。地址里带着密钥，不要发给别人。',
     phoneAfter: '在手机上可以看每条线，用底部的输入框加想法和待办（选一条线，或者以 #线名 开头），也可以在线的面板里复制一段给 agent 的提示。',
     start: '▶ 开始', startTitle: '在电脑上为这条线开一个 Claude Code 会话（开着 Remote Control），在 Claude app 里就能跟进和批准', startShow: '查看',
@@ -2416,7 +2416,7 @@ function applyCam() {
   world.style.transform = `translate(${x}px, ${y}px) scale(${z})`;
   vp.style.backgroundSize = `${24 * z}px ${24 * z}px`;
   vp.style.backgroundPosition = `${x * 0.85}px ${y * 0.85}px`; // the grid lags the cards a little: a hint of depth
-  vp.classList.toggle('far', z < 0.5); // zoomed out to the whole map: only the lines and the key stations keep their words
+  vp.classList.toggle('far', z < 0.3); // zoomed far out: the lines, each card's latest record and the key stations keep their words (Fit often lands at 40-50%, where every title stays)
   $('#zoom-reset').textContent = Math.round(z * 100) + '%';
 }
 /* ---- motion: only transform and opacity, and none under reduced motion or on a touch screen ---- */
@@ -4440,7 +4440,8 @@ menu.addEventListener('click', e => {
   else if (k === 'sync') { if (syncTrouble().length) openSheet('sync'); else syncNow(); }
   else if (k === 'update') {
     if (S.remote) { toast(t('tUpdateHere')); return; }
-    postJSON('/api/update', {}).then(r => { if (r.error) return toast(r.error); toast(t('tUpdating')); setTimeout(() => location.reload(), 6000); });
+    toast(t('tUpdating'));
+    postJSON('/api/update', {}).then(r => { if (r.failed) return toast(t('tUpdateFail', r.error)); setTimeout(() => location.reload(), 4000); }); // no answer: the server is restarting
   }
   else if (k === 'away') {
     S.awayLive = !S.awayLive; menuState(); menu.hidden = false;

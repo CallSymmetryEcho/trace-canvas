@@ -267,7 +267,14 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         return send(res, 200, failed ? { error: failed, command: r.command } : { ok: true, name: r.thread.name });
       }
       // Update: trace-canvas update pulls the newest version and restarts this server; the page reloads after it.
-      if (req.method === 'POST' && p === '/api/update') { spawn(process.execPath, [CLI, 'update'], { detached: true, stdio: 'ignore' }).unref(); return send(res, 200, { ok: true }); }
+      // A refused update (local changes in the way, no network) exits at once with its reason, which the page shows; a good one
+      // restarts this server, so the answer never comes and the page reloads. Its output goes to a file so it outlives this server.
+      if (req.method === 'POST' && p === '/api/update') {
+        const log = path.join(home(), 'update.log'), fd = fs.openSync(log, 'w');
+        const ch = spawn(process.execPath, [CLI, 'update'], { detached: true, stdio: ['ignore', fd, fd] }); fs.closeSync(fd); ch.unref();
+        ch.on('exit', code => { if (res.writableEnded) return; if (!code) return send(res, 200, { ok: true }); let why = ''; try { why = fs.readFileSync(log, 'utf8').trim().split('\n').pop(); } catch {} send(res, 500, { error: why.replace(/^Could not update: /, ''), failed: true }); });
+        return;
+      }
       if (req.method === 'GET' && p === '/api/doctor') return send(res, 200, { checks: remote ? [] : doctor() });
       if (req.method === 'POST' && p === '/api/sync') { const r = runSync(); broadcast('change'); return send(res, 200, r); }
       if (req.method === 'POST' && p === '/api/bind') {

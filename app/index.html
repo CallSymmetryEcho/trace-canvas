@@ -245,7 +245,7 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .hist-btn { display: inline-flex; align-items: center; gap: 6px; border-color: color-mix(in srgb, var(--ok) 30%, var(--rule)); background: linear-gradient(135deg, var(--surface), color-mix(in srgb, var(--ok) 9%, var(--surface))); }
 .hist-btn svg { flex: none; }
 /* In History the workspace's own controls go: views, search, goals, the capture bar; the button reads "back to the workspace". */
-body.history-open .tabs, body.history-open .search, body.history-open #goals-btn, body.history-open #sync, body.history-open #ex-banner, body.history-open .capture { display: none !important; }
+body.history-open .tabs, body.history-open .search, body.history-open #goals-btn, body.history-open #rs-new-btn, body.history-open #sync, body.history-open #ex-banner, body.history-open .capture { display: none !important; }
 body.history-open .hist-btn span { display: inline; }
 .hist-btn[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .history { --h-glass: color-mix(in srgb, var(--surface) 32%, transparent); --h-edge: color-mix(in srgb, #fff 62%, transparent); --h-hi: rgba(255,255,255,.8); --h-sheen: rgba(255,255,255,.5);
@@ -479,6 +479,47 @@ body.history-open .hist-btn span { display: inline; }
 .g-row:hover { background: var(--surface-2); }
 .g-row.is-sel { background: var(--accent-soft); }
 .g-row.is-dim { opacity: .35; }
+.star { color: #e0a800; margin-right: 4px; }
+.rs-chip { font-size: 11px; padding: 0 5px; margin-right: 5px; border-radius: 4px; border: 1px solid var(--ok); color: var(--ok); }
+.rs .rs-q { font-size: 15px; font-weight: 600; margin: 2px 0 10px; }
+.rs .rs-c { margin: 2px 0 10px; padding: 6px 10px; border-left: 3px solid var(--ok); }
+.rs-more > summary { cursor: pointer; font-weight: 600; margin: 6px 0; }
+.rs-tab { width: 100%; border-collapse: collapse; font-size: 12.5px; margin: 4px 0 10px; }
+.rs-tab td, .rs-tab th { border-top: 1px solid var(--rule-soft); padding: 5px 6px; vertical-align: top; text-align: left; }
+.rs-st { font-size: 12px; color: var(--muted); }
+.rs-st.rs-stopped { color: var(--danger, #c0392b); }
+.rs-pts { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+.rs-steps { padding-left: 20px; margin: 6px 0; }
+.rs-steps > li { margin: 0 0 12px; }
+.rs-h { font-weight: 600; margin-bottom: 4px; }
+.rs-fig { max-width: 100%; border: 1px solid var(--rule-soft); background: #fff; }
+.rs-frame { width: 192px; image-rendering: pixelated; border: 1px solid var(--rule-soft); }
+.rs-code { font-size: 12px; overflow-x: auto; background: var(--rule-soft); padding: 6px 8px; border-radius: 6px; white-space: pre; }
+.rs-code .hit { background: color-mix(in srgb, var(--ok) 25%, transparent); display: inline-block; min-width: 100%; }
+.rs-todo { color: var(--muted); font-style: italic; border-left: 3px solid var(--muted); padding-left: 8px; }
+.rs-ref { margin: 4px 0 8px; font-size: 13px; }
+.rs-calc { font-size: 12.5px; word-break: break-all; }
+.rs-run { border: 1px solid var(--rule-soft); border-radius: 8px; padding: 8px 10px; margin: 8px 0; font-size: 13px; }
+.rs-run-h { margin-bottom: 4px; }
+.rs-chip2 { font-size: 11.5px; padding: 1px 6px; border-radius: 9px; border: 1px solid var(--muted); color: var(--muted); white-space: nowrap; }
+.rs-s-running, .rs-s-submitted { border-color: var(--accent); color: var(--accent); }
+.rs-s-delivered { border-color: var(--ok); color: var(--ok); }
+.rs-s-failed, .rs-s-stopped { border-color: #c0392b; color: #c0392b; }
+.rs-s-waiting { border-color: #e0a800; color: #b58900; }
+.rs-final { max-height: 260px; overflow: auto; border-left: 3px solid var(--ok); padding-left: 8px; }
+.rs-ctl { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
+.rs-manual { border-top: 1px dashed var(--rule-soft); margin-top: 6px; padding-top: 6px; }
+.rs-sum { font-size: 13px; }
+.rs-wb { display: flex; gap: 8px; align-items: flex-start; padding: 6px 0; border-top: 1px solid var(--rule-soft); }
+.rs-wb small { display: block; color: var(--muted); }
+.fld .rs-wb input { width: auto; min-height: 0; flex: none; margin: 3px 0 0; padding: 0; border: 0; }
+.rs-drop { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 6px; padding: 8px; border: 1px dashed var(--rule); border-radius: 8px; font-size: 12.5px; color: var(--muted); }
+.rs-drop.over { border-color: var(--accent); color: var(--accent); }
+.rs-wb > span { flex: 1; min-width: 0; text-align: left; }
+.rs-wb.off { opacity: .65; }
+.rs-tag { font-size: 11px; border: 1px solid var(--muted); border-radius: 4px; padding: 0 4px; color: var(--muted); }
+.d-star { margin-left: auto; font-size: 20px; color: var(--muted); }
+.d-star.on { color: #e0a800; }
 .g-title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .g-row.k-fork .g-title, .g-row.k-merge .g-title { color: var(--muted); font-style: italic; }
 .g-row.done .g-title { text-decoration: line-through; text-decoration-color: var(--faint); color: var(--muted); }
@@ -986,6 +1027,7 @@ button.gl-prog[aria-pressed="true"] { color: var(--ink); background: var(--surfa
       <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="2" fill="none"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       <input id="q" type="search" data-i18n-ph="searchPh" autocomplete="off">
     </label>
+    <button class="btn" id="rs-new-btn" hidden data-i18n="rsNewBtn" data-i18n-title="rsNewTitle">New question</button>
     <button class="btn" id="goals-btn" data-i18n="goalsBtn" data-i18n-title="goalsBtnTitle">Goals</button>
     <button class="btn hist-btn" id="hist-btn" aria-pressed="false" data-i18n-title="histTitle"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.6" fill="none" stroke="var(--ok)" stroke-width="2.6"/><path d="M5.6 8.1l1.7 1.7 3.1-3.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="hist-label" data-i18n="histBtn">History</span></button>
     <div class="menu-wrap">
@@ -1212,7 +1254,7 @@ apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent 
     dayLabel: d => `${I18N.en.week[d.getDay()]} ${d.getMonth() + 1}/${d.getDate()}`,
     monthLabel: d => `${I18N.en.months[d.getMonth()]} ${d.getFullYear()}`,
     tickDay: d => `${I18N.en.week[d.getDay()]} ${d.getDate()}`,
-    dRecord: 'Record', dTitle: 'Title', dKind: 'Type', dThread: 'Thread', dDone: 'Done', openTmux: 'Open in a terminal (tmux)', dBody: 'Details', mdEdit: 'Edit', mdDone: 'Done', mdExpand: 'Read', mdRead: 'Read', mdErr_missing: 'This file is not on this computer: it may have been moved or renamed, or it is on another machine.', mdErr_big: 'This file is over 2 MB.', mdErr_unlinked: 'No record links this file.', mdErr_type: 'Only .md and .txt files open here.', mdView: 'View', mdErr_bigImg: 'This image is over 10 MB.', dBodyPh: 'Context, a summary of what the agent produced, next steps…',
+    dRecord: 'Record', dTitle: 'Title', dKind: 'Type', dThread: 'Thread', dDone: 'Done', rsNewBtn: 'New question', rsPick: 'Choose files…', rsDrop: 'or drop files here; they are copied to this computer and their paths added above', rsUploading: n => `Uploading ${n} file${n === 1 ? '' : 's'}…`, rsWbFail: 'Could not load the workbench list.', rsRetry: 'Try again', rsNewTitle: 'Write a research question and run it in a workbench', rsNewHead: 'New question card', rsNewP: 'One research question is enough; input files are optional.', rsQ: 'Research question (say which deliverables you want, if any)', rsQPh: 'e.g. After the light spot moves, does one bright region pass the midpoint, or does the old one fade while a new one brightens?', rsLine: 'Line', rsInputs: 'Input files (optional, one local path per line)', rsBench: 'Workbench', rsWhen: 'Save only: makes the card and freezes the question and inputs as version 1 (with their SHA-256); nothing runs. Save and run: freezes it, then runs it once in the chosen workbench. A version runs once; for a comparison, press Add an independent control on the card: it runs the same version and hash again, on its own.', rsWhenCard: 'Runs the frozen version once in the chosen workbench; its state, session and result come back here.', rsSaveRun: n => `Save and run once in ${n}`, rsSavePrep: n => `Save and prepare the ${n} package`, rsSaveOnly: 'Save only, do not run', rsModelIs: m => `Model: ${m}`, rsManualTag2: 'by hand', rsManualTag: 'entered by hand', rsUnavailable: 'unavailable', wbName_codex: 'Codex CLI', wbName_claude: 'Claude Code', 'wbName_claude-science': 'Claude Science', wbName_openscience: 'OpenScience native agent', wbWhere_codex: 'Runs codex exec in the background on this computer, on your Codex subscription; writes only its own run folder.', wbWhere_claude: 'Runs claude -p in the background on this computer, on your Claude subscription; edits files in its run folder, searches the web, runs python.', 'wbWhere_claude-science': 'The web workbench on this computer, by hand: the card prepares the package; you start the session in Claude Science and bring its link and export folder back to the card.', wbWhere_openscience: 'OpenScience\'s own research agent.', wbModelDefault_codex: 'Codex default', wbModelDefault_claude: 'Claude Code default (the run reports the actual model)', 'wbModelDefault_claude-science': 'chosen in Claude Science', wbModelDefault_openscience: '—', wbReason_nocmd: 'Its command is not on this computer.', wbReason_noapp: 'The app is not installed on this computer.', wbReason_openscience: 'Unavailable: no OpenScience command line here, and desktop 2.0.153 rejects 6.2 Astra and 6.2 Sol at model selection. To run Codex in its terminal, choose Codex CLI.', rsFrozen: (v, at, h, n) => `Version ${v} · frozen ${at} · package SHA-256 ${h}… · ${n} input${n === 1 ? '' : 's'}`, rsNoRuns: 'No run yet.', rsRunOnce: 'Run once', rsControl: 'Add an independent control', rsControlP: 'Runs the same version and hash again, independently: its own folder, session and result.', rsRefresh: 'Refresh', rsModeSingle: 'single run', rsModeControl: 'independent control', rsStatus_submitted: 'submitted, waiting for its session', rsStatus_running: 'running', rsStatus_waiting: 'waiting for you', rsStatus_stopped: 'stopped', rsStatus_failed: 'failed', rsStatus_delivered: 'delivered', rsWhere2: 'Where:', rsReqModel: 'Requested model:', rsActModel: 'Actual model:', rsStarted: 'Started:', rsEnded: 'Ended:', rsUsage: 'Usage:', rsDenied: 'Refused:', rsDeniedN: n => `${n} tool call${n === 1 ? '' : 's'} outside what this workbench allows (refused at once; the run went on without them)`, rsDir: 'Folder:', rsResult: 'Result, as written', rsProducts: 'Products', rsOpenSession: 'Open its session in a terminal', rsCopyTask: 'Copy the task', 'rsManualP_claude-science': 'In Claude Science: start a research session, paste the task, upload the files in the input folder below. When it is done, export its results and enter the session link and export folder here.', rsReturnSession: 'Session link', rsReturnFolder: 'Export folder (a path on this computer)', rsReturnP: 'The card lists the files in that folder and marks the run delivered (entered by hand).', rsReturn: 'Bring it back to the card', tRsSaved: 'Question card saved (version 1 frozen)', tRsStarted: n => `Run started in ${n}`, tRsPrepared: n => `${n} package ready: follow the steps on the card`, tRsSavedNoRun: e => `Card saved; the run did not start: ${e}`, tRsAgain: 'This one was already started; nothing sent twice', tRsNoChange: 'No change yet', tRsTaskCopied: 'Task copied', tRsReturned: 'Back on the card', rsErr_empty: 'Write the research question first', rsErr_already: 'This version already ran once; use Add an independent control to run it again', rsErr_changed: 'The package no longer matches its frozen hash; nothing ran', rsErr_nofolder: 'No such folder', rsErr_nosession: 'This run has no session yet', rsErr_notfile: f => `Input file not found: ${f}`, rsErr_big: 'Inputs are over 500 MB', rsErr_nobench: 'Unknown workbench', rsChip: 'Question', rsQuestion: 'Question', rsConclusion: 'Conclusion', rsMore: (r, p) => `Runs (${r}) and evidence (${p} points)`, rsRuns: 'Runs', rsHost: 'Host', rsExec: 'Ran in', rsModel: 'Model', rsRoute: 'Billing', rsSession: 'Session', rsInput: 'Input', rsReview: 'Checked', rsOpenRun: 'Open the run', rsVerdicts: 'What each run concluded', rsKnown: 'Known answer', rsTrace: 'Trace a point on a figure back to its evidence', rsFigure: 'Figure', rsRow: k => `Data row (${k})`, rsFrame: 'Raw frame', rsCode: 'Code', rsRerun: 'Rerun', rsRefs: 'Method papers', rsClaim: 'What this point supports', rsSupports: 'Supports: ', rsLimits: 'Does not show: ', rsWhere: 'Where:', rsUse: 'Carries over:', rsNotUse: 'Does not:', rsAccess: 'Read:', rsTodo: 'To fill in: ', rsNoRow: k => `no row matches ${k}`, rsNoField: f => `the row has no ${f}`, rsNoLine: 'the line is not in the file any more', rsOpenFile: 'Open the file', starOn: 'Mark as important (search ★ to find them all)', starOff: 'Important: click to unmark', openTmux: 'Open in a terminal (tmux)', dBody: 'Details', mdEdit: 'Edit', mdDone: 'Done', mdExpand: 'Read', mdRead: 'Read', mdErr_missing: 'This file is not on this computer: it may have been moved or renamed, or it is on another machine.', mdErr_big: 'This file is over 2 MB.', mdErr_unlinked: 'No record links this file.', mdErr_type: 'Only .md and .txt reports, and data or code files (.csv, .json, .py), open here.', mdView: 'View', mdErr_bigImg: 'This image is over 10 MB.', dBodyPh: 'Context, a summary of what the agent produced, next steps…',
     dLinks: 'Links or file paths, one per line', dLinksPh: 'https://…  or  ~/Documents/plan.md', dAgent: 'Source', dAgentPh: 'me / Claude Code…', dTime: 'Time',
     forkedFromRec: 'Forked from', mergedFromThread: 'Merged from thread', forkedHere: 'Forked from here:',
     forkHere: 'Fork from here', viewThread: 'View thread', forkNamePh: 'Name of the new thread', createBranch: 'Create branch',
@@ -1393,7 +1435,7 @@ apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的
     dayLabel: d => `${d.getMonth() + 1}/${d.getDate()} 周${I18N.zh.week[d.getDay()]}`,
     monthLabel: d => `${d.getFullYear()} 年 ${d.getMonth() + 1} 月`,
     tickDay: d => `${d.getDate()} ${I18N.zh.week[d.getDay()]}`,
-    dRecord: '记录', dTitle: '标题', dKind: '类型', dThread: '所在线程', dDone: '已完成', openTmux: '在终端里打开（tmux）', dBody: '详情', mdEdit: '编辑', mdDone: '完成', mdExpand: '放大阅读', mdRead: '阅读', mdErr_missing: '这台电脑上找不到这个文件：可能已被移动或改名，或者在另一台机器上。', mdErr_big: '文件超过 2 MB。', mdErr_unlinked: '没有记录链接这个文件。', mdErr_type: '这里只能打开 .md 和 .txt 文件。', mdView: '查看', mdErr_bigImg: '这张图超过 10 MB。', dBodyPh: '背景、agent 的输出摘要、下一步要做什么…',
+    dRecord: '记录', dTitle: '标题', dKind: '类型', dThread: '所在线程', dDone: '已完成', rsNewBtn: '新建问题卡', rsPick: '选择文件…', rsDrop: '或把文件拖到这里；文件会拷到本机，路径自动填到上面', rsUploading: n => `正在上传 ${n} 个文件…`, rsWbFail: '工作台列表没有加载出来。', rsRetry: '重试', rsNewTitle: '写一句研究问题，选工作台跑一次', rsNewHead: '新建问题卡', rsNewP: '写一句研究问题就能建卡；输入文件可以不填。', rsQ: '研究问题（想要哪些交付可以直接写进来）', rsQPh: '例：移动光斑后，是单个亮区经过中点，还是旧区变暗、新区变亮？', rsLine: '放在哪条线', rsInputs: '输入文件（可不填，每行一个本机路径）', rsBench: '工作台', rsWhen: '「只保存」：建卡，把问题和输入冻结成第 1 版（记下 SHA-256），不运行。「保存并运行」：冻结后马上在所选工作台跑一次。同一版默认只跑一次；要对照，到卡上点「加独立对照」，它从同一版、同一哈希另起一次运行。', rsWhenCard: '用冻结的这一版在所选工作台跑一次，状态、会话和结果会回到这张卡上。', rsSaveRun: n => `保存并在 ${n} 运行一次`, rsSavePrep: n => `保存并准备 ${n} 任务包`, rsSaveOnly: '只保存，不运行', rsModelIs: m => `模型：${m}`, rsManualTag2: '人工操作', rsManualTag: '人工登记', rsUnavailable: '不可用', wbName_codex: 'Codex CLI', wbName_claude: 'Claude Code', 'wbName_claude-science': 'Claude Science', wbName_openscience: 'OpenScience 原生 agent', wbWhere_codex: '在本机后台运行 codex exec，用你的 Codex 订阅；只能写自己的运行目录。', wbWhere_claude: '在本机后台运行 claude -p，用你的 Claude 订阅；可改运行目录里的文件、联网检索、跑 python。', 'wbWhere_claude-science': '本机网页工作台，人工操作：卡片准备好任务包，你在 Claude Science 里发题，做完把会话链接和导出目录填回卡片。', wbWhere_openscience: 'OpenScience 自己的 research agent。', wbModelDefault_codex: 'Codex 默认', wbModelDefault_claude: 'Claude Code 默认（运行后回报实际模型）', 'wbModelDefault_claude-science': '在 Claude Science 里选', wbModelDefault_openscience: '—', wbReason_nocmd: '本机找不到它的命令。', wbReason_noapp: '本机没装这个应用。', wbReason_openscience: '不可用：本机没有 OpenScience 命令行；桌面版 2.0.153 的原生订阅入口在选模型时拒绝 6.2 Astra 和 6.2 Sol。要在它的终端里跑 Codex，请选 Codex CLI。', rsFrozen: (v, at, h, n) => `第 ${v} 版 · 冻结于 ${at} · 任务包 SHA-256 ${h}… · ${n} 个输入`, rsNoRuns: '还没有运行。', rsRunOnce: '运行一次', rsControl: '加独立对照', rsControlP: '从同一版、同一哈希另起一次独立运行：各自的目录、会话和结果分开。', rsRefresh: '刷新状态', rsModeSingle: '单跑', rsModeControl: '独立对照', rsStatus_submitted: '已提交，等会话开始', rsStatus_running: '运行中', rsStatus_waiting: '等人工操作', rsStatus_stopped: '已中断', rsStatus_failed: '失败', rsStatus_delivered: '已交付', rsWhere2: '运行位置：', rsReqModel: '请求模型：', rsActModel: '实际模型：', rsStarted: '开始：', rsEnded: '结束：', rsUsage: '用量：', rsDenied: '被拒：', rsDeniedN: n => `${n} 次工具调用超出这个工作台的放行范围（当场被拒，运行跳过它们继续）`, rsDir: '目录：', rsResult: '结果原文', rsProducts: '产物', rsOpenSession: '在终端打开这次会话', rsCopyTask: '复制任务书', 'rsManualP_claude-science': '在 Claude Science 里：新建研究会话，粘贴任务书，上传下面 input 目录里的文件。做完后导出结果，把会话链接和导出目录填在这里。', rsReturnSession: '会话链接', rsReturnFolder: '导出目录（本机路径）', rsReturnP: '卡片会列出这个目录里的文件，并把这次运行标为已交付（人工登记）。', rsReturn: '回卡', tRsSaved: '问题卡已保存（第 1 版已冻结）', tRsStarted: n => `已在 ${n} 发起运行`, tRsPrepared: n => `${n} 任务包已备好：按卡上的步骤操作`, tRsSavedNoRun: e => `卡已保存，运行没有发起：${e}`, tRsAgain: '这次提交已经发起过，没有重复派发', tRsNoChange: '暂时没有变化', tRsTaskCopied: '任务书已复制', tRsReturned: '已回卡', rsErr_empty: '先写研究问题', rsErr_already: '这一版已经跑过一次；要再跑请用「加独立对照」', rsErr_changed: '任务包和冻结时的哈希不一致，没有运行', rsErr_nofolder: '找不到这个目录', rsErr_nosession: '这次运行还没有会话', rsErr_notfile: f => `找不到输入文件：${f}`, rsErr_big: '输入超过 500 MB', rsErr_nobench: '没有这个工作台', rsChip: '问题卡', rsQuestion: '问题', rsConclusion: '结论', rsMore: (r, p) => `运行（${r}）与证据（${p} 个点）`, rsRuns: '运行', rsHost: '宿主', rsExec: '执行程序', rsModel: '模型', rsRoute: '计量', rsSession: '会话', rsInput: '输入', rsReview: '复核', rsOpenRun: '打开这次运行', rsVerdicts: '各次运行的判断', rsKnown: '盲底', rsTrace: '从图上的点回查证据', rsFigure: '图', rsRow: k => `数据行（${k}）`, rsFrame: '原始帧', rsCode: '代码', rsRerun: '复跑', rsRefs: '方法文献', rsClaim: '这个点支持什么', rsSupports: '支持：', rsLimits: '不能说明：', rsWhere: '原文位置：', rsUse: '可迁移：', rsNotUse: '不可迁移：', rsAccess: '读到：', rsTodo: '待补录：', rsNoRow: k => `表里没有 ${k} 这一行`, rsNoField: f => `这一行没有 ${f}`, rsNoLine: '文件里已找不到这一行', rsOpenFile: '打开文件', starOn: '标为重要（搜索 ★ 找出全部）', starOff: '已标为重要：点一下取消', openTmux: '在终端里打开（tmux）', dBody: '详情', mdEdit: '编辑', mdDone: '完成', mdExpand: '放大阅读', mdRead: '阅读', mdErr_missing: '这台电脑上找不到这个文件：可能已被移动或改名，或者在另一台机器上。', mdErr_big: '文件超过 2 MB。', mdErr_unlinked: '没有记录链接这个文件。', mdErr_type: '这里只能打开 .md、.txt 报告和数据、代码文件（.csv、.json、.py）。', mdView: '查看', mdErr_bigImg: '这张图超过 10 MB。', dBodyPh: '背景、agent 的输出摘要、下一步要做什么…',
     dLinks: '链接或文件路径，每行一个', dLinksPh: 'https://…  或  ~/Documents/方案.md', dAgent: '来源', dAgentPh: '自己 / Claude Code…', dTime: '时间',
     forkedFromRec: '分叉自', mergedFromThread: '合并自线程', forkedHere: '从这里分出了',
     forkHere: '从这里分叉', viewThread: '查看线程', forkNamePh: '新线程名称', createBranch: '创建分支',
@@ -1655,11 +1697,12 @@ const quietLines = (by = byThread()) => viewLines().map(th => quietInfo(th, by))
 function lastCommit(tid) { let best = null; for (const c of S.commits.values()) if (tidOf(c) === tid && (!best || c.ts > best.ts)) best = c; return best; }
 // Search text and the kind filter both narrow what stays bright; the rest is dimmed, never hidden, so lanes stay whole.
 const filtering = () => !!(S.q || S.kinds.size);
+const starMark = c => (c.starred ? '<span class="star" aria-hidden="true">★</span>' : '') + (c.research ? `<span class="rs-chip">${esc(t('rsChip'))}</span>` : '');
 function matches(c) {
   if (S.kinds.size && !S.kinds.has(c.kind)) return false;
   if (!S.q) return true;
   const q = S.q.toLowerCase();
-  return [c.title, c.body, c.agent, ...(c.links || [])].some(v => v && String(v).toLowerCase().includes(q));
+  return [c.starred ? '★' : '', c.title, c.body, c.agent, ...(c.links || [])].some(v => v && String(v).toLowerCase().includes(q));
 }
 function hasExamples() { return COLS.some(col => [...S[col].values()].some(d => d.example)); }
 function threadByName(name) {
@@ -2053,6 +2096,8 @@ async function loadServer() {
     S.sync = data.sync || null; showSync();
     S.update = data.update || null; $('#update-item').hidden = !S.update; $('#update-label').textContent = S.update ? t('menuUpdate', S.update.behind) : ''; $('#more-btn').classList.toggle('has-update', !!S.update);
     if (S.offline) { S.offline = false; renderSync(); }
+    $('#rs-new-btn').hidden = S.remote;
+    if (S.wantRec && S.commits.has(S.wantRec)) { const id = S.wantRec; S.wantRec = null; select({ type: 'commit', id }); }
   } catch { S.offline = true; COLS.forEach(c => S.got.add(c)); renderSync(); render(); }
 }
 async function initStore() {
@@ -2619,7 +2664,7 @@ function cardHTML(th, cs, selT) {
   apSeen(th);
   const cls = ['card', isInbox ? 'is-inbox' : `st-${th.status || 'active'}`, shut ? 'is-shut' : '', peeking ? 'is-peek' : '', apRun(th) ? 'ap-on' : '', apEvo(th) ? 'ap-evo' : '', selT === th.id ? 'is-sel' : '', filtering() && !anyHit ? 'is-dim' : '', S.connect && S.connect.from === th.id ? 'is-from' : '', S.multi.has(th.id) ? 'is-multi' : '', S.multi.has(th.id) && th.id === S.multiTarget ? 'is-multi-target' : ''].filter(Boolean).join(' ');
   const items = recent.length
-    ? recent.map(c => `<li data-cid="${esc(c.id)}" class="${c.id === selC ? 'is-sel' : ''} ${filtering() && matches(c) ? 'hit' : ''}">${mini(c.kind, stationColor(c, th), c.done)}<span class="s-title" title="${esc(c.title)}">${esc(c.title)}</span><time class="s-time">${fmtShort(c.ts)}</time></li>`).join('')
+    ? recent.map(c => `<li data-cid="${esc(c.id)}" class="${c.id === selC ? 'is-sel' : ''} ${filtering() && matches(c) ? 'hit' : ''}">${mini(c.kind, stationColor(c, th), c.done)}<span class="s-title" title="${esc(c.title)}">${starMark(c)}${esc(c.title)}</span><time class="s-time">${fmtShort(c.ts)}</time></li>`).join('')
       + (more > 0 ? `<li class="s-more"><span></span><span>${esc(t('moreEarlier', more))}</span><span></span></li>` : '')
     : `<li class="s-empty"><span></span><span>${esc(isInbox ? t('inboxEmpty') : t('noRecords'))}</span><span></span></li>`;
   const chip = apChip(th) + (isInbox ? `<span class="chip">${esc(t('unsorted'))}</span>` : `<span class="chip chip-${th.status || 'active'}">${esc(statusLabel(th.status))}</span>`);
@@ -2950,7 +2995,7 @@ ${machineTag(s.away && s.machine)}
     const th = getThread(tidOf(c));
     return `<div class="g-row k-${c.kind} ${c.done ? 'done' : ''} ${selT && tidOf(c) !== selT ? 'is-other' : ''} ${c.id === selC ? 'is-sel' : ''} ${filtering() && !matches(c) ? 'is-dim' : ''}" data-cid="${esc(c.id)}" style="padding-left:${gw + 6}px">
       ${c.kind === 'fork' || c.kind === 'merge' ? '<span class="actor"></span>' : actorMark(c, th.color)}
-      <span class="g-title">${esc(c.title)}</span>
+      <span class="g-title">${starMark(c)}${esc(c.title)}</span>
       ${c.agent ? `<span class="agent-tag">${esc(c.agent)}</span>` : ''}${machineTag(c.machine)}
       <span class="kind-tag">${esc(kindLabel(c.kind))}</span>
       <span class="pill" style="--c:${th.color}"><i></i><span>${esc(th.name)}</span></span>
@@ -3057,7 +3102,7 @@ function renderTimeline() {
   b += `<line class="now" x1="${X(now)}" y1="0" x2="${X(now)}" y2="${BH}"/>`;
   for (const id of ids) {
     const th = getThread(id), cs = by.get(id), y = rowY.get(id);
-    for (const c of cs) b += `<g data-cid="${esc(c.id)}" class="${c.id === selC ? 'is-sel' : ''}"><title>${esc(fmtAbs(c.ts) + ' · ' + kindLabel(c.kind) + ' · ' + c.title)}</title>${glyph(c.kind, stationColor(c, th), X(c.ts), y, 6, { done: c.done, dim: filtering() && !matches(c) })}</g>`;
+    for (const c of cs) b += `<g data-cid="${esc(c.id)}" class="${c.id === selC ? 'is-sel' : ''}"><title>${esc(fmtAbs(c.ts) + ' · ' + kindLabel(c.kind) + ' · ' + (c.starred ? '★ ' : '') + c.title)}</title>${glyph(c.kind, stationColor(c, th), X(c.ts), y, 6, { done: c.done, dim: filtering() && !matches(c) })}</g>`;
     const tip = cs[cs.length - 1];
     const label = tip.title.length > 26 ? tip.title.slice(0, 25) + '…' : tip.title;
     b += `<text class="tip" x="${X(tip.ts) + 12}" y="${y - 14}">${esc(label)}</text>`;
@@ -3109,7 +3154,7 @@ function threadOptions(selected, { excludeId, onlyOpen } = {}) {
   return opts.map(th => `<option value="${esc(th.id)}" ${th.id === selected ? 'selected' : ''}>${esc(th.name)}${th.status && th.status !== 'active' && th.id !== INBOX ? ` (${esc(statusLabel(th.status))})` : ''}</option>`).join('');
 }
 // A local report (a .md or .txt file a record links) gets 阅读, which shows it in the reader (a .txt as it is written).
-const isMdPath = l => !/^https?:\/\//i.test(l) && /\.(md|markdown|txt)$/i.test(l.trim());
+const isMdPath = l => !/^https?:\/\//i.test(l) && /\.(md|markdown|txt|csv|tsv|json|py|r)$/i.test(l.trim());
 // A local image a record links gets 查看, which opens it in the reader (loaded on the click, not before).
 const isImgPath = l => !/^https?:\/\//i.test(l) && /\.(png|jpe?g|gif|webp|svg)$/i.test(l.trim());
 function linksView(links) {
@@ -3317,7 +3362,8 @@ async function imgBlob(path, from) {
   try {
     const r = await fetch(`/api/img?${q}`, { headers: { 'X-Trace-Canvas': '1' }, cache: 'no-store' });
     if (/json/.test(r.headers.get('content-type') || '')) return { error: (await r.json()).error };
-    return { url: URL.createObjectURL(await r.blob()) }; // the reader revokes it when it shows something else
+    const blob = await r.blob();
+    return { url: URL.createObjectURL(blob), blob }; // the reader revokes it when it shows something else
   } catch { return { error: t('syncOfflineTitle') }; }
 }
 async function viewImage(path) {
@@ -3331,7 +3377,7 @@ async function viewImage(path) {
 async function readFile(path) {
   openReader(path.split('/').pop(), null, path);
   const r = await fetch(`/api/md?path=${encodeURIComponent(path)}`, { headers: { 'X-Trace-Canvas': '1' }, cache: 'no-store' }).then(x => x.json()).catch(() => ({ error: t('syncOfflineTitle') }));
-  if (S.sheet === 'read') openReader(path.split('/').pop(), r.error ? `> ${mdErr(r.error)}` : r.text, path, !r.error && /\.txt$/i.test(path) ? `<pre class="md-txt">${esc(r.text)}</pre>` : undefined);
+  if (S.sheet === 'read') openReader(path.split('/').pop(), r.error ? `> ${mdErr(r.error)}` : r.text, path, !r.error && !/\.(md|markdown)$/i.test(path) ? `<pre class="md-txt">${esc(r.text)}</pre>` : undefined);
 }
 const delUI = q => S.ui.del
   ? `<span class="confirm">${esc(q)}</span><button class="btn btn-danger" data-act="del-confirm">${esc(t('del'))}</button><button class="btn" data-act="del-cancel">${esc(t('cancel'))}</button>`
@@ -3390,6 +3436,7 @@ function commitDetail(c) {
   const children = [...S.threads.values()].filter(x => x.forkOf === c.id);
   return `<div class="d-head">
       <span class="d-eyebrow">${mini(c.kind, stationColor(c, th), c.done)}${esc(kindLabel(c.kind))}<span class="mono">${fmtAbs(c.ts)}</span></span>
+      ${S.readOnly ? '' : `<button class="icon-btn d-star${c.starred ? ' on' : ''}" data-act="star" aria-pressed="${!!c.starred}" title="${esc(t(c.starred ? 'starOff' : 'starOn'))}" aria-label="${esc(t(c.starred ? 'starOff' : 'starOn'))}">${c.starred ? '★' : '☆'}</button>`}
       <button class="icon-btn" data-act="close" aria-label="${esc(t('close'))}">×</button>
     </div>
     <div class="d-scroll">
@@ -3400,7 +3447,7 @@ function commitDetail(c) {
       </div>
       ${c.kind === 'task' ? `<label class="check"><input type="checkbox" id="d-done" ${c.done ? 'checked' : ''}>${esc(t('dDone'))}</label>` : ''}
       ${isTodo(c) && !c.done && !S.readOnly ? `<div class="fld"><span>${esc(t('goalsWho'))}</span><div class="d-hand">${handActs(c)}</div></div>` : ''}
-      ${c.retro ? retroView(c, th) : c.body && !S.ui.editBody
+      ${c.research ? researchView(c) : c.retro ? retroView(c, th) : c.body && !S.ui.editBody
         ? `<div class="fld"><div class="fld-head"><span>${esc(t('dBody'))}</span><span class="spacer"></span><button class="linkish" data-act="read-body">${esc(t('mdExpand'))}</button>${S.readOnly ? '' : `<button class="linkish" data-act="body-edit">${esc(t('mdEdit'))}</button>`}</div><div class="md md-body">${mdHTML(c.body)}</div></div>`
         : `<label class="fld"><div class="fld-head"><span>${esc(t('dBody'))}</span><span class="spacer"></span>${c.body ? `<button class="linkish" data-act="body-done">${esc(t('mdDone'))}</button>` : ''}</div><textarea id="d-body" class="grow" rows="5" placeholder="${esc(t('dBodyPh'))}">${esc(c.body || '')}</textarea></label>`}
       <label class="fld"><span>${esc(t('dLinks'))}</span><textarea id="d-links" rows="2" placeholder="${esc(t('dLinksPh'))}">${esc((c.links || []).join('\n'))}</textarea></label>
@@ -3429,6 +3476,150 @@ function commitDetail(c) {
 /* ---- retro ---- */
 const RETRO_LAYERS = ['project', 'line', 'memory'];
 const fmtTok = n => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(n || 0));
+// <research> A research question card (a record with research: {...}): the question and its conclusion; opened, the runs that
+// answered it, how each answered, and for a point on a figure the way back to its data row, raw frame, code, rerun and method
+// papers, read live from the files the record links (so the numbers are the files', not copied). A step without its mapping says so.
+function csvRows(text) {
+  const s = text.replace(/^﻿/, ''), rows = []; let row = [], f = '', q = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (q) { if (ch !== '"') f += ch; else if (s[i + 1] === '"') { f += '"'; i++; } else q = false; }
+    else if (ch === '"') q = true;
+    else if (ch === ',') { row.push(f); f = ''; }
+    else if (ch === '\n' || ch === '\r') { if (ch === '\r' && s[i + 1] === '\n') i++; row.push(f); rows.push(row); row = []; f = ''; }
+    else f += ch;
+  }
+  if (f || row.length) { row.push(f); rows.push(row); }
+  const [head = [], ...body] = rows;
+  return body.filter(r => r.length > 1).map(r => Object.fromEntries(head.map((h, k) => [h, r[k]])));
+}
+const linkedText = p => fetch('/api/md?path=' + encodeURIComponent(p), { headers: { 'X-Trace-Canvas': '1' }, cache: 'no-store' }).then(r => r.json()).catch(() => ({ error: t('syncOfflineTitle') }));
+const rsTodo = why => '<p class="rs-todo">' + esc(t('rsTodo')) + esc(why) + '</p>';
+const rsOpenBtn = (act, p) => '<button class="linkish" data-act="' + act + '" data-path="' + esc(p) + '">' + esc(t(act === 'view-img' ? 'mdView' : 'rsOpenFile')) + '</button>';
+const rsBenches = () => S.rsWb ? Promise.resolve(S.rsWb) : fetch('/api/research/workbenches', { cache: 'no-store' }).then(r => r.json()).then(r => { if (!r.workbenches) throw 0; S.rsWbErr = false; return (S.rsWb = r.workbenches); }).catch(() => { S.rsWbErr = true; return null; });
+// A file picked or dropped: uploaded to this computer (research/uploads), its path added to the inputs.
+async function rsUpload(files) {
+  const N = S.rsNew; N.uploading = files.length; N.error = ''; openSheet('rs-new');
+  for (const f of files) {
+    const r = await fetch('/api/research/upload?name=' + encodeURIComponent(f.name), { method: 'POST', headers: { 'X-Trace-Canvas': '1' }, body: f }).then(x => x.json()).catch(() => ({ error: t('syncOfflineTitle') }));
+    if (r.error) N.error = f.name + ': ' + rsErr(r.error); else N.inputs = [(N.inputs || '').trim(), r.path].filter(Boolean).join('\n');
+    N.uploading--;
+  }
+  openSheet('rs-new');
+}
+const rsErr = e => { const [k, x] = String(e).split(/:(.*)/s); return k === 'unavailable' ? t('wbReason_' + x) : k === 'notfile' ? t('rsErr_notfile', x) : t('rsErr_' + k) === 'rsErr_' + k ? String(e) : t('rsErr_' + k); };
+function liveRuns(c) {
+  const R = c.research, F = R.frozen, live = (R.runs || []).filter(r => r.workbench), B = S.rsWb || [], ro = S.readOnly || S.remote;
+  const fld = (k, v) => v ? '<div><span class="muted">' + esc(t(k)) + '</span> ' + esc(v) + '</div>' : '';
+  const file = p => '<div><code>' + esc(p.split('/').slice(-2).join('/')) + '</code>' + (isMdPath(p) ? rsOpenBtn('read-file', p) : isImgPath(p) ? rsOpenBtn('view-img', p) : '') + '</div>';
+  const run = r => {
+    const fin = ['last.md', 'result.md'].map(n => r.dir + '/' + n).find(p => (c.links || []).includes(p));
+    return '<div class="rs-run"><div class="rs-run-h"><b>' + esc(t('wbName_' + r.workbench)) + '</b> · ' + esc(t(r.mode === 'control' ? 'rsModeControl' : 'rsModeSingle')) + ' · v' + r.version
+      + ' <span class="rs-chip2 rs-s-' + esc(r.status) + '">' + esc(t('rsStatus_' + r.status)) + (r.manual ? ' · ' + esc(t('rsManualTag')) : '') + '</span></div>'
+      + fld('rsWhere2', t('wbWhere_' + r.workbench)) + fld('rsReqModel', r.requestedModel || t('wbModelDefault_' + r.workbench)) + fld('rsActModel', r.model)
+      + (/^https?:\/\//.test(r.session || '') ? '<div><span class="muted">' + esc(t('rsSession')) + '</span> <a href="' + esc(r.session) + '" target="_blank" rel="noopener noreferrer">' + esc(r.session) + '</a></div>' : fld('rsSession', r.session)) + fld('rsStarted', fmtAbs(r.startedAt)) + fld('rsEnded', r.endedAt && fmtAbs(r.endedAt)) + fld('rsUsage', r.usage) + (r.denied ? fld('rsDenied', t('rsDeniedN', r.denied)) : '') + fld('rsDir', r.resultDir || r.dir)
+      + (r.error ? '<pre class="rs-code">' + esc(r.error) + '</pre>' : '')
+      + (r.final ? '<div class="sec-label">' + esc(t('rsResult')) + '</div><div class="md rs-final">' + mdHTML(r.final) + '</div>' : '')
+      + (fin ? '<div>' + rsOpenBtn('read-file', fin) + '</div>' : '')
+      + (r.products && r.products.length ? '<div class="sec-label">' + esc(t('rsProducts')) + ' · ' + r.products.length + '</div>' + r.products.filter(p => p !== fin).map(file).join('') : '')
+      + (r.status === 'waiting' && !ro ? '<div class="rs-manual"><p>' + esc(t('rsManualP_' + r.workbench)) + '</p><div class="fld-row"><button class="btn" data-act="rs-copy-task" data-path="' + esc(r.dir + '/task.md') + '">' + esc(t('rsCopyTask')) + '</button></div><p class="mono rs-calc">' + esc(r.dir + '/input') + '</p>'
+        + '<label class="fld"><span>' + esc(t('rsReturnSession')) + '</span><input id="rs-ret-s-' + esc(r.id) + '" placeholder="http://localhost:51593/projects/…"></label><label class="fld"><span>' + esc(t('rsReturnFolder')) + '</span><input id="rs-ret-f-' + esc(r.id) + '" placeholder="/Users/…/export"></label>'
+        + '<p class="muted">' + esc(t('rsReturnP')) + '</p><button class="btn btn-primary" data-act="rs-return" data-run="' + esc(r.id) + '">' + esc(t('rsReturn')) + '</button></div>' : '')
+      + (r.session && r.workbench !== 'claude-science' && !ro ? '<div class="d-actions"><button class="btn" data-act="rs-open" data-run="' + esc(r.id) + '">' + esc(t('rsOpenSession')) + '</button></div>' : '')
+      + '</div>';
+  };
+  const pick = S.ui.rsWb || (B.find(b => b.available && b.auto && !live.some(r => r.workbench === b.id)) || B.find(b => b.available) || {}).id || '';
+  const opts = B.map(b => '<option value="' + esc(b.id) + '"' + (b.id === pick ? ' selected' : '') + (b.available ? '' : ' disabled') + '>' + esc(t('wbName_' + b.id)) + (b.available ? '' : ' · ' + esc(t('rsUnavailable'))) + '</option>').join('');
+  return '<div class="sec-label">' + esc(t('rsFrozen', F.version, fmtAbs(F.at), F.sha256.slice(0, 12), F.inputs.length)) + '</div><div>' + rsOpenBtn('read-file', F.task) + '</div>'
+    + (live.length ? live.map(run).join('') : '<p class="muted">' + esc(t('rsNoRuns')) + '</p>')
+    + (ro ? '' : '<div class="rs-ctl"><select id="rs-wb">' + opts + '</select>'
+      + (live.length ? '<button class="btn" data-act="rs-run" data-mode="control">' + esc(t('rsControl')) + '</button>' : '<button class="btn btn-primary" data-act="rs-run" data-mode="single">' + esc(t('rsRunOnce')) + '</button>')
+      + (live.some(r => r.status === 'submitted' || r.status === 'running') ? '<button class="btn" data-act="rs-refresh">' + esc(t('rsRefresh')) + '</button>' : '') + '</div>'
+      + '<p class="muted">' + esc(t(live.length ? 'rsControlP' : 'rsWhenCard')) + '</p>');
+}
+function researchView(c) {
+  const R = c.research, pts = R.points || [], tr = S.ui.rsTrace, runs = (R.runs || []).filter(r => !r.workbench);
+  if (R.frozen && !S.rsWb) rsBenches().then(render);
+  const live = (R.runs || []).filter(r => r.workbench);
+  const runRow = r => '<tr><td><b>' + esc(r.name) + '</b><div class="rs-st rs-' + esc(r.state || '') + '">' + esc(r.status || '') + '</div></td><td>'
+    + [[t('rsHost'), r.host], [t('rsExec'), r.executor], [t('rsModel'), r.model], [t('rsRoute'), r.route], [t('rsSession'), r.session], [t('rsInput'), r.input], [t('rsReview'), r.reviewed]]
+      .filter(x => x[1]).map(x => '<div><span class="muted">' + esc(x[0]) + '</span> ' + esc(x[1]) + '</div>').join('')
+    + (r.url ? '<div><a href="' + esc(r.url) + '" target="_blank" rel="noopener noreferrer">' + esc(t('rsOpenRun')) + '</a></div>' : '') + '</td></tr>';
+  const names = runs.filter(r => r.state !== 'stopped').map(r => r.name);
+  return '<div class="rs">'
+    + '<div class="sec-label">' + esc(t('rsQuestion')) + '</div><p class="rs-q">' + esc(R.question) + '</p>'
+    + (R.conclusion ? '<div class="sec-label">' + esc(t('rsConclusion')) + '</div><p class="rs-c">' + esc(R.conclusion) + '</p>' : '')
+    + (live.length ? '<p class="rs-sum">' + live.map(r => esc(t('wbName_' + r.workbench)) + ' <span class="rs-chip2 rs-s-' + esc(r.status) + '">' + esc(t('rsStatus_' + r.status)) + '</span>').join(' · ') + '</p>' : '')
+    + '<details class="rs-more"' + (S.ui.rsOpen || (R.frozen && !R.conclusion) ? ' open' : '') + '><summary>' + esc(t('rsMore', (R.runs || []).length, pts.length)) + '</summary>'
+    + (R.frozen ? liveRuns(c) : '')
+    + (runs.length ? '<div class="sec-label">' + esc(t('rsRuns')) + '</div><table class="rs-tab">' + runs.map(runRow).join('') + '</table>' : '')
+    + (R.verdicts ? '<div class="sec-label">' + esc(t('rsVerdicts')) + '</div><table class="rs-tab rs-v"><tr><th></th>' + names.map(n => '<th>' + esc(n) + '</th>').join('') + '<th>' + esc(t('rsKnown')) + '</th></tr>'
+      + R.verdicts.map(v => '<tr><th>' + esc(v.seq) + '</th>' + names.map(n => '<td>' + esc((v.runs || {})[n] || '—') + '</td>').join('') + '<td>' + esc(v.known || '') + '</td></tr>').join('') + '</table>' : '')
+    + (pts.length ? '<div class="sec-label">' + esc(t('rsTrace')) + '</div>' : '') + '<div class="rs-pts">' + pts.map((p, k) => '<button class="btn' + (tr && tr.k === k ? ' btn-primary' : '') + '" data-act="rs-point" data-k="' + k + '">' + esc(p.label) + '<span class="muted"> · ' + esc(p.run) + '</span></button>').join('') + '</div>'
+    + (tr ? '<ol class="rs-steps">' + tr.html + '</ol>' : '')
+    + '</details></div>';
+}
+async function rsTrace(c, k) {
+  const P = c.research.points[k], step = (head, body) => '<li><div class="rs-h">' + esc(head) + '</div>' + body + '</li>';
+  for (const u of S.rsBlobs || []) URL.revokeObjectURL(u);
+  S.rsBlobs = []; S.ui.rsTrace = { k, html: '<li>' + esc(t('gxLoading')) + '</li>' }; render();
+  const blob = async p => { const r = await imgBlob(p); if (r.url) S.rsBlobs.push(r.url); return r; };
+  const out = [];
+  if (P.todo) out.push(step(t('rsFigure'), rsTodo(P.todo)));
+  if (P.figure) {
+    const r = await blob(P.figure);
+    out.push(step(t('rsFigure'), (r.url ? '<img class="rs-fig" src="' + r.url + '" alt="">' : rsTodo(mdErr(r.error))) + '<p>' + esc(P.panel || '') + ' ' + rsOpenBtn('view-img', P.figure) + '</p>'));
+  }
+  let row = null;
+  if (P.table) {
+    const r = await linkedText(P.table), rows = r.error ? [] : csvRows(r.text);
+    row = rows.find(x => Object.entries(P.match || {}).every(([f, v]) => x[f] === String(v) || (x[f] !== '' && Number(x[f]) === Number(v)))) || null;
+    const key = Object.entries(P.match || {}).map(([f, v]) => f + '=' + v).join(', ');
+    let body = !row ? rsTodo(r.error ? mdErr(r.error) : t('rsNoRow', key))
+      : '<table class="rs-tab rs-row">' + (P.show || Object.keys(row)).map(f => '<tr><th>' + esc(f) + '</th><td class="mono">' + esc(row[f] ?? '—') + '</td></tr>').join('') + '</table>';
+    for (const k of row ? P.calcs || (P.ratio ? [{ op: 'div', f: P.ratio, pct: true }] : []) : []) {
+      const [a, b] = k.f, x = Number(row[a]), y = Number(row[b]), u = k.unit ? ' ' + k.unit : '';
+      const line = k.op === 'div' ? a + ' / ' + b + ' = ' + row[a] + ' / ' + row[b] + ' = ' + (x / y).toFixed(8) + (k.pct ? ' → ' + (x / y * 100).toFixed(1) + '%' : '')
+        : k.op === 'mul' ? a + ' × ' + k.k + ' = ' + row[a] + ' × ' + k.k + ' = ' + +(x * k.k).toFixed(6) + u
+        : '(' + a + ' + ' + b + ') / 2 = (' + row[a] + ' + ' + row[b] + ') / 2 = ' + +((x + y) / 2).toFixed(6) + u;
+      body += '<p class="mono rs-calc">' + esc((k.label ? k.label + '：' : '') + line) + '</p>';
+    }
+    out.push(step(t('rsRow', key), body + '<p>' + esc(P.table.split('/').slice(-2).join('/')) + ' ' + rsOpenBtn('read-file', P.table) + '</p>'));
+  }
+  if (P.frame) {
+    const name = row && row[P.frame.field];
+    if (!name) out.push(step(t('rsFrame'), rsTodo(t('rsNoField', P.frame.field))));
+    else {
+      const p = P.frame.base + '/' + name, r = await blob(p);
+      const sha = r.blob && crypto.subtle ? [...new Uint8Array(await crypto.subtle.digest('SHA-256', await r.blob.arrayBuffer()))].map(b => b.toString(16).padStart(2, '0')).join('') : '';
+      out.push(step(t('rsFrame'), (r.url ? '<img class="rs-frame" src="' + r.url + '" alt="">' : rsTodo(mdErr(r.error))) + '<p class="mono">' + esc(P.frame.field + ' = ' + name) + ' ' + (r.url ? rsOpenBtn('view-img', p) : '') + '</p>'
+        + '<p class="mono rs-calc">' + esc(p.split('/').slice(-5).join('/')) + (sha ? '<br>SHA-256 ' + sha : '') + '</p>'));
+    }
+  }
+  if (P.code) {
+    const r = await linkedText(P.code.file), L = r.error ? [] : r.text.split('\n');
+    const at = re => L.findIndex(l => re.test(l));
+    const fns = (P.code.fns || []).map(f => [f, at(new RegExp('^\\s*def ' + f + '\\b'))]);
+    const want = [].concat(P.code.line || []), hits = want.map(w => L.findIndex(l => l.includes(w)));
+    const body = r.error ? rsTodo(mdErr(r.error))
+      : '<p>' + fns.map(([f, i]) => '<span class="mono">' + esc(f) + (i < 0 ? ' ?' : ':' + (i + 1)) + '</span>').join(' → ') + '</p>'
+        + (P.code.why ? '<p>' + esc(P.code.why) + '</p>' : '')
+        + hits.map(hit => hit < 0 ? rsTodo(t('rsNoLine')) : '<pre class="rs-code">' + L.slice(Math.max(0, hit - 3), hit + 2).map((l, j) => { const n = Math.max(0, hit - 3) + j; return '<span' + (n === hit ? ' class="hit"' : '') + '>' + String(n + 1).padStart(4) + '  ' + esc(l) + '</span>'; }).join('\n') + '</pre>').join('');
+    out.push(step(t('rsCode'), body + '<p>' + esc(P.code.file.split('/').pop()) + ' ' + rsOpenBtn('read-file', P.code.file) + '</p>'));
+  }
+  if (P.rerun) out.push(step(t('rsRerun'), '<pre class="rs-code">' + esc((P.rerun.cwd ? 'cd ' + P.rerun.cwd + '\n' : '') + P.rerun.cmd) + '</pre>' + (P.rerun.env ? '<p>' + esc(P.rerun.env) + '</p>' : '') + (P.rerun.status ? '<p><b>' + esc(P.rerun.status) + '</b></p>' : '')));
+  if (P.refs) {
+    const r = await linkedText(P.refs.table), rows = r.error ? [] : csvRows(r.text), C = P.refs.cols || {};
+    const got = (P.refs.ids || []).map(id => rows.find(x => x[C.id || '编号'] === id) || { missing: id });
+    out.push(step(t('rsRefs'), r.error ? rsTodo(mdErr(r.error)) : got.map(x => x.missing ? rsTodo(t('rsNoRow', x.missing)) : '<div class="rs-ref"><b>' + esc(x[C.id || '编号']) + ' · ' + esc(x[C.who || '作者'] || '') + ' ' + esc(x[C.year || '年份'] || '') + '</b> '
+      + (x[C.doi || 'DOI'] ? '<a href="https://doi.org/' + esc(x[C.doi || 'DOI']) + '" target="_blank" rel="noopener noreferrer">' + esc(x[C.doi || 'DOI']) + '</a>' : '')
+      + [[t('rsWhere'), C.where || '核对位置'], [t('rsUse'), C.use || '可迁移判断'], [t('rsNotUse'), C.notUse || '不可迁移判断'], [t('rsAccess'), C.access || '访问层级']].filter(([, f]) => x[f]).map(([h, f]) => '<div><span class="muted">' + esc(h) + '</span> ' + esc(x[f]) + '</div>').join('') + '</div>').join('')
+      + '<p>' + rsOpenBtn('read-file', P.refs.table) + '</p>'));
+  }
+  if (P.supports || P.limits) out.push(step(t('rsClaim'), (P.supports ? '<p><b>' + esc(t('rsSupports')) + '</b>' + esc(P.supports) + '</p>' : '') + (P.limits ? '<p><b>' + esc(t('rsLimits')) + '</b>' + esc(P.limits) + '</p>' : '')));
+  if (S.sel && S.sel.id === c.id && S.ui.rsTrace && S.ui.rsTrace.k === k) { S.ui.rsTrace = { k, html: out.join('') }; render(); }
+}
+// </research>
 function retroView(c, th) {
   const R = c.retro, max = Math.max(1, ...R.items.map(r => r.rounds)), pick = S.ui.rt || {};
   return `<div class="sec-label">${esc(t('retroHead', R.prompts, R.sessions))}${R.until ? ` · ${esc(t('retroRange', R.since ? fmtAbs(R.since) : t('retroStartOfLine'), fmtAbs(R.until)))}` : ''}</div>
@@ -3505,7 +3696,7 @@ function threadDetail(th) {
   const cs = (byThread().get(th.id) || []).slice().reverse();
   const isInbox = th.id === INBOX;
   const forkC = th.forkOf ? S.commits.get(th.forkOf) : null;
-  const items = cs.slice(0, 40).map(c => `<li data-act="goto-commit" data-cid="${esc(c.id)}">${mini(c.kind, stationColor(c, th), c.done)}<span class="s-title" title="${esc(c.title)}">${esc(c.title)}</span><time class="s-time">${fmtShort(c.ts)}</time></li>`).join('');
+  const items = cs.slice(0, 40).map(c => `<li data-act="goto-commit" data-cid="${esc(c.id)}">${mini(c.kind, stationColor(c, th), c.done)}<span class="s-title" title="${esc(c.title)}">${starMark(c)}${esc(c.title)}</span><time class="s-time">${fmtShort(c.ts)}</time></li>`).join('');
   return `<div class="d-head">
       <span class="d-eyebrow"><span class="roundel" style="--c:${th.color}"></span>${esc(isInbox ? t('inbox') : t('threadLabel'))}<span class="mono">${esc(t('countRecords', cs.length))}</span></span>
       <button class="icon-btn" data-act="close" aria-label="${esc(t('close'))}">×</button>
@@ -3609,6 +3800,7 @@ detail.addEventListener('change', e => {
   }
   if (s.type !== 'commit') return;
   if (el.dataset.who) { patchDoc('commits', el.dataset.who, { assignee: el.value || null }, 0); el.blur(); return; }
+  if (el.id === 'rs-wb') { S.ui.rsWb = el.value; return; }
   if (el.id === 'd-kind') patchDoc('commits', s.id, { kind: el.value }, 0);
   else if (el.id === 'd-thread') { patchDoc('commits', s.id, { thread: el.value }, 0); toast(t('tMoved', getThread(el.value).name)); }
   else if (el.id === 'd-done') patchDoc('commits', s.id, el.checked ? { done: true, doneBy: 'human', doneAt: Date.now(), toReview: null } : { done: false, doneBy: null, doneAt: null, toReview: null }, 0);
@@ -3616,6 +3808,7 @@ detail.addEventListener('change', e => {
   el.blur();
 });
 detail.addEventListener('focusout', () => setTimeout(render, 0));
+detail.addEventListener('toggle', e => { if (e.target.classList && e.target.classList.contains('rs-more')) S.ui.rsOpen = e.target.open; }, true);
 detail.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.id === 'd-fork-name' && !e.isComposing) { e.preventDefault(); forkFrom(S.sel.id, e.target.value); }
   if (e.key === 'Enter' && e.target.id === 'd-title' && !e.isComposing) { e.preventDefault(); e.target.blur(); }
@@ -3624,10 +3817,11 @@ detail.addEventListener('click', e => {
   if (handClick(e)) return;
   const b = e.target.closest('[data-act]'); if (!b) return;
   const act = b.dataset.act, s = S.sel;
-  const writeActs = ['detach', 'fork-open', 'fork-create', 'del-open', 'del-confirm', 'status', 'color', 'merge-open', 'merge', 'label', 'flip', 'g-arrange', 'g-ungroup'];
+  const writeActs = ['star', 'detach', 'fork-open', 'fork-create', 'del-open', 'del-confirm', 'status', 'color', 'merge-open', 'merge', 'label', 'flip', 'g-arrange', 'g-ungroup'];
   if (writeActs.includes(act) && !canWrite()) return;
   switch (act) {
     case 'close': select(null); break;
+    case 'star': if (s && s.type === 'commit') patchDoc('commits', s.id, { starred: S.commits.get(s.id).starred ? null : Date.now() }, 0); break;
     case 'goto-commit': select({ type: 'commit', id: b.dataset.cid }); break;
     case 'gx-file': { const k = b.dataset.dk; if (GX.open.has(k)) GX.open.delete(k); else GX.open.add(k); render(); break; }
     case 'gx-more': GX.more.add(b.dataset.key); render(); break;
@@ -3672,6 +3866,23 @@ detail.addEventListener('click', e => {
     case 'body-done': S.ui = {}; render(); break;
     case 'read-body': { const c = S.commits.get(s.id); if (c) openReader(c.title, c.body || ''); break; }
     case 'read-file': readFile(b.dataset.path); break;
+    case 'rs-point': S.ui.rsOpen = true; rsTrace(S.commits.get(s.id), +b.dataset.k); break;
+    case 'rs-run': { // once by default; a control from the same version. The key makes a retried click return the run it started.
+      const c = S.commits.get(s.id), R = c.research, wb = ($('#rs-wb', detail) || {}).value, mode = b.dataset.mode;
+      if (!wb) break;
+      b.disabled = true;
+      postJSON('/api/research/run', { card: c.id, workbench: wb, mode, key: mode === 'single' ? c.id + ':v' + R.frozen.version + ':single' : c.id + ':v' + R.frozen.version + ':control:' + wb + ':' + R.runs.length })
+        .then(r => { b.disabled = false; toast(r.error ? rsErr(r.error) : r.again ? t('tRsAgain') : t(r.run.status === 'waiting' ? 'tRsPrepared' : 'tRsStarted', t('wbName_' + wb))); });
+      break;
+    }
+    case 'rs-refresh': postJSON('/api/research/refresh', { card: s.id }).then(r => r.changed || toast(t('tRsNoChange'))); break;
+    case 'rs-open': postJSON('/api/research/open', { card: s.id, run: b.dataset.run }).then(r => toast(r.error ? (r.command ? r.error + ' · ' + r.command : rsErr(r.error)) : t('tOpenedTerminal'))); break;
+    case 'rs-copy-task': linkedText(b.dataset.path).then(r => r.error ? toast(mdErr(r.error)) : copyText(r.text, t('tRsTaskCopied'))); break;
+    case 'rs-return': {
+      const id = b.dataset.run, session = ($('#rs-ret-s-' + id, detail) || {}).value || '', folder = ($('#rs-ret-f-' + id, detail) || {}).value || '';
+      postJSON('/api/research/return', { card: s.id, run: id, session, folder }).then(r => toast(r.error ? rsErr(r.error) : t('tRsReturned')));
+      break;
+    }
     case 'view-img': viewImage(b.dataset.path); break;
     case 'del-confirm':
       if (s.type === 'commit') removeDoc('commits', s.id);
@@ -4018,6 +4229,20 @@ function openSheet(kind) {
     setSheet(t('lsHead', L.group), L.error ? `<p class="sync-bad">${esc(L.error)}</p>` : !L.list ? `<p>${esc(t('lsWait'))}</p>` : !L.list.length ? `<p>${esc(t('lsNone'))}</p>`
       : `<p>${esc(t('lsP'))}</p>${L.list.map((l, i) => `<label class="ls-item"><input type="checkbox" data-ls="${i}"><span><b>${esc(l.title)}</b><small>${esc(l.body)}</small></span></label>`).join('')}
         <div class="d-actions"><button class="btn btn-primary" data-ls-save>${esc(t('lsSave'))}</button><button class="btn" data-ap-cancel>${esc(t('apCancel'))}</button></div>`);
+  } else if (kind === 'rs-new') {
+    const N = S.rsNew, B = S.rsWb, pick = N.wb || (B && (B.find(b => b.available && b.auto) || {}).id) || '';
+    const wbRow = b => `<label class="rs-wb${b.available ? '' : ' off'}"><input type="radio" name="rs-wb" value="${esc(b.id)}" ${b.id === pick ? 'checked' : ''} ${b.available ? '' : 'disabled'}><span><b>${esc(t('wbName_' + b.id))}</b>${b.auto ? '' : ` <span class="rs-tag">${esc(t('rsManualTag2'))}</span>`}<small>${esc(t('wbWhere_' + b.id))}</small>${b.available ? `<small>${esc(t('rsModelIs', b.model || t('wbModelDefault_' + b.id)))}</small>` : `<small class="sync-bad">${esc(t('wbReason_' + b.reason))}</small>`}</span></label>`;
+    const pb = B && B.find(b => b.id === pick);
+    setSheet(t('rsNewHead'), `<p>${esc(t('rsNewP'))}</p>
+      <label class="fld"><span>${esc(t('rsQ'))}</span><textarea id="rs-q" rows="3" placeholder="${esc(t('rsQPh'))}">${esc(N.q || '')}</textarea></label>
+      <label class="fld"><span>${esc(t('rsLine'))}</span><select id="rs-thread">${threadOptions(N.thread, { onlyOpen: true })}</select></label>
+      <label class="fld"><span>${esc(t('rsInputs'))}</span><textarea id="rs-inputs" rows="2" placeholder="/Users/…/blind-input.zip">${esc(N.inputs || '')}</textarea></label>
+      <div class="rs-drop" id="rs-drop"><button class="btn" type="button" data-rs-pick>${esc(t('rsPick'))}</button><span>${esc(N.uploading ? t('rsUploading', N.uploading) : t('rsDrop'))}</span><input type="file" id="rs-file" multiple hidden></div>
+      <div class="fld"><span>${esc(t('rsBench'))}</span>${B ? B.map(wbRow).join('') : S.rsWbErr ? `<p class="sync-bad">${esc(t('rsWbFail'))} <button class="btn" type="button" data-rs-retry>${esc(t('rsRetry'))}</button></p>` : `<p>${esc(t('gxLoading'))}</p>`}</div>
+      <p class="muted">${esc(t('rsWhen'))}</p>
+      ${N.error ? `<p class="sync-bad">${esc(N.error)}</p>` : ''}
+      <div class="d-actions">${pb ? `<button class="btn btn-primary" data-rs-save="run" ${N.busy ? 'disabled' : ''}>${esc(t(pb.auto ? 'rsSaveRun' : 'rsSavePrep', t('wbName_' + pb.id)))}</button>` : ''}<button class="btn${pb ? '' : ' btn-primary'}" data-rs-save="only" ${N.busy ? 'disabled' : ''}>${esc(t('rsSaveOnly'))}</button></div>`);
+    $('#rs-q').focus();
   } else if (kind === 'ap-send') {
     setSheet(t('apSendTitle'), `<p>${esc(t('apSendP', S.apSend.name))}</p><div class="l-cmd"><code>${esc(S.apSend.prompt)}</code><button class="btn" data-ap-copy>${esc(t('copy2'))}</button></div>`);
   } else if (kind === 'sync') {
@@ -4062,6 +4287,7 @@ async function initSample() {
   $('#ai-item').hidden = !aiAvailable();
 }
 $('#goals-btn').onclick = () => openSheet('goals');
+$('#rs-new-btn').onclick = () => { S.rsNew = { key: uid('q'), thread: S.sel && S.sel.type === 'thread' ? S.sel.id : S.sel && S.sel.type === 'commit' ? tidOf(S.commits.get(S.sel.id) || {}) : INBOX }; openSheet('rs-new'); rsBenches().then(() => S.sheet === 'rs-new' && openSheet('rs-new')); };
 
 /* ---- goals and to-dos: a sheet, so the main page stays as it is ---- */
 // A to-do is a task meant to be ticked: the first instruction of a session (logged by hooks or
@@ -4255,7 +4481,7 @@ function renderGoals() {
     const by = c.done && c.doneBy && c.doneBy !== 'human' ? agentBy(c) : '';
     const who = c.done ? '' : handActs(c);
     const ret = c.returned && !c.done ? `<span class="gl-ret-tag" title="${esc(t('rvReturnedBy', c.returned.by || ''))}">${esc(t('rvReturned'))}${c.returned.n > 1 ? ` ×${c.returned.n}` : ''}${c.returned.note ? `: ${esc(c.returned.note)}` : ''}</span>` : '';
-    const title = S.glEdit === c.id ? `<input class="gl-t-in" data-title="${esc(c.id)}" value="${esc(c.title)}" enterkeyhint="done" aria-label="${esc(t('goalsEdit'))}">` : `<span class="gl-t" data-cid="${esc(c.id)}">${ret}${esc(c.title)}</span>`;
+    const title = S.glEdit === c.id ? `<input class="gl-t-in" data-title="${esc(c.id)}" value="${esc(c.title)}" enterkeyhint="done" aria-label="${esc(t('goalsEdit'))}">` : `<span class="gl-t" data-cid="${esc(c.id)}">${ret}${starMark(c)}${esc(c.title)}</span>`;
     return `<li data-k="${esc(c.id)}" class="${c.done ? 'done' : ''} ${S.glOpen === c.id ? 'open' : ''}"><input type="checkbox" data-task="${esc(c.id)}" ${c.done ? 'checked' : ''} aria-label="${esc(c.title)}">${title}<span class="gl-acts">${who}<button class="btn gl-edit" data-edit="${esc(c.id)}">${esc(t('goalsEdit'))}</button><button class="btn gl-view" data-view-rec="${esc(c.id)}">${esc(t('goalsView'))}</button></span>${by}<time>${fmtShort(c.doneAt || c.ts)}</time></li>`;
   };
   // A row to review: who did it and when, its result, Pass and Return (a reason box opens under it). The title opens the record.
@@ -4337,6 +4563,40 @@ function handCommand(c) {
   return `${dir ? `cd ${shq(dir)} && ` : ''}TRACE_CANVAS_THREAD=${tid} ${AGENT_LAUNCH[c.assignee](t('handPrompt', th.name, tid, c.title))}`;
 }
 const sheetBody = $('#sheet-body');
+sheetBody.addEventListener('input', e => {
+  if (S.sheet !== 'rs-new') return;
+  const id = e.target.id; if (id === 'rs-q') S.rsNew.q = e.target.value; else if (id === 'rs-inputs') S.rsNew.inputs = e.target.value;
+});
+sheetBody.addEventListener('change', e => {
+  if (S.sheet !== 'rs-new') return;
+  if (e.target.id === 'rs-thread') S.rsNew.thread = e.target.value;
+  if (e.target.name === 'rs-wb') { S.rsNew.wb = e.target.value; openSheet('rs-new'); }
+});
+sheetBody.addEventListener('click', e => {
+  if (S.sheet !== 'rs-new') return;
+  if (e.target.closest('[data-rs-pick]')) $('#rs-file').click();
+  if (e.target.closest('[data-rs-retry]')) { S.rsWbErr = false; openSheet('rs-new'); rsBenches().then(() => S.sheet === 'rs-new' && openSheet('rs-new')); }
+});
+sheetBody.addEventListener('change', e => { if (e.target.id === 'rs-file' && e.target.files.length) rsUpload([...e.target.files]); });
+for (const ev of ['dragover', 'dragleave', 'drop']) sheetBody.addEventListener(ev, e => {
+  const z = S.sheet === 'rs-new' && e.target.closest && e.target.closest('#rs-drop, #rs-inputs'); if (!z) return;
+  e.preventDefault(); $('#rs-drop').classList.toggle('over', ev === 'dragover');
+  if (ev === 'drop' && e.dataTransfer.files.length) rsUpload([...e.dataTransfer.files]);
+});
+sheetBody.addEventListener('click', async e => {
+  const b = e.target.closest('[data-rs-save]'); if (!b || S.sheet !== 'rs-new') return;
+  const N = S.rsNew, q = (N.q || '').trim();
+  if (!q) { N.error = t('rsErr_empty'); return openSheet('rs-new'); }
+  const wb = b.dataset.rsSave === 'run' ? (N.wb || (S.rsWb.find(x => x.available && x.auto) || {}).id) : '';
+  if (N.uploading) return;
+  N.busy = true; N.error = ''; openSheet('rs-new');
+  // The same key on a retry: the server returns the card it already made instead of a second one.
+  const r = await postJSON('/api/research/new', { key: N.key, question: q, thread: N.thread || INBOX, inputs: (N.inputs || '').split('\n').map(x => x.trim()).filter(Boolean), workbench: wb });
+  N.busy = false;
+  if (r.error) { N.error = rsErr(r.error); return openSheet('rs-new'); }
+  closeSheet(); S.wantRec = r.id; await loadServer(); render();
+  toast(r.runError ? t('tRsSavedNoRun', rsErr(r.runError)) : r.run ? t(r.run.status === 'waiting' ? 'tRsPrepared' : 'tRsStarted', t('wbName_' + r.run.workbench)) : t('tRsSaved'));
+});
 // Quiet lines sit in one row of small chips; a chip opens one sentence and three answers.
 function quietStrip() {
   const q = quietLines();
@@ -4646,6 +4906,9 @@ applyStatic();
 renderKinds();
 autosize();
 const h = (location.hash || '').slice(1);
+S.wantRec = (/^rec=(.+)$/.exec(h) || [])[1] || null;
+// #rec=<id> on a page already open: select it now (it is in the data already) and put the view back in the address.
+addEventListener('hashchange', () => { const id = (/^#rec=(.+)$/.exec(location.hash) || [])[1]; if (id && S.commits.has(id)) { select({ type: 'commit', id }); history.replaceState(null, '', '#' + S.view); } });
 setView(['git', 'timeline', 'agents'].includes(h) ? h : 'canvas');
 initStore();
 initSample();

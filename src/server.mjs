@@ -21,6 +21,7 @@ import { otherMachines, remoteLive } from './remote.mjs';
 import { commitDiff, commitInfo, readLinkedImage, readLinkedMd } from './git-view.mjs';
 import { autopilotSig, runSync, syncSoon, syncStatus } from './sync.mjs';
 import { doctor } from './doctor.mjs';
+import { createCard, refreshCard, resumeCommand, returnRun, startRun, workbenches } from './research.mjs';
 import { desktopSessions } from './desktop.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -69,6 +70,12 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
     clearTimeout(pending[event]);
     pending[event] = setTimeout(() => { for (const res of clients) res.write(`event: ${event}\ndata: ${Date.now()}\n\n`); }, 80);
   };
+  // Research runs end on their own: their cards catch up every 10 s, whether or not a page is open.
+  const activeCards = d => Object.values(d.commits).filter(c => c.research && (c.research.runs || []).some(r => r.status === 'submitted' || r.status === 'running')).map(c => c.id);
+  setInterval(() => {
+    const ids = activeCards(readData());
+    if (ids.length && mutate(d => ids.map(id => refreshCard(d, id)).some(Boolean) || false)) broadcast('change');
+  }, 10e3).unref();
   // An Autopilot switch that changed here (asked, taken up by a session, stopped, ended by its summary) goes to the
   // other machines at once, not with the next 2-minute sync, so their pages show it too.
   let apSig = autopilotSig(readData());
@@ -202,6 +209,49 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
       // ▶ Start: a Claude Code session on the line in a new Terminal window, with Remote Control on, so it
       // shows in the Claude app on the phone. Built from the line or to-do id like Open in Terminal; a line
       // that already has a session running gets none, the person is pointed at that one instead.
+      // Research question cards (src/research.mjs). A run starts an agent on this computer, so not from the phone.
+      if (p.startsWith('/api/research/')) {
+        if (remote) return send(res, 403, { error: 'Only on the computer itself' });
+        if (req.method === 'GET' && p === '/api/research/workbenches') return send(res, 200, { workbenches: workbenches() });
+        if (req.method !== 'POST') return send(res, 404, { error: 'not found' });
+        // A file picked or dropped on the page: the browser cannot give its path, so its bytes come here, into a folder of
+        // its own, and the form uses that path. At most 500 MB.
+        if (p === '/api/research/upload') {
+          const name = path.basename(String(url.searchParams.get('name') || '')).replace(/[\u0000-\u001f]/g, '');
+          if (!name || name === '.' || name === '..') return send(res, 400, { error: 'name' });
+          const dir = path.join(home(), 'research', 'uploads', crypto.randomBytes(6).toString('hex')), file = path.join(dir, name);
+          fs.mkdirSync(dir, { recursive: true });
+          const ok = await new Promise(done => {
+            let size = 0; const out = fs.createWriteStream(file);
+            req.on('data', c => { size += c.length; if (size > 500 << 20) { req.destroy(); out.destroy(); done(false); } });
+            req.pipe(out); out.on('finish', () => done(true)); out.on('error', () => done(false)); req.on('error', () => done(false));
+          });
+          if (!ok) { fs.rmSync(dir, { recursive: true, force: true }); return send(res, 200, { error: 'big' }); }
+          return send(res, 200, { path: file });
+        }
+        const b = JSON.parse((await readBody(req)) || '{}'), card = String(b.card || '');
+        const act = fn => { try { const r = mutate(fn); broadcast('change'); return send(res, 200, r); } catch (e) { return send(res, 200, { error: String(e.message || e) }); } };
+        // Save, and with a workbench run it once. A retried save (same key) returns the card it made; a run that
+        // cannot start leaves the card saved and says why.
+        if (p === '/api/research/new') return act(d => {
+          const had = b.key && Object.values(d.commits).find(c => c.research && c.research.key === b.key);
+          if (had) return { id: had.id, again: true };
+          const c = createCard(d, { question: b.question, thread: b.thread, inputs: Array.isArray(b.inputs) ? b.inputs : [] });
+          if (b.key) c.research.key = String(b.key);
+          if (!b.workbench) return { id: c.id };
+          try { return { id: c.id, run: startRun(d, c.id, { workbench: String(b.workbench), mode: 'single', key: c.id + ':v1:single' }).run }; } catch (e) { return { id: c.id, runError: String(e.message || e) }; }
+        });
+        if (p === '/api/research/run') return act(d => startRun(d, card, { workbench: String(b.workbench || ''), mode: b.mode === 'control' ? 'control' : 'single', key: String(b.key || '') }));
+        if (p === '/api/research/return') return act(d => ({ run: returnRun(d, card, String(b.run || ''), b) }));
+        if (p === '/api/research/refresh') { const changed = mutate(d => refreshCard(d, card) || false); if (changed) broadcast('change'); return send(res, 200, { changed: !!changed }); }
+        if (p === '/api/research/open') {
+          const r = ((readData().commits[card] || {}).research || { runs: [] }).runs.find(x => x.id === b.run), cmd = r && resumeCommand(r);
+          if (!cmd) return send(res, 200, { error: 'nosession' });
+          const failed = await openTerminal(cmd);
+          return send(res, 200, failed ? { error: failed, command: cmd } : { ok: true, command: cmd });
+        }
+        return send(res, 404, { error: 'not found' });
+      }
       if (req.method === 'POST' && p === '/api/start') {
         if (!canStart(remote)) return send(res, 403, { error: remote ? 'Turn it on with trace-canvas phone --allow-start' : 'No terminal to open on this machine (macOS, or a Linux desktop)' });
         // A to-do handed to Codex or Gemini starts that agent; handTo would otherwise reassign it to Claude Code.

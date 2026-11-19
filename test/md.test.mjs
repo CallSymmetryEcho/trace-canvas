@@ -24,13 +24,17 @@ test('a report reads as Markdown, and its text stays text', () => {
   assert.doesNotMatch(html, /<script>/);
 });
 
-test('the reader opens only .md and .txt files a record links', () => {
+test('the reader opens only reports (.md, .txt) and data or code (.csv, .py, .json) a record links', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-md-')), f = path.join(dir, 'r.md'), txt = path.join(dir, 'plan.txt');
-  fs.writeFileSync(f, '# Report'); fs.writeFileSync(txt, '大纲\n- Fig.1');
-  const d = { commits: { c1: { links: [f, txt, path.join(dir, 'gone.md'), '/etc/hosts', path.join(dir, 's.json')] } } };
+  const csv = path.join(dir, 'per_frame.csv');
+  fs.writeFileSync(f, '# Report'); fs.writeFileSync(txt, '大纲\n- Fig.1'); fs.writeFileSync(csv, 'sequence,mid_net_DN\nS82,5472'); fs.writeFileSync(path.join(dir, 'run.sh'), 'rm -rf /');
+  const d = { commits: { c1: { links: [f, txt, csv, path.join(dir, 'gone.md'), '/etc/hosts', path.join(dir, 's.json'), path.join(dir, 'run.sh')] } } };
   assert.deepEqual(readLinkedMd(d, f), { text: '# Report' });
   assert.deepEqual(readLinkedMd(d, txt), { text: '大纲\n- Fig.1' });
-  assert.match(readLinkedMd(d, path.join(dir, 's.json')).error, /type/);
+  assert.deepEqual(readLinkedMd(d, csv), { text: 'sequence,mid_net_DN\nS82,5472' });
+  assert.match(readLinkedMd(d, path.join(dir, 's.json')).error, /missing/); // a text type, linked, not on disk
+  assert.match(readLinkedMd(d, path.join(dir, 'run.sh')).error, /type/); // linked, but not a type the page reads
+  assert.match(readLinkedMd(d, path.join(dir, 'analyze.py')).error, /unlinked/);
   assert.match(readLinkedMd(d, path.join(dir, 'other.md')).error, /unlinked/);
   assert.match(readLinkedMd(d, '/etc/hosts').error, /type/);
   assert.match(readLinkedMd(d, path.join(dir, 'gone.md')).error, /missing/);

@@ -162,7 +162,8 @@ Capturing is safe to repeat: records already on the canvas are skipped. If the h
 | `trace_merge` | Merges any number of threads, in `merge` or `combine` mode (below) |
 | `trace_fork` | Branches a new thread off a record or a thread's newest record; `bind: true` puts the calling session on it |
 | `trace_detach` | Makes a forked thread a line of its own; `take` moves the record that started it over as its first |
-| `trace_log` | Adds one record |
+| `trace_log` | Adds one record (with `quest`, a step of that Quest) |
+| `trace_quest` | Opens a Quest, or closes one with its conclusion |
 | `trace_import_data` | Merges another data set: an export, `data.json` from another computer, or JSON lines |
 | `trace_live` | Lists the sessions running now, with status, activity and thread |
 | `trace_bind` | Puts a running session (the current one by default) on a thread |
@@ -222,9 +223,17 @@ Agents use the same list. At the start of work they read the goal and the open t
 
 **Lines that have gone quiet.** A line nobody has touched for three times its usual gap (at least three days), with no session on it, gets a small dot on **Goals** and a chip under **Gone quiet** at the top of the list; nothing pops up. Click the chip for one sentence and three answers: a line with no open to-dos is asked whether it is finished (**Done**, **Parked**, **Still on it**), one with open to-dos whether to park it. **Still on it** counts as activity, so it asks again only after another quiet spell.
 
+## Quest: one long piece of work as one card
+
+Some answers take many steps: an Autopilot round, a long investigation, a study, a bug hunt across sessions. Logged one by one, they bury the line. A **Quest** keeps them together: on the line it is one card with its question and, once closed, its conclusion; open it and its steps are listed in order, each opening like any record. To-dos stay on the line.
+
+- **Start one yourself:** at the start of the capture box type `/` (from a Chinese keyboard `、` works too) and pick **Quest**, or type `/quest <your question>`. Enter opens the Quest form with the question filled in; add files the question rests on (they are copied and frozen with it) and, if you like, a workbench (Codex or Claude Code) to run it. A path such as `/home/…` or anything that is not a command stays plain text: nothing becomes a Quest unless you pick it.
+- **Agents start them too:** `trace_quest` opens one (question, line, optional files), `trace_log` with `quest: <its id>` adds a step, and `trace_quest` with the id and a `conclusion` closes it. The skill tells agents to open one only for work that takes many steps, not for a one- or two-step job.
+- **Autopilot** opens one per round, so a round of a dozen decisions is one station on the line.
+
 ## Autopilot (beta): a line's to-dos, done by your rules
 
-**Autopilot (beta)** in a line's panel (or `trace-canvas autopilot <line>`, or `/trace-canvas autopilot <line>`) keeps a line's to-dos moving until you turn it off: the line's agent works through every open to-do by your **decision profile** and logs each decision as "what it did · the rule it rests on", so you can follow it on the line. It never sends email or messages to people, pushes, publishes anything or changes permissions or credentials: it gets those ready and asks you. It stops to ask when something touches security, no rule covers it, or the rule is still swinging.
+**Autopilot (beta)** in a line's panel (or `trace-canvas autopilot <line>`, or `/trace-canvas autopilot <line>`) keeps a line's to-dos moving until you turn it off: the line's agent works through every open to-do by your **decision profile** and logs each decision as "what it did · the rule it rests on", so you can follow it on the line. Each round is one **Quest** on the line: its plan, decisions and hand-overs sit inside that card, and the summary closes it. It commits, pushes its own commits and restarts its own services, but never publishes anything outside, sends email or messages to people, force-pushes or rewrites pushed history, changes permissions or credentials, opens ports to the internet or deletes for good: it gets those ready and asks you. It stops to ask when something touches security, no rule covers it, or the rule is still swinging.
 
 The decision profile is a decision or note on any line titled with its name and a version, such as "decision profile v1" or "决策画像 v1" (the highest version counts; later records with the same version add to it): your hard rules, the stable rules your past decisions show, what still swings, and one-offs that are not rules. Without one, Autopilot follows four basic rules. While it is on the line shows **Autopilot** and the button reads **Stop Autopilot**. When the agent reaches something it cannot decide it logs an "Autopilot summary" record and stops to ask; answer it in its session and it goes on to the next thing it cannot decide. The switch stays on until you turn it off.
 

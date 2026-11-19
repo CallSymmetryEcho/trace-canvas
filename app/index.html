@@ -414,6 +414,7 @@ body.history-open .hist-btn span { display: inline; }
 @keyframes st-flow { 0% { transform: translateY(56px); opacity: 0; } 25% { opacity: .9; } 85% { opacity: .9; } 100% { transform: translateY(0); opacity: 0; } }
 .card .live-badge.st-working .ldot { animation: none; }
 @media (prefers-reduced-motion: reduce), (hover: none) { .card.is-running .strip::after { animation: none; opacity: .9; } } /* still: a lit point at the head */
+.git-svg g[data-cid], .tl-body g[data-cid] { transform-box: fill-box; transform-origin: center; }
 .st-seg { position: absolute; left: 14.5px; top: 12px; width: 3px; border-radius: 2px; background: var(--c); transform-origin: bottom; pointer-events: none; }
 .st-ripple { position: absolute; left: 5px; top: 50%; width: 12px; height: 12px; margin-top: -6px; border-radius: 50%; border: 2px solid var(--rc); box-sizing: border-box; pointer-events: none; opacity: 0; }
 .is-inbox .strip::before { background: repeating-linear-gradient(to bottom, var(--c) 0 4px, transparent 4px 8px); }
@@ -2338,9 +2339,9 @@ function renderAll() {
   menuState();
   const fresh = freshRecords();
   if (S.view === 'canvas') { renderCanvas(); keepMoving(); playFresh(fresh); }
-  else if (S.view === 'git') renderGit();
+  else if (S.view === 'git') { renderGit(); keepMoving(); playFreshList('git', fresh); }
   else if (S.view === 'agents') renderAgents();
-  else renderTimeline();
+  else { renderTimeline(); keepMoving(); playFreshList('timeline', fresh); }
   renderEmpty();
   renderDetail();
 }
@@ -2427,6 +2428,38 @@ function playFresh(fresh) {
   if (!fresh) return intro();
   if (fresh.length > 6) return; // ponytail: a sync that brings a batch at once lands still; one action, one motion
   for (const id of fresh) if (liOf(id) && S.commits.has(id)) arrive(id, S.commits.get(id));
+}
+// The branch graph and the timeline: a new record's dot springs in (its row slides in on the graph); the first
+// time a view is drawn in this page, what is on the screen comes in quickly, newest row first on the graph, in time order on the timeline.
+const introDone = new Set();
+const dotOf = (view, id) => (view === 'git' ? $('#git-body') : $('#tl-inner'))?.querySelector(`svg g[data-cid="${CSS.escape(id)}"]`);
+const rowOf = id => $('#git-body')?.querySelector(`.g-row[data-cid="${CSS.escape(id)}"]`);
+const SLIDE = [{ transform: 'translateY(-8px)', opacity: 0 }, { transform: 'none', opacity: 1 }];
+function playFreshList(view, fresh) {
+  if (CALM.matches || !loaded()) return;
+  if (!introDone.has(view)) { introDone.add(view); return view === 'git' ? introGit() : introTimeline(); }
+  if (!fresh || !fresh.length || fresh.length > 6) return;
+  for (const id of fresh) {
+    if (view === 'git') motion(() => rowOf(id), SLIDE, { duration: 320, easing: EASE_OUT, fill: 'backwards' });
+    motion(() => dotOf(view, id), POP, { duration: 420, delay: view === 'git' ? 80 : 0, easing: SPRING, fill: 'backwards' });
+  }
+}
+function introGit() {
+  const wrap = $('#git-scroll'), top = wrap.getBoundingClientRect().top, bot = top + wrap.clientHeight;
+  const rows = [...$('#git-body').querySelectorAll('.g-row[data-cid]')].filter(r => { const b = r.getBoundingClientRect(); return b.bottom > top && b.top < bot; }).slice(0, 30);
+  motion(() => $('#git-body .git-svg'), [{ opacity: 0 }, { opacity: 1 }], { duration: 300, easing: 'ease-out', fill: 'backwards' });
+  rows.forEach((r, i) => {
+    const id = r.dataset.cid, d = i * Math.min(25, 550 / rows.length);
+    motion(() => rowOf(id), SLIDE, { duration: 280, delay: d, easing: EASE_OUT, fill: 'backwards' });
+    motion(() => dotOf('git', id), POP, { duration: 260, delay: d + 40, easing: SPRING, fill: 'backwards' });
+  });
+}
+function introTimeline() {
+  const wrap = $('#tl-scroll'), v = wrap.getBoundingClientRect();
+  const gs = [...$('#tl-inner').querySelectorAll('svg g[data-cid]')].filter(g => { const b = g.getBoundingClientRect(); return b.right > v.left && b.left < v.right && b.bottom > v.top && b.top < v.bottom; })
+    .map(g => g.dataset.cid).sort((a, b) => S.commits.get(a).ts - S.commits.get(b).ts).slice(-80);
+  motion(() => $('#tl-inner .tl-body'), [{ opacity: 0 }, { opacity: 1 }], { duration: 300, easing: 'ease-out', fill: 'backwards' });
+  gs.forEach((id, i) => motion(() => dotOf('timeline', id), POP, { duration: 260, delay: 60 + i * (560 / gs.length), easing: SPRING, fill: 'backwards' }));
 }
 // A new station: the line grows to it from the station before, then it springs in with a ripple of its own colour (a decision's is bigger).
 function arrive(id, c) {
@@ -3303,6 +3336,7 @@ $('#tl-scroll').addEventListener('click', e => {
 
 /* ================= detail drawer ================= */
 const detail = $('#detail');
+let detailOut = null, lastSelKey = '';
 let lastKey = '', lastHTML = '', detailHold = false;
 // The panel holds still from a tap's pointerdown until its click has landed (a phone sends the click
 // a moment after pointerup): a live update in between would replace the button under the finger.
@@ -3942,7 +3976,16 @@ function renderDetail() {
   }
   detail.classList.toggle('ap-on', !!sel && sel.type === 'thread' && apRun(getThread(sel.id)));
   detail.classList.toggle('ap-evo', !!sel && sel.type === 'thread' && apEvo(getThread(sel.id)));
-  if (!sel) { detail.hidden = true; detail.innerHTML = ''; lastKey = ''; lastHTML = ''; return; }
+  if (!sel) {
+    // Closing slides the panel out a little and fades it, then empties it (unless something was picked meanwhile).
+    const shut = () => { detailOut = null; if (S.sel) return; detail.hidden = true; detail.innerHTML = ''; lastKey = ''; lastHTML = ''; };
+    if (detailOut) return;
+    if (detail.hidden || CALM.matches) return shut();
+    detailOut = detail.animate([{ transform: 'none', opacity: 1 }, { transform: PHONE.matches ? 'translateX(28px)' : 'translateX(18px)', opacity: 0 }], { duration: 180, easing: 'ease-in', fill: 'forwards' });
+    detailOut.onfinish = () => { const a = detailOut; shut(); a?.cancel(); };
+    return;
+  }
+  if (detailOut) { detailOut.onfinish = null; detailOut.cancel(); detailOut = null; }
   const key = LANG + ':' + sel.type + ':' + sel.id + ':' + JSON.stringify(S.ui);
   const ae = document.activeElement;
   if (key === lastKey && (detailHold || (detail.contains(ae) && ae.matches('input, textarea, select')))) return;
@@ -3951,8 +3994,13 @@ function renderDetail() {
   lastKey = key; lastHTML = html;
   const sc = $('.d-scroll', detail);
   const top = sc ? sc.scrollTop : 0;
+  const opening = detail.hidden, other = !opening && lastSelKey !== sel.type + ':' + sel.id;
+  lastSelKey = sel.type + ':' + sel.id;
   detail.hidden = false;
   detail.innerHTML = html;
+  // Opening, the panel springs in from its side; another record in an open panel fades its contents in.
+  if (!CALM.matches && opening) detail.animate([{ transform: PHONE.matches ? 'translateX(40px)' : 'translateX(28px)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 380, easing: SPRING });
+  else if (!CALM.matches && other) $('.d-scroll', detail)?.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: EASE_OUT });
   apMove();
   const sc2 = $('.d-scroll', detail);
   if (sc2) sc2.scrollTop = top;

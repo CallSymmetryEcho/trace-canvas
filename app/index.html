@@ -207,7 +207,8 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .cv-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
 .cv-edges { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
 .cv-edges .e-line { fill: none; stroke-width: 2.4; stroke-linecap: round; }
-.cv-edges .edge-fork .e-line { stroke-dasharray: 6 6; }
+/* Far out, the fork and merge words fade with the records (the dashes and the arrow already say it); a relation's own words stay. */
+.cv-edges .edge-fork .e-label, .cv-edges .edge-merge .e-label { opacity: var(--fade, 1); }
 .cv-edges .edge-rel .e-line { stroke: var(--edge); }
 .cv-edges .e-head { stroke: none; }
 .cv-edges .edge-rel .e-head { fill: var(--edge); }
@@ -370,14 +371,14 @@ body.history-open .hist-btn span { display: inline; }
 /* While a round runs: a light runs round the card's border, a ticker under its head names the to-do in hand,
    and stars twinkle on the selector's track. Compositor-friendly (one rotating angle, one translate); off when motion is reduced. */
 @property --ap-a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
-.card.ap-on::after, .detail.ap-on::after { content: ''; position: absolute; inset: -1px; padding: 2px; border-radius: inherit; pointer-events: none; z-index: 2;
+.card.ap-on::after, .detail.ap-on::after, .far .card.ap-on:not(.is-shut) .card-head::after { content: ''; position: absolute; inset: -1px; padding: 2px; border-radius: inherit; pointer-events: none; z-index: 2;
   background: conic-gradient(from var(--ap-a), transparent 0 50%, color-mix(in srgb, #8b5cf6 35%, transparent) 72%, #a78bfa 88%, #8b5cf6 92%, transparent 97%);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: ap-run 3.2s linear infinite; }
 @keyframes ap-run { to { --ap-a: 360deg; } }
 .card.ap-on { box-shadow: 0 0 16px -6px color-mix(in srgb, #8b5cf6 50%, transparent); }
 /* The line panel of a running line: the same light, slower and softer, just inside its border (the panel clips overflow). */
 .detail.ap-on::after { inset: 0; padding: 1.5px; z-index: 5; opacity: .8; animation-duration: 6s; }
-.card.ap-evo::after, .detail.ap-evo::after { background: conic-gradient(from var(--ap-a), transparent 0 8%, color-mix(in srgb, #22d3ee 40%, transparent) 20%, #22d3ee 30%, transparent 36% 52%, color-mix(in srgb, #f472b6 40%, transparent) 66%, #f472b6 76%, #f59e0b 82%, transparent 88%); animation-duration: 2.2s; }
+.card.ap-evo::after, .detail.ap-evo::after, .far .card.ap-evo:not(.is-shut) .card-head::after { background: conic-gradient(from var(--ap-a), transparent 0 8%, color-mix(in srgb, #22d3ee 40%, transparent) 20%, #22d3ee 30%, transparent 36% 52%, color-mix(in srgb, #f472b6 40%, transparent) 66%, #f472b6 76%, #f59e0b 82%, transparent 88%); animation-duration: 2.2s; }
 .detail.ap-evo::after { animation-duration: 4s; }
 .card.ap-evo { animation: ap-evo-card 3s ease-in-out infinite; }
 @keyframes ap-evo-card { 0%, 100% { box-shadow: 0 0 18px -6px color-mix(in srgb, #f472b6 65%, transparent); } 50% { box-shadow: 0 0 22px -5px color-mix(in srgb, #22d3ee 65%, transparent); } }
@@ -391,7 +392,7 @@ body.history-open .hist-btn span { display: inline; }
 .chip-wait { color: var(--ok); border: 1px dashed var(--ok); opacity: .75; }
 @keyframes ap-wait { 50% { opacity: .55; } }
 @media (prefers-reduced-motion: reduce), (hover: none) { .chip-auto { animation: none; } .ap-burst::before { animation: none; display: none; } .ap-fill, .ap-knob, .ap-v, .ap-dot, .ap-row, .ap-row > span em { transition: none; }
-  .card.ap-on::after, .detail.ap-on::after, .is-run .ap-v::before, .is-run .ap-v::after, .is-wait .ap-knob, .is-evo .ap-v, .is-evo .ap-v::before, .is-evo .ap-v::after, .is-evo .ap-knob, .is-evo .ap-knob::before, .ap-row.is-evo > span em, .card.ap-evo, .chip-evo { animation: none; } .ap-tick span { animation: none; padding-left: 8px; } }
+  .card.ap-on::after, .detail.ap-on::after, .card.ap-on .card-head::after, .is-run .ap-v::before, .is-run .ap-v::after, .is-wait .ap-knob, .is-evo .ap-v, .is-evo .ap-v::before, .is-evo .ap-v::after, .is-evo .ap-knob, .is-evo .ap-knob::before, .ap-row.is-evo > span em, .card.ap-evo, .chip-evo { animation: none; } .ap-tick span { animation: none; padding-left: 8px; } }
 .chip-done { background: var(--surface-2); }
 .chip-merged { background: var(--surface-2); }
 .strip { list-style: none; margin: 0; padding: 2px 10px 4px 4px; position: relative; }
@@ -425,6 +426,9 @@ body.history-open .hist-btn span { display: inline; }
   box-shadow: 0 0 0 .5px color-mix(in srgb, var(--ink) 14%, transparent), 0 2px 10px -2px rgba(20, 24, 28, .14); }
 .far .card:not(.is-shut):hover .card-head { box-shadow: 0 0 0 .5px color-mix(in srgb, var(--ink) 18%, transparent), 0 4px 14px -2px rgba(20, 24, 28, .22); }
 .far .card.is-sel:not(.is-shut) { outline-color: transparent; }
+/* A running line's light goes round its capsule, not the emptied card (the transformed head holds the light's absolute box). */
+.far .card.ap-on:not(.is-shut)::after { display: none; }
+.far .card.ap-evo:not(.is-shut) { animation: none; }
 .far .card.is-sel:not(.is-shut) .card-head { box-shadow: 0 0 0 2px var(--accent), 0 2px 10px -2px rgba(20, 24, 28, .14); }
 .far .card:not(.is-shut) .strip { pointer-events: none; }
 .far .card:not(.is-shut) .card-head { flex-wrap: wrap; row-gap: 4px; }
@@ -2445,12 +2449,14 @@ function renderEmpty() {
 
 /* ================= canvas ================= */
 const vp = $('#cv'), cardsEl = $('#cv-cards'), edgesSvg = $('#cv-edges'), world = $('#cv-world');
+let edgeAt = 0.62, edgeRaf = 0; // the zoom the lines were last drawn for (see drawEdges)
 function applyCam() {
   const { x, y, z } = S.cam;
   world.style.transform = `translate(${x}px, ${y}px) scale(${z})`;
   vp.style.backgroundSize = `${24 * z}px ${24 * z}px`;
   vp.style.backgroundPosition = `${x * 0.85}px ${y * 0.85}px`; // the grid lags the cards a little: a hint of depth
   vp.style.setProperty('--z', z.toFixed(3)); vp.classList.toggle('far', z < 0.5); // the records have faded out by here (see --fade): the head has the card to itself
+  if (edgeAt !== Math.min(z, 0.62) && !edgeRaf) edgeRaf = requestAnimationFrame(() => { edgeRaf = 0; drawEdges(); }); // below 62% the lines follow the heads as they grow
   $('#zoom-reset').textContent = Math.round(z * 100) + '%';
 }
 /* ---- motion: only transform and opacity, and none under reduced motion or on a touch screen ---- */
@@ -2893,9 +2899,20 @@ function border(R, c, toward, gap) {
   const k = Math.min(dx ? hw / Math.abs(dx) : Infinity, dy ? hh / Math.abs(dy) : Infinity);
   return { x: c.x + dx * k, y: c.y + dy * k };
 }
+// Zoomed out, a line runs between the heads, not the emptied cards: each end slides from the card's box to its head as the records fade
+// (the same --fade the CSS uses), and the line, its arrow and gaps grow with the head (--k), so they stay the size they have at 62%.
 function drawEdges() {
+  const z = S.cam.z, k = clamp(0.62 / z, 1, 3), f = clamp((z - 0.5) * 8.3, 0, 1);
+  edgeAt = Math.min(z, 0.62);
   const rects = new Map();
-  for (const el of cardsEl.children) rects.set(el.dataset.tid, { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight });
+  for (const el of cardsEl.children) {
+    const R = { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight }, hd = el.querySelector('.card-head');
+    if (f < 1 && hd && !el.classList.contains('is-shut')) { // the head is scaled by k from its top left, and the card clips it
+      const H = { x: R.x + hd.offsetLeft, y: R.y + hd.offsetTop }; H.w = Math.min(hd.offsetWidth * k, R.x + R.w - H.x); H.h = Math.min(hd.offsetHeight * k, R.y + R.h - H.y);
+      for (const p of ['x', 'y', 'w', 'h']) R[p] = H[p] + (R[p] - H[p]) * f;
+    }
+    rects.set(el.dataset.tid, R);
+  }
   const lines = [];
   for (const th of S.threads.values()) {
     if (th.parent && rects.has(th.parent) && rects.has(th.id)) lines.push({ a: th.parent, b: th.id, kind: 'fork', label: t('edgeFork'), color: th.color });
@@ -2906,19 +2923,19 @@ function drawEdges() {
   edgesSvg.innerHTML = lines.map(L => {
     const A = rects.get(L.a), B = rects.get(L.b);
     const ca = { x: A.x + A.w / 2, y: A.y + A.h / 2 }, cb = { x: B.x + B.w / 2, y: B.y + B.h / 2 };
-    const p1 = border(A, ca, cb, 6), p2 = border(B, cb, ca, 8);
+    const p1 = border(A, ca, cb, 6 * k), p2 = border(B, cb, ca, 8 * k);
     const ang = Math.atan2(p2.y - p1.y, p2.x - p1.x);
-    const hx = p2.x - Math.cos(ang) * 11, hy = p2.y - Math.sin(ang) * 11;
-    const left = { x: hx + Math.cos(ang + Math.PI / 2) * 5.5, y: hy + Math.sin(ang + Math.PI / 2) * 5.5 };
-    const right = { x: hx - Math.cos(ang + Math.PI / 2) * 5.5, y: hy - Math.sin(ang + Math.PI / 2) * 5.5 };
+    const hx = p2.x - Math.cos(ang) * 11 * k, hy = p2.y - Math.sin(ang) * 11 * k;
+    const left = { x: hx + Math.cos(ang + Math.PI / 2) * 5.5 * k, y: hy + Math.sin(ang + Math.PI / 2) * 5.5 * k };
+    const right = { x: hx - Math.cos(ang + Math.PI / 2) * 5.5 * k, y: hy - Math.sin(ang + Math.PI / 2) * 5.5 * k };
     const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
     const w = [...L.label].reduce((s, ch) => s + (ch.charCodeAt(0) > 255 ? 12 : 7), 0) + 16;
-    const stroke = L.kind === 'rel' ? '' : `style="stroke:${L.color}"`;
+    const stroke = `style="stroke-width:${(2.4 * k).toFixed(2)};stroke-dasharray:${L.kind === 'fork' ? `${6 * k} ${6 * k}` : 'none'}${L.kind === 'rel' ? '' : `;stroke:${L.color}`}"`;
     const fill = L.kind === 'rel' ? '' : `style="fill:${L.color}"`;
     return `<g class="edge edge-${L.kind} ${L.id && L.id === selE ? 'is-sel' : ''}" ${L.id ? `data-eid="${esc(L.id)}"` : ''}>
       <path class="e-line" d="M${p1.x.toFixed(1)} ${p1.y.toFixed(1)} L${hx.toFixed(1)} ${hy.toFixed(1)}" ${stroke}/>
       <polygon class="e-head" points="${p2.x.toFixed(1)},${p2.y.toFixed(1)} ${left.x.toFixed(1)},${left.y.toFixed(1)} ${right.x.toFixed(1)},${right.y.toFixed(1)}" ${fill}/>
-      <g class="e-label" transform="translate(${mx.toFixed(1)} ${my.toFixed(1)})"><rect x="${-w / 2}" y="-10" width="${w}" height="20" rx="10"/><text>${esc(L.label)}</text></g>
+      <g class="e-label" transform="translate(${mx.toFixed(1)} ${my.toFixed(1)}) scale(${k.toFixed(3)})"><rect x="${-w / 2}" y="-10" width="${w}" height="20" rx="10"/><text>${esc(L.label)}</text></g>
     </g>`;
   }).join('');
 }

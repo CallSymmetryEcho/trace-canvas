@@ -924,6 +924,8 @@ body.sheet-open .top { z-index: 80; }
 .gx-diff .h:first-child { margin-top: 0; }
 .gx-diff .h strong { font-weight: 700; color: var(--ink); margin-right: 8px; } .gx-diff .h u { text-decoration: none; color: var(--muted); font-family: var(--f-body); }
 .gx-diff .x { color: var(--muted); }
+.gx-diff.only span:not(.a):not(.d):not(.h) { display: none; }
+.gx-check { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; white-space: nowrap; } .gx-check input { margin: 0; }
 .gx-diff b { font-weight: 600; background: color-mix(in srgb, currentColor 16%, transparent); border-radius: 2px; }
 /* Added and removed lines are a row colour and a bold sign; the code keeps its own colours (hlLine): keyword, string, comment, number.
    Each is at least 4.5:1 on the plain, the added and the removed row of every theme. */
@@ -1375,7 +1377,7 @@ apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent 
     livePrompt: 'Latest instruction', liveThread: 'Thread', liveAuto: 'Automatic (repository and branch)', liveNow: 'Now on',
     liveResume: 'Resume in a terminal', openChat: 'Open the chat', openChatWeb: 'Open on claude.ai', goTerm: 'Go to its terminal', tNoTerm: 'Its terminal tab is no longer open', liveRunning: 'Running now', lineSessions: 'Sessions on this line', loggedIn: 'Logged in',
     gxChanges: 'Changes', gxLoading: 'Reading from git…', gxNoRepo: 'This repository is not on this computer.', gxNoRepoOn: m => `This repository is on ${m}, not on this computer.`, gxNoCommit: 'This commit is no longer in its repository (rewritten or cleaned up).',
-    gxLine: n => `line ${n}`, gxRole_test: 'test', gxRole_doc: 'docs', gxRole_gen: 'generated', gxFiles: n => `${n} file${n === 1 ? '' : 's'}`, gxMore: n => `${n} more`, gxQuiet: n => `${n} binary or generated`, gxBinary: 'binary',
+    gxLine: n => `line ${n}`, gxOnly: 'Changed lines only', gxRole_test: 'test', gxRole_doc: 'docs', gxRole_gen: 'generated', gxFiles: n => `${n} file${n === 1 ? '' : 's'}`, gxMore: n => `${n} more`, gxQuiet: n => `${n} binary or generated`, gxBinary: 'binary',
     gxCompare: 'Compare with', gxThisOnly: 'this commit only', gxOtherRepo: 'That station is in another repository.', gxTruncated: 'Cut at 200 KB.',
     gxLater: 'Committed later in', gxUncommitted: 'Not committed yet.', copyResume: 'Copy resume command', lineSessionsHint: 'Resume one to keep working on this line instead of starting a new session.', liveBadge: (n, w) => `${n} running${w ? `, ${w} need${w === 1 ? 's' : ''} you` : ''}`,
     tBound: n => `Bound to “${n}”`, tUnbound: 'Back to the repository and branch line',
@@ -1557,7 +1559,7 @@ apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的
     livePrompt: '最近的指令', liveThread: '所属线', liveAuto: '自动（按仓库和分支）', liveNow: '当前在',
     liveResume: '在终端里恢复', openChat: '打开对话', openChatWeb: '在 claude.ai 打开', goTerm: '跳到终端', tNoTerm: '它的终端标签页已经关了', liveRunning: '正在运行', lineSessions: '这条线上的会话', loggedIn: '记在这个会话里',
     gxChanges: '改动', gxLoading: '正在从 git 读取…', gxNoRepo: '这台电脑上没有这个仓库。', gxNoRepoOn: m => `这个仓库在 ${m} 上，这台电脑上没有。`, gxNoCommit: '仓库里已经没有这个提交，可能被改写或清理了。',
-    gxLine: n => `第 ${n} 行`, gxRole_test: '测试', gxRole_doc: '文档', gxRole_gen: '生成', gxFiles: n => `${n} 个文件`, gxMore: n => `还有 ${n} 个`, gxQuiet: n => `${n} 个二进制或生成文件`, gxBinary: '二进制',
+    gxLine: n => `第 ${n} 行`, gxOnly: '只看改动的行', gxRole_test: '测试', gxRole_doc: '文档', gxRole_gen: '生成', gxFiles: n => `${n} 个文件`, gxMore: n => `还有 ${n} 个`, gxQuiet: n => `${n} 个二进制或生成文件`, gxBinary: '二进制',
     gxCompare: '对比', gxThisOnly: '只看这次提交', gxOtherRepo: '那个站点不在同一个仓库。', gxTruncated: '超过 200 KB，已截断。',
     gxLater: '之后提交于', gxUncommitted: '尚未提交。', copyResume: '复制恢复命令', lineSessionsHint: '恢复其中一个就能接着在这条线上做，不用新开会话。', liveBadge: (n, w) => `${n} 个运行中${w ? `，${w} 个等你` : ''}`,
     tBound: n => `已绑定到「${n}」`, tUnbound: '已改回按仓库和分支自动归线',
@@ -3674,7 +3676,7 @@ function diffHTML(r, path) {
       const m = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@ ?(.*)$/.exec(l) || [0, 0, 0, ''], at = (r.hunks && r.hunks[++hk]) || {};
       o = +m[1]; n = +m[2]; lang = at.lang || ext;
       const scope = at.scope || m[3].trim();
-      return `${scope ? `<strong>${esc(scope.length > 90 ? scope.slice(0, 90) + ' …' : scope)}</strong>` : ''}<u>${esc(t('gxLine', n))}</u>`;
+      return `${scope ? `<strong>${esc(scope.length > 60 ? scope.slice(0, 60) + ' …' : scope)}</strong>` : ''}<u>${esc(t('gxLine', n))}</u>`;
     }
     if (l[0] === '\\') return esc(l);
     nums[i] = l[0] === '-' ? o++ : (l[0] === '+' || o++, n++); wide = Math.max(wide, String(nums[i]).length);
@@ -3690,7 +3692,7 @@ function diffHTML(r, path) {
       return mark(l) + esc((from > 1 ? '… ' : '') + l.slice(from, p)) + `<b>${esc(mid.length > 600 ? mid.slice(0, 600) + ' …' : mid)}</b>` + esc(l.slice(end, to) + (to < l.length ? ' …' : '')); };
     out[i] = cut(a); out[i + 1] = cut(b); i++;
   }
-  return `<pre class="gx-diff" style="--gw:${wide}ch">${lines.map((l, i) => `<span class="${l[0] === '+' ? 'a' : l[0] === '-' ? 'd' : l.startsWith('@@') ? 'h' : l[0] === '\\' ? 'x' : ''}"${nums[i] ? ` data-n="${nums[i]}"` : ''}>${out[i] || ' '}</span>`).join('')}</pre>${r.truncated ? `<p class="gx-note">${esc(t('gxTruncated'))}</p>` : ''}`;
+  return `<pre class="gx-diff${ls.get('tc.gxOnly', false) ? ' only' : ''}" style="--gw:${wide}ch">${lines.map((l, i) => `<span class="${l[0] === '+' ? 'a' : l[0] === '-' ? 'd' : l.startsWith('@@') ? 'h' : l[0] === '\\' ? 'x' : ''}"${nums[i] ? ` data-n="${nums[i]}"` : ''}>${out[i] || ' '}</span>`).join('')}</pre>${r.truncated ? `<p class="gx-note">${esc(t('gxTruncated'))}</p>` : ''}`;
 }
 function changesHTML(c) {
   if (S.mode !== 'server') return '';
@@ -3720,7 +3722,9 @@ function changesHTML(c) {
   const pick = others.length ? `<label>${esc(t('gxCompare'))} <select class="gx-against" data-cid="${esc(c.id)}"><option value="">${esc(t('gxThisOnly'))}</option>${others.map(x => `<option value="${esc(x.id)}" ${x.id === against ? 'selected' : ''}>${esc(gitSha(x).slice(0, 7))} · ${esc(x.title.replace(/^[^:：]*[:：]\s*/, '').slice(0, 40))}</option>`).join('')}</select></label>` : '';
   const sum = `${esc(info.against && info.against.short ? `${info.short} ↔ ${info.against.short}` : info.short)} · ${esc(t('gxFiles', files.length))} · <b class="gx-add">+${add}</b> <b class="gx-del">−${del}</b>${quiet.length ? ` · ${esc(t('gxQuiet', quiet.length))}` : ''}`;
   const cross = info.against && info.against.missing;
-  return head + `<div class="gx-head"><span>${cross ? esc(info.short) : sum}</span>${pick}</div>`
+  // Changed lines only: hides the unchanged lines around a change in every diff (the hunk bands stay).
+  const only = cross ? '' : `<label class="gx-check"><input type="checkbox" class="gx-only" ${ls.get('tc.gxOnly', false) ? 'checked' : ''}>${esc(t('gxOnly'))}</label>`;
+  return head + `<div class="gx-head"><span>${cross ? esc(info.short) : sum}</span>${pick}${only}</div>`
     + (cross ? `<p class="gx-note">${esc(t('gxOtherRepo'))}</p>` : `<ul class="gx-list">${shown.map(row).join('')}</ul>`)
     + (hidden > 0 ? `<button class="linkish" data-act="gx-more" data-key="${esc(key)}">${esc(t('gxMore', hidden))}</button>` : '');
 }
@@ -4107,6 +4111,7 @@ detail.addEventListener('input', e => {
 });
 detail.addEventListener('change', e => {
   if (e.target.classList.contains('rt-layer')) { (S.ui.rt ||= {})[e.target.dataset.n] = e.target.value; return; }
+  if (e.target.classList.contains('gx-only')) { ls.set('tc.gxOnly', e.target.checked); render(); return; } // kept in this browser, for every diff
   if (e.target.classList.contains('gx-against')) { GX.against.set(e.target.dataset.cid, e.target.value); e.target.blur(); render(); return; }
   const el = e.target, s = S.sel; if (!s || S.readOnly) return;
   if (s.type === 'live' && el.id === 'l-thread') { bindLive(s.id, el.value); el.blur(); return; }

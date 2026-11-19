@@ -916,10 +916,19 @@ body.sheet-open .top { z-index: 80; }
 .gx-bar i { background: var(--ok); } .gx-bar u { background: var(--danger); }
 .gx-quiet { opacity: .6; } .gx-quiet .gx-bar { background: none; }
 .gx-role { margin-left: 6px; padding: 0 5px; border: 1px solid var(--rule); border-radius: 8px; font: 10.5px var(--f-body); font-style: normal; color: var(--muted); }
-.gx-diff { margin: 2px 0 8px; padding: 8px 10px; max-height: 380px; overflow: auto; font: 11.5px/1.5 var(--f-mono); background: var(--rule-soft); border-radius: 6px; white-space: pre-wrap; overflow-wrap: anywhere; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
-.gx-diff span { display: block; padding-left: 1.4em; text-indent: -1.4em; } /* a wrapped line hangs under its first row */
+.gx-diff { margin: 2px 0 8px; padding: 8px 0; max-height: 380px; overflow: auto; font: 11.5px/1.5 var(--f-mono); background: var(--rule-soft); border-radius: 6px; white-space: pre-wrap; overflow-wrap: anywhere; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+.gx-diff span { display: block; padding: 0 10px 0 calc(10px + 1.4em); text-indent: -1.4em; } /* a wrapped line hangs under its first row */
 .gx-diff b { font-weight: 600; background: color-mix(in srgb, currentColor 16%, transparent); border-radius: 2px; }
-.gx-diff .a { color: var(--ok); } .gx-diff .d { color: var(--danger); } .gx-diff .h { color: var(--faint); }
+/* Added and removed lines are a row colour and a bold sign; the code keeps its own colours (hlLine): keyword, string, comment, number.
+   Each is at least 4.5:1 on the plain, the added and the removed row of every theme. */
+.gx-diff .a { background: color-mix(in srgb, var(--ok) 15%, transparent); } .gx-diff .d { background: color-mix(in srgb, var(--danger) 13%, transparent); }
+.gx-diff .h { color: var(--muted); }
+.gx-diff em { font-style: normal; font-weight: 700; } .gx-diff i { font-style: normal; }
+.gx-diff .hk { color: var(--hl-k); } .gx-diff .hs { color: var(--hl-s); } .gx-diff .hc { color: var(--hl-c); font-style: italic; } .gx-diff .hn { color: var(--hl-n); }
+:root { --hl-k: #5B21B6; --hl-s: #7C4300; --hl-c: #4F5963; --hl-n: #075580; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme]) { --hl-k: #C4A7FF; --hl-s: #E5B567; --hl-c: #9EA8B3; --hl-n: #6CC7E8; } }
+:root[data-theme="dark"] { --hl-k: #C4A7FF; --hl-s: #E5B567; --hl-c: #9EA8B3; --hl-n: #6CC7E8; }
+:root[data-theme="mist"] { --hl-k: #5B3F9E; --hl-s: #7A4A0C; --hl-c: #4E5B6B; --hl-n: #1F5F82; }
 .gx-note { margin: 0; color: var(--faint); font-size: 12px; }
 .l-cmd code { flex: 1; min-width: 0; overflow-wrap: anywhere; max-height: 7.5em; overflow: auto; font-family: var(--f-mono); font-size: 12px; padding: 6px 8px; background: var(--surface-2); border: 1px solid var(--rule-soft); border-radius: 6px; }
 
@@ -3606,14 +3615,58 @@ function gxGet(map, key, url) {
   fetch(url, { cache: 'no-store' }).then(r => r.json()).catch(() => ({ error: t('syncOfflineTitle') })).then(j => { map.set(key, j); render(); });
   return null;
 }
-function diffHTML(r) {
+// <hl> A small colourer for the code in a diff: keywords, strings, comments and numbers, one line at a time, with no dependency.
+// A language it does not know stays plain. ponytail: no state across lines and no regex literals, so a block comment or a template
+// string spanning lines is coloured only where a line shows it (/* … */, a leading *), and // inside a regex reads as a comment;
+// a real tokenizer if that ever misleads.
+const HL_EXT = { js: 'js', mjs: 'js', cjs: 'js', jsx: 'js', ts: 'js', tsx: 'js', css: 'css', scss: 'css', less: 'css', html: 'html', htm: 'html', py: 'py', md: 'md', markdown: 'md', json: 'json', sh: 'sh', bash: 'sh', zsh: 'sh' };
+const hlLang = p => HL_EXT[((/\.([a-z0-9]+)$/i.exec(p || '') || [])[1] || '').toLowerCase()] || '';
+const hlWords = s => new Set(s.split(' '));
+const HL_KW = {
+  js: hlWords('async await break case catch class const continue default delete do else export extends finally for from function if import in instanceof let new of return static switch this throw try typeof var void while yield null undefined true false'),
+  py: hlWords('and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield None True False self'),
+  sh: hlWords('if then else elif fi for in do done while until case esac function return local export set unset exit'),
+  json: hlWords('true false null'),
+};
+const HL_STR = `"(?:[^"\\\\]|\\\\.)*"|'(?:[^'\\\\]|\\\\.)*'`, HL_NUM = '\\b(?:0x[\\da-fA-F]+|\\d[\\d_]*(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)\\b';
+// Each finds, in order of appearance: c comment, s string, k keyword as written, w a word to look up in the language's keywords, n number.
+const HL_RE = {
+  js: new RegExp(`(?<c>\\/\\/.*$|\\/\\*.*?(?:\\*\\/|$)|^\\s*\\*(?:\\s.*)?$)|(?<s>${HL_STR}|\`(?:[^\`\\\\]|\\\\.)*\`)|(?<w>[A-Za-z_$][\\w$]*)|(?<n>${HL_NUM})`, 'g'),
+  py: new RegExp(`(?<c>#.*$)|(?<s>"""[\\s\\S]*?"""|'''[\\s\\S]*?'''|${HL_STR})|(?<w>[A-Za-z_][\\w]*)|(?<n>${HL_NUM})`, 'g'),
+  sh: new RegExp(`(?<c>^#.*$|\\s#.*$)|(?<s>${HL_STR})|(?<w>[A-Za-z_][\\w-]*)|(?<n>${HL_NUM})`, 'g'),
+  json: new RegExp(`(?<k>"(?:[^"\\\\]|\\\\.)*"(?=\\s*:))|(?<s>"(?:[^"\\\\]|\\\\.)*")|(?<w>[A-Za-z_]\\w*)|(?<n>-?${HL_NUM})`, 'g'),
+  css: new RegExp(`(?<c>\\/\\*.*?(?:\\*\\/|$))|(?<s>${HL_STR})|(?<k>@[\\w-]+|!important|[\\w-]+(?=\\s*:(?!:)[^;{}]*(?:[;}]|$)))|(?<n>#[\\da-fA-F]{3,8}\\b|-?(?:\\d+\\.?\\d*|\\.\\d+)(?:%|[a-z]+)?\\b)|(?<w>[A-Za-z_-][\\w-]*)`, 'g'),
+  html: new RegExp(`(?<c><!--.*?(?:-->|$))|(?<k><\\/?[A-Za-z][\\w-]*|\\/?>)|(?<s>${HL_STR})`, 'g'),
+  md: /(?<k>^#{1,6}\s.*$)|(?<c>^\s*>.*$)|(?<s>`[^`]+`)/g,
+};
+function hlLine(text, lang) {
+  const re = HL_RE[lang]; if (!re) return esc(text);
+  const kw = HL_KW[lang]; let out = '', last = 0; re.lastIndex = 0;
+  for (let m; (m = re.exec(text));) {
+    if (!m[0]) { re.lastIndex++; continue; }
+    const g = m.groups, cls = g.c != null ? 'c' : g.s != null ? 's' : g.k != null || (g.w != null && kw && kw.has(g.w)) ? 'k' : g.n != null ? 'n' : '';
+    if (!cls) continue;
+    out += esc(text.slice(last, m.index)) + `<i class="h${cls}">${esc(m[0])}</i>`; last = m.index + m[0].length;
+  }
+  return out + esc(text.slice(last));
+}
+// </hl>
+function diffHTML(r, path) {
   if (!r) return `<p class="gx-note">${esc(t('gxLoading'))}</p>`;
   if (r.error || r.missing) return `<p class="gx-note">${esc(r.error || t('gxNoCommit'))}</p>`;
   const lines = r.diff.split('\n').filter(l => !/^(diff --git|index |--- |\+\+\+ |new file mode|deleted file mode)/.test(l)).slice(0, 3000);
   // Long lines (this page's own source has lines of thousands of characters) are cut to what matters: a removed line
   // followed by its replacement shows only the part that differs, in bold, with some text around it; any other long line
   // shows its start. Lines wrap, so nothing is read by scrolling sideways.
-  const LONG = 240, AROUND = 60, sign = l => (l[0] === '+' || l[0] === '-' ? l[0] : ''), out = lines.map(l => esc(l.length > LONG ? l.slice(0, LONG) + ' …' : l));
+  // Code is coloured by its language (hlLine): the file's, or for a page the part the hunk sits in (r.hunks, src/git-view.mjs hunkPlaces).
+  // Added and removed lines are told apart by their row's background, so the colours of the code stay free.
+  const LONG = 240, AROUND = 60, sign = l => (l[0] === '+' || l[0] === '-' ? l[0] : ''), ext = hlLang(path), mark = l => `<em>${esc(l[0] || ' ')}</em>`;
+  let lang = ext, hk = -1;
+  const out = lines.map(l => {
+    if (l.startsWith('@@')) { hk++; lang = (r.hunks && r.hunks[hk] && r.hunks[hk].lang) || ext; return esc(l); }
+    if (l[0] === '\\') return esc(l);
+    return mark(l) + hlLine(l.length > LONG ? l.slice(1, LONG) : l.slice(1), lang) + (l.length > LONG ? ' …' : '');
+  });
   for (let i = 0; i + 1 < lines.length; i++) {
     const a = lines[i], b = lines[i + 1];
     if (a[0] !== '-' || b[0] !== '+' || sign(lines[i - 1] || '') || sign(lines[i + 2] || '') || Math.max(a.length, b.length) <= LONG) continue;
@@ -3621,10 +3674,10 @@ function diffHTML(r) {
     while (p < m && a[p] === b[p]) p++;
     while (q < m - p && a[a.length - 1 - q] === b[b.length - 1 - q]) q++;
     const cut = l => { const from = Math.max(1, p - AROUND), end = l.length - q, to = Math.min(l.length, end + AROUND), mid = l.slice(p, end);
-      return esc(l[0] + (from > 1 ? '… ' : '') + l.slice(from, p)) + `<b>${esc(mid.length > 600 ? mid.slice(0, 600) + ' …' : mid)}</b>` + esc(l.slice(end, to) + (to < l.length ? ' …' : '')); };
+      return mark(l) + esc((from > 1 ? '… ' : '') + l.slice(from, p)) + `<b>${esc(mid.length > 600 ? mid.slice(0, 600) + ' …' : mid)}</b>` + esc(l.slice(end, to) + (to < l.length ? ' …' : '')); };
     out[i] = cut(a); out[i + 1] = cut(b); i++;
   }
-  return `<pre class="gx-diff">${lines.map((l, i) => `<span class="${l[0] === '+' ? 'a' : l[0] === '-' ? 'd' : l.startsWith('@@') ? 'h' : ''}">${out[i] || ' '}</span>`).join('')}</pre>${r.truncated ? `<p class="gx-note">${esc(t('gxTruncated'))}</p>` : ''}`;
+  return `<pre class="gx-diff">${lines.map((l, i) => `<span class="${l[0] === '+' ? 'a' : l[0] === '-' ? 'd' : l.startsWith('@@') || l[0] === '\\' ? 'h' : ''}">${out[i] || ' '}</span>`).join('')}</pre>${r.truncated ? `<p class="gx-note">${esc(t('gxTruncated'))}</p>` : ''}`;
 }
 function changesHTML(c) {
   if (S.mode !== 'server') return '';
@@ -3645,7 +3698,7 @@ function changesHTML(c) {
   const all = GX.more.has(key), shown = all ? files : [...main.slice(0, 8), ...quiet.slice(0, 3)], hidden = files.length - shown.length;
   const row = f => {
     const dk = `${key}|${f.path}`, open = GX.open.has(dk), w = n => `${Math.round(56 * n / max)}px`;
-    const diff = open ? diffHTML(gxGet(GX.diff, dk, `/api/git/diff?${q}&file=${encodeURIComponent(f.path)}`)) : '';
+    const diff = open ? diffHTML(gxGet(GX.diff, dk, `/api/git/diff?${q}&file=${encodeURIComponent(f.path)}`), f.path) : '';
     return `<li class="${f.binary || f.generated ? 'gx-quiet' : ''}"><button class="gx-file" data-act="gx-file" data-dk="${esc(dk)}" title="${esc(f.path)}" ${f.binary ? 'disabled' : ''}><span class="gx-path">${esc(f.path)}${f.role && f.role !== 'src' && !f.binary ? `<i class="gx-role">${esc(t('gxRole_' + f.role))}</i>` : ''}</span><span>${f.binary ? esc(t('gxBinary')) : `<b class="gx-add">+${f.add}</b> <b class="gx-del">−${f.del}</b>`}</span><span class="gx-bar">${f.binary || f.generated ? '' : `<i style="width:${w(f.add)}"></i><u style="width:${w(f.del)}"></u>`}</span></button>${diff}</li>`;
   };
   // Other commit stations to compare with: this line's first, then the same repository's, newest first.

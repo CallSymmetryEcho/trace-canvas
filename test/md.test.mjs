@@ -89,3 +89,18 @@ test('images: a linked one, or one a linked report shows; nothing else, 10 MB at
 test('math: \\mathrm keeps its letters upright, also around spaces and scripts', () => {
   assert.equal(mdHTML('$\\mathrm{J\\,m^{-3}}$'), '<p><math><mrow><mi mathvariant="normal">J</mi><mspace width="0.167em"></mspace><msup><mi mathvariant="normal">m</mi><mrow><mo>−</mo><mn>3</mn></mrow></msup></mrow></math></p>');
 });
+
+// The page's code colourer for diffs, taken out the same way.
+const { hlLine, hlLang } = new Function('esc', `${page.slice(page.indexOf('// <hl>'), page.indexOf('// </hl>'))}; return { hlLine, hlLang };`)(esc);
+test('code in a diff is coloured by language: keywords, strings, comments, numbers; text stays text', () => {
+  assert.equal(hlLine("const a = 'x<y'; // 12 <b>", 'js'), '<i class="hk">const</i> a = <i class="hs">&#39;x&lt;y&#39;</i>; <i class="hc">// 12 &lt;b&gt;</i>');
+  assert.equal(hlLine('  return n1 + 0.5;', 'js'), '  <i class="hk">return</i> n1 + <i class="hn">0.5</i>;');
+  assert.equal(hlLine('.a:hover { color: #fff; margin: 0 4px; } /* x */', 'css'), '.a:hover { <i class="hk">color</i>: <i class="hn">#fff</i>; <i class="hk">margin</i>: <i class="hn">0</i> <i class="hn">4px</i>; } <i class="hc">/* x */</i>');
+  assert.equal(hlLine('def f(x):  # go', 'py'), '<i class="hk">def</i> f(x):  <i class="hc"># go</i>');
+  assert.equal(hlLine('"name": "tc", "n": 3, "ok": true', 'json'), '<i class="hk">&quot;name&quot;</i>: <i class="hs">&quot;tc&quot;</i>, <i class="hk">&quot;n&quot;</i>: <i class="hn">3</i>, <i class="hk">&quot;ok&quot;</i>: <i class="hk">true</i>');
+  assert.equal(hlLine('<div class="a">x</div>', 'html'), '<i class="hk">&lt;div</i> class=<i class="hs">&quot;a&quot;</i><i class="hk">&gt;</i>x<i class="hk">&lt;/div</i><i class="hk">&gt;</i>');
+  assert.equal(hlLine('## Install `npm`', 'md'), '<i class="hk">## Install `npm`</i>');
+  assert.equal(hlLine('if [ -f x ]; then echo "hi" # c', 'sh'), '<i class="hk">if</i> [ -f x ]; <i class="hk">then</i> echo <i class="hs">&quot;hi&quot;</i><i class="hc"> # c</i>');
+  assert.equal(hlLine('<b>x</b> const', ''), '&lt;b&gt;x&lt;/b&gt; const'); // an unknown language stays plain
+  assert.deepEqual(['a/b.MJS', 'x.css', 'Makefile', 'p.lock'].map(hlLang), ['js', 'css', '', '']);
+});

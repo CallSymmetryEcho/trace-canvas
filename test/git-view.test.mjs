@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { commitDiff, commitInfo } from '../src/git-view.mjs';
+import { hunkPlaces, commitDiff, commitInfo } from '../src/git-view.mjs';
 import { GIT_COMMIT, commandDir } from '../src/git-events.mjs';
 import { gitRoot, handleHook } from '../src/hook.mjs';
 import { createThread, emptyData, mutate, readData } from '../src/store.mjs';
@@ -127,4 +127,22 @@ test('a commit with no clone here is read on the machine it was made on, over ss
     process.env.PATH = keep.PATH;
     for (const [k, v] of [['TRACE_CANVAS_HOME', keep.HOME_], ['TRACE_CANVAS_MACHINE', keep.M]]) if (v === undefined) delete process.env[k]; else process.env[k] = v;
   }
+});
+
+test('each hunk of a diff is placed in its file: the language of that part of a page, and the function, rule, test or heading around it', () => {
+  const page = ['<!doctype html>', '<style>', '.card { color: red; }', '@media (max-width: 760px) {', '  .card,', '  .sheet {', '    color: blue;', '  }', '}', '</style>', '<div id="app"></div>', '<script>',
+    'const S = {};', 'function draw(c) {', '  if (c.open) {', '    paint(c);', '  }', '}', 'class Pane {', '  render(x) {', '    return x;', '  }', '}', 'boot();', '</script>'].join('\n');
+  const at = (n, file = 'app/index.html', text = page) => hunkPlaces(`@@ -${n},1 +${n},1 @@\n-old\n+new`, text, file)[0];
+  assert.deepEqual(at(3), { lang: 'css', scope: '.card' });              // a one-line rule names itself
+  assert.deepEqual(at(7), { lang: 'css', scope: '.sheet' });             // a selector spread over lines is named by its last line
+  assert.deepEqual(at(11), { lang: 'html', scope: null });
+  assert.deepEqual(at(16), { lang: 'js', scope: 'function draw' });      // through the if, to the function
+  assert.deepEqual(at(21), { lang: 'js', scope: 'render()' });
+  assert.deepEqual(at(24), { lang: 'js', scope: null });                 // a top-level statement has no scope
+  assert.equal(at(2, 'a.py', 'class A:\n    def run(self):\n        x = 1\n        return x\n').scope, 'def run');
+  assert.equal(at(4, 'README.md', '# Title\n\n## Install\ntext\n').scope, 'Install');
+  assert.equal(at(3, 't.test.mjs', "test('adds up', () => {\n  const a = 1;\n  assert.equal(a, 1);\n});\n").scope, 'test: adds up');
+  // Two hunks: each takes the first changed line after its own context lines.
+  const two = hunkPlaces('@@ -13,3 +13,3 @@\n const S = {};\n function draw(c) {\n-  x\n+  y\n@@ -20,2 +20,3 @@\n   render(x) {\n+    log(x);\n     return x;', page, 'app/index.html');
+  assert.deepEqual(two.map(h => h.scope), ['function draw', 'render()']);
 });

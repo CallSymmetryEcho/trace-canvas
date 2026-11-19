@@ -98,6 +98,67 @@ export async function commitInfo(d, id, against = null) {
   return { ...info, against: { id: against, sha: other, short: other.slice(0, 7) }, from, to, files: ns ? filesOf(ns.out) : [] };
 }
 
+// Where each hunk of a diff sits in the file as it is after the change: its language when the file holds several (a page: css inside
+// <style>, js inside <script>), and the function, class, test, CSS rule or heading around its first changed line. Read from indentation:
+// from that line upwards, each less-indented line is an enclosing block, and the first that names something is the scope.
+// ponytail: no parser, so code that is not indented by nesting gets no scope (the page then shows git's own hunk text).
+const JS_SCOPE = [
+  [/^(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s*\*?\s*([\w$]+)/, m => `function ${m[1]}`],
+  [/^(?:export\s+)?(?:default\s+)?class\s+([\w$]+)/, m => `class ${m[1]}`],
+  [/^(?:test|it|describe)\(\s*(['"`])(.+?)\1/, m => `test: ${m[2]}`],
+  [/^(?:export\s+)?(?:const|let|var)\s+([\w$]+)\s*=/, m => m[1]],
+  [/^([\w$]+)\s*:\s*(?:async\s+)?(?:function\b|\([^)]*\)\s*=>|[\w$]+\s*=>)/, m => m[1]],
+  [/^(?:static\s+|async\s+|get\s+|set\s+)*([\w$]+)\s*\([^)]*\)\s*\{\s*$/, m => (/^(if|for|while|switch|catch|function|return|with)$/.test(m[1]) ? null : `${m[1]}()`)],
+];
+const SCOPES = {
+  js: JS_SCOPE,
+  css: [[/^([^{}/*][^{}]*?)\s*\{/, m => m[1]]],
+  py: [[/^(?:async\s+)?def\s+(\w+)/, m => `def ${m[1]}`], [/^class\s+(\w+)/, m => `class ${m[1]}`]],
+  json: [[/^"([^"]+)"\s*:\s*[{[]\s*$/, m => m[1]]],
+  other: [[/^(?:pub(?:\([a-z]+\))?\s+)?(?:async\s+)?(?:fn|func)\s+(?:\([^)]*\)\s*)?(\w+)/, m => `func ${m[1]}`], [/^(?:[\w:<>,*&\s]+\s+)?(class|struct|interface|enum)\s+(\w+)/, m => `${m[1]} ${m[2]}`]],
+};
+const LANG = { js: 'js', mjs: 'js', cjs: 'js', jsx: 'js', ts: 'js', tsx: 'js', css: 'css', scss: 'css', less: 'css', py: 'py', json: 'json', md: 'md', markdown: 'md', html: 'html', htm: 'html' };
+export function hunkPlaces(diff, text, file) {
+  const lines = String(text).split('\n'), ext = LANG[(/\.([a-z0-9]+)$/i.exec(file) || [])[1]?.toLowerCase()] || 'other';
+  let region = null;
+  if (ext === 'html') {
+    region = []; let cur = 'html';
+    for (const l of lines) {
+      region.push(cur);
+      if (cur === 'html') cur = /<style\b[^>]*>(?!.*<\/style>)/i.test(l) ? 'css' : /<script\b[^>]*>(?!.*<\/script>)/i.test(l) ? 'js' : 'html';
+      else if (/<\/(style|script)>/i.test(l)) cur = 'html';
+    }
+  }
+  const indent = l => l.length - l.trimStart().length;
+  const scopeAt = i => {
+    const lang = region ? region[i] : ext;
+    if (lang === 'md') { for (let j = i; j >= 0; j--) { const m = /^#{1,6}\s+(.+)/.exec(lines[j]); if (m) return m[1].trim(); } return null; }
+    const pats = SCOPES[lang]; if (!pats) return null;
+    let ind = lines[i] && lines[i].trim() ? indent(lines[i]) + 1 : Infinity; // + 1: the changed line itself may be the one that names the scope
+    for (let j = i, n = 0; j >= 0 && n < 5000; j--, n++) {
+      const l = lines[j];
+      if (region && region[j] !== lang) break;
+      if (!l || !l.trim() || indent(l) >= ind) continue;
+      ind = indent(l);
+      for (const [re, name] of pats) { const m = re.exec(l.trim()), s = m && name(m); if (s) return s.replace(/\s+/g, ' ').slice(0, 80); }
+      if (!ind) break; // top level and unnamed: nothing encloses it
+    }
+    return null;
+  };
+  const out = []; let n = 0, open = false;
+  for (const l of String(diff).split('\n')) {
+    const h = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(l);
+    if (h) { n = Number(h[1]); open = true; continue; }
+    if (!open) { if (l[0] === ' ' || l[0] === '+') n++; continue; }
+    if (l[0] === ' ') { n++; continue; }
+    if (l[0] !== '+' && l[0] !== '-') continue;
+    const i = Math.min(Math.max(n - 1, 0), lines.length - 1);
+    out.push({ lang: region ? region[i] : '', scope: scopeAt(i) }); open = false;
+    if (l[0] === '+') n++;
+  }
+  return out;
+}
+
 /** The diff of one file of a record's commit, or between two records' commits. */
 export async function commitDiff(d, id, file, against = null) {
   const info = await commitInfo(d, id, against);
@@ -107,7 +168,10 @@ export async function commitDiff(d, id, file, against = null) {
   const r = info.against
     ? await git(info, ['diff', ...PLAIN, info.from, info.to, '--', file], CAP)
     : await git(info, ['show', ...PLAIN, '--format=', info.sha, '--', file], CAP);
-  return r ? { file, diff: r.out, truncated: !!r.truncated } : { error: 'git could not show this diff' };
+  if (!r) return { error: 'git could not show this diff' };
+  // The file as it is after the change, to place each hunk in it; a deleted or very large file has no places.
+  const whole = await git(info, ['show', `${info.against ? info.to : info.sha}:${file}`], 12 * CAP);
+  return { file, diff: r.out, truncated: !!r.truncated, hunks: whole && !whole.truncated ? hunkPlaces(r.out, whole.out, file) : [] };
 }
 
 const home = p => p.replace(/^~(?=\/|$)/, os.homedir());

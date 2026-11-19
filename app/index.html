@@ -939,6 +939,16 @@ body.sheet-open .top { z-index: 80; }
 .gx-sum { margin: 0 0 6px; padding: 8px 10px; background: var(--surface-2); border: 1px solid var(--rule-soft); border-radius: 6px; font-size: 13px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 .gx-ask { display: block; margin: 0 0 8px; font-size: 12.5px; text-align: left; }
 .gx-why { margin: 0 6px 6px; font-size: 12.5px; line-height: 1.45; color: var(--muted); overflow-wrap: anywhere; }
+.gx-zoom { display: block; margin: 0 6px 2px auto; font-size: 12px; }
+/* A commit's file in the reader: the whole diff, no inner scroll; ‹ n / m › stays at the top; a turned page slides in from its side. */
+.md-read .gx-diff { max-height: none; overflow: visible; border: 0; padding: 0 0 8px; font-size: 12px; line-height: 1.55; }
+.md-read:has(.gx-pager) { max-width: none; }
+.gx-pager { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; padding: 4px 0; background: var(--surface); font: 12.5px var(--f-mono); color: var(--muted); }
+.gx-pager .btn { min-width: 44px; padding: 4px 10px; font-size: 18px; line-height: 1; }
+@media (prefers-reduced-motion: no-preference) {
+  .gx-page.from-r { animation: gx-from-r .18s ease-out; } .gx-page.from-l { animation: gx-from-l .18s ease-out; }
+  @keyframes gx-from-r { from { transform: translateX(28px); opacity: 0; } } @keyframes gx-from-l { from { transform: translateX(-28px); opacity: 0; } }
+}
 .gx-note { margin: 0; color: var(--faint); font-size: 12px; }
 .l-cmd code { flex: 1; min-width: 0; overflow-wrap: anywhere; max-height: 7.5em; overflow: auto; font-family: var(--f-mono); font-size: 12px; padding: 6px 8px; background: var(--surface-2); border: 1px solid var(--rule-soft); border-radius: 6px; }
 
@@ -1380,7 +1390,7 @@ apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent 
     livePrompt: 'Latest instruction', liveThread: 'Thread', liveAuto: 'Automatic (repository and branch)', liveNow: 'Now on',
     liveResume: 'Resume in a terminal', openChat: 'Open the chat', openChatWeb: 'Open on claude.ai', goTerm: 'Go to its terminal', tNoTerm: 'Its terminal tab is no longer open', liveRunning: 'Running now', lineSessions: 'Sessions on this line', loggedIn: 'Logged in',
     gxChanges: 'Changes', gxLoading: 'Reading from git…', gxNoRepo: 'This repository is not on this computer.', gxNoRepoOn: m => `This repository is on ${m}, not on this computer.`, gxNoCommit: 'This commit is no longer in its repository (rewritten or cleaned up).',
-    gxLine: n => `line ${n}`, gxOnly: 'Changed lines only', gxExplain: 'Have your local Claude explain each file in a sentence', gxExplaining: 'Your local Claude is reading this commit… (about a minute)', gxRole_test: 'test', gxRole_doc: 'docs', gxRole_gen: 'generated', gxFiles: n => `${n} file${n === 1 ? '' : 's'}`, gxMore: n => `${n} more`, gxQuiet: n => `${n} binary or generated`, gxBinary: 'binary',
+    gxLine: n => `line ${n}`, gxOnly: 'Changed lines only', gxExplain: 'Have your local Claude explain each file in a sentence', gxExplaining: 'Your local Claude is reading this commit… (about a minute)', gxPrev: 'Previous file', gxNext: 'Next file', gxRole_test: 'test', gxRole_doc: 'docs', gxRole_gen: 'generated', gxFiles: n => `${n} file${n === 1 ? '' : 's'}`, gxMore: n => `${n} more`, gxQuiet: n => `${n} binary or generated`, gxBinary: 'binary',
     gxCompare: 'Compare with', gxThisOnly: 'this commit only', gxOtherRepo: 'That station is in another repository.', gxTruncated: 'Cut at 200 KB.',
     gxLater: 'Committed later in', gxUncommitted: 'Not committed yet.', copyResume: 'Copy resume command', lineSessionsHint: 'Resume one to keep working on this line instead of starting a new session.', liveBadge: (n, w) => `${n} running${w ? `, ${w} need${w === 1 ? 's' : ''} you` : ''}`,
     tBound: n => `Bound to “${n}”`, tUnbound: 'Back to the repository and branch line',
@@ -1562,7 +1572,7 @@ apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的
     livePrompt: '最近的指令', liveThread: '所属线', liveAuto: '自动（按仓库和分支）', liveNow: '当前在',
     liveResume: '在终端里恢复', openChat: '打开对话', openChatWeb: '在 claude.ai 打开', goTerm: '跳到终端', tNoTerm: '它的终端标签页已经关了', liveRunning: '正在运行', lineSessions: '这条线上的会话', loggedIn: '记在这个会话里',
     gxChanges: '改动', gxLoading: '正在从 git 读取…', gxNoRepo: '这台电脑上没有这个仓库。', gxNoRepoOn: m => `这个仓库在 ${m} 上，这台电脑上没有。`, gxNoCommit: '仓库里已经没有这个提交，可能被改写或清理了。',
-    gxLine: n => `第 ${n} 行`, gxOnly: '只看改动的行', gxExplain: '让本机的 Claude 给每个文件写一句说明', gxExplaining: '本机的 Claude 正在读这次提交…（一分钟左右）', gxRole_test: '测试', gxRole_doc: '文档', gxRole_gen: '生成', gxFiles: n => `${n} 个文件`, gxMore: n => `还有 ${n} 个`, gxQuiet: n => `${n} 个二进制或生成文件`, gxBinary: '二进制',
+    gxLine: n => `第 ${n} 行`, gxOnly: '只看改动的行', gxExplain: '让本机的 Claude 给每个文件写一句说明', gxExplaining: '本机的 Claude 正在读这次提交…（一分钟左右）', gxPrev: '上一个文件', gxNext: '下一个文件', gxRole_test: '测试', gxRole_doc: '文档', gxRole_gen: '生成', gxFiles: n => `${n} 个文件`, gxMore: n => `还有 ${n} 个`, gxQuiet: n => `${n} 个二进制或生成文件`, gxBinary: '二进制',
     gxCompare: '对比', gxThisOnly: '只看这次提交', gxOtherRepo: '那个站点不在同一个仓库。', gxTruncated: '超过 200 KB，已截断。',
     gxLater: '之后提交于', gxUncommitted: '尚未提交。', copyResume: '复制恢复命令', lineSessionsHint: '恢复其中一个就能接着在这条线上做，不用新开会话。', liveBadge: (n, w) => `${n} 个运行中${w ? `，${w} 个等你` : ''}`,
     tBound: n => `已绑定到「${n}」`, tUnbound: '已改回按仓库和分支自动归线',
@@ -3581,6 +3591,7 @@ function mdHTML(src) {
 // </md>
 function openReader(title, md, src, html) {
   S.sheet = 'read'; document.body.classList.add('sheet-open', 'read-page'); document.body.classList.remove('goals-page');
+  S.gxRead = null; // set again by gxRead when the reader shows a commit's file
   for (const u of S.readBlobs || []) URL.revokeObjectURL(u);
   S.readBlobs = [];
   mdImgFrom = src || '';
@@ -3695,7 +3706,22 @@ function diffHTML(r, path) {
       return mark(l) + esc((from > 1 ? '… ' : '') + l.slice(from, p)) + `<b>${esc(mid.length > 600 ? mid.slice(0, 600) + ' …' : mid)}</b>` + esc(l.slice(end, to) + (to < l.length ? ' …' : '')); };
     out[i] = cut(a); out[i + 1] = cut(b); i++;
   }
-  return `<pre class="gx-diff${ls.get('tc.gxOnly', false) ? ' only' : ''}" style="--gw:${wide}ch">${lines.map((l, i) => `<span class="${l[0] === '+' ? 'a' : l[0] === '-' ? 'd' : l.startsWith('@@') ? 'h' : l[0] === '\\' ? 'x' : ''}"${nums[i] ? ` data-n="${nums[i]}"` : ''}>${out[i] || ' '}</span>`).join('')}</pre>${r.truncated ? `<p class="gx-note">${esc(t('gxTruncated'))}</p>` : ''}`;
+  return `<pre class="gx-diff${ls.get('tc.gxOnly', false) ? ' only' : ''}" data-act="gx-tap" style="--gw:${wide}ch">${lines.map((l, i) => `<span class="${l[0] === '+' ? 'a' : l[0] === '-' ? 'd' : l.startsWith('@@') ? 'h' : l[0] === '\\' ? 'x' : ''}"${nums[i] ? ` data-n="${nums[i]}"` : ''}>${out[i] || ' '}</span>`).join('')}</pre>${r.truncated ? `<p class="gx-note">${esc(t('gxTruncated'))}</p>` : ''}`;
+}
+// A commit's files read full screen, one file a page, in the reader that Read larger uses: on a phone a tap on a file's code opens it
+// there (Read larger does anywhere), and a swipe left or right, or ‹ ›, turns to the next or previous file of the list.
+const gxUrl = dk => { const [id, against, ...p] = dk.split('|'); return `/api/git/diff?record=${encodeURIComponent(id)}${against ? `&against=${encodeURIComponent(against)}` : ''}&file=${encodeURIComponent(p.join('|'))}`; };
+async function gxRead(dks, i, dir = 0) {
+  i = clamp(i, 0, dks.length - 1);
+  const dk = dks[i], [id, against, ...p] = dk.split('|'), path = p.join('|'), st = { dks, i }, c = S.commits.get(id);
+  const why = !against && c && c.gxNotes && c.gxNotes.files && c.gxNotes.files[path];
+  const pager = `<div class="gx-pager"><button class="btn" data-act="gx-page" data-d="-1" aria-label="${esc(t('gxPrev'))}" ${i ? '' : 'disabled'}>‹</button><span>${i + 1} / ${dks.length}</span><button class="btn" data-act="gx-page" data-d="1" aria-label="${esc(t('gxNext'))}" ${i < dks.length - 1 ? '' : 'disabled'}>›</button></div>`;
+  const page = r => { openReader(path.split('/').pop(), null, path, `${pager}<div class="gx-page${dir ? (dir > 0 ? ' from-r' : ' from-l') : ''}">${why ? `<p class="gx-why">${esc(why)}</p>` : ''}${diffHTML(r, path)}</div>`); S.gxRead = st; };
+  page(GX.diff.get(dk) || null);
+  if (GX.diff.get(dk)) return;
+  const r = await fetch(gxUrl(dk), { cache: 'no-store' }).then(x => x.json()).catch(() => ({ error: t('syncOfflineTitle') }));
+  GX.diff.set(dk, r);
+  if (S.sheet === 'read' && S.gxRead === st) { dir = 0; page(r); }
 }
 function changesHTML(c) {
   if (S.mode !== 'server') return '';
@@ -3722,7 +3748,7 @@ function changesHTML(c) {
   const all = GX.more.has(key), shown = all ? files : [...main.slice(0, 8), ...quiet.slice(0, 3)], hidden = files.length - shown.length;
   const row = f => {
     const dk = `${key}|${f.path}`, open = GX.open.has(dk), w = n => `${Math.round(56 * n / max)}px`;
-    const diff = open ? diffHTML(gxGet(GX.diff, dk, `/api/git/diff?${q}&file=${encodeURIComponent(f.path)}`), f.path) : '';
+    const diff = open ? `<button class="linkish gx-zoom" data-act="gx-read" data-dk="${esc(dk)}">${esc(t('mdExpand'))}</button>` + diffHTML(gxGet(GX.diff, dk, gxUrl(dk)), f.path) : '';
     return `<li class="${f.binary || f.generated ? 'gx-quiet' : ''}"><button class="gx-file" data-act="gx-file" data-dk="${esc(dk)}" title="${esc(f.path)}" ${f.binary ? 'disabled' : ''}><span class="gx-path">${esc(f.path)}${f.role && f.role !== 'src' && !f.binary ? `<i class="gx-role">${esc(t('gxRole_' + f.role))}</i>` : ''}</span><span>${f.binary ? esc(t('gxBinary')) : `<b class="gx-add">+${f.add}</b> <b class="gx-del">−${f.del}</b>`}</span><span class="gx-bar">${f.binary || f.generated ? '' : `<i style="width:${w(f.add)}"></i><u style="width:${w(f.del)}"></u>`}</span></button>${notes && notes.files && notes.files[f.path] ? `<p class="gx-why">${esc(notes.files[f.path])}</p>` : ''}${diff}</li>`;
   };
   // Other commit stations to compare with: this line's first, then the same repository's, newest first.
@@ -4156,6 +4182,9 @@ detail.addEventListener('click', e => {
     case 'goto-commit': select({ type: 'commit', id: b.dataset.cid }); break;
     case 'gx-file': { const k = b.dataset.dk; if (GX.open.has(k)) GX.open.delete(k); else GX.open.add(k); render(); break; }
     case 'gx-more': GX.more.add(b.dataset.key); render(); break;
+    case 'gx-tap': if (!PHONE.matches || String(getSelection())) break; // on a phone, a tap on a file's code reads it full screen
+    case 'gx-read': { const li = b.closest('li'), list = li && li.closest('.gx-list'); if (!list) break;
+      const dks = $$('.gx-file:not(:disabled)', list).map(x => x.dataset.dk); gxRead(dks, dks.indexOf($('.gx-file', li).dataset.dk)); break; }
     case 'gx-explain': { const id = b.dataset.cid; GX.explain.set(id, 'wait'); render();
       postJSON('/api/git/explain', { record: id, lang: LANG }).then(r => { const c = S.commits.get(id); if (r.notes && c) { c.gxNotes = r.notes; GX.explain.delete(id); } else GX.explain.set(id, r.error || t('syncOfflineTitle')); render(); });
       break; }
@@ -4924,6 +4953,15 @@ function handCommand(c) {
   return `${dir ? `cd ${shq(dir)} && ` : ''}TRACE_CANVAS_THREAD=${tid} ${AGENT_LAUNCH[c.assignee](t('handPrompt', th.name, tid, c.title))}`;
 }
 const sheetBody = $('#sheet-body');
+// In the reader on a commit's file, ‹ and › turn the page, and so does a swipe mostly sideways: left to the next file, right to the previous one.
+sheetBody.addEventListener('click', e => { const b = e.target.closest('[data-act="gx-page"]'); if (b && S.gxRead) gxRead(S.gxRead.dks, S.gxRead.i + Number(b.dataset.d), Number(b.dataset.d)); });
+{ let sx = 0, sy = 0;
+  sheetBody.addEventListener('touchstart', e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, { passive: true });
+  sheetBody.addEventListener('touchend', e => {
+    const g = S.gxRead, dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy;
+    if (!g || S.sheet !== 'read' || Math.abs(dx) < 60 || Math.abs(dx) < 1.5 * Math.abs(dy)) return;
+    const to = g.i + (dx < 0 ? 1 : -1); if (to >= 0 && to < g.dks.length) gxRead(g.dks, to, dx < 0 ? 1 : -1);
+  }, { passive: true }); }
 sheetBody.addEventListener('input', e => {
   if (S.sheet !== 'rs-new') return;
   const id = e.target.id; if (id === 'rs-q') S.rsNew.q = e.target.value; else if (id === 'rs-inputs') S.rsNew.inputs = e.target.value;

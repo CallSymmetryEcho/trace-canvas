@@ -42,6 +42,10 @@ test('a commit record shows its files and diffs, compares with another, and says
   assert.equal(i1.subject, 'Split the bill');
   assert.deepEqual(i1.files.map(f => [f.path, f.add, f.binary, f.generated]), [['split.js', 3, false, false], ['package-lock.json', 1, false, true], ['logo.png', 0, true, false]]);
   assert.match((await commitDiff(d, 'r1', 'split.js')).diff, /^\+b$/m);
+  // Source first, then tests, then docs, whatever their size; lock files and binaries last.
+  const mixed = r.commit({ 'README.md': 'x\n'.repeat(50), 'split.test.js': 't\n'.repeat(20), 'tip.js': 'one\n', 'yarn.lock': 'l\n'.repeat(900) }, 'Tips');
+  rec('r4', { gitCommit: mixed, repo: r.dir });
+  assert.deepEqual((await commitInfo(d, 'r4')).files.map(f => [f.path, f.role]), [['tip.js', 'src'], ['split.test.js', 'test'], ['README.md', 'doc'], ['yarn.lock', 'gen']]);
   assert.match((await commitDiff(d, 'r1', '../../etc/passwd')).error, /not part of this change/);
 
   const i2 = await commitInfo(d, 'r2', 'r1');

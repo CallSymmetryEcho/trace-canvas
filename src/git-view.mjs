@@ -61,12 +61,17 @@ async function locate(d, c) {
   return { sha, missing, ...(missing === 'no-repo' && c.machine ? { machine: c.machine } : {}) };
 }
 
-// numstat lines → files, the biggest change first; binary and generated files go last.
+// What a changed file is to a reader: source first, then tests, then docs; binary and generated files (lock files, builds) last.
+const TEST = /(^|\/)(tests?|__tests__|spec|fixtures|e2e)\/|\.(test|spec)\.[a-z]+$|(^|\/)test_[^/]+\.py$|_test\.(go|py)$/i;
+const DOC = /\.(md|markdown|rst|txt|adoc)$|(^|\/)(docs?|site)\/|(^|\/)(LICENSE|CHANGELOG|README)[^/]*$/i;
+export const roleOf = (file, binary) => (binary || GENERATED.test(file) ? 'gen' : TEST.test(file) ? 'test' : DOC.test(file) ? 'doc' : 'src');
+const RANK = { src: 0, test: 1, doc: 2, gen: 3 };
+// numstat lines → files, by role (roleOf), the biggest change first within each.
 function filesOf(out) {
   return out.split('\n').filter(l => /^(\d+|-)\t(\d+|-)\t/.test(l)).map(l => {
     const [a, del, ...p] = l.split('\t'), file = p.join('\t'), binary = a === '-';
-    return { path: file, add: binary ? 0 : Number(a), del: binary ? 0 : Number(del), binary, generated: GENERATED.test(file) };
-  }).sort((x, y) => (x.binary || x.generated) - (y.binary || y.generated) || (y.add + y.del) - (x.add + x.del));
+    return { path: file, add: binary ? 0 : Number(a), del: binary ? 0 : Number(del), binary, generated: GENERATED.test(file), role: roleOf(file, binary) };
+  }).sort((x, y) => RANK[x.role] - RANK[y.role] || (y.add + y.del) - (x.add + x.del));
 }
 
 /**

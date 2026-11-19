@@ -914,7 +914,8 @@ body.sheet-open .top { z-index: 80; }
 .gx-add { color: var(--ok); font-weight: 500; } .gx-del { color: var(--danger); font-weight: 500; }
 .gx-bar { display: flex; height: 5px; border-radius: 3px; overflow: hidden; background: var(--rule-soft); }
 .gx-bar i { background: var(--ok); } .gx-bar u { background: var(--danger); }
-.gx-quiet { opacity: .6; }
+.gx-quiet { opacity: .6; } .gx-quiet .gx-bar { background: none; }
+.gx-role { margin-left: 6px; padding: 0 5px; border: 1px solid var(--rule); border-radius: 8px; font: 10.5px var(--f-body); font-style: normal; color: var(--muted); }
 .gx-diff { margin: 2px 0 8px; padding: 8px 10px; max-height: 380px; overflow: auto; font: 11.5px/1.5 var(--f-mono); background: var(--rule-soft); border-radius: 6px; white-space: pre-wrap; overflow-wrap: anywhere; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .gx-diff span { display: block; padding-left: 1.4em; text-indent: -1.4em; } /* a wrapped line hangs under its first row */
 .gx-diff b { font-weight: 600; background: color-mix(in srgb, currentColor 16%, transparent); border-radius: 2px; }
@@ -1360,7 +1361,7 @@ apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent 
     livePrompt: 'Latest instruction', liveThread: 'Thread', liveAuto: 'Automatic (repository and branch)', liveNow: 'Now on',
     liveResume: 'Resume in a terminal', openChat: 'Open the chat', openChatWeb: 'Open on claude.ai', goTerm: 'Go to its terminal', tNoTerm: 'Its terminal tab is no longer open', liveRunning: 'Running now', lineSessions: 'Sessions on this line', loggedIn: 'Logged in',
     gxChanges: 'Changes', gxLoading: 'Reading from git…', gxNoRepo: 'This repository is not on this computer.', gxNoRepoOn: m => `This repository is on ${m}, not on this computer.`, gxNoCommit: 'This commit is no longer in its repository (rewritten or cleaned up).',
-    gxFiles: n => `${n} file${n === 1 ? '' : 's'}`, gxMore: n => `${n} more`, gxQuiet: n => `${n} binary or generated`, gxBinary: 'binary',
+    gxRole_test: 'test', gxRole_doc: 'docs', gxRole_gen: 'generated', gxFiles: n => `${n} file${n === 1 ? '' : 's'}`, gxMore: n => `${n} more`, gxQuiet: n => `${n} binary or generated`, gxBinary: 'binary',
     gxCompare: 'Compare with', gxThisOnly: 'this commit only', gxOtherRepo: 'That station is in another repository.', gxTruncated: 'Cut at 200 KB.',
     gxLater: 'Committed later in', gxUncommitted: 'Not committed yet.', copyResume: 'Copy resume command', lineSessionsHint: 'Resume one to keep working on this line instead of starting a new session.', liveBadge: (n, w) => `${n} running${w ? `, ${w} need${w === 1 ? 's' : ''} you` : ''}`,
     tBound: n => `Bound to “${n}”`, tUnbound: 'Back to the repository and branch line',
@@ -1542,7 +1543,7 @@ apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的
     livePrompt: '最近的指令', liveThread: '所属线', liveAuto: '自动（按仓库和分支）', liveNow: '当前在',
     liveResume: '在终端里恢复', openChat: '打开对话', openChatWeb: '在 claude.ai 打开', goTerm: '跳到终端', tNoTerm: '它的终端标签页已经关了', liveRunning: '正在运行', lineSessions: '这条线上的会话', loggedIn: '记在这个会话里',
     gxChanges: '改动', gxLoading: '正在从 git 读取…', gxNoRepo: '这台电脑上没有这个仓库。', gxNoRepoOn: m => `这个仓库在 ${m} 上，这台电脑上没有。`, gxNoCommit: '仓库里已经没有这个提交，可能被改写或清理了。',
-    gxFiles: n => `${n} 个文件`, gxMore: n => `还有 ${n} 个`, gxQuiet: n => `${n} 个二进制或生成文件`, gxBinary: '二进制',
+    gxRole_test: '测试', gxRole_doc: '文档', gxRole_gen: '生成', gxFiles: n => `${n} 个文件`, gxMore: n => `还有 ${n} 个`, gxQuiet: n => `${n} 个二进制或生成文件`, gxBinary: '二进制',
     gxCompare: '对比', gxThisOnly: '只看这次提交', gxOtherRepo: '那个站点不在同一个仓库。', gxTruncated: '超过 200 KB，已截断。',
     gxLater: '之后提交于', gxUncommitted: '尚未提交。', copyResume: '复制恢复命令', lineSessionsHint: '恢复其中一个就能接着在这条线上做，不用新开会话。', liveBadge: (n, w) => `${n} 个运行中${w ? `，${w} 个等你` : ''}`,
     tBound: n => `已绑定到「${n}」`, tUnbound: '已改回按仓库和分支自动归线',
@@ -3638,13 +3639,14 @@ function changesHTML(c) {
   const info = gxGet(GX.info, key, `/api/git/commit?${q}`);
   if (!info) return head + `<p class="gx-note">${esc(t('gxLoading'))}</p>`;
   if (info.missing || info.error) return head + `<p class="gx-note">${esc(info.error || (info.missing === 'no-repo' ? (info.machine && info.machine !== S.machine ? t('gxNoRepoOn', info.machine) : t('gxNoRepo')) : t('gxNoCommit')))}</p>`;
+  // Files come in reading order (src/git-view.mjs roleOf): source, tests, docs, then lock files, builds and binaries, which show their counts only until opened.
   const files = info.files || [], main = files.filter(f => !f.binary && !f.generated), quiet = files.filter(f => f.binary || f.generated);
   const add = files.reduce((n, f) => n + f.add, 0), del = files.reduce((n, f) => n + f.del, 0), max = Math.max(1, ...main.map(f => f.add + f.del));
-  const all = GX.more.has(key), shown = all ? [...main, ...quiet] : main.slice(0, 8), hidden = files.length - shown.length;
+  const all = GX.more.has(key), shown = all ? files : [...main.slice(0, 8), ...quiet.slice(0, 3)], hidden = files.length - shown.length;
   const row = f => {
     const dk = `${key}|${f.path}`, open = GX.open.has(dk), w = n => `${Math.round(56 * n / max)}px`;
     const diff = open ? diffHTML(gxGet(GX.diff, dk, `/api/git/diff?${q}&file=${encodeURIComponent(f.path)}`)) : '';
-    return `<li class="${f.binary || f.generated ? 'gx-quiet' : ''}"><button class="gx-file" data-act="gx-file" data-dk="${esc(dk)}" title="${esc(f.path)}" ${f.binary ? 'disabled' : ''}><span class="gx-path">${esc(f.path)}</span><span>${f.binary ? esc(t('gxBinary')) : `<b class="gx-add">+${f.add}</b> <b class="gx-del">−${f.del}</b>`}</span><span class="gx-bar"><i style="width:${w(f.add)}"></i><u style="width:${w(f.del)}"></u></span></button>${diff}</li>`;
+    return `<li class="${f.binary || f.generated ? 'gx-quiet' : ''}"><button class="gx-file" data-act="gx-file" data-dk="${esc(dk)}" title="${esc(f.path)}" ${f.binary ? 'disabled' : ''}><span class="gx-path">${esc(f.path)}${f.role && f.role !== 'src' && !f.binary ? `<i class="gx-role">${esc(t('gxRole_' + f.role))}</i>` : ''}</span><span>${f.binary ? esc(t('gxBinary')) : `<b class="gx-add">+${f.add}</b> <b class="gx-del">−${f.del}</b>`}</span><span class="gx-bar">${f.binary || f.generated ? '' : `<i style="width:${w(f.add)}"></i><u style="width:${w(f.del)}"></u>`}</span></button>${diff}</li>`;
   };
   // Other commit stations to compare with: this line's first, then the same repository's, newest first.
   const others = [...S.commits.values()].filter(x => x.id !== c.id && gitSha(x) && (x.repo === info.repo || (x.repo && x.repo === c.repo) || tidOf(x) === tidOf(c)))

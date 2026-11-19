@@ -407,12 +407,13 @@ body.history-open .hist-btn span { display: inline; }
 @media (prefers-reduced-motion: reduce), (hover: none) { .strip::before { transition: none; } .strip li.is-sel::after { animation: none; transform: scale(1.3); opacity: .4; } }
 .far .strip li:not(.key):not(.is-sel) .s-title, .far .strip li:not(.key):not(.is-sel) .s-time, .far .strip .s-more, .far .card-foot { opacity: 0; }
 .far .strip li:not(.key):not(.is-sel) .g { opacity: .4; }
-@media (prefers-reduced-motion: reduce), (hover: none) { .strip li .s-title, .strip li .s-time, .strip li .g, .strip .s-more, .card-foot { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .strip li .s-title, .strip li .s-time, .strip li .g, .strip .s-more, .card-foot { transition: none; } }
+.strip li[data-cid]:active .g { transform: scale(.82); }
 /* a line with a session working on it: a point of light runs slowly up to its head (instead of the badge blinking) */
 .card.is-running .strip::after { content: ""; position: absolute; left: 13.5px; top: 10px; width: 5px; height: 5px; border-radius: 50%; background: #fff; box-shadow: 0 0 6px 2px var(--c); pointer-events: none; opacity: 0; animation: st-flow 2.8s ease-in-out var(--ph, 0s) infinite; }
 @keyframes st-flow { 0% { transform: translateY(56px); opacity: 0; } 25% { opacity: .9; } 85% { opacity: .9; } 100% { transform: translateY(0); opacity: 0; } }
 .card .live-badge.st-working .ldot { animation: none; }
-@media (prefers-reduced-motion: reduce), (hover: none) { .card.is-running .strip::after { animation: none; display: none; } }
+@media (prefers-reduced-motion: reduce), (hover: none) { .card.is-running .strip::after { animation: none; opacity: .9; } } /* still: a lit point at the head */
 .st-seg { position: absolute; left: 14.5px; top: 12px; width: 3px; border-radius: 2px; background: var(--c); transform-origin: bottom; pointer-events: none; }
 .st-ripple { position: absolute; left: 5px; top: 50%; width: 12px; height: 12px; margin-top: -6px; border-radius: 50%; border: 2px solid var(--rc); box-sizing: border-box; pointer-events: none; opacity: 0; }
 .is-inbox .strip::before { background: repeating-linear-gradient(to bottom, var(--c) 0 4px, transparent 4px 8px); }
@@ -2386,7 +2387,8 @@ function applyCam() {
   $('#zoom-reset').textContent = Math.round(z * 100) + '%';
 }
 /* ---- motion: only transform and opacity, and none under reduced motion or on a touch screen ---- */
-const CALM = matchMedia('(prefers-reduced-motion: reduce), (hover: none)');
+// Short, one-off motion runs on touch screens too; only the looping kind stays off there (CSS, hover: none), to spare a tablet's battery.
+const CALM = matchMedia('(prefers-reduced-motion: reduce)');
 // A spring as a CSS linear() curve (overshoots about 13%, then settles); browsers without linear() get a back-out bezier.
 const SPRING = (s => CSS.supports('transition-timing-function', s) ? s : 'cubic-bezier(.34,1.4,.64,1)')('linear(' + Array.from({ length: 41 }, (_, i) => i === 40 ? 1 : (1 - Math.exp(-7 * i / 40) * Math.cos(11 * i / 40)).toFixed(3)).join(',') + ')');
 const EASE_OUT = 'cubic-bezier(.3,.7,.4,1)';
@@ -3315,6 +3317,8 @@ function select(sel) {
   S.sel = sel; S.ui = {};
   render();
   if (S.view === 'canvas' && sel && (sel.type === 'thread' || sel.type === 'commit')) requestAnimationFrame(() => reveal(sel.type === 'thread' ? sel.id : tidOf(S.commits.get(sel.id))));
+  // A tapped station springs back from its press (the redraw replaced the pressed element).
+  if (S.view === 'canvas' && sel && sel.type === 'commit' && !CALM.matches) requestAnimationFrame(() => motion(() => liOf(sel.id)?.querySelector('.g'), [{ transform: 'scale(.82)' }, { transform: 'scale(1)' }], { duration: 380, easing: SPRING }));
 }
 window.addEventListener('popstate', () => {
   if (S.sel) { S.sel = null; S.ui = {}; render(); }

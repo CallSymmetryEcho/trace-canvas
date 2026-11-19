@@ -406,10 +406,10 @@ body.history-open .hist-btn span { display: inline; }
 .strip li.is-sel::after { content: ""; position: absolute; left: 5px; top: 50%; width: 12px; height: 12px; margin-top: -6px; border-radius: 50%; border: 2px solid var(--c); box-sizing: border-box; pointer-events: none; animation: st-breathe 2.4s ease-in-out var(--ph, 0s) infinite; }
 @keyframes st-breathe { 0%, 100% { transform: scale(1.15); opacity: .55; } 50% { transform: scale(1.7); opacity: .12; } }
 @media (prefers-reduced-motion: reduce), (hover: none) { .strip::before { transition: none; } .strip li.is-sel::after { animation: none; transform: scale(1.3); opacity: .4; } }
-/* Zooming out, a card's head (ring, name, badges) grows against the zoom so it stays about the size it has at 62%, and the records under it
-   fade away as it does: both follow the zoom itself (--z), so the change is as smooth as the zoom. Below 50% the name may take two lines and
-   the badges drop to a row of their own. */
-#cv { --k: clamp(1, calc(0.62 / var(--z, 1)), 3); --fade: clamp(0, calc((var(--z, 1) - 0.5) * 8.3), 1); }
+/* Zooming out past Fit (or 62% when Fit is closer), a card's head (ring, name, badges) grows against the zoom so it keeps its size there,
+   and the records under it fade away as it does: --k and --fade follow the zoom itself (applyCam sets them), so the change is as smooth
+   as the zoom. Once they are gone the name may take two lines and the badges drop to a row of their own. */
+#cv { --k: 1; --fade: 1; }
 .card:not(.is-shut) .card-head { transform-origin: 0 0; transform: scale(var(--k)); width: calc(100% / var(--k)); box-sizing: border-box; }
 .card:not(.is-shut) .strip, .card:not(.is-shut) .card-foot, .card:not(.is-shut) .ap-tick { opacity: var(--fade); }
 /* As the records fade, the card's frame fades with them (its fill and border follow --fade), and far out the head becomes a translucent
@@ -2449,14 +2449,20 @@ function renderEmpty() {
 
 /* ================= canvas ================= */
 const vp = $('#cv'), cardsEl = $('#cv-cards'), edgesSvg = $('#cv-edges'), world = $('#cv-world');
-let edgeAt = 0.62, edgeRaf = 0; // the zoom the lines were last drawn for (see drawEdges)
+// Fit shows the cards whole: their records fade and their heads grow only below zTop, which is Fit's own zoom when that is under 62%;
+// they are gone at 80% of it, and the zoom can go a little further out than that, to see the capsules.
+let zTop = 0.62;
+const zoomK = z => clamp(zTop / z, 1, 3), zoomFade = z => clamp((z / zTop - 0.8) * 5, 0, 1);
+let edgeK = 1, edgeF = 1, edgeRaf = 0; // what the lines were last drawn for (see drawEdges)
 function applyCam() {
   const { x, y, z } = S.cam;
   world.style.transform = `translate(${x}px, ${y}px) scale(${z})`;
   vp.style.backgroundSize = `${24 * z}px ${24 * z}px`;
   vp.style.backgroundPosition = `${x * 0.85}px ${y * 0.85}px`; // the grid lags the cards a little: a hint of depth
-  vp.style.setProperty('--z', z.toFixed(3)); vp.classList.toggle('far', z < 0.5); // the records have faded out by here (see --fade): the head has the card to itself
-  if (edgeAt !== Math.min(z, 0.62) && !edgeRaf) edgeRaf = requestAnimationFrame(() => { edgeRaf = 0; drawEdges(); }); // below 62% the lines follow the heads as they grow
+  const k = zoomK(z), f = zoomFade(z);
+  vp.style.setProperty('--k', k.toFixed(3)); vp.style.setProperty('--fade', f.toFixed(3));
+  vp.classList.toggle('far', f === 0); // the records have faded out: the head has the card to itself
+  if ((k !== edgeK || f !== edgeF) && !edgeRaf) edgeRaf = requestAnimationFrame(() => { edgeRaf = 0; drawEdges(); }); // the lines follow the heads as they grow
   $('#zoom-reset').textContent = Math.round(z * 100) + '%';
 }
 /* ---- motion: only transform and opacity, and none under reduced motion or on a touch screen ---- */
@@ -2900,10 +2906,10 @@ function border(R, c, toward, gap) {
   return { x: c.x + dx * k, y: c.y + dy * k };
 }
 // Zoomed out, a line runs between the heads, not the emptied cards: each end slides from the card's box to its head as the records fade
-// (the same --fade the CSS uses), and the line, its arrow and gaps grow with the head (--k), so they stay the size they have at 62%.
+// (the same --fade the CSS uses), and the line, its arrow and gaps grow with the head (--k), so they keep the size they have at zTop.
 function drawEdges() {
-  const z = S.cam.z, k = clamp(0.62 / z, 1, 3), f = clamp((z - 0.5) * 8.3, 0, 1);
-  edgeAt = Math.min(z, 0.62);
+  const k = zoomK(S.cam.z), f = zoomFade(S.cam.z);
+  edgeK = k; edgeF = f;
   const rects = new Map();
   for (const el of cardsEl.children) {
     const R = { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight }, hd = el.querySelector('.card-head');
@@ -2943,7 +2949,7 @@ function drawEdges() {
 function zoomAt(cx, cy, f, fly) {
   const r = vp.getBoundingClientRect(), from = fly && camGoal ? camGoal : S.cam;
   const px = cx - r.left, py = cy - r.top;
-  const z = clamp(from.z * f, 0.25, 2), k = z / from.z;
+  const z = clamp(from.z * f, Math.min(0.25, zTop * 0.6), 2), k = z / from.z;
   const to = { x: px - (px - from.x) * k, y: py - (py - from.y) * k, z };
   if (fly) camTo(to); else { stopCam(); Object.assign(S.cam, to); applyCam(); }
 }
@@ -3011,6 +3017,7 @@ function fit(instant) {
   const padX = 24, padTop = 24, padBottom = 70;
   const availW = r.width - padX * 2, availH = r.height - padTop - padBottom;
   const z = clamp(Math.min(availW / (x1 - x0), availH / (y1 - y0)), r.width < 600 || matchMedia('(hover: none)').matches ? 0.6 : 0.3, 1.1); // a tablet: readable cards, pan for the rest
+  zTop = Math.min(0.62, z * 0.98); // see zoomK
   const w = (x1 - x0) * z, hgt = (y1 - y0) * z;
   const to = {
     z,

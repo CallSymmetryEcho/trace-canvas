@@ -405,16 +405,16 @@ body.history-open .hist-btn span { display: inline; }
 .strip li.is-sel::after { content: ""; position: absolute; left: 5px; top: 50%; width: 12px; height: 12px; margin-top: -6px; border-radius: 50%; border: 2px solid var(--c); box-sizing: border-box; pointer-events: none; animation: st-breathe 2.4s ease-in-out var(--ph, 0s) infinite; }
 @keyframes st-breathe { 0%, 100% { transform: scale(1.15); opacity: .55; } 50% { transform: scale(1.7); opacity: .12; } }
 @media (prefers-reduced-motion: reduce), (hover: none) { .strip::before { transition: none; } .strip li.is-sel::after { animation: none; transform: scale(1.3); opacity: .4; } }
-/* Zoomed far out the records are too small to read: each open card becomes a quiet tile with its line's colour down the left edge and its
-   name in the body face, two lines at most, the same 11px on screen at any zoom (--z is the zoom). A running line keeps a dot, top right. */
-.far .card:not(.is-shut) { box-shadow: inset calc(3px / var(--z)) 0 0 var(--c); }
-.far .card:not(.is-shut) .strip, .far .card:not(.is-shut) .card-foot, .far .card:not(.is-shut) .ap-tick { opacity: 0; }
-.far .card:not(.is-shut) .card-head { position: absolute; inset: 0; z-index: 1; padding: 0 calc(6px / var(--z)) 0 calc(10px / var(--z)); font-size: calc(11px / var(--z)); }
-.far .card:not(.is-shut) .card-name { font-family: var(--f-body); font-weight: 500; font-size: 1em; line-height: 1.35; letter-spacing: 0; white-space: normal; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-.far .card:not(.is-shut) .roundel, .far .card:not(.is-shut) .chip, .far .card:not(.is-shut) .grp-tog { display: none; }
-.far .card:not(.is-shut) .live-badge { position: absolute; top: .55em; right: .55em; padding: 0; border: 0; font-size: 0; }
-.far .card:not(.is-shut) .live-badge .ldot { width: calc(5px / var(--z)); height: calc(5px / var(--z)); }
-.strip, .card-foot { transition: opacity .2s; }
+/* Zooming out, a card's head (ring, name, badges) grows against the zoom so it stays about the size it has at 62%, and the records under it
+   fade away as it does: both follow the zoom itself (--z), so the change is as smooth as the zoom. Below 50% the name may take two lines and
+   the badges drop to a row of their own. */
+#cv { --k: clamp(1, calc(0.62 / var(--z, 1)), 3); --fade: clamp(0, calc((var(--z, 1) - 0.5) * 8.3), 1); }
+.card:not(.is-shut) .card-head { transform-origin: 0 0; transform: scale(var(--k)); width: calc(100% / var(--k)); box-sizing: border-box; }
+.card:not(.is-shut) .strip, .card:not(.is-shut) .card-foot, .card:not(.is-shut) .ap-tick { opacity: var(--fade); }
+.far .card:not(.is-shut) { overflow: hidden; }
+.far .card:not(.is-shut) .strip { pointer-events: none; }
+.far .card:not(.is-shut) .card-head { flex-wrap: wrap; row-gap: 4px; }
+.far .card:not(.is-shut) .card-name { flex: 1 1 55%; white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 @media (prefers-reduced-motion: reduce) { .strip, .strip li .s-title, .strip li .s-time, .strip li .g, .strip .s-more, .card-foot { transition: none; } }
 .strip li[data-cid]:active .g { transform: scale(.82); }
 /* a line with a session working on it: a point of light runs slowly up to its head (instead of the badge blinking) */
@@ -2436,7 +2436,7 @@ function applyCam() {
   world.style.transform = `translate(${x}px, ${y}px) scale(${z})`;
   vp.style.backgroundSize = `${24 * z}px ${24 * z}px`;
   vp.style.backgroundPosition = `${x * 0.85}px ${y * 0.85}px`; // the grid lags the cards a little: a hint of depth
-  vp.style.setProperty('--z', z.toFixed(3)); vp.classList.toggle('far', z < 0.42); // zoomed far out (a 13px title is under 5.5px on screen): cards show only their line's name, large
+  vp.style.setProperty('--z', z.toFixed(3)); vp.classList.toggle('far', z < 0.5); // the records have faded out by here (see --fade): the head has the card to itself
   $('#zoom-reset').textContent = Math.round(z * 100) + '%';
 }
 /* ---- motion: only transform and opacity, and none under reduced motion or on a touch screen ---- */

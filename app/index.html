@@ -2461,7 +2461,7 @@ function renderCanvas() {
   drawGroups();
   drawEdges();
   applyCam();
-  if (!S.fitted && loaded() && (S.threads.size || S.commits.size)) { S.fitted = true; fit(); }
+  if (!S.fitted && loaded() && (S.threads.size || S.commits.size)) { S.fitted = true; fit(true); }
   vp.classList.toggle('connecting', !!S.connect);
   $('#connect-btn').setAttribute('aria-pressed', S.connect ? 'true' : 'false');
   const cb = $('#connect-banner');
@@ -2800,15 +2800,70 @@ function drawEdges() {
     </g>`;
   }).join('');
 }
-function zoomAt(cx, cy, f) {
-  const r = vp.getBoundingClientRect();
+// fly: the buttons and keys glide there on the camera spring; wheel and pinch follow the hand directly.
+function zoomAt(cx, cy, f, fly) {
+  const r = vp.getBoundingClientRect(), from = fly && camGoal ? camGoal : S.cam;
   const px = cx - r.left, py = cy - r.top;
-  const z = clamp(S.cam.z * f, 0.25, 2);
-  const k = z / S.cam.z;
-  S.cam.x = px - (px - S.cam.x) * k; S.cam.y = py - (py - S.cam.y) * k; S.cam.z = z;
-  applyCam();
+  const z = clamp(from.z * f, 0.25, 2), k = z / from.z;
+  const to = { x: px - (px - from.x) * k, y: py - (py - from.y) * k, z };
+  if (fly) camTo(to); else { stopCam(); Object.assign(S.cam, to); applyCam(); }
 }
-function fit() {
+/* ---- the camera has weight: a spring flies it to a goal, a released drag glides on ---- */
+// Slightly under-damped (about 5% overshoot, settled in under half a second). x, y and z share one spring,
+// so they move in step and the point a zoom is anchored on stays put on the screen.
+let camRaf = 0, camGoal = null;
+function stopCam() { cancelAnimationFrame(camRaf); camRaf = 0; camGoal = null; }
+function camTo(to) {
+  stopCam();
+  if (CALM.matches) { Object.assign(S.cam, to); applyCam(); return; }
+  camGoal = to;
+  const v = { x: 0, y: 0, z: 0 };
+  let last = performance.now();
+  const step = now => {
+    const dt = Math.min(0.032, (now - last) / 1000); last = now;
+    let rest = true;
+    for (const k of ['x', 'y', 'z']) {
+      v[k] += (170 * (to[k] - S.cam[k]) - 18 * v[k]) * dt;
+      S.cam[k] += v[k] * dt;
+      const tol = k === 'z' ? 1e-4 : 0.3;
+      if (Math.abs(to[k] - S.cam[k]) > tol || Math.abs(v[k]) > tol * 10) rest = false;
+    }
+    if (rest) { Object.assign(S.cam, to); camRaf = 0; camGoal = null; } else camRaf = requestAnimationFrame(step);
+    applyCam();
+  };
+  camRaf = requestAnimationFrame(step);
+}
+// After a flick: friction slows the canvas down; if the map ended up off the screen, the spring brings an edge of it back.
+function glide(vx, vy) {
+  stopCam();
+  let last = performance.now();
+  const step = now => {
+    const dt = Math.min(0.032, (now - last) / 1000); last = now;
+    const f = Math.exp(-4.5 * dt);
+    vx *= f; vy *= f;
+    S.cam.x += vx * dt; S.cam.y += vy * dt;
+    applyCam();
+    if (Math.hypot(vx, vy) > 20) camRaf = requestAnimationFrame(step); else { camRaf = 0; keepInView(); }
+  };
+  camRaf = requestAnimationFrame(step);
+}
+function keepInView() {
+  const els = [...cardsEl.children]; if (!els.length) return;
+  const r = vp.getBoundingClientRect(), { x, y, z } = S.cam, m = 80;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const el of els) { x0 = Math.min(x0, el.offsetLeft); y0 = Math.min(y0, el.offsetTop); x1 = Math.max(x1, el.offsetLeft + el.offsetWidth); y1 = Math.max(y1, el.offsetTop + el.offsetHeight); }
+  const nx = clamp(x, m - x1 * z, r.width - m - x0 * z), ny = clamp(y, m - y1 * z, r.height - m - y0 * z);
+  if (nx !== x || ny !== y) camTo({ x: nx, y: ny, z });
+}
+// A line or station picked elsewhere (the goals, a link) whose card is off the screen: fly there, close enough to read.
+function reveal(tid) {
+  const el = cardsEl.querySelector(`.card[data-tid="${CSS.escape(tid)}"]`); if (!el) return;
+  const v = vp.getBoundingClientRect(), b = el.getBoundingClientRect();
+  if (b.left >= v.left && b.top >= v.top && b.right <= v.right && b.bottom <= v.bottom) return;
+  const z = Math.max(S.cam.z, 0.8);
+  camTo({ z, x: v.width / 2 - (el.offsetLeft + el.offsetWidth / 2) * z, y: v.height / 2 - (el.offsetTop + el.offsetHeight / 2) * z });
+}
+function fit(instant) {
   const els = [...cardsEl.children, ...groupsEl.querySelectorAll('.grp-folded')]; // folded groups' chips count too
   if (!els.length) return;
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -2818,18 +2873,19 @@ function fit() {
   const availW = r.width - padX * 2, availH = r.height - padTop - padBottom;
   const z = clamp(Math.min(availW / (x1 - x0), availH / (y1 - y0)), r.width < 600 || matchMedia('(hover: none)').matches ? 0.6 : 0.3, 1.1); // a tablet: readable cards, pan for the rest
   const w = (x1 - x0) * z, hgt = (y1 - y0) * z;
-  S.cam = {
+  const to = {
     z,
     x: (w <= availW ? padX + (availW - w) / 2 : padX) - x0 * z,
     y: (hgt <= availH && w <= availW ? padTop + (availH - hgt) / 2 : padTop) - y0 * z,
   };
-  applyCam();
+  if (instant === true) { stopCam(); Object.assign(S.cam, to); applyCam(); } else camTo(to);
 }
 
 const ptrs = new Map();
 let gesture = null;
 vp.addEventListener('pointerdown', e => {
   if (e.pointerType === 'mouse' && e.button !== 0) return;
+  stopCam();
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   try { vp.setPointerCapture(e.pointerId); } catch {}
   if (ptrs.size === 2) {
@@ -2847,7 +2903,7 @@ vp.addEventListener('pointerdown', e => {
     const th = getThread(card.dataset.tid);
     gesture = { type: 'card', id: card.dataset.tid, sx: e.clientX, sy: e.clientY, ox: th.x || 0, oy: th.y || 0, moved: false, el: card, target: e.target, multiKey: e.shiftKey || e.metaKey || e.ctrlKey };
   } else if (edge) gesture = { type: 'edge', id: edge.dataset.eid };
-  else { gesture = { type: 'pan', sx: e.clientX, sy: e.clientY, cx: S.cam.x, cy: S.cam.y, moved: false }; vp.classList.add('panning'); }
+  else { gesture = { type: 'pan', sx: e.clientX, sy: e.clientY, cx: S.cam.x, cy: S.cam.y, moved: false, trail: [] }; vp.classList.add('panning'); }
 });
 vp.addEventListener('pointermove', e => {
   if (!ptrs.has(e.pointerId)) return;
@@ -2861,6 +2917,7 @@ vp.addEventListener('pointermove', e => {
     const dx = e.clientX - g.sx, dy = e.clientY - g.sy;
     if (Math.abs(dx) + Math.abs(dy) > 3) g.moved = true;
     S.cam.x = g.cx + dx; S.cam.y = g.cy + dy; applyCam();
+    g.trail.push({ t: e.timeStamp, x: e.clientX, y: e.clientY }); if (g.trail.length > 6) g.trail.shift();
   } else if (g.type === 'card' && !S.connect && !S.readOnly) {
     const dx = (e.clientX - g.sx) / S.cam.z, dy = (e.clientY - g.sy) / S.cam.z;
     if (!g.moved && Math.abs(dx) + Math.abs(dy) < 4) return;
@@ -2924,20 +2981,26 @@ function endPointer(e) {
     select({ type: 'edge', id: g.id });
   } else if (g.type === 'pan' && !g.moved) {
     if (S.connect) { S.connect = null; render(); } else select(null);
+  } else if (g.type === 'pan') {
+    // The speed of the last ~80 ms of the drag carries on; a drag that stopped before letting go stays put.
+    const tr = g.trail.filter(p => e.timeStamp - p.t < 80), a = tr[0], b = tr[tr.length - 1];
+    const dt = a && b && b.t > a.t ? (b.t - a.t) / 1000 : 0;
+    if (dt && !CALM.matches) glide((b.x - a.x) / dt, (b.y - a.y) / dt); else keepInView();
   }
 }
 vp.addEventListener('pointerup', endPointer);
 vp.addEventListener('pointercancel', endPointer);
 vp.addEventListener('wheel', e => {
   e.preventDefault();
+  stopCam();
   if (e.ctrlKey || e.metaKey) zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.01));
   else { S.cam.x -= e.deltaX; S.cam.y -= e.deltaY; applyCam(); }
 }, { passive: false });
-const vpCenter = f => { const r = vp.getBoundingClientRect(); zoomAt(r.left + r.width / 2, r.top + r.height / 2, f); };
+const vpCenter = f => { const r = vp.getBoundingClientRect(); zoomAt(r.left + r.width / 2, r.top + r.height / 2, f, true); };
 $('#zoom-in').onclick = () => vpCenter(1.2);
 $('#zoom-out').onclick = () => vpCenter(1 / 1.2);
-$('#zoom-reset').onclick = () => vpCenter(1 / S.cam.z);
-$('#zoom-fit').onclick = fit;
+$('#zoom-reset').onclick = () => vpCenter(1 / (camGoal || S.cam).z);
+$('#zoom-fit').onclick = () => fit();
 $('#connect-btn').onclick = () => { if (!canWrite()) return; S.connect = S.connect ? null : { from: null }; render(); };
 $('#connect-banner').addEventListener('click', e => { if (e.target.id === 'connect-cancel') { S.connect = null; render(); } });
 $('#new-thread-btn').onclick = () => createThreadAndEdit();
@@ -3231,6 +3294,7 @@ function select(sel) {
   if (PHONE.matches && sel && !S.sel) history.pushState({ tcPanel: 1 }, '');
   S.sel = sel; S.ui = {};
   render();
+  if (S.view === 'canvas' && sel && (sel.type === 'thread' || sel.type === 'commit')) requestAnimationFrame(() => reveal(sel.type === 'thread' ? sel.id : tidOf(S.commits.get(sel.id))));
 }
 window.addEventListener('popstate', () => {
   if (S.sel) { S.sel = null; S.ui = {}; render(); }

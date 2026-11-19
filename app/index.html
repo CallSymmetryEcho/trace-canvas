@@ -414,7 +414,7 @@ body.history-open .hist-btn span { display: inline; }
 @keyframes st-flow { 0% { transform: translateY(56px); opacity: 0; } 25% { opacity: .9; } 85% { opacity: .9; } 100% { transform: translateY(0); opacity: 0; } }
 .card .live-badge.st-working .ldot { animation: none; }
 @media (prefers-reduced-motion: reduce), (hover: none) { .card.is-running .strip::after { animation: none; opacity: .9; } } /* still: a lit point at the head */
-.git-svg g[data-cid], .tl-body g[data-cid] { transform-box: fill-box; transform-origin: center; }
+.git-svg g[data-cid], .git-svg g[data-sid], .tl-body g[data-cid] { transform-box: fill-box; transform-origin: center; }
 .st-seg { position: absolute; left: 14.5px; top: 12px; width: 3px; border-radius: 2px; background: var(--c); transform-origin: bottom; pointer-events: none; }
 .st-ripple { position: absolute; left: 5px; top: 50%; width: 12px; height: 12px; margin-top: -6px; border-radius: 50%; border: 2px solid var(--rc); box-sizing: border-box; pointer-events: none; opacity: 0; }
 .is-inbox .strip::before { background: repeating-linear-gradient(to bottom, var(--c) 0 4px, transparent 4px 8px); }
@@ -2445,13 +2445,14 @@ function playFreshList(view, fresh) {
   }
 }
 function introGit() {
+  // Every row on the screen, the running sessions at the top included (they have a session id, not a record id).
   const wrap = $('#git-scroll'), top = wrap.getBoundingClientRect().top, bot = top + wrap.clientHeight;
-  const rows = [...$('#git-body').querySelectorAll('.g-row[data-cid]')].filter(r => { const b = r.getBoundingClientRect(); return b.bottom > top && b.top < bot; }).slice(0, 30);
+  const rows = [...$('#git-body').querySelectorAll('.g-row')].filter(r => { const b = r.getBoundingClientRect(); return b.bottom > top && b.top < bot; }).slice(0, 30);
   motion(() => $('#git-body .git-svg'), [{ opacity: 0 }, { opacity: 1 }], { duration: 300, easing: 'ease-out', fill: 'backwards' });
   rows.forEach((r, i) => {
-    const id = r.dataset.cid, d = i * Math.min(25, 550 / rows.length);
-    motion(() => rowOf(id), SLIDE, { duration: 280, delay: d, easing: EASE_OUT, fill: 'backwards' });
-    motion(() => dotOf('git', id), POP, { duration: 260, delay: d + 40, easing: SPRING, fill: 'backwards' });
+    const sel = r.dataset.cid ? `[data-cid="${CSS.escape(r.dataset.cid)}"]` : `[data-sid="${CSS.escape(r.dataset.sid)}"]`, d = i * Math.min(25, 550 / rows.length);
+    motion(() => $('#git-body')?.querySelector(`.g-row${sel}`), SLIDE, { duration: 280, delay: d, easing: EASE_OUT, fill: 'backwards' });
+    motion(() => $('#git-body')?.querySelector(`svg g${sel}`), POP, { duration: 260, delay: d + 40, easing: SPRING, fill: 'backwards' });
   });
 }
 function introTimeline() {

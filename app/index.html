@@ -396,7 +396,15 @@ body.history-open .hist-btn span { display: inline; }
 .chip-merged { background: var(--surface-2); }
 .strip { list-style: none; margin: 0; padding: 2px 10px 4px 4px; position: relative; }
 .strip::before { content: ""; position: absolute; left: 14.5px; top: var(--st-top, 12px); bottom: 12px; width: 3px; border-radius: 2px; background: var(--c); transform-origin: bottom; }
-.strip li .s-title, .strip li .s-time, .strip li .g, .strip .s-more, .card-foot { transition: opacity .3s ease; }
+.strip li .s-title, .strip li .s-time, .strip li .g, .strip .s-more, .card-foot { transition: opacity .3s ease, transform .18s ease; }
+/* hover: the station grows a little and its line brightens; selected: a ring breathes round it and the line's other stations step back */
+.strip::before { transition: filter .18s ease; }
+.strip li[data-cid]:hover .g { transform: scale(1.25); }
+.strip:has(li[data-cid]:hover)::before { filter: brightness(1.25) saturate(1.15); }
+.strip:has(li.is-sel) li[data-cid]:not(.is-sel) { opacity: .55; }
+.strip li.is-sel::after { content: ""; position: absolute; left: 5px; top: 50%; width: 12px; height: 12px; margin-top: -6px; border-radius: 50%; border: 2px solid var(--c); box-sizing: border-box; pointer-events: none; animation: st-breathe 2.4s ease-in-out var(--ph, 0s) infinite; }
+@keyframes st-breathe { 0%, 100% { transform: scale(1.15); opacity: .55; } 50% { transform: scale(1.7); opacity: .12; } }
+@media (prefers-reduced-motion: reduce), (hover: none) { .strip::before { transition: none; } .strip li.is-sel::after { animation: none; transform: scale(1.3); opacity: .4; } }
 .far .strip li:not(.key):not(.is-sel) .s-title, .far .strip li:not(.key):not(.is-sel) .s-time, .far .strip .s-more, .far .card-foot { opacity: 0; }
 .far .strip li:not(.key):not(.is-sel) .g { opacity: .4; }
 @media (prefers-reduced-motion: reduce), (hover: none) { .strip li .s-title, .strip li .s-time, .strip li .g, .strip .s-more, .card-foot { transition: none; } }
@@ -2395,6 +2403,8 @@ function keepMoving() {
   const now = document.timeline.currentTime;
   moving = moving.filter(m => now < m.end && play(m));
 }
+// A looping animation restarts when render() rebuilds its element: a negative delay tied to the clock keeps it in step.
+const phase = period => `-${Date.now() % period}ms`;
 const POP = [{ transform: 'scale(0)' }, { transform: 'scale(1)' }], GROW = [{ transform: 'scaleY(0)' }, { transform: 'scaleY(1)' }];
 const liOf = id => cardsEl.querySelector(`li[data-cid="${CSS.escape(id)}"]`);
 // Records already drawn: a render after a data refresh animates only the ones that arrived since (null until the first load).
@@ -2757,7 +2767,7 @@ function cardHTML(th, cs, selT) {
   apSeen(th);
   const cls = ['card', isInbox ? 'is-inbox' : `st-${th.status || 'active'}`, shut ? 'is-shut' : '', peeking ? 'is-peek' : '', apRun(th) ? 'ap-on' : '', apEvo(th) ? 'ap-evo' : '', selT === th.id ? 'is-sel' : '', filtering() && !anyHit ? 'is-dim' : '', S.connect && S.connect.from === th.id ? 'is-from' : '', S.multi.has(th.id) ? 'is-multi' : '', S.multi.has(th.id) && th.id === S.multiTarget ? 'is-multi-target' : ''].filter(Boolean).join(' ');
   const items = recent.length
-    ? recent.map(c => `<li data-cid="${esc(c.id)}" class="${c.id === selC ? 'is-sel' : ''} ${filtering() && matches(c) ? 'hit' : ''} ${c.kind === 'decision' || c.starred ? 'key' : ''}">${mini(c.kind, stationColor(c, th), c.done)}<span class="s-title" title="${esc(c.title)}">${starMark(c)}${esc(c.title)}</span><time class="s-time">${fmtShort(c.ts)}</time></li>`).join('')
+    ? recent.map(c => `<li data-cid="${esc(c.id)}" class="${c.id === selC ? 'is-sel' : ''} ${filtering() && matches(c) ? 'hit' : ''} ${c.kind === 'decision' || c.starred ? 'key' : ''}"${c.id === selC ? ` style="--ph:${phase(2400)}"` : ''}>${mini(c.kind, stationColor(c, th), c.done)}<span class="s-title" title="${esc(c.title)}">${starMark(c)}${esc(c.title)}</span><time class="s-time">${fmtShort(c.ts)}</time></li>`).join('')
       + (more > 0 ? `<li class="s-more"><span></span><span>${esc(t('moreEarlier', more))}</span><span></span></li>` : '')
     : `<li class="s-empty"><span></span><span>${esc(isInbox ? t('inboxEmpty') : t('noRecords'))}</span><span></span></li>`;
   const chip = apChip(th) + (isInbox ? `<span class="chip">${esc(t('unsorted'))}</span>` : `<span class="chip chip-${th.status || 'active'}">${esc(statusLabel(th.status))}</span>`);

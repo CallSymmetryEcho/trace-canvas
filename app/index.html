@@ -661,6 +661,7 @@ body.read-page .sheet { width: min(860px, 100%); }
 .fld input, .fld select, .fld textarea {
   width: 100%; min-width: 0; padding: 7px 9px; border: 1px solid var(--rule); border-radius: 7px; background: var(--surface-2);
 }
+.detail .fld input, .detail .fld select, .detail .fld textarea { box-sizing: border-box; min-width: 0; max-width: 100%; }
 .fld textarea { resize: vertical; line-height: 1.5; }
 .fld input:focus, .fld select:focus, .fld textarea:focus { outline: none; border-color: var(--accent); background: var(--surface); }
 .fld-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
@@ -829,7 +830,6 @@ body.sheet-open .top { z-index: 80; }
   .d-head [data-act="close"] { order: -1; width: 40px; height: 40px; font-size: 0; }
   .d-head [data-act="close"]::before { content: "←"; font-size: 22px; }
   .d-actions .btn { min-height: 40px; }
-  .detail .fld input, .detail .fld select, .detail .fld textarea { box-sizing: border-box; min-width: 0; max-width: 100%; }
 
 }
 @media (max-width: 480px) {

@@ -411,6 +411,8 @@ body.history-open .hist-btn span { display: inline; }
 #cv { --k: clamp(1, calc(0.62 / var(--z, 1)), 3); --fade: clamp(0, calc((var(--z, 1) - 0.5) * 8.3), 1); }
 .card:not(.is-shut) .card-head { transform-origin: 0 0; transform: scale(var(--k)); width: calc(100% / var(--k)); box-sizing: border-box; }
 .card:not(.is-shut) .strip, .card:not(.is-shut) .card-foot, .card:not(.is-shut) .ap-tick { opacity: var(--fade); }
+/* As the records fade, the line's colour grows in down the card's left edge (4px on screen once they are gone), so the emptied card still says which line it is. */
+.card:not(.is-shut) { background-image: linear-gradient(var(--c), var(--c)); background-repeat: no-repeat; background-size: calc((1 - var(--fade)) * 4px / var(--z, 1)) 100%; }
 .far .card:not(.is-shut) { overflow: hidden; }
 .far .card:not(.is-shut) .strip { pointer-events: none; }
 .far .card:not(.is-shut) .card-head { flex-wrap: wrap; row-gap: 4px; }

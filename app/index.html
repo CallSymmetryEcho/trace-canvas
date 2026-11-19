@@ -663,7 +663,7 @@ body.read-page .sheet { width: min(860px, 100%); }
 }
 .fld textarea { resize: vertical; line-height: 1.5; }
 .fld input:focus, .fld select:focus, .fld textarea:focus { outline: none; border-color: var(--accent); background: var(--surface); }
-.fld-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.fld-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
 .big-input { font-family: var(--f-display); font-weight: 600; font-size: 19px !important; letter-spacing: .01em; }
 .check { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; }
 .swatches { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -915,7 +915,9 @@ body.sheet-open .top { z-index: 80; }
 .gx-bar { display: flex; height: 5px; border-radius: 3px; overflow: hidden; background: var(--rule-soft); }
 .gx-bar i { background: var(--ok); } .gx-bar u { background: var(--danger); }
 .gx-quiet { opacity: .6; }
-.gx-diff { margin: 2px 0 8px; padding: 8px 10px; max-height: 380px; overflow: auto; font: 11.5px/1.5 var(--f-mono); background: var(--rule-soft); border-radius: 6px; white-space: pre; }
+.gx-diff { margin: 2px 0 8px; padding: 8px 10px; max-height: 380px; overflow: auto; font: 11.5px/1.5 var(--f-mono); background: var(--rule-soft); border-radius: 6px; white-space: pre-wrap; overflow-wrap: anywhere; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+.gx-diff span { display: block; padding-left: 1.4em; text-indent: -1.4em; } /* a wrapped line hangs under its first row */
+.gx-diff b { font-weight: 600; background: color-mix(in srgb, currentColor 16%, transparent); border-radius: 2px; }
 .gx-diff .a { color: var(--ok); } .gx-diff .d { color: var(--danger); } .gx-diff .h { color: var(--faint); }
 .gx-note { margin: 0; color: var(--faint); font-size: 12px; }
 .l-cmd code { flex: 1; min-width: 0; overflow-wrap: anywhere; max-height: 7.5em; overflow: auto; font-family: var(--f-mono); font-size: 12px; padding: 6px 8px; background: var(--surface-2); border: 1px solid var(--rule-soft); border-radius: 6px; }
@@ -3607,7 +3609,21 @@ function diffHTML(r) {
   if (!r) return `<p class="gx-note">${esc(t('gxLoading'))}</p>`;
   if (r.error || r.missing) return `<p class="gx-note">${esc(r.error || t('gxNoCommit'))}</p>`;
   const lines = r.diff.split('\n').filter(l => !/^(diff --git|index |--- |\+\+\+ |new file mode|deleted file mode)/.test(l)).slice(0, 3000);
-  return `<pre class="gx-diff">${lines.map(l => `<span class="${l[0] === '+' ? 'a' : l[0] === '-' ? 'd' : l.startsWith('@@') ? 'h' : ''}">${esc(l)}</span>`).join('\n')}</pre>${r.truncated ? `<p class="gx-note">${esc(t('gxTruncated'))}</p>` : ''}`;
+  // Long lines (this page's own source has lines of thousands of characters) are cut to what matters: a removed line
+  // followed by its replacement shows only the part that differs, in bold, with some text around it; any other long line
+  // shows its start. Lines wrap, so nothing is read by scrolling sideways.
+  const LONG = 240, AROUND = 60, sign = l => (l[0] === '+' || l[0] === '-' ? l[0] : ''), out = lines.map(l => esc(l.length > LONG ? l.slice(0, LONG) + ' …' : l));
+  for (let i = 0; i + 1 < lines.length; i++) {
+    const a = lines[i], b = lines[i + 1];
+    if (a[0] !== '-' || b[0] !== '+' || sign(lines[i - 1] || '') || sign(lines[i + 2] || '') || Math.max(a.length, b.length) <= LONG) continue;
+    let p = 1, q = 0; const m = Math.min(a.length, b.length);
+    while (p < m && a[p] === b[p]) p++;
+    while (q < m - p && a[a.length - 1 - q] === b[b.length - 1 - q]) q++;
+    const cut = l => { const from = Math.max(1, p - AROUND), end = l.length - q, to = Math.min(l.length, end + AROUND), mid = l.slice(p, end);
+      return esc(l[0] + (from > 1 ? '… ' : '') + l.slice(from, p)) + `<b>${esc(mid.length > 600 ? mid.slice(0, 600) + ' …' : mid)}</b>` + esc(l.slice(end, to) + (to < l.length ? ' …' : '')); };
+    out[i] = cut(a); out[i + 1] = cut(b); i++;
+  }
+  return `<pre class="gx-diff">${lines.map((l, i) => `<span class="${l[0] === '+' ? 'a' : l[0] === '-' ? 'd' : l.startsWith('@@') ? 'h' : ''}">${out[i] || ' '}</span>`).join('')}</pre>${r.truncated ? `<p class="gx-note">${esc(t('gxTruncated'))}</p>` : ''}`;
 }
 function changesHTML(c) {
   if (S.mode !== 'server') return '';

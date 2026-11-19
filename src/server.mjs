@@ -292,7 +292,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         return send(res, 200, { ok: true });
       }
       // Lessons from an archived project: drafted by the local claude, written to Theatrum only for the ticked ones,
-      // and noted on the project's first line (the plaque counts them; Autopilot finds their records from there).
+      // and noted on its latest archived line (the plaque counts them; Autopilot finds their records from there).
       if (req.method === 'POST' && p === '/api/lessons') {
         const body = JSON.parse(await readBody(req));
         try { return send(res, 200, { lessons: await draftLessons(readData(), String(body.group || ''), String(body.lang || 'zh')) }); }
@@ -305,7 +305,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         for (const l of ls) { const e = await rememberLesson(l, group); if (e) failed.push(e); }
         const saved = ls.length - failed.length;
         if (saved) mutate(d => {
-          const th = Object.values(d.threads).filter(t => t.group === group).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))[0];
+          const th = Object.values(d.threads).filter(t => t.group === group && t.archived).sort((a, b) => b.archived - a.archived)[0];
           if (th) addCommit(d, { thread: th.id, kind: 'note', title: `Lessons (${saved}): ${group}`, body: ls.map(l => `- ${l.title}\n  ${l.body}${l.from.length ? `\n  (${l.from.join(', ')})` : ''}`).join('\n'), agent: 'Trace Canvas', extra: { lessons: saved } });
         });
         broadcast('change');

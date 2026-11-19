@@ -6,9 +6,11 @@ import path from 'node:path';
 import { emptyData, createThread, addCommit } from '../src/store.mjs';
 import { draftLessons, lessonSource, lessonsFor, parseLessons, rememberLesson } from '../src/lessons.mjs';
 
-test('lessons are drawn from a project\'s decisions and wrap-ups only, and the draft is read as JSON', async () => {
+test('lessons are drawn from the decisions and wrap-ups of a project\'s finished lines only, and the draft is read as JSON', async () => {
   const d = emptyData();
-  const a = createThread(d, { name: 'Video', extra: { group: 'Promo' } }).id, b = createThread(d, { name: 'Other' }).id;
+  const a = createThread(d, { name: 'Video', extra: { group: 'Promo', status: 'done', archived: 9 } }).id, b = createThread(d, { name: 'Other' }).id;
+  const live = createThread(d, { name: 'Still going', extra: { group: 'Promo' } }).id;
+  addCommit(d, { thread: live, kind: 'decision', title: 'A running line', ts: 6 });
   const dec = addCommit(d, { thread: a, kind: 'decision', title: 'Voice-over: write English words plainly', ts: 1 });
   addCommit(d, { thread: a, kind: 'note', title: 'Wrap-up: Video', body: 'Outputs:\n- v1', ts: 2 });
   addCommit(d, { thread: a, kind: 'agent', title: 'Rendered a take', ts: 3 });
@@ -19,10 +21,10 @@ test('lessons are drawn from a project\'s decisions and wrap-ups only, and the d
   assert.doesNotMatch(src, /Not applied|\] note: Retro/);
   assert.match(src, new RegExp(`\\[${dec.id}\\] decision: Voice-over`));
   assert.match(src, /Wrap-up: Video/);
-  assert.doesNotMatch(src, /Rendered a take|Not this project/);
+  assert.doesNotMatch(src, /Rendered a take|Not this project|A running line/);
   let asked = '';
   const ls = await draftLessons(d, 'Promo', 'en', async p => { asked = p; return `Sure:\n[{"title":"Write English words plainly in TTS scripts","body":"Phonetic marks get read out.","from":["${dec.id}"]},{"body":"no title"}]`; });
-  assert.match(asked, /finished project, "Promo"/);
+  assert.match(asked, /finished lines of a project, "Promo"/);
   assert.deepEqual(ls, [{ title: 'Write English words plainly in TTS scripts', body: 'Phonetic marks get read out.', from: [dec.id] }]);
   assert.deepEqual(parseLessons('no json here'), []);
   assert.deepEqual(await draftLessons(d, 'Nothing', 'en', async () => '[]'), []);

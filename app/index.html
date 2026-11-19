@@ -411,9 +411,21 @@ body.history-open .hist-btn span { display: inline; }
 #cv { --k: clamp(1, calc(0.62 / var(--z, 1)), 3); --fade: clamp(0, calc((var(--z, 1) - 0.5) * 8.3), 1); }
 .card:not(.is-shut) .card-head { transform-origin: 0 0; transform: scale(var(--k)); width: calc(100% / var(--k)); box-sizing: border-box; }
 .card:not(.is-shut) .strip, .card:not(.is-shut) .card-foot, .card:not(.is-shut) .ap-tick { opacity: var(--fade); }
-/* As the records fade, the line's colour grows in down the card's left edge (4px on screen once they are gone), so the emptied card still says which line it is. */
-.card:not(.is-shut) { background-image: linear-gradient(var(--c), var(--c)); background-repeat: no-repeat; background-size: calc((1 - var(--fade)) * 4px / var(--z, 1)) 100%; }
-.far .card:not(.is-shut) { overflow: hidden; }
+/* As the records fade, the card's frame fades with them (its fill and border follow --fade), and far out the head becomes a translucent
+   capsule round the ring and name, like a place label on Apple Maps: no empty white box, only what is left to read. The capsule sits
+   6px (scaled) inside the card so its shadow is not clipped. No backdrop blur: over the dotted grid it adds nothing, and dozens of them
+   would make a phone stutter while pinching. */
+.card { --card-bg: var(--surface); }
+.card.is-inbox { --card-bg: var(--surface-2); }
+.card:not(.is-shut) { background-color: color-mix(in srgb, var(--card-bg) calc(var(--fade) * 100%), transparent); border-color: color-mix(in srgb, var(--rule) calc(var(--fade) * 100%), transparent); }
+.card:not(.is-shut) .card-head { border-radius: 16px; transition: background-color .25s, box-shadow .25s; }
+.far .card:not(.is-shut) { overflow: hidden; box-shadow: none; }
+.far .card:not(.is-shut) .card-head { width: fit-content; max-width: calc(100% / var(--k) - 12px); margin: calc(6px * var(--k)); padding: 8px 14px 8px 10px;
+  background: color-mix(in srgb, var(--card-bg) 84%, transparent);
+  box-shadow: 0 0 0 .5px color-mix(in srgb, var(--ink) 14%, transparent), 0 2px 10px -2px rgba(20, 24, 28, .14); }
+.far .card:not(.is-shut):hover .card-head { box-shadow: 0 0 0 .5px color-mix(in srgb, var(--ink) 18%, transparent), 0 4px 14px -2px rgba(20, 24, 28, .22); }
+.far .card.is-sel:not(.is-shut) { outline-color: transparent; }
+.far .card.is-sel:not(.is-shut) .card-head { box-shadow: 0 0 0 2px var(--accent), 0 2px 10px -2px rgba(20, 24, 28, .14); }
 .far .card:not(.is-shut) .strip { pointer-events: none; }
 .far .card:not(.is-shut) .card-head { flex-wrap: wrap; row-gap: 4px; }
 .far .card:not(.is-shut) .card-name { flex: 1 1 55%; white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }

@@ -485,7 +485,7 @@ export function autopilotStop(input, env = process.env) {
       ? `Autopilot self-iteration is on for the line "${th.name}" (thread ${th.id}): ${rounds} of ${ev.rounds} rounds done, its to-dos are ${open.length ? 'all waiting on the person' : 'cleared'}. Measure by "${firstLine(ev.metric, 200)}", log "Evolve round ${rounds + 1}: kept|reverted · <before → after>" for the round just done if not yet logged, then set the next 1-3 "Evolve: …" to-dos that should move the measure and do them. Stop with the "Autopilot summary" only when two rounds in a row kept nothing or the next step needs the person.`
       : todo.length
       ? `${head}, next: ${firstLine(todo[0].title, 120)} [${todo[0].id}]. Go on by the decision profile, with this line's to-dos only. One you cannot decide: log "Question: <the question> [<its id>]" and go on with the next; write the "Autopilot summary" only when the rest all wait on the person or on another running session.`
-      : `${head}, each with a question asked. Log the "Autopilot summary" with the count (cleared N · M wait on you · K with others) and the questions together, then stop.`;
+      : `${head}, each with a question asked. Log the "Autopilot summary" with the count (cleared N · M wait on you · K with others) and the questions together, close the round's Quest with its conclusion (trace_quest), then stop.`;
   }
   return reason;
 }

@@ -408,6 +408,11 @@ body.history-open .hist-btn span { display: inline; }
 .far .strip li:not(.key):not(.is-sel) .s-title, .far .strip li:not(.key):not(.is-sel) .s-time, .far .strip .s-more, .far .card-foot { opacity: 0; }
 .far .strip li:not(.key):not(.is-sel) .g { opacity: .4; }
 @media (prefers-reduced-motion: reduce), (hover: none) { .strip li .s-title, .strip li .s-time, .strip li .g, .strip .s-more, .card-foot { transition: none; } }
+/* a line with a session working on it: a point of light runs slowly up to its head (instead of the badge blinking) */
+.card.is-running .strip::after { content: ""; position: absolute; left: 13.5px; top: 10px; width: 5px; height: 5px; border-radius: 50%; background: #fff; box-shadow: 0 0 6px 2px var(--c); pointer-events: none; opacity: 0; animation: st-flow 2.8s ease-in-out var(--ph, 0s) infinite; }
+@keyframes st-flow { 0% { transform: translateY(56px); opacity: 0; } 25% { opacity: .9; } 85% { opacity: .9; } 100% { transform: translateY(0); opacity: 0; } }
+.card .live-badge.st-working .ldot { animation: none; }
+@media (prefers-reduced-motion: reduce), (hover: none) { .card.is-running .strip::after { animation: none; display: none; } }
 .st-seg { position: absolute; left: 14.5px; top: 12px; width: 3px; border-radius: 2px; background: var(--c); transform-origin: bottom; pointer-events: none; }
 .st-ripple { position: absolute; left: 5px; top: 50%; width: 12px; height: 12px; margin-top: -6px; border-radius: 50%; border: 2px solid var(--rc); box-sizing: border-box; pointer-events: none; opacity: 0; }
 .is-inbox .strip::before { background: repeating-linear-gradient(to bottom, var(--c) 0 4px, transparent 4px 8px); }
@@ -2765,7 +2770,7 @@ function cardHTML(th, cs, selT) {
   const selC = S.sel && S.sel.type === 'commit' ? S.sel.id : null;
   const peeking = isFolded(th) && S.peek.has(th.id), shut = isFolded(th) && !peeking;
   apSeen(th);
-  const cls = ['card', isInbox ? 'is-inbox' : `st-${th.status || 'active'}`, shut ? 'is-shut' : '', peeking ? 'is-peek' : '', apRun(th) ? 'ap-on' : '', apEvo(th) ? 'ap-evo' : '', selT === th.id ? 'is-sel' : '', filtering() && !anyHit ? 'is-dim' : '', S.connect && S.connect.from === th.id ? 'is-from' : '', S.multi.has(th.id) ? 'is-multi' : '', S.multi.has(th.id) && th.id === S.multiTarget ? 'is-multi-target' : ''].filter(Boolean).join(' ');
+  const cls = ['card', isInbox ? 'is-inbox' : `st-${th.status || 'active'}`, shut ? 'is-shut' : '', peeking ? 'is-peek' : '', apRun(th) ? 'ap-on' : '', apEvo(th) ? 'ap-evo' : '', selT === th.id ? 'is-sel' : '', filtering() && !anyHit ? 'is-dim' : '', S.connect && S.connect.from === th.id ? 'is-from' : '', S.multi.has(th.id) ? 'is-multi' : '', S.multi.has(th.id) && th.id === S.multiTarget ? 'is-multi-target' : '', liveOn(th.id).some(s => s.status === 'working') ? 'is-running' : ''].filter(Boolean).join(' ');
   const items = recent.length
     ? recent.map(c => `<li data-cid="${esc(c.id)}" class="${c.id === selC ? 'is-sel' : ''} ${filtering() && matches(c) ? 'hit' : ''} ${c.kind === 'decision' || c.starred ? 'key' : ''}"${c.id === selC ? ` style="--ph:${phase(2400)}"` : ''}>${mini(c.kind, stationColor(c, th), c.done)}<span class="s-title" title="${esc(c.title)}">${starMark(c)}${esc(c.title)}</span><time class="s-time">${fmtShort(c.ts)}</time></li>`).join('')
       + (more > 0 ? `<li class="s-more"><span></span><span>${esc(t('moreEarlier', more))}</span><span></span></li>` : '')
@@ -2775,7 +2780,7 @@ function cardHTML(th, cs, selT) {
   return `<div class="${cls}${apD(th.id) != null ? ' ap-burst' : ''}" data-tid="${esc(th.id)}" style="left:${th.x || 0}px;top:${th.y || 0}px;--c:${th.color}${apD(th.id) != null ? `;--apd:${apD(th.id)}ms` : ''}">
     <div class="card-head">${isFolded(th) ? `<span class="grp-tog" data-park-tog="1" title="${esc(t(peeking ? 'peekClose' : th.status === 'done' ? 'peekOpen' : 'peekOpenParked'))}">${peeking ? '▾' : '▸'}</span>` : ''}<span class="roundel"></span><span class="card-name">${esc(th.name)}</span>${liveBadge(th.id)}${chip}</div>
     ${shut ? '' : apTickHTML(th, cs)}
-    <ol class="strip">${items}</ol>
+    <ol class="strip" style="--ph:${phase(2800)}">${items}</ol>
     <div class="card-foot"><span>${esc(t('countRecords', cs.length))}${agents ? esc(t('countAgent', agents)) : ''}${mergedIn(th.id).length && !S.showMerged ? `<button class="linkish mi-tog" data-merged-tog="1" title="${esc(t(S.mergedOpen.has(th.id) ? 'mergedClose' : 'mergedOpen'))}">${esc(t('mergedInCount', mergedIn(th.id).length))} ${S.mergedOpen.has(th.id) ? '▾' : '▸'}</button>` : ''}</span><span>${last ? esc(t('updated', fmtRel(last.ts))) : ''}</span></div>
   </div>`;
 }

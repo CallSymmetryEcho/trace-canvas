@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { createCard } from './research.mjs';
 import { addCommit, dataFile, ensureThread, findThreadByName, importText, INBOX, mutate, readConfig, readData, threadById, threadIdOf } from './store.mjs';
 import { sessionThread, whereFind } from './hook.mjs';
 import { agentEnv, agentKey, agentOf } from './agents.mjs';
@@ -99,7 +100,14 @@ const TOOLS = [
     name: 'trace_log',
     title: 'Log one record',
     description: 'Adds one record to a thread (created if the name is new) or to the inbox.',
-    inputSchema: { type: 'object', properties: { title: { type: 'string' }, kind: KIND, thread: { type: 'string' }, body: { type: 'string' }, links: { type: 'array', items: { type: 'string' } }, agent: { type: 'string' }, assignee: { type: 'string', enum: ['claude', 'codex', 'gemini', 'agy'], description: 'Hand this to-do to an agent (kind defaults to task).' }, on: { type: 'string', description: 'The machine to do this to-do on (as the canvas names machines): dispatch gives it to the latest session on that machine for its line, or starts one there.' }, to: { type: 'string', description: 'A reply for one session, shown to it at the start of its next turn even when its process (and its messaging name) changed meanwhile: its session id, the from= of the cross-session message you answer (the socket path or pid, even if gone), or the id of a record it logged. Use it when SendMessage cannot reach the sender, or alongside it.' } }, required: ['title'] },
+    inputSchema: { type: 'object', properties: { title: { type: 'string' }, kind: KIND, thread: { type: 'string' }, body: { type: 'string' }, links: { type: 'array', items: { type: 'string' } }, agent: { type: 'string' }, assignee: { type: 'string', enum: ['claude', 'codex', 'gemini', 'agy'], description: 'Hand this to-do to an agent (kind defaults to task).' }, on: { type: 'string', description: 'The machine to do this to-do on (as the canvas names machines): dispatch gives it to the latest session on that machine for its line, or starts one there.' }, to: { type: 'string', description: 'A reply for one session, shown to it at the start of its next turn even when its process (and its messaging name) changed meanwhile: its session id, the from= of the cross-session message you answer (the socket path or pid, even if gone), or the id of a record it logged. Use it when SendMessage cannot reach the sender, or alongside it.' }, quest: { type: 'string', description: 'A Quest\'s id (from trace_quest): the record is a step of that Quest, shown inside its card instead of on the line, on the Quest\'s line.' } }, required: ['title'] },
+    annotations: { readOnlyHint: false, destructiveHint: false },
+  },
+  {
+    name: 'trace_quest',
+    title: 'Open or close a Quest',
+    description: 'A Quest is one long piece of work as one card on its line: the question, the steps (records logged with trace_log and quest: its id, drawn inside the card instead of along the line) and the conclusion. Open one when an answer will take many steps (an Autopilot round, a long investigation, a study); not for a one- or two-step job. Open: question (and thread, optionally inputs: files frozen with it as its first version). Close: quest (its id) and conclusion, the answer in a few lines.',
+    inputSchema: { type: 'object', properties: { question: { type: 'string' }, thread: { type: 'string' }, inputs: { type: 'array', items: { type: 'string' }, description: 'Files the question rests on, copied and frozen with it.' }, quest: { type: 'string', description: 'The Quest to close.' }, conclusion: { type: 'string' } } },
     annotations: { readOnlyHint: false, destructiveHint: false },
   },
   {
@@ -237,6 +245,26 @@ async function callTool(name, a = {}) {
       const r = mutate(d => mergeThreads(d, { sources, target: a.target, newName: a.new_name, mode }));
       return { text: `${mode === 'combine' ? 'Combined' : 'Merged'} ${r.sources.map(s => `"${s}"`).join(', ')} into "${r.target.name}".`, data: { target: { id: r.target.id, name: r.target.name }, sources: r.sources, mode } };
     }
+    case 'trace_quest': {
+      if (a.quest) {
+        if (!String(a.conclusion || '').trim()) throw new Error('conclusion is required to close a Quest');
+        const c = mutate(d => {
+          const q = d.commits[String(a.quest)];
+          if (!(q && q.research)) throw new Error(`no Quest ${a.quest}`);
+          q.research.conclusion = String(a.conclusion).trim().slice(0, 8000); q.research.closedAt = Date.now();
+          return q;
+        });
+        return { text: `Closed the Quest "${c.title}".`, data: { id: c.id } };
+      }
+      if (!String(a.question || '').trim()) throw new Error('question is required to open a Quest');
+      let from = null; try { from = currentSessionId({ projectDir: projectDir() }); } catch {}
+      const c = mutate(d => {
+        const q = createCard(d, { question: a.question, thread: a.thread ? ensureThread(d, a.thread) : INBOX, inputs: Array.isArray(a.inputs) ? a.inputs : [], agent: a.agent || agentOf(agentKey()).name });
+        if (from) q.fromSession = from;
+        return q;
+      });
+      return { text: `Opened the Quest "${c.title}" (${c.id}). Log its steps with trace_log and quest: "${c.id}"; close it with trace_quest, quest: "${c.id}" and the conclusion.`, data: { id: c.id, thread: c.thread } };
+    }
     case 'trace_log': {
       if (!String(a.title || '').trim()) throw new Error('title is required');
       // Agents are reminded of new to-dos on every message, so the same open to-do twice stays one.
@@ -247,10 +275,12 @@ async function callTool(name, a = {}) {
       try { from = currentSessionId({ projectDir: projectDir() }); } catch {}
       const to = a.to ? replyTo(String(a.to)) : '';
       const c = mutate(d => {
-        const thread = a.thread ? ensureThread(d, a.thread) : INBOX, kind = a.kind || (a.assignee ? 'task' : 'agent');
+        const q = a.quest ? d.commits[String(a.quest)] : null;
+        if (a.quest && !(q && q.research)) throw new Error(`no Quest ${a.quest}`);
+        const thread = q ? q.thread : a.thread ? ensureThread(d, a.thread) : INBOX, kind = a.kind || (a.assignee ? 'task' : 'agent');
         const same = kind === 'task' && Object.values(d.commits).find(x => x.kind === 'task' && !x.done && threadIdOf(d, x) === thread && norm(x.title) === norm(a.title));
         if (same) { dup = true; return same; }
-        return addCommit(d, { thread, kind, title: a.title, body: a.body || '', links: Array.isArray(a.links) ? a.links : [], agent: a.agent || agentOf(agentKey()).name, extra: { ...(a.assignee ? { assignee: a.assignee } : {}), ...(a.on ? { on: String(a.on) } : {}), ...(from ? { fromSession: from } : {}), ...(to ? { to } : {}) } });
+        return addCommit(d, { thread, kind, title: a.title, body: a.body || '', links: Array.isArray(a.links) ? a.links : [], agent: a.agent || agentOf(agentKey()).name, extra: { ...(a.assignee ? { assignee: a.assignee } : {}), ...(a.on ? { on: String(a.on) } : {}), ...(from ? { fromSession: from } : {}), ...(to ? { to } : {}), ...(q ? { quest: q.id } : {}) } });
       });
       const where = c.thread === INBOX ? 'the inbox' : `"${readData().threads[c.thread].name}"`;
       // on: the to-do is dispatched now, as `trace-canvas dispatch <id> --on <machine>` would (it used to be only stored,

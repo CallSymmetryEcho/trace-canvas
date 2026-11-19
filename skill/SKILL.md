@@ -1,7 +1,7 @@
 ---
 name: trace-canvas
 description: Put an agent session on the Trace Canvas, a transit map of parallel work (threads like git branches, records like commits), log a key moment, list past Claude Code sessions, merge sessions and threads into one line, or hand new to-dos to the agents working on each line. Use when the user asks to trace, capture, save or log this session or conversation, to see how parallel work fits together, or to merge sessions or threads, including "留痕", "把这次会话放进画布", "合并会话", "合并线程" and "分派".
-allowed-tools: mcp__trace-canvas__trace_capture_session mcp__trace-canvas__trace_list_sessions mcp__trace-canvas__trace_list_threads mcp__trace-canvas__trace_read_thread mcp__trace-canvas__trace_log mcp__trace-canvas__trace_open mcp__trace-canvas__trace_live mcp__trace-canvas__trace_bind mcp__trace-canvas__trace_tasks mcp__trace-canvas__trace_task_done mcp__trace-canvas__trace_fork
+allowed-tools: mcp__trace-canvas__trace_capture_session mcp__trace-canvas__trace_list_sessions mcp__trace-canvas__trace_list_threads mcp__trace-canvas__trace_read_thread mcp__trace-canvas__trace_log mcp__trace-canvas__trace_quest mcp__trace-canvas__trace_open mcp__trace-canvas__trace_live mcp__trace-canvas__trace_bind mcp__trace-canvas__trace_tasks mcp__trace-canvas__trace_task_done mcp__trace-canvas__trace_fork
 ---
 
 # Trace Canvas
@@ -113,6 +113,12 @@ Call `trace_open` with `open_browser: true`. Pass `view: "timeline"` or `view: "
 ## log <text>
 
 Call `trace_log` with the text as `title`. Use `thread` if the user named one, and pick a fitting `kind`.
+
+## quest <question>: one long piece of work as one card
+
+A Quest keeps a long chain of work off the line: the line shows one card (its question and, once closed, its conclusion), and the steps sit inside it. Open one with `trace_quest` (`question`, `thread`; `inputs` for files the question rests on, frozen with it) when the answer will take many steps: an Autopilot round, a long investigation, a study, a debugging hunt across sessions. Not for a one- or two-step job: log that as usual.
+
+While you work, log each step with `trace_log` and `quest: <its id>` (decisions, results, hand-overs); to-dos stay on the line as to-dos. When you have the answer, close it with `trace_quest`, `quest: <its id>` and `conclusion`: the answer in a few lines, and where the details are. The person can start one too: `/quest` at the start of the page's capture box.
 
 ## If the tools are missing
 

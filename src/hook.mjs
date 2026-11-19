@@ -259,7 +259,7 @@ export function handleHook(input, env = process.env) {
       if (th && th.history && historyDue(th.id, env)) due = th.id;
     } else if (ev === 'PostToolUse') {
       const tool = input.tool_name, ti = input.tool_input || {}, out = input.tool_response || {};
-      if (/^mcp_+trace-canvas_+trace_(log|task_done)$/.test(String(tool))) state.turnLogged = true;
+      if (/^mcp_+trace-canvas_+trace_(log|quest|task_done)$/.test(String(tool))) state.turnLogged = true;
       if (EDIT_TOOLS.has(tool)) {
         // Codex's apply_patch can touch several files at once (normalize puts them in `files`).
         for (const f of ti.files || [ti.file_path || ti.notebook_path || out.filePath].filter(Boolean)) {

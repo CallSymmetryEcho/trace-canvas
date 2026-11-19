@@ -162,9 +162,12 @@ export function canonicalize(d) {
   return n;
 }
 
+// A record filed into a Quest (its quest: the Quest's id) is drawn inside that card, not on the line; to-dos stay on the line.
+export const questStep = c => !!c.quest && c.kind !== 'task';
 export function lastCommit(d, tid) {
   let best = null;
-  for (const c of Object.values(d.commits)) if (threadIdOf(d, c) === tid && (!best || c.ts > best.ts)) best = c;
+  // A step inside a Quest is not a station of the line, so the line's next record does not hang from it.
+  for (const c of Object.values(d.commits)) if (!questStep(c) && threadIdOf(d, c) === tid && (!best || c.ts > best.ts)) best = c;
   return best;
 }
 
@@ -230,7 +233,7 @@ export function evolveConfig(e) {
 }
 export function addCommit(d, { thread, kind = 'idea', title, body = '', links = [], agent = '', ts = Date.now(), parents, extra = {} }) {
   const tid = thread === INBOX ? INBOX : (threadById(d, thread) || { id: INBOX }).id;
-  const prev = lastCommit(d, tid);
+  const prev = extra.quest ? null : lastCommit(d, tid);
   const c = {
     id: uid('c'), thread: tid, kind: KINDS.includes(kind) ? kind : 'agent',
     title: String(title || '').slice(0, 500), body: String(body || '').slice(0, 8000),

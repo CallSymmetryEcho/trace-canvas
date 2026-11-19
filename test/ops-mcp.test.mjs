@@ -130,13 +130,30 @@ test('the MCP server speaks JSON-RPC over stdio and captures the current session
     assert.equal(init.result.serverInfo.name, 'trace-canvas');
     child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
     const list = await call('tools/list', {});
-    assert.deepEqual(list.result.tools.map(t => t.name), ['trace_capture_session', 'trace_list_sessions', 'trace_list_threads', 'trace_read_thread', 'trace_merge', 'trace_log', 'trace_import_data', 'trace_fork', 'trace_detach', 'trace_tasks', 'trace_task_done', 'trace_live', 'trace_bind', 'trace_open', 'trace_precedents', 'trace_where']);
+    assert.deepEqual(list.result.tools.map(t => t.name), ['trace_capture_session', 'trace_list_sessions', 'trace_list_threads', 'trace_read_thread', 'trace_merge', 'trace_log', 'trace_quest', 'trace_import_data', 'trace_fork', 'trace_detach', 'trace_tasks', 'trace_task_done', 'trace_live', 'trace_bind', 'trace_open', 'trace_precedents', 'trace_where']);
 
     const cap = await call('tools/call', { name: 'trace_capture_session', arguments: { summary: 'Drafted methods.', highlights: [{ kind: 'task', title: 'Build the sampling table' }] } });
     assert.equal(cap.result.isError, undefined);
     assert.equal(cap.result.structuredContent.thread.name, 'Methods chapter draft');
     assert.equal(cap.result.structuredContent.added, 6);
     assert.match(cap.result.content[0].text, /^Added 6 records to "Methods chapter draft"/);
+
+    // A Quest: opened on a line, its steps filed into it (off the line's chain), closed with its conclusion.
+    const opened = await call('tools/call', { name: 'trace_quest', arguments: { question: 'Which sampling frame fits the methods chapter?', thread: 'Methods chapter draft' } });
+    const qid = opened.result.structuredContent.id;
+    const step = await call('tools/call', { name: 'trace_log', arguments: { title: 'Compared three frames', kind: 'decision', quest: qid, thread: 'Somewhere else' } });
+    await call('tools/call', { name: 'trace_log', arguments: { title: 'Next note on the line', thread: 'Methods chapter draft', kind: 'note' } });
+    const nope = await call('tools/call', { name: 'trace_log', arguments: { title: 'x', quest: 'cnope' } });
+    assert.equal(nope.result.isError, true);
+    const closed = await call('tools/call', { name: 'trace_quest', arguments: { quest: qid, conclusion: 'The stratified frame.' } });
+    assert.match(closed.result.content[0].text, /^Closed the Quest/);
+    const dq = JSON.parse(fs.readFileSync(path.join(root, 'home', 'data.json'), 'utf8'));
+    const s1 = dq.commits[step.result.structuredContent.id], q = dq.commits[qid], next = Object.values(dq.commits).find(c => c.title === 'Next note on the line');
+    assert.equal(s1.quest, qid);
+    assert.equal(s1.thread, q.thread); // a step lands on its Quest's line, whatever thread it names
+    assert.deepEqual(s1.parents, []);
+    assert.deepEqual(next.parents, [qid]); // the line's next record hangs from the Quest, not from its step
+    assert.equal(q.research.conclusion, 'The stratified frame.');
 
     const sessions = await call('tools/call', { name: 'trace_list_sessions', arguments: {} });
     assert.equal(sessions.result.structuredContent.sessions[0].onCanvas, 'Methods chapter draft');

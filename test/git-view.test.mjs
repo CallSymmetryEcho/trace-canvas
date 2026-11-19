@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { hunkPlaces, commitDiff, commitInfo } from '../src/git-view.mjs';
+import { explainCommit, hunkPlaces, commitDiff, commitInfo } from '../src/git-view.mjs';
 import { GIT_COMMIT, commandDir } from '../src/git-events.mjs';
 import { gitRoot, handleHook } from '../src/hook.mjs';
 import { createThread, emptyData, mutate, readData } from '../src/store.mjs';
@@ -147,4 +147,22 @@ test('each hunk of a diff is placed in its file: the language of that part of a 
   // Two hunks: each takes the first changed line after its own context lines.
   const two = hunkPlaces('@@ -13,3 +13,3 @@\n const S = {};\n function draw(c) {\n-  x\n+  y\n@@ -20,2 +20,3 @@\n   render(x) {\n+    log(x);\n     return x;', page, 'app/index.html');
   assert.deepEqual(two.map(h => h.scope), ['function draw', 'render()']);
+});
+
+test('a commit is explained once from its message and diffs: two sentences for it, one per file, only for files it changed', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-explain-'));
+  const r = repo(root, 'tripsplit');
+  const sha = r.commit({ 'split.js': 'a\nb\n', 'notes.md': 'why\n', 'yarn.lock': 'l\n' }, 'Split the bill evenly\n\nSo nobody does the sum by hand.\n\nCo-Authored-By: X <x@y.z>');
+  const d = emptyData();
+  const th = createThread(d, { name: 'tripsplit', note: r.dir });
+  d.commits.r1 = { id: 'r1', thread: th.id, kind: 'agent', title: 'r1', ts: 1, gitCommit: sha, repo: r.dir };
+  assert.equal((await commitInfo(d, 'r1')).message, 'Split the bill evenly\n\nSo nobody does the sum by hand.'); // trailers are not part of the summary
+  let asked = '';
+  const ok = await explainCommit(d, 'r1', 'zh', async p => { asked = p; return 'Here:\n{"summary": "平分账单。", "files": {"split.js": "新增平分  的计算。", "other.js": "x", "notes.md": ""}}'; });
+  assert.match(asked, /简体中文[\s\S]*## Message\nSplit the bill evenly[\s\S]*### split\.js \(\+2 -0\)[\s\S]*\+a\n\+b/);
+  assert.doesNotMatch(asked, /yarn\.lock/); // a lock file is not read
+  assert.deepEqual(ok.notes, { sha, summary: '平分账单。', files: { 'split.js': '新增平分 的计算。' } });
+  assert.equal((await explainCommit(d, 'r1', 'en', async () => 'no json')).error, 'The answer could not be read');
+  assert.equal((await explainCommit(d, 'r1', 'en', async () => { throw new Error('timeout'); })).error, 'timeout');
+  assert.equal((await explainCommit(d, 'nope', 'en', async () => '{}')).error, 'No such record');
 });

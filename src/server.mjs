@@ -18,7 +18,7 @@ import { applyRetro, askAgent, retroRecord, runRetro } from './retro.mjs';
 import { AGENTS, focusTab, launchRow, openTerminal, terminalCommand } from './agents.mjs';
 import { draftLessons, rememberLesson } from './lessons.mjs';
 import { otherMachines, remoteLive } from './remote.mjs';
-import { commitDiff, commitInfo, readLinkedImage, readLinkedMd } from './git-view.mjs';
+import { commitDiff, commitInfo, explainCommit, readLinkedImage, readLinkedMd } from './git-view.mjs';
 import { autopilotSig, runSync, syncSoon, syncStatus } from './sync.mjs';
 import { doctor } from './doctor.mjs';
 import { createCard, refreshCard, resumeCommand, returnRun, startRun, workbenches } from './research.mjs';
@@ -66,6 +66,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
   const ai = claudeAvailable();
   const clients = new Set();
   const pending = {};
+  const explaining = new Map(); // record id → its explanation being written, so two clicks ask once
   const broadcast = (event = 'change') => {
     clearTimeout(pending[event]);
     pending[event] = setTimeout(() => { for (const res of clients) res.write(`event: ${event}\ndata: ${Date.now()}\n\n`); }, 80);
@@ -125,7 +126,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         if (!phone || !phone.token || !(same(cookie, phone.token) || same(k, phone.token))) return send(res, 403, { error: 'Open the address trace-canvas phone printed' });
         if (same(k, phone.token) && !same(cookie, phone.token)) res.setHeader('Set-Cookie', `tc_k=${phone.token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000`);
         // These act on the computer itself (a terminal, git pushes, the claude CLI, the whole data set).
-        if (['/api/hand', '/api/focus', '/api/sync', '/api/ai', '/api/demo', '/api/retro', '/api/retro/apply', '/api/update', '/api/autopilot', '/api/lessons', '/api/lessons/save'].includes(p)) return send(res, 403, { error: 'Only on the computer itself' });
+        if (['/api/hand', '/api/focus', '/api/sync', '/api/ai', '/api/demo', '/api/retro', '/api/retro/apply', '/api/update', '/api/autopilot', '/api/lessons', '/api/lessons/save', '/api/git/explain'].includes(p)) return send(res, 403, { error: 'Only on the computer itself' });
       }
       const write = req.method !== 'GET' && req.method !== 'HEAD';
       if (write && req.headers['x-trace-canvas'] !== '1') return send(res, 403, { error: 'missing header' });
@@ -293,6 +294,15 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
       }
       // Lessons from an archived project: drafted by the local claude, written to Theatrum only for the ticked ones,
       // and noted on its latest archived line (the plaque counts them; Autopilot finds their records from there).
+      // What a commit changes, in plain words, by the person's own claude: asked once (the page's button), kept on the record as gxNotes.
+      if (req.method === 'POST' && p === '/api/git/explain') {
+        const body = JSON.parse(await readBody(req)), id = String(body.record || ''), had = (readData().commits[id] || {}).gxNotes;
+        if (had) return send(res, 200, { notes: had });
+        if (!explaining.has(id)) explaining.set(id, explainCommit(readData(), id, String(body.lang || 'zh'), askAgent).finally(() => explaining.delete(id)));
+        const r = await explaining.get(id);
+        if (r.notes && !(readData().commits[id] || {}).gxNotes) { mutate(d => { if (d.commits[id]) d.commits[id].gxNotes = r.notes; }); broadcast('change'); }
+        return send(res, 200, r);
+      }
       if (req.method === 'POST' && p === '/api/lessons') {
         const body = JSON.parse(await readBody(req));
         try { return send(res, 200, { lessons: await draftLessons(readData(), String(body.group || ''), String(body.lang || 'zh')) }); }

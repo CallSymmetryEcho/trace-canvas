@@ -936,6 +936,9 @@ body.sheet-open .top { z-index: 80; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme]) { --hl-k: #C4A7FF; --hl-s: #E5B567; --hl-c: #9EA8B3; --hl-n: #6CC7E8; } }
 :root[data-theme="dark"] { --hl-k: #C4A7FF; --hl-s: #E5B567; --hl-c: #9EA8B3; --hl-n: #6CC7E8; }
 :root[data-theme="mist"] { --hl-k: #5B3F9E; --hl-s: #7A4A0C; --hl-c: #4E5B6B; --hl-n: #1F5F82; }
+.gx-sum { margin: 0 0 6px; padding: 8px 10px; background: var(--surface-2); border: 1px solid var(--rule-soft); border-radius: 6px; font-size: 13px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.gx-ask { display: block; margin: 0 0 8px; font-size: 12.5px; text-align: left; }
+.gx-why { margin: 0 6px 6px; font-size: 12.5px; line-height: 1.45; color: var(--muted); overflow-wrap: anywhere; }
 .gx-note { margin: 0; color: var(--faint); font-size: 12px; }
 .l-cmd code { flex: 1; min-width: 0; overflow-wrap: anywhere; max-height: 7.5em; overflow: auto; font-family: var(--f-mono); font-size: 12px; padding: 6px 8px; background: var(--surface-2); border: 1px solid var(--rule-soft); border-radius: 6px; }
 
@@ -1377,7 +1380,7 @@ apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent 
     livePrompt: 'Latest instruction', liveThread: 'Thread', liveAuto: 'Automatic (repository and branch)', liveNow: 'Now on',
     liveResume: 'Resume in a terminal', openChat: 'Open the chat', openChatWeb: 'Open on claude.ai', goTerm: 'Go to its terminal', tNoTerm: 'Its terminal tab is no longer open', liveRunning: 'Running now', lineSessions: 'Sessions on this line', loggedIn: 'Logged in',
     gxChanges: 'Changes', gxLoading: 'Reading from git…', gxNoRepo: 'This repository is not on this computer.', gxNoRepoOn: m => `This repository is on ${m}, not on this computer.`, gxNoCommit: 'This commit is no longer in its repository (rewritten or cleaned up).',
-    gxLine: n => `line ${n}`, gxOnly: 'Changed lines only', gxRole_test: 'test', gxRole_doc: 'docs', gxRole_gen: 'generated', gxFiles: n => `${n} file${n === 1 ? '' : 's'}`, gxMore: n => `${n} more`, gxQuiet: n => `${n} binary or generated`, gxBinary: 'binary',
+    gxLine: n => `line ${n}`, gxOnly: 'Changed lines only', gxExplain: 'Have your local Claude explain each file in a sentence', gxExplaining: 'Your local Claude is reading this commit… (about a minute)', gxRole_test: 'test', gxRole_doc: 'docs', gxRole_gen: 'generated', gxFiles: n => `${n} file${n === 1 ? '' : 's'}`, gxMore: n => `${n} more`, gxQuiet: n => `${n} binary or generated`, gxBinary: 'binary',
     gxCompare: 'Compare with', gxThisOnly: 'this commit only', gxOtherRepo: 'That station is in another repository.', gxTruncated: 'Cut at 200 KB.',
     gxLater: 'Committed later in', gxUncommitted: 'Not committed yet.', copyResume: 'Copy resume command', lineSessionsHint: 'Resume one to keep working on this line instead of starting a new session.', liveBadge: (n, w) => `${n} running${w ? `, ${w} need${w === 1 ? 's' : ''} you` : ''}`,
     tBound: n => `Bound to “${n}”`, tUnbound: 'Back to the repository and branch line',
@@ -1559,7 +1562,7 @@ apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的
     livePrompt: '最近的指令', liveThread: '所属线', liveAuto: '自动（按仓库和分支）', liveNow: '当前在',
     liveResume: '在终端里恢复', openChat: '打开对话', openChatWeb: '在 claude.ai 打开', goTerm: '跳到终端', tNoTerm: '它的终端标签页已经关了', liveRunning: '正在运行', lineSessions: '这条线上的会话', loggedIn: '记在这个会话里',
     gxChanges: '改动', gxLoading: '正在从 git 读取…', gxNoRepo: '这台电脑上没有这个仓库。', gxNoRepoOn: m => `这个仓库在 ${m} 上，这台电脑上没有。`, gxNoCommit: '仓库里已经没有这个提交，可能被改写或清理了。',
-    gxLine: n => `第 ${n} 行`, gxOnly: '只看改动的行', gxRole_test: '测试', gxRole_doc: '文档', gxRole_gen: '生成', gxFiles: n => `${n} 个文件`, gxMore: n => `还有 ${n} 个`, gxQuiet: n => `${n} 个二进制或生成文件`, gxBinary: '二进制',
+    gxLine: n => `第 ${n} 行`, gxOnly: '只看改动的行', gxExplain: '让本机的 Claude 给每个文件写一句说明', gxExplaining: '本机的 Claude 正在读这次提交…（一分钟左右）', gxRole_test: '测试', gxRole_doc: '文档', gxRole_gen: '生成', gxFiles: n => `${n} 个文件`, gxMore: n => `还有 ${n} 个`, gxQuiet: n => `${n} 个二进制或生成文件`, gxBinary: '二进制',
     gxCompare: '对比', gxThisOnly: '只看这次提交', gxOtherRepo: '那个站点不在同一个仓库。', gxTruncated: '超过 200 KB，已截断。',
     gxLater: '之后提交于', gxUncommitted: '尚未提交。', copyResume: '复制恢复命令', lineSessionsHint: '恢复其中一个就能接着在这条线上做，不用新开会话。', liveBadge: (n, w) => `${n} 个运行中${w ? `，${w} 个等你` : ''}`,
     tBound: n => `已绑定到「${n}」`, tUnbound: '已改回按仓库和分支自动归线',
@@ -3614,7 +3617,7 @@ const delUI = q => S.ui.del
   : '';
 // What a commit record changed, read from git through /api/git (src/git-view.mjs). Each answer is
 // fetched once and kept here, so the panel can redraw from it on every render.
-const GX = { info: new Map(), diff: new Map(), open: new Set(), more: new Set(), against: new Map() };
+const GX = { info: new Map(), diff: new Map(), open: new Set(), more: new Set(), against: new Map(), explain: new Map() };
 const gitSha = c => c.gitCommit || ((c.id || '').match(/^c-git-([0-9a-f]{7,40})$/) || [])[1] || '';
 function gxGet(map, key, url) {
   if (map.has(key)) return map.get(key);
@@ -3710,11 +3713,17 @@ function changesHTML(c) {
   // Files come in reading order (src/git-view.mjs roleOf): source, tests, docs, then lock files, builds and binaries, which show their counts only until opened.
   const files = info.files || [], main = files.filter(f => !f.binary && !f.generated), quiet = files.filter(f => f.binary || f.generated);
   const add = files.reduce((n, f) => n + f.add, 0), del = files.reduce((n, f) => n + f.del, 0), max = Math.max(1, ...main.map(f => f.add + f.del));
+  // The summary comes before any code: the commit's own message, or, once the person has asked their local claude for it (the button,
+  // only on the computer itself; kept on the record as gxNotes, so it is written once), two sentences for the commit and one under each file.
+  const notes = !against && c.gxNotes && c.gxNotes.sha === info.sha ? c.gxNotes : null, asking = GX.explain.get(c.id);
+  const summary = against ? '' : `<div class="gx-sum">${esc((notes && notes.summary) || info.message || info.subject || '')}</div>`
+    + (notes || S.readOnly || S.remote ? '' : asking === 'wait' ? `<p class="gx-note">${esc(t('gxExplaining'))}</p>`
+      : `<button class="linkish gx-ask" data-act="gx-explain" data-cid="${esc(c.id)}">${esc(t('gxExplain'))}</button>${asking ? `<p class="gx-note">${esc(asking)}</p>` : ''}`);
   const all = GX.more.has(key), shown = all ? files : [...main.slice(0, 8), ...quiet.slice(0, 3)], hidden = files.length - shown.length;
   const row = f => {
     const dk = `${key}|${f.path}`, open = GX.open.has(dk), w = n => `${Math.round(56 * n / max)}px`;
     const diff = open ? diffHTML(gxGet(GX.diff, dk, `/api/git/diff?${q}&file=${encodeURIComponent(f.path)}`), f.path) : '';
-    return `<li class="${f.binary || f.generated ? 'gx-quiet' : ''}"><button class="gx-file" data-act="gx-file" data-dk="${esc(dk)}" title="${esc(f.path)}" ${f.binary ? 'disabled' : ''}><span class="gx-path">${esc(f.path)}${f.role && f.role !== 'src' && !f.binary ? `<i class="gx-role">${esc(t('gxRole_' + f.role))}</i>` : ''}</span><span>${f.binary ? esc(t('gxBinary')) : `<b class="gx-add">+${f.add}</b> <b class="gx-del">−${f.del}</b>`}</span><span class="gx-bar">${f.binary || f.generated ? '' : `<i style="width:${w(f.add)}"></i><u style="width:${w(f.del)}"></u>`}</span></button>${diff}</li>`;
+    return `<li class="${f.binary || f.generated ? 'gx-quiet' : ''}"><button class="gx-file" data-act="gx-file" data-dk="${esc(dk)}" title="${esc(f.path)}" ${f.binary ? 'disabled' : ''}><span class="gx-path">${esc(f.path)}${f.role && f.role !== 'src' && !f.binary ? `<i class="gx-role">${esc(t('gxRole_' + f.role))}</i>` : ''}</span><span>${f.binary ? esc(t('gxBinary')) : `<b class="gx-add">+${f.add}</b> <b class="gx-del">−${f.del}</b>`}</span><span class="gx-bar">${f.binary || f.generated ? '' : `<i style="width:${w(f.add)}"></i><u style="width:${w(f.del)}"></u>`}</span></button>${notes && notes.files && notes.files[f.path] ? `<p class="gx-why">${esc(notes.files[f.path])}</p>` : ''}${diff}</li>`;
   };
   // Other commit stations to compare with: this line's first, then the same repository's, newest first.
   const others = [...S.commits.values()].filter(x => x.id !== c.id && gitSha(x) && (x.repo === info.repo || (x.repo && x.repo === c.repo) || tidOf(x) === tidOf(c)))
@@ -3724,7 +3733,7 @@ function changesHTML(c) {
   const cross = info.against && info.against.missing;
   // Changed lines only: hides the unchanged lines around a change in every diff (the hunk bands stay).
   const only = cross ? '' : `<label class="gx-check"><input type="checkbox" class="gx-only" ${ls.get('tc.gxOnly', false) ? 'checked' : ''}>${esc(t('gxOnly'))}</label>`;
-  return head + `<div class="gx-head"><span>${cross ? esc(info.short) : sum}</span>${pick}${only}</div>`
+  return head + (cross ? '' : summary) + `<div class="gx-head"><span>${cross ? esc(info.short) : sum}</span>${pick}${only}</div>`
     + (cross ? `<p class="gx-note">${esc(t('gxOtherRepo'))}</p>` : `<ul class="gx-list">${shown.map(row).join('')}</ul>`)
     + (hidden > 0 ? `<button class="linkish" data-act="gx-more" data-key="${esc(key)}">${esc(t('gxMore', hidden))}</button>` : '');
 }
@@ -4147,6 +4156,9 @@ detail.addEventListener('click', e => {
     case 'goto-commit': select({ type: 'commit', id: b.dataset.cid }); break;
     case 'gx-file': { const k = b.dataset.dk; if (GX.open.has(k)) GX.open.delete(k); else GX.open.add(k); render(); break; }
     case 'gx-more': GX.more.add(b.dataset.key); render(); break;
+    case 'gx-explain': { const id = b.dataset.cid; GX.explain.set(id, 'wait'); render();
+      postJSON('/api/git/explain', { record: id, lang: LANG }).then(r => { const c = S.commits.get(id); if (r.notes && c) { c.gxNotes = r.notes; GX.explain.delete(id); } else GX.explain.set(id, r.error || t('syncOfflineTitle')); render(); });
+      break; }
     case 'goto-thread': select({ type: 'thread', id: b.dataset.tid }); break;
     case 'detach': detachThread(s.id); break;
     case 'start': startOn({ thread: s.id }); break;

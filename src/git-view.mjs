@@ -83,10 +83,12 @@ export async function commitInfo(d, id, against = null) {
   if (!c) return { error: 'No such record' };
   const at = await locate(d, c);
   if (at.missing) return at;
-  const meta = await git(at, ['show', '-s', '--format=%H%x1f%s%x1f%an%x1f%aI', at.sha]);
+  const meta = await git(at, ['show', '-s', '--format=%H%x1f%s%x1f%an%x1f%aI%x1f%B', at.sha]);
   if (!meta) return { sha: at.sha, missing: 'no-commit' };
-  const [sha, subject, author, date] = meta.out.trim().split('\x1f');
-  const info = { id, repo: at.repo, ...(at.machine ? { machine: at.machine } : {}), sha, short: sha.slice(0, 7), subject, author, date };
+  const [sha, subject, author, date, full = ''] = meta.out.trim().split('\x1f');
+  // The whole message, without the trailers (Co-Authored-By: …) at its end: the page shows it above the files as the summary.
+  const message = full.split('\n').filter(l => !/^[A-Za-z][A-Za-z-]+: \S/.test(l) || !/^(co-authored-by|signed-off-by|claude-session|reviewed-by):/i.test(l)).join('\n').trim().slice(0, 4000) || subject;
+  const info = { id, repo: at.repo, ...(at.machine ? { machine: at.machine } : {}), sha, short: sha.slice(0, 7), subject, message, author, date };
   if (!against) {
     const ns = await git(at, ['show', ...PLAIN, '--numstat', '--format=', sha]);
     return { ...info, files: ns ? filesOf(ns.out) : [] };
@@ -173,6 +175,38 @@ export async function commitDiff(d, id, file, against = null) {
   // The file as it is after the change, to place each hunk in it; a deleted or very large file has no places.
   const whole = await git(info, ['show', `${info.against ? info.to : info.sha}:${file}`], 12 * CAP);
   return { file, diff: r.out, truncated: !!r.truncated, hunks: whole && !whole.truncated ? hunkPlaces(r.out, whole.out, file) : [] };
+}
+
+/**
+ * What a commit changes, for a person who will not read the code: two sentences for the whole commit and one per changed file on what
+ * changed there and why, written by the person's own claude or codex (ask) from the commit message and the diffs. The page asks for it
+ * once, on the computer itself, and the answer is kept on the record (server.mjs /api/git/explain), so opening the record costs nothing.
+ */
+export async function explainCommit(d, id, lang, ask) {
+  const info = await commitInfo(d, id);
+  if (info.error || info.missing) return { error: info.error || 'This commit is not on this computer' };
+  const files = info.files.filter(f => f.role !== 'gen').slice(0, 30), parts = [];
+  let room = 120000; // characters of diff in all; ponytail: a commit larger than this is explained from its first files and the message
+  for (const f of files) {
+    if (room <= 0) break;
+    const r = await git(info, ['show', ...PLAIN, '--format=', info.sha, '--', f.path], CAP);
+    const text = ((r && r.out) || '').split('\n').map(l => (l.length > 400 ? l.slice(0, 400) + ' …' : l)).join('\n').slice(0, Math.min(12000, room));
+    room -= text.length; parts.push(`### ${f.path} (+${f.add} -${f.del})\n${text}`);
+  }
+  const prompt = [
+    'Below is one git commit: its message, then the diff of each changed file.',
+    `For a person who will not read the code, write in ${lang === 'zh' ? 'Simplified Chinese (简体中文)' : 'English'}:`,
+    '- "summary": at most two sentences on what this commit changes and why;',
+    '- "files": for each file path below, one sentence on what changed in that file and why, in plain words, no code, at most 60 characters in Chinese or 30 words in English.',
+    'Use only what the message and the diffs show. Where the reason is not shown, say what changed and leave the reason out.',
+    'Answer with JSON only, no other text: {"summary": "…", "files": {"<path>": "…"}}',
+    '', '## Message', info.message, '', '## Files', ...parts,
+  ].join('\n');
+  let j;
+  try { j = JSON.parse(/\{[\s\S]*\}/.exec(await ask(prompt, { timeout: 240000 }))[0]); } catch (e) { return { error: e instanceof SyntaxError || e instanceof TypeError ? 'The answer could not be read' : e.message }; }
+  const str = (v, n) => String(v || '').replace(/\s+/g, ' ').trim().slice(0, n);
+  const notes = { sha: info.sha, summary: str(j.summary, 400), files: Object.fromEntries(info.files.map(f => [f.path, str(j.files && j.files[f.path], 240)]).filter(x => x[1])) };
+  return notes.summary || Object.keys(notes.files).length ? { notes } : { error: 'The answer could not be read' };
 }
 
 const home = p => p.replace(/^~(?=\/|$)/, os.homedir());

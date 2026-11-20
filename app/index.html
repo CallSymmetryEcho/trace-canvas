@@ -100,6 +100,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
   width: 100%; padding: 6px 10px 6px 28px; border: 1px solid var(--rule); border-radius: var(--r);
   background: var(--surface-2);
 }
+.cap-suggest.q-suggest { top: calc(100% + 6px); bottom: auto; left: auto; right: 0; width: max(100%, 340px); max-width: calc(100vw - 24px); max-height: min(420px, 70vh); }
+.q-suggest .q-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.cap-suggest.q-suggest .cap-cmd { flex: 1 0 20%; text-align: right; }
 .search svg { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--faint); pointer-events: none; }
 .btn {
   display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; font-size: 13px; font-weight: 500;
@@ -1120,6 +1123,7 @@ button.gl-prog[aria-pressed="true"] { color: var(--ink); background: var(--surfa
     <label class="search" for="q">
       <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="2" fill="none"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       <input id="q" type="search" data-i18n-ph="searchPh" autocomplete="off">
+      <ul class="cap-suggest q-suggest" id="q-suggest" role="listbox" hidden></ul>
     </label>
     <button class="btn" id="goals-btn" data-i18n="goalsBtn" data-i18n-title="goalsBtnTitle">Goals</button>
     <button class="btn hist-btn" id="hist-btn" aria-pressed="false" data-i18n-title="histTitle"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.6" fill="none" stroke="var(--ok)" stroke-width="2.6"/><path d="M5.6 8.1l1.7 1.7 3.1-3.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="hist-label" data-i18n="histBtn">History</span></button>
@@ -1281,7 +1285,7 @@ const I18N = {
     syncLocalTitle: 'Not connected to any storage; data stays in this browser only',
     syncRoTitle: 'You can view but not change this page', syncOfflineTitle: 'Lost the local server. Start it again with trace-canvas serve.',
     exChip: 'Example data', exClear: 'Clear', exChipTitle: 'Records added to show how the views work',
-    searchPh: 'Search records…', aiBtn: 'AI tidy-up', aiBtnTitle: 'Claude reads every line and suggests merges, lines to wrap up and to-dos already done; you click each one',
+    searchPh: 'Search; # picks a field', sc_thread: 'line', sc_title: 'title', sc_body: 'body', sc_kind: 'type', sc_links: 'links', scHint_thread: 'line names, groups and folders only', scHint_title: 'record titles only', scHint_body: 'record details only', scHint_kind: 'by type: idea, to-do, decision…', scHint_links: 'linked files and addresses only', aiBtn: 'AI tidy-up', aiBtnTitle: 'Claude reads every line and suggests merges, lines to wrap up and to-dos already done; you click each one',
     langGroup: 'Language', more: 'More',
     menuNewThread: 'New thread', menuHideDone: 'Hide finished threads', menuShowDone: 'Show finished threads', quietLabel: 'Gone quiet', quietDays: n => `${n}d`, quietDot: n => `${n} line${n === 1 ? ' has' : 's have'} gone quiet`, quietAsk: (n, u) => `Nothing for ${n} days, where it usually moves every ${u === 1 ? 'day' : `${u} days`}. Finished?`, quietAskOpen: (n, k) => `Nothing for ${n} days, with ${k} to-do${k === 1 ? '' : 's'} still open. Park it for now?`, quietStill: 'Still on it', menuShowMerged: 'Show merged threads', menuHideMerged: 'Fold merged threads', menuShow: 'Hide', chipDone: 'Finished', chipMerged: 'Merged', menuThemeL: 'Theme', menuMachines: 'Other computers', chipSync: 'Sync now', chipAway: 'Show their sessions', chipAwayGit: 'Read their changes over ssh', menuHelpL: 'Help', chipHelp: 'Shortcuts and how-to', peekOpen: 'Show its stations (it stays finished)', peekOpenParked: 'Show its stations (it stays parked)', peekClose: 'Fold it again', mergedOpen: 'Show the lines merged into it', mergedClose: 'Fold them again', mergedInCount: n => ` · ${n} merged in`, mergedInLabel: 'Merged in',
     arrange: 'Arrange', arrangeTitle: 'Lay the lines out by group, forks next to the lines they came from', tArranged: 'Arranged', tUndo: 'Undo',
@@ -1464,7 +1468,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     syncLocalTitle: '没有连上任何存储，数据只保存在当前浏览器',
     syncRoTitle: '你可以查看，但不能修改', syncOfflineTitle: '和本地服务断开了。用 trace-canvas serve 重新启动。',
     exChip: '示例数据', exClear: '清除', exChipTitle: '这些是演示各个视图用的示例数据',
-    searchPh: '搜索记录…', aiBtn: 'AI 梳理', aiBtnTitle: 'Claude 通看所有线路，建议合并、收尾和勾掉已做完的待办，每条由你点了才做',
+    searchPh: '搜索；输入 # 选范围', sc_thread: '线路', sc_title: '标题', sc_body: '正文', sc_kind: '类型', sc_links: '链接', scHint_thread: '只搜线路名、分组和文件夹', scHint_title: '只搜记录标题', scHint_body: '只搜记录详情', scHint_kind: '按类型：想法、待办、决策…', scHint_links: '只搜链接的文件和网址', aiBtn: 'AI 梳理', aiBtnTitle: 'Claude 通看所有线路，建议合并、收尾和勾掉已做完的待办，每条由你点了才做',
     langGroup: '语言', more: '更多',
     menuNewThread: '新建线程', menuHideDone: '隐藏已完成的线程', menuShowDone: '显示已完成的线程', quietLabel: '安静了', quietDays: n => `${n} 天`, quietDot: n => `${n} 条线安静了`, quietAsk: (n, u) => `${n} 天没动静，平时${u === 1 ? '每天' : ` ${u} 天`}一更。做完了吗？`, quietAskOpen: (n, k) => `${n} 天没动静，还有 ${k} 项待办。先搁置？`, quietStill: '还在做', menuShowMerged: '显示已合并的线程', menuHideMerged: '收起已合并的线程', menuShow: '隐藏', chipDone: '已完成', chipMerged: '已合并', menuThemeL: '主题', menuMachines: '其他电脑', chipSync: '立即同步', chipAway: '显示它们的会话', chipAwayGit: '通过 ssh 读它们的改动', menuHelpL: '帮助', chipHelp: '快捷键与用法', peekOpen: '展开看看（仍是已完成）', peekOpenParked: '展开看看（仍是搁置）', peekClose: '收起', mergedOpen: '展开并入这条线的线程', mergedClose: '收起', mergedInCount: n => ` · 已并入 ${n} 条`, mergedInLabel: '已并入',
     arrange: '整理', arrangeTitle: '按分组排好线程，分叉排在原线旁边', tArranged: '已整理', tUndo: '撤销',
@@ -1794,11 +1798,23 @@ function lastCommit(tid) { let best = null; for (const c of S.commits.values()) 
 // Search text and the kind filter both narrow what stays bright; the rest is dimmed, never hidden, so lanes stay whole.
 const filtering = () => !!(S.q || S.kinds.size);
 const starMark = c => (c.starred ? '<span class="star" aria-hidden="true">★</span>' : '') + (c.research ? `<span class="rs-chip">${esc(t('rsChip'))}</span>` : '');
+// "#scope text" searches one field only; no prefix searches every field and the line's name. A scope is typed in either
+// language or picked from the list under the box.
+// ponytail: a search for text that itself starts with "#" is not possible; add an escape if someone needs it.
+const SCOPES = { thread: ['thread', 'line', 'card', '线路', '线程', '卡片'], title: ['title', '标题'], body: ['body', 'details', '正文', '详情'], kind: ['kind', 'type', '类型'], links: ['links', 'link', '链接'] };
+function parseQ(v) {
+  const m = /^#(\S*)(?:\s+(.*))?$/.exec(v.trim() ? v.trimStart() : '');
+  if (!m) return { q: v.trim(), scope: '' };
+  const scope = Object.keys(SCOPES).find(k => SCOPES[k].includes(m[1].toLowerCase()));
+  return scope && m[2] !== undefined ? { q: m[2].trim(), scope } : { q: '', scope: '', pick: m[1].toLowerCase() };
+}
+const hasQ = vs => vs.some(v => v && String(v).toLowerCase().includes(S.q.toLowerCase()));
+const REC_FIELDS = { title: c => [c.title], body: c => [c.body], kind: c => [c.kind, kindLabel(c.kind)], links: c => c.links || [] };
+const recHit = c => !!S.q && (S.qScope ? !!REC_FIELDS[S.qScope] && hasQ(REC_FIELDS[S.qScope](c)) : hasQ([c.starred ? '★' : '', c.title, c.body, c.agent, ...(c.links || [])]));
+const lineHit = th => !!S.q && !!th && (!S.qScope || S.qScope === 'thread') && hasQ([th.name, th.group, th.note, ...(th.aliases || [])]);
 function matches(c) {
   if (S.kinds.size && !S.kinds.has(c.kind)) return false;
-  if (!S.q) return true;
-  const q = S.q.toLowerCase();
-  return [c.starred ? '★' : '', c.title, c.body, c.agent, ...(c.links || [])].some(v => v && String(v).toLowerCase().includes(q));
+  return !S.q || recHit(c) || lineHit(S.threads.get(tidOf(c)));
 }
 function hasExamples() { return COLS.some(col => [...S[col].values()].some(d => d.example)); }
 function threadByName(name) {
@@ -2880,7 +2896,7 @@ function cardHTML(th, cs, selT) {
   const recent = cs.slice(-4).reverse();
   const more = cs.length - recent.length;
   const last = cs[cs.length - 1];
-  const anyHit = !filtering() || cs.some(matches);
+  const anyHit = !filtering() || cs.some(matches) || (!S.kinds.size && lineHit(th));
   const selC = S.sel && S.sel.type === 'commit' ? S.sel.id : null;
   const peeking = isFolded(th) && S.peek.has(th.id), shut = isFolded(th) && !peeking;
   apSeen(th);
@@ -4479,8 +4495,40 @@ function markTabs() {
   const goals = PHONE.matches && S.sheet === 'goals';
   $$('.tab').forEach(el => el.setAttribute('aria-selected', String(goals ? el.id === 'tab-goals' : el.dataset.view === S.view)));
 }
-let qTimer = 0;
-$('#q').addEventListener('input', e => { clearTimeout(qTimer); qTimer = setTimeout(() => { S.q = e.target.value.trim(); render(); }, 120); });
+// Under the search box: after "#" the scopes to pick from; otherwise the lines and records found, and a click goes there.
+let qTimer = 0, qRows = [], qAt = 0;
+const qBox = $('#q'), qSug = $('#q-suggest');
+function renderQSug() {
+  const p = parseQ(qBox.value);
+  qRows = document.activeElement !== qBox ? [] : p.pick !== undefined
+    ? Object.keys(SCOPES).filter(k => [k, t('sc_' + k).toLowerCase(), ...SCOPES[k]].some(n => n.startsWith(p.pick))).map(k => ({ scope: k }))
+    : [...[...S.threads.values()].filter(lineHit).slice(0, 8).map(th => ({ th })), ...[...S.commits.values()].filter(recHit).sort((a, b) => b.ts - a.ts).slice(0, 8).map(c => ({ c }))];
+  qAt = Math.min(qAt, Math.max(0, qRows.length - 1));
+  qSug.hidden = !qRows.length;
+  qSug.innerHTML = qRows.map((r, i) => {
+    const th = r.th || (r.c && (S.threads.get(tidOf(r.c)) || inboxThread())), to = r.th && r.th.status === 'merged' && S.threads.get(r.th.mergedInto);
+    return `<li role="option" data-i="${i}" aria-selected="${i === qAt}"${th ? ` style="--c:${esc(th.color)}"` : ''}>` + (r.scope ? `<b class="mono">#${esc(t('sc_' + r.scope))}</b><span class="cap-cmd">${esc(t('scHint_' + r.scope))}</span>`
+      : r.th ? `<i></i><span class="q-name">${esc(th.name)}</span><span class="cap-cmd">${esc(to ? '→ ' + to.name : th.group || '')}</span>`
+      : `${mini(r.c.kind, th.color, r.c.done)}<span class="q-name">${esc(r.c.title)}</span><span class="cap-cmd">${esc(th.name)}</span>`) + '</li>';
+  }).join('');
+  // The box sits at the right on a wide page and at the left on a phone: keep the list on the screen either way.
+  qSug.style.right = ''; const left = qRows.length ? qSug.getBoundingClientRect().left : 8; if (left < 8) qSug.style.right = (left - 8) + 'px';
+}
+function setQ() { const p = parseQ(qBox.value); S.q = p.q; S.qScope = p.scope; qAt = 0; renderQSug(); clearTimeout(qTimer); qTimer = setTimeout(render, 120); }
+function pickQ(r) {
+  if (!r) return;
+  if (r.scope) { qBox.value = '#' + t('sc_' + r.scope) + ' '; qBox.focus(); setQ(); return; }
+  qBox.blur(); select(r.th ? { type: 'thread', id: r.th.id } : { type: 'commit', id: r.c.id });
+}
+qBox.addEventListener('input', setQ);
+qBox.addEventListener('focus', renderQSug);
+qBox.addEventListener('blur', renderQSug);
+qBox.addEventListener('keydown', e => {
+  if (e.isComposing || !qRows.length) return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); qAt = (qAt + (e.key === 'ArrowDown' ? 1 : qRows.length - 1)) % qRows.length; renderQSug(); }
+  else if (e.key === 'Enter') { e.preventDefault(); pickQ(qRows[qAt]); }
+});
+qSug.addEventListener('mousedown', e => { e.preventDefault(); pickQ(qRows[(e.target.closest('li') || {}).dataset?.i]); });
 
 const menu = $('#menu'), moreBtn = $('#more-btn');
 function closeMenu() { menu.hidden = true; moreBtn.setAttribute('aria-expanded', 'false'); $$('.menu-row.open', menu).forEach(r => r.classList.remove('open')); }

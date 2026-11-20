@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Search finds lines, and can look in one field only.** The search box now matches line names, groups and folders as well as records, and lists what it found under the box: lines first, then the newest records; click one to go to it. Type `#` to pick one field to search: `#line`, `#title`, `#body`, `#type` or `#links` (`#线路`, `#标题`, `#正文`, `#类型`, `#链接`), then the text.
+
 - **Open what an agent wrote, from any of your machines.** A turn's record now lists the files it changed, and its reports (.md, .txt) and images open in the reader from there, without the agent having to link them; code and data still open only when linked. When the file is on the machine that wrote the record and not on this one, the reader says so and offers to pull it over ssh (key login only); the copy is kept under the data folder (`files/<machine>/`), opens straight away the next time, and says where it came from, with "Pull again" beside it.
 
 - **After a merge, the agents go with the line.** Merging a line into another (keeping the merged line) now takes its sessions and its open to-dos along: what those agents log from then on lands on the line it went into, each is told once at its next turn, and finished to-dos stay behind as history. A record logged to a merged line by its id goes there too. Undoing the merge takes them back (not the ones you moved by hand since); what the agents logged on the other line meanwhile stays there.

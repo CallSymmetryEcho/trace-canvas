@@ -142,14 +142,21 @@ export function leadsTo(d, t) {
   return t;
 }
 // After a merge that keeps the source line, its sessions and its open to-dos go on on the line it went into
-// (finished to-dos stay as history). Run on every write, so every way of merging (page, MCP, a git merge) is covered.
-// mergedFrom / movedFrom keep where each came from, for the note to the agent and for undoing the merge.
+// (finished to-dos stay as history); when the merge is undone they go back. Run on every write, so every way of
+// merging and unmerging (page, MCP, a git merge) is covered. Each moved one keeps the line it came from and the
+// line it was put on: moved by hand since (bound elsewhere, dragged to another line), it is left where it is.
+function follow(d, x, from, to, movable) {
+  if (x[from] && (!d.threads[x[from]] || (x[to] ?? x.thread) !== x.thread)) { delete x[from]; delete x[to]; }
+  const base = d.threads[x[from] || x.thread], want = base && leadsTo(d, base).id;
+  if (!want || want === x.thread || !(x[from] || movable)) return '';
+  x[from] ||= x.thread; x.thread = x[to] = want;
+  if (want !== x[from]) return 'merged';
+  delete x[from]; delete x[to];
+  return 'undone';
+}
 export function settleMerged(d) {
-  const to = {};
-  for (const t of Object.values(d.threads)) if (t.status === 'merged') { const g = leadsTo(d, t); if (g !== t) to[t.id] = g.id; }
-  if (!Object.keys(to).length) return;
-  for (const s of Object.values(d.sessions || {})) if (to[s.thread]) { s.mergedFrom = s.thread; s.mergedNote = true; s.thread = to[s.thread]; }
-  for (const c of Object.values(d.commits)) if (to[c.thread] && isTodo(c) && !c.done) { c.movedFrom = c.thread; c.thread = to[c.thread]; }
+  for (const s of Object.values(d.sessions || {})) { const how = follow(d, s, 'mergedFrom', 'mergedTo', true); if (how) s.mergedNote = how; }
+  for (const c of Object.values(d.commits)) follow(d, c, 'movedFrom', 'movedTo', isTodo(c) && !c.done);
 }
 
 // Points everything that refers to line `from` at line `to`.

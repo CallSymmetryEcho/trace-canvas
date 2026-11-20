@@ -169,7 +169,7 @@ test('after a merge that keeps the source line, its sessions and open to-dos go 
   s.fire('a', 'UserPromptSubmit', { prompt: 'Work in the folder' }); // unbound: on the folder line by its key
   const folder = Object.values(readData(s.env).threads).find(t => t.key === 'tripsplit').id;
   const [promo, big] = mutate(d => {
-    bindSession(d, 'b', folder, s.env);
+    bindSession(d, 'b', folder, s.env); bindSession(d, 'c', folder, s.env);
     addCommit(d, { thread: folder, kind: 'task', title: 'open one' });
     addCommit(d, { thread: folder, kind: 'task', title: 'finished one', extra: { done: true } });
     return [createThread(d, { name: 'promo' }).id, createThread(d, { name: 'big' }).id];
@@ -179,7 +179,7 @@ test('after a merge that keeps the source line, its sessions and open to-dos go 
   let d = readData(s.env);
   const of = title => Object.values(d.commits).find(c => c.title === title);
   assert.equal(d.sessions.b.thread, big);
-  assert.equal(d.sessions.b.mergedFrom, promo);
+  assert.equal(d.sessions.b.mergedFrom, folder);
   assert.equal(of('open one').thread, big);
   assert.equal(of('finished one').thread, folder); // history stays
   assert.match(promptContext({ session_id: 'b', prompt: 'go on', cwd: s.repo }, s.env), /was merged into "big" \(thread \w+\)[^]*you work on the line "big"/);
@@ -192,4 +192,19 @@ test('after a merge that keeps the source line, its sessions and open to-dos go 
   assert.equal(Object.values(d.commits).filter(c => c.thread === folder).length, before);
   assert.equal(of('logged by id on the old line').thread, big);
   assert.equal(d.sessions.a.thread, big);
+  // Undoing the merges takes them back, one step at a time; what was moved by hand since stays where it was put.
+  mutate(dd => { dd.threads[promo].status = 'active'; dd.threads[promo].mergedInto = null; }, s.env);
+  d = readData(s.env);
+  assert.equal(d.sessions.b.thread, promo); // folder is still merged into promo
+  assert.equal(of('open one').thread, promo);
+  mutate(dd => { addCommit(dd, { thread: promo, kind: 'task', title: 'stays' }); bindSession(dd, 'c', big, s.env); }, s.env); // c: bound by hand to where the merge had put it
+  mutate(dd => { dd.threads[folder].status = 'done'; dd.threads[folder].mergedInto = null; }, s.env);
+  d = readData(s.env);
+  assert.equal(d.sessions.b.thread, folder);
+  assert.equal(d.sessions.b.mergedFrom, undefined);
+  assert.equal(d.sessions.c.thread, big);
+  assert.equal(of('open one').thread, folder);
+  assert.equal(of('open one').movedFrom, undefined);
+  assert.equal(of('stays').thread, promo);
+  assert.match(promptContext({ session_id: 'b', prompt: 'go on', cwd: s.repo }, s.env), /merge of your line was undone[^]*you work on the line "tripsplit"/);
 });

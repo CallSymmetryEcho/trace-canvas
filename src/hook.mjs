@@ -359,6 +359,7 @@ export function bindSession(d, sid, tid, env = process.env) {
   const s = d.sessions[sid] || (d.sessions[sid] = { id: sid, ...adoptSession(d, sid, loadState(sid, env)) });
   s.thread = tid || null;
   s.bound = !!tid;
+  delete s.mergedFrom; delete s.mergedTo; // put here by hand: undoing an earlier merge no longer takes it back
 }
 
 // The line a session is on: bound by hand, else where the hooks last put it, else its repo/branch line.
@@ -521,14 +522,16 @@ export function promptContext(input, env = process.env) {
   const replies = takeReplies(input.session_id, env);
   return [replies, mergedNote(input.session_id, env), NUDGE.test(cleanPrompt(input.prompt)) ? '' : lineContext(input, env)].filter(Boolean).join('\n');
 }
-// Told once to a session whose line was merged into another: from then on it works on that line.
+// Told once to a session whose line was merged into another (from then on it works on that line), or whose merge was undone.
 function mergedNote(sid, env) {
   const s = readData(env).sessions[sid];
   if (!s || !s.mergedNote) return '';
   return mutate(d => {
-    const x = d.sessions[sid], from = d.threads[x.mergedFrom], th = d.threads[x.thread];
+    const x = d.sessions[sid], how = x.mergedNote, from = d.threads[x.mergedFrom], th = d.threads[x.thread];
     delete x.mergedNote;
-    return th ? `Trace Canvas: the line you worked on${from ? ` ("${from.name}")` : ''} was merged into "${th.name}" (thread ${th.id}). From now on you work on that line: log there, and its to-dos (the open ones of your old line moved with you) are yours to read with trace_tasks.` : '';
+    if (!th) return '';
+    return how === 'undone' ? `Trace Canvas: the merge of your line was undone. You work on "${th.name}" (thread ${th.id}) again: log there; its to-dos that had moved with you are back on it.`
+      : `Trace Canvas: the line you worked on${from ? ` ("${from.name}")` : ''} was merged into "${th.name}" (thread ${th.id}). From now on you work on that line: log there, and its to-dos (the open ones of your old line moved with you) are yours to read with trace_tasks.`;
   }, env);
 }
 function lineContext(input, env) {

@@ -191,3 +191,27 @@ test('the MCP server speaks JSON-RPC over stdio and captures the current session
     child.stdin.end();
   }
 });
+
+test('trace_fork start: the new line gets its own agent through the canvas launcher, not a terminal the agent picks', { skip: process.platform !== 'darwin' }, async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-fork-'));
+  const bin = path.join(root, 'bin'), said = path.join(root, 'osascript.txt'), project = path.join(root, 'paper');
+  fs.mkdirSync(bin); fs.mkdirSync(project);
+  fs.writeFileSync(path.join(bin, 'osascript'), `#!/bin/sh\nprintf '%s' "$2" > '${said}'\n`, { mode: 0o755 }); // records the script, opens nothing
+  const child = spawn(process.execPath, [path.join(here, '..', 'bin', 'trace-canvas.mjs'), 'mcp'], {
+    env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, TRACE_CANVAS_TERMINAL: 'iterm', TRACE_CANVAS_HOME: path.join(root, 'home'), CLAUDE_PROJECT_DIR: project, CLAUDE_PROJECTS_DIR: path.join(root, 'projects'), TRACE_CANVAS_LANG: 'en' },
+    stdio: ['pipe', 'pipe', 'inherit'],
+  });
+  const call = rpc(child);
+  try {
+    await call('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '1' } });
+    await call('tools/call', { name: 'trace_log', arguments: { title: 'Device results', thread: 'Sensor paper', kind: 'note' } });
+    const r = await call('tools/call', { name: 'trace_fork', arguments: { from: 'Sensor paper', name: 'Learn: Si contacts', start: 'claude', prompt: 'Write the reading list.' } });
+    const { thread, started } = r.result.structuredContent;
+    assert.equal(started.failed, undefined);
+    assert.match(r.result.content[0].text, /Claude Code started on it in a new terminal tab\./);
+    assert.equal(started.command, `cd '${path.resolve(project)}' && TRACE_CANVAS_THREAD=${thread.id} claude 'Write the reading list.'`);
+    assert.match(fs.readFileSync(said, 'utf8'), /tell application "iTerm"[\s\S]*create tab[\s\S]*TRACE_CANVAS_THREAD=/);
+  } finally {
+    child.stdin.end();
+  }
+});

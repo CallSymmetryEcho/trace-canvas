@@ -120,8 +120,8 @@ const TOOLS = [
   {
     name: 'trace_fork',
     title: 'Fork a thread',
-    description: 'Starts a new thread that branches off an existing one, drawn as a fork in the Branches view. from is a record id, or a thread id or name (then it forks from that thread\'s newest record). bind: true also puts the calling session on the new thread, so its records land there.',
-    inputSchema: { type: 'object', properties: { from: { type: 'string', description: 'Record id, or thread id or name.' }, name: { type: 'string', description: 'Name of the new thread.' }, bind: { type: 'boolean' }, session_id: { type: 'string', description: 'Session to bind instead of the calling one.' } }, required: ['from'] },
+    description: 'Starts a new thread that branches off an existing one, drawn as a fork in the Branches view. from is a record id, or a thread id or name (then it forks from that thread\'s newest record). bind: true also puts the calling session on the new thread, so its records land there. start: an agent to start on the new thread in a new terminal tab here (the terminal the person chose: iTerm2 when installed, else Terminal); use it to open a separate agent session, never open a terminal yourself.',
+    inputSchema: { type: 'object', properties: { from: { type: 'string', description: 'Record id, or thread id or name.' }, name: { type: 'string', description: 'Name of the new thread.' }, bind: { type: 'boolean' }, session_id: { type: 'string', description: 'Session to bind instead of the calling one.' }, start: { type: 'string', enum: ['claude', 'codex', 'gemini', 'agy'], description: 'Start this agent on the new thread, bound to it.' }, prompt: { type: 'string', description: 'With start: what the new session should do first (default: take over the line and work through its to-dos).' }, dir: { type: 'string', description: 'With start: folder to start it in (default: the line\'s folder, else this session\'s).' } }, required: ['from'] },
     annotations: { readOnlyHint: false, destructiveHint: false },
   },
   {
@@ -319,7 +319,17 @@ async function callTool(name, a = {}) {
       const sessionId = a.bind ? currentSessionId({ sessionId: a.session_id, projectDir: projectDir() }) : null;
       if (a.bind && !sessionId) throw new Error('No session to bind; pass session_id');
       const r = mutate(d => { const f = forkThread(d, { from: a.from, name: a.name, agent: agentOf(agentKey()).name }); if (sessionId) bindLiveSession(d, { sessionId, thread: f.thread.id, agent: agentKey() }); return f; });
-      return { text: `Forked "${r.thread.name}"${sessionId ? `; session ${sessionId} is on it now` : ''}.`, data: { thread: { id: r.thread.id, name: r.thread.name }, forkOf: r.thread.forkOf, record: r.record.id, sessionId } };
+      let started = null;
+      if (a.start) {
+        // Through the canvas's own launcher, so the agent opens where the person chose and is bound by TRACE_CANVAS_THREAD.
+        const { handTo } = await import('./ops.mjs'), { openTerminal, q } = await import('./agents.mjs');
+        const h = handTo(readData(), { ref: r.thread.id, to: a.start, prompt: a.prompt || null });
+        const command = a.dir || !h.command.startsWith('cd ') ? `cd ${q(path.resolve(a.dir || projectDir()))} && ${h.command.replace(/^cd '(?:[^']|'\\'')*' && /, '')}` : h.command;
+        const failed = await openTerminal(command);
+        started = { agent: a.start, command, ...(failed ? { failed } : {}) };
+      }
+      const say = !started ? '' : started.failed ? ` Not started: ${started.failed}; run it by hand: ${started.command}` : ` ${agentOf(a.start).name} started on it in a new terminal tab.`;
+      return { text: `Forked "${r.thread.name}"${sessionId ? `; session ${sessionId} is on it now` : ''}.${say}`, data: { thread: { id: r.thread.id, name: r.thread.name }, forkOf: r.thread.forkOf, record: r.record.id, sessionId, ...(started ? { started } : {}) } };
     }
     case 'trace_detach': {
       const th = mutate(d => detachThread(d, { thread: a.thread, take: a.take || '' }));

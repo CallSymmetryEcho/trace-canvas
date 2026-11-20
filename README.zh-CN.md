@@ -160,7 +160,7 @@ node bin/trace-canvas.mjs setup --user
 | `trace_list_threads` | 列出线程：状态、记录数、最近更新；`query` 可搜索 |
 | `trace_read_thread` | 读取一条线程上的记录 |
 | `trace_merge` | 合并任意多条线程，`merge` 或 `combine` 两种方式（见下） |
-| `trace_fork` | 从一条记录或一条线最新的记录分出新线；`bind: true` 时把调用它的会话放到新线上 |
+| `trace_fork` | 从一条记录或一条线最新的记录分出新线；`bind: true` 时把调用它的会话放到新线上；`start: "claude"`（或 codex、gemini、agy）在本机新开一个终端标签，起一个 agent 会话专做这条线 |
 | `trace_detach` | 让分出来的线独立成线；`take` 把开启它的那条记录挪过来作为第一条 |
 | `trace_log` | 记一条（带 `quest` 时记成那个求索的一步） |
 | `trace_quest` | 开一个求索，或者写上结论把它收起 |

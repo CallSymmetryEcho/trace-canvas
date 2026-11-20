@@ -160,7 +160,7 @@ Capturing is safe to repeat: records already on the canvas are skipped. If the h
 | `trace_list_threads` | Lists threads with status, record count, last update; `query` searches |
 | `trace_read_thread` | Returns the records on one thread |
 | `trace_merge` | Merges any number of threads, in `merge` or `combine` mode (below) |
-| `trace_fork` | Branches a new thread off a record or a thread's newest record; `bind: true` puts the calling session on it |
+| `trace_fork` | Branches a new thread off a record or a thread's newest record; `bind: true` puts the calling session on it; `start: "claude"` (or codex, gemini, agy) opens a new agent session on it in a terminal tab here |
 | `trace_detach` | Makes a forked thread a line of its own; `take` moves the record that started it over as its first |
 | `trace_log` | Adds one record (with `quest`, a step of that Quest) |
 | `trace_quest` | Opens a Quest, or closes one with its conclusion |

@@ -47,7 +47,7 @@ Call `trace_list_sessions` and show a short table: when, title, prompts, files c
 
 ## fork <thread>: branch a new line off another
 
-Call `trace_fork` with `from` (the thread or record the user named) and `name`. Pass `bind: true` when this session should work on the new line. Report the new thread's name in one line.
+Call `trace_fork` with `from` (the thread or record the user named) and `name`. Pass `bind: true` when this session should work on the new line. When a separate agent should work on it, pass `start` (claude, codex, gemini or agy) and a `prompt`: it opens in the terminal the person chose, bound to the line; never open a terminal yourself (no `open -a Terminal`, no .command files). Report the new thread's name in one line.
 
 ## detach <thread>: make a forked line a line of its own
 

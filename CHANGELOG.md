@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+## 0.3.7 (2026-11-19)
+
+A canvas that moves and reads at any zoom, a page tidied up after a UI review, diffs you can read on a phone, and Quests: one long piece of work as one card.
+
+### New
+
+- **Quest (求索): one long piece of work as one card.** At the start of the capture box, "/" (or "、" from a Chinese keyboard) opens the commands; picking Quest turns what you write next into a Quest's question, and `/quest <question>` typed out works too. Agents open and close one with `trace_quest`, and a record logged with `quest:` is a step drawn inside the Quest's card instead of along the line. Autopilot runs each round as a Quest, so a round is one card on its line; its Questions and summary stay on the line.
+- **Zoomed out, a card becomes a capsule.** Past Fit's own zoom (or 62% when Fit is closer), a card's head grows against the zoom while its records, frame and footer fade, until a translucent capsule with the line's ring, name and status is left. The lines between cards follow the capsules and keep their size, the fork and merge words fade, and a running line's light goes round its capsule. Fit still shows the cards whole.
+- **The canvas has weight.** Zoom buttons, Fit and `f` fly on a spring; a released drag glides on and springs back if flung off the screen; picking a line or record that is off the screen flies to it. A new station springs in with a ripple of its line's colour, the first draw grows the lines in the order they started, a station under the pointer grows and the selected one breathes, and a line with a session working on it shows a point of light running up to its head. The branch graph, the timeline and the detail panel move the same way. One-off motion runs on phones too; looping motion stays still on touch screens, and everything stays still under reduced motion.
+- **Diffs that read.** A record's changes open with the commit's message, and on the computer itself a button has your local claude write two sentences for the commit and one per file, kept on the record. Files come in reading order (source, tests, docs; lock files and builds last). Code is coloured (JS, CSS, HTML, Python, Markdown, JSON, shell), every line carries its number, each hunk names the function or rule around it, long lines wrap instead of scrolling sideways, and a switch shows changed lines only. On a phone a file opens full screen, one per page; swipe for the next.
+- **A record opens to be read.** Its panel shows the title, the line, who logged it, the details, links and changes; Edit brings the form and Done goes back.
+- **A to-do's own panel can hand it to an agent**: Who does it, Hand to it, Open in a terminal and Start, as in Goals.
+- **Research question cards.** A question is saved with its inputs frozen (copies and SHA-256), run once on Codex or Claude Code from that package or given to Claude Science by hand and brought back, with an independent control from the same package; each run shows its session, model, usage, products and refused tool calls.
+- **Autopilot pushes its own commits** (never force) and restarts its own services; it still asks before publishing, email or messages, force-pushing or rewriting history, permissions or credentials, open ports or deleting for good.
+
+### Fixed
+
+- **From a UI review.** One type scale (12 sizes, from 22) and one corner scale (7, from 15); on touch screens the view tabs, icon and zoom buttons take taps over 44px; canvas cards and branch-graph rows take keyboard focus and open with Enter; on a phone the branch graph leaves a title two full lines; the live bar folds to one row; a sub-agent's chip shows its last activity; a timeline hour label no longer sits under Now.
+- **Update says why when it cannot.** It waits for `trace-canvas update` to finish and, when git refuses (local changes in the way, no network), the page says so with the files in the way instead of reloading as if updated.
+- **Phone.** The Goals page no longer runs off the right edge, the record panel's fields stay inside it (on a computer too), and iOS no longer blows up a diff's type.
+- **History and Retro.** Restore brings a line back as active; Draw lessons reads only archived lines; a retro piece with no suggested rule says why.
+
 ## 0.3.6 (2026-11-17)
 
 Antigravity joins the agents, Autopilot that keeps improving a line by a measure you give, ticks that show how they were checked, and a History wall that takes in every finished line.

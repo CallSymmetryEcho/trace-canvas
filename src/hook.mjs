@@ -15,7 +15,7 @@ import { lessonsFor } from './lessons.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { RETURN_LIMIT, dataFile, home, mutate, readConfig, readData, createThread, addCommit, lastCommit, goalOf, hashId, threadById, threadByKey, isTodo, AUTOPILOT_ASK, AUTOPILOT_WORKER, AUTOPILOT_END, EVOLVE_ROUND } from './store.mjs';
+import { RETURN_LIMIT, dataFile, home, mutate, readConfig, readData, createThread, addCommit, lastCommit, goalOf, hashId, threadById, threadByKey, leadsTo, isTodo, AUTOPILOT_ASK, AUTOPILOT_WORKER, AUTOPILOT_END, EVOLVE_ROUND } from './store.mjs';
 import { gitEvents, redirectTargets, BASH_WRITES, EDIT_TOOLS, GIT_COMMIT, commandDir, commitMessage, headline, firstLine, cleanPrompt } from './git-events.mjs';
 import { tr } from './i18n.mjs';
 const threadIdOfLocal = (d, c) => (c && c.thread && d.threads[c.thread] ? c.thread : 'inbox');
@@ -216,7 +216,7 @@ export function handleHook(input, env = process.env) {
     if (d.sessions[sid] && s.cwd && dir !== s.cwd) { s.cwd = dir; changed = true; }
     const touch = () => { d.sessions[sid] = Object.assign(s, { id: sid, agent: ag.name, agentKey: input._agent || 'claude', resume: ag.resume(sid), cwd: dir, machine: cfg.machine, last: Date.now() }); changed = true; };
     const thread = prompt => {
-      const t = (s.bound && threadById(d, s.thread)) || resolveThread(d, info, { cfg, sid, prevThreadId: s.thread, promptForName: prompt || state.lastPrompt, agent: ag.name, cwd });
+      const t = leadsTo(d, (s.bound && threadById(d, s.thread)) || resolveThread(d, info, { cfg, sid, prevThreadId: s.thread, promptForName: prompt || state.lastPrompt, agent: ag.name, cwd }));
       s.thread = t.id; touch(); return t;
     };
 
@@ -364,9 +364,9 @@ export function bindSession(d, sid, tid, env = process.env) {
 // The line a session is on: bound by hand, else where the hooks last put it, else its repo/branch line.
 export function sessionThread(d, s, env = process.env) {
   const e = (d.sessions || {})[s.id] || adoptSession(d, s.id, loadState(s.id, env));
-  const t = threadById(d, e.thread);
+  const t = leadsTo(d, threadById(d, e.thread));
   if (t) return { threadId: t.id, bound: !!e.bound };
-  const k = threadByKey(d, s.key);
+  const k = leadsTo(d, threadByKey(d, s.key));
   return { threadId: k ? k.id : null, bound: false };
 }
 
@@ -519,7 +519,17 @@ export function takeReplies(sid, env = process.env, now = Date.now()) {
 export function promptContext(input, env = process.env) {
   if (!input.session_id || cleanPrompt(input.prompt).startsWith('/')) return '';
   const replies = takeReplies(input.session_id, env);
-  return [replies, NUDGE.test(cleanPrompt(input.prompt)) ? '' : lineContext(input, env)].filter(Boolean).join('\n');
+  return [replies, mergedNote(input.session_id, env), NUDGE.test(cleanPrompt(input.prompt)) ? '' : lineContext(input, env)].filter(Boolean).join('\n');
+}
+// Told once to a session whose line was merged into another: from then on it works on that line.
+function mergedNote(sid, env) {
+  const s = readData(env).sessions[sid];
+  if (!s || !s.mergedNote) return '';
+  return mutate(d => {
+    const x = d.sessions[sid], from = d.threads[x.mergedFrom], th = d.threads[x.thread];
+    delete x.mergedNote;
+    return th ? `Trace Canvas: the line you worked on${from ? ` ("${from.name}")` : ''} was merged into "${th.name}" (thread ${th.id}). From now on you work on that line: log there, and its to-dos (the open ones of your old line moved with you) are yours to read with trace_tasks.` : '';
+  }, env);
 }
 function lineContext(input, env) {
   const d = readData(env), { threadId } = sessionThread(d, { id: input.session_id }, env);

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **After a merge, the agents go with the line.** Merging a line into another (keeping the merged line) now takes its sessions and its open to-dos along: what those agents log from then on lands on the line it went into, each is told once at its next turn, and finished to-dos stay behind as history. A record logged to a merged line by its id goes there too.
+
 ## 0.3.7 (2026-11-19)
 
 A canvas that moves and reads at any zoom, a page tidied up after a UI review, diffs you can read on a phone, and Quests: one long piece of work as one card.

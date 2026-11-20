@@ -162,3 +162,34 @@ test('a hidden session the app runs for itself (Codex suggestions) leaves nothin
   s.fire('p1', 'UserPromptSubmit', { prompt: 'A real instruction' }); // the person's own sessions are logged as before
   assert.deepEqual(s.on('tripsplit'), ['task']);
 });
+
+test('after a merge that keeps the source line, its sessions and open to-dos go on on the line it went into', async () => {
+  const { promptContext } = await import('../src/hook.mjs');
+  const s = sandbox();
+  s.fire('a', 'UserPromptSubmit', { prompt: 'Work in the folder' }); // unbound: on the folder line by its key
+  const folder = Object.values(readData(s.env).threads).find(t => t.key === 'tripsplit').id;
+  const [promo, big] = mutate(d => {
+    bindSession(d, 'b', folder, s.env);
+    addCommit(d, { thread: folder, kind: 'task', title: 'open one' });
+    addCommit(d, { thread: folder, kind: 'task', title: 'finished one', extra: { done: true } });
+    return [createThread(d, { name: 'promo' }).id, createThread(d, { name: 'big' }).id];
+  }, s.env);
+  mutate(d => mergeThreads(d, { sources: [folder], target: 'promo', mode: 'merge' }, s.env), s.env);
+  mutate(d => mergeThreads(d, { sources: [promo], target: 'big', mode: 'merge' }, s.env), s.env); // a chain: folder > promo > big
+  let d = readData(s.env);
+  const of = title => Object.values(d.commits).find(c => c.title === title);
+  assert.equal(d.sessions.b.thread, big);
+  assert.equal(d.sessions.b.mergedFrom, promo);
+  assert.equal(of('open one').thread, big);
+  assert.equal(of('finished one').thread, folder); // history stays
+  assert.match(promptContext({ session_id: 'b', prompt: 'go on', cwd: s.repo }, s.env), /was merged into "big" \(thread \w+\)[^]*you work on the line "big"/);
+  assert.doesNotMatch(promptContext({ session_id: 'b', prompt: 'go on', cwd: s.repo }, s.env), /was merged into/); // told once
+  const before = Object.values(d.commits).filter(c => c.thread === folder).length;
+  s.edit('b'); // bound to the merged line
+  s.fire('a', 'UserPromptSubmit', { prompt: 'More work in the same folder' }); // found by the merged line's key
+  mutate(dd => { addCommit(dd, { thread: folder, kind: 'note', title: 'logged by id on the old line' }); }, s.env);
+  d = readData(s.env);
+  assert.equal(Object.values(d.commits).filter(c => c.thread === folder).length, before);
+  assert.equal(of('logged by id on the old line').thread, big);
+  assert.equal(d.sessions.a.thread, big);
+});

@@ -74,7 +74,7 @@ export function mutate(fn, env) {
     current = env || process.env;
     try {
       const r = fn(d);
-      if (r !== false) writeData(d, env);
+      if (r !== false) { settleMerged(d); writeData(d, env); }
       return r;
     } finally { current = prev; }
   }, env);
@@ -134,6 +134,22 @@ export function absorb(target, gone) {
   const keys = gone.map(g => g.key).filter(Boolean);
   if (!target.key && keys.length) target.key = keys.shift();
   target.aliases = [...new Set([...(target.aliases || []), ...keys, ...gone.flatMap(g => [g.id, ...(g.aliases || [])])])];
+}
+
+// The line a merged line leads to (itself when it is not merged): work goes on there after a merge.
+export function leadsTo(d, t) {
+  for (const seen = new Set(); t && t.status === 'merged' && d.threads[t.mergedInto] && !seen.has(t.id); t = d.threads[t.mergedInto]) seen.add(t.id);
+  return t;
+}
+// After a merge that keeps the source line, its sessions and its open to-dos go on on the line it went into
+// (finished to-dos stay as history). Run on every write, so every way of merging (page, MCP, a git merge) is covered.
+// mergedFrom / movedFrom keep where each came from, for the note to the agent and for undoing the merge.
+export function settleMerged(d) {
+  const to = {};
+  for (const t of Object.values(d.threads)) if (t.status === 'merged') { const g = leadsTo(d, t); if (g !== t) to[t.id] = g.id; }
+  if (!Object.keys(to).length) return;
+  for (const s of Object.values(d.sessions || {})) if (to[s.thread]) { s.mergedFrom = s.thread; s.mergedNote = true; s.thread = to[s.thread]; }
+  for (const c of Object.values(d.commits)) if (to[c.thread] && isTodo(c) && !c.done) { c.movedFrom = c.thread; c.thread = to[c.thread]; }
 }
 
 // Points everything that refers to line `from` at line `to`.
@@ -232,7 +248,8 @@ export function evolveConfig(e) {
   return { metric, rounds: num(e.rounds, 1, 20, 5), hours: num(e.hours, 1, 168, 24), limits: String(e.limits || '').trim().slice(0, 600) };
 }
 export function addCommit(d, { thread, kind = 'idea', title, body = '', links = [], agent = '', ts = Date.now(), parents, extra = {} }) {
-  const tid = thread === INBOX ? INBOX : (threadById(d, thread) || { id: INBOX }).id;
+  // A record for a merged line goes to the line it was merged into (the merge record itself stays where it is put).
+  const at = thread === INBOX ? null : threadById(d, thread), tid = at ? (kind === 'merge' ? at : leadsTo(d, at)).id : INBOX;
   const prev = extra.quest ? null : lastCommit(d, tid);
   const c = {
     id: uid('c'), thread: tid, kind: KINDS.includes(kind) ? kind : 'agent',

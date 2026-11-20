@@ -208,7 +208,6 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .cv-edges { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
 .cv-edges .e-line { fill: none; stroke-width: 2.4; stroke-linecap: round; }
 /* Far out, the fork and merge words fade with the records (the dashes and the arrow already say it); a relation's own words stay. */
-.cv-edges .edge-fork .e-label, .cv-edges .edge-merge .e-label { opacity: var(--fade, 1); }
 .cv-edges .edge-rel .e-line { stroke: var(--edge); }
 .cv-edges .e-head { stroke: none; }
 .cv-edges .edge-rel .e-head { fill: var(--edge); }
@@ -406,22 +405,24 @@ body.history-open .hist-btn span { display: inline; }
 .strip li.is-sel::after { content: ""; position: absolute; left: 5px; top: 50%; width: 12px; height: 12px; margin-top: -6px; border-radius: 50%; border: 2px solid var(--c); box-sizing: border-box; pointer-events: none; animation: st-breathe 2.4s ease-in-out var(--ph, 0s) infinite; }
 @keyframes st-breathe { 0%, 100% { transform: scale(1.15); opacity: .55; } 50% { transform: scale(1.7); opacity: .12; } }
 @media (prefers-reduced-motion: reduce), (hover: none) { .strip::before { transition: none; } .strip li.is-sel::after { animation: none; transform: scale(1.3); opacity: .4; } }
-/* Zooming out past Fit (or 62% when Fit is closer), a card's head (ring, name, badges) grows against the zoom so it keeps its size there,
-   and the records under it fade away as it does: --k and --fade follow the zoom itself (applyCam sets them), so the change is as smooth
-   as the zoom. Once they are gone the name may take two lines and the badges drop to a row of their own. */
-#cv { --k: 1; --fade: 1; }
-.card:not(.is-shut) .card-head { transform-origin: 0 0; transform: scale(var(--k)); width: calc(100% / var(--k)); box-sizing: border-box; }
-.card:not(.is-shut) .strip, .card:not(.is-shut) .card-foot, .card:not(.is-shut) .ap-tick { opacity: var(--fade); }
-/* As the records fade, the card's frame fades with them (its fill and border follow --fade), and far out the head becomes a translucent
-   capsule round the ring and name, like a place label on Apple Maps: no empty white box, only what is left to read. The capsule sits
-   6px (scaled) inside the card so its shadow is not clipped. No backdrop blur: over the dotted grid it adds nothing, and dozens of them
-   would make a phone stutter while pinching. */
+/* Zooming out past Fit (or 62% when Fit is closer), the cards change state once: the records and the frame fade out and the head becomes
+   a capsule that keeps its size on the screen (--k grows against the zoom). The change is a timed, eased transition started by one class
+   on #cv (.far, see setFar), not something recomputed on every zoom frame: opacity and transform run on the compositor, and while
+   zooming far out only the heads' transform changes (the width limit --kw moves in quarter steps, so layout runs rarely). --k and --kw
+   live on the heads themselves (the #far-k sheet, written by applyCam): on #cv they would restyle every record of every card each frame. */
+#cv { --far-ease: cubic-bezier(.32, .72, 0, 1); --far-t: .44s; }
 .card { --card-bg: var(--surface); }
 .card.is-inbox { --card-bg: var(--surface-2); }
-.card:not(.is-shut) { background-color: color-mix(in srgb, var(--card-bg) calc(var(--fade) * 100%), transparent); border-color: color-mix(in srgb, var(--rule) calc(var(--fade) * 100%), transparent); }
-.card:not(.is-shut) .card-head { border-radius: 16px; transition: background-color .25s, box-shadow .25s; }
-.far .card:not(.is-shut) { overflow: hidden; box-shadow: none; }
-.far .card:not(.is-shut) .card-head { width: fit-content; max-width: calc(100% / var(--k) - 12px); margin: calc(6px * var(--k)); padding: 8px 14px 8px 10px;
+.card:not(.is-shut) { transition: box-shadow .15s, opacity .15s, background-color var(--far-t) var(--far-ease), border-color var(--far-t) var(--far-ease); }
+.card:not(.is-shut) .strip, .card:not(.is-shut) .card-foot, .card:not(.is-shut) .ap-tick { transition: opacity var(--far-t) var(--far-ease); }
+.card:not(.is-shut) .card-head { transform-origin: 0 0; box-sizing: border-box; border-radius: 16px; transition: background-color var(--far-t) var(--far-ease), box-shadow var(--far-t) var(--far-ease); }
+.far-move .card:not(.is-shut) .card-head { transition: transform var(--far-t) var(--far-ease), background-color var(--far-t) var(--far-ease), box-shadow var(--far-t) var(--far-ease); } /* only while changing state: otherwise the head follows the hand */
+/* The capsule: translucent, round the ring and name, like a place label on Apple Maps. It sits 6px (scaled) inside the card so its shadow
+   is not clipped; that offset is part of the transform, so it eases in with the rest. No backdrop blur: over the dotted grid it adds
+   nothing, and dozens of them would make a phone stutter while pinching. */
+.far .card:not(.is-shut) { overflow: hidden; box-shadow: none; background-color: transparent; border-color: transparent; }
+.far .card:not(.is-shut) .strip, .far .card:not(.is-shut) .card-foot, .far .card:not(.is-shut) .ap-tick { opacity: 0; }
+.far .card:not(.is-shut) .card-head { transform: translate(calc(6px * var(--k)), calc(6px * var(--k))) scale(var(--k)); width: fit-content; max-width: calc(100% / var(--kw) - 12px); padding: 8px 14px 8px 10px;
   background: color-mix(in srgb, var(--card-bg) 84%, transparent);
   box-shadow: 0 0 0 .5px color-mix(in srgb, var(--ink) 14%, transparent), 0 2px 10px -2px rgba(20, 24, 28, .14); }
 .far .card:not(.is-shut):hover .card-head { box-shadow: 0 0 0 .5px color-mix(in srgb, var(--ink) 18%, transparent), 0 4px 14px -2px rgba(20, 24, 28, .22); }
@@ -433,6 +434,7 @@ body.history-open .hist-btn span { display: inline; }
 .far .card:not(.is-shut) .strip { pointer-events: none; }
 .far .card:not(.is-shut) .card-head { flex-wrap: wrap; row-gap: 4px; }
 .far .card:not(.is-shut) .card-name { flex: 1 1 55%; white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+@media (prefers-reduced-motion: reduce) { #cv { --far-t: 0s; } }
 @media (prefers-reduced-motion: reduce) { .strip, .strip li .s-title, .strip li .s-time, .strip li .g, .strip .s-more, .card-foot { transition: none; } }
 .strip li[data-cid]:active .g { transform: scale(.82); }
 /* a line with a session working on it: a point of light runs slowly up to its head (instead of the badge blinking) */
@@ -1094,6 +1096,7 @@ button.gl-prog[aria-pressed="true"] { color: var(--ink); background: var(--surfa
   .gl-add-go { min-height: 40px; padding: 0 14px; font-size: 14px; }
 }
 </style>
+<style id="far-k">.card-head { --k: 1; --kw: 1; }</style>
 
 <div id="app">
   <header class="top">
@@ -2449,20 +2452,34 @@ function renderEmpty() {
 
 /* ================= canvas ================= */
 const vp = $('#cv'), cardsEl = $('#cv-cards'), edgesSvg = $('#cv-edges'), world = $('#cv-world');
-// Fit shows the cards whole: their records fade and their heads grow only below zTop, which is Fit's own zoom when that is under 62%;
-// they are gone at 80% of it, and the zoom can go a little further out than that, to see the capsules.
-let zTop = 0.62;
-const zoomK = z => clamp(zTop / z, 1, 3), zoomFade = z => clamp((z / zTop - 0.8) * 5, 0, 1);
-let edgeK = 1, edgeF = 1, edgeRaf = 0; // what the lines were last drawn for (see drawEdges)
+// Fit shows the cards whole: they turn into capsules only below zTop, which is Fit's own zoom when that is under 62%. Going out the
+// change starts at 88% of it and coming back at 95% (so a hand resting near the edge does not flip it back and forth), and the zoom
+// can go a little further out than Fit, to see the capsules.
+let zTop = 0.62, far = false, farF = 1, farRaf = 0, farTimer = 0, camK = 1; // farF: 1 = whole cards, 0 = capsules, eased over time (the lines follow it)
+const FAR_MS = 440, farEase = t => 1 - Math.pow(1 - t, 3.6); // close to --far-ease
+function setFar(v) {
+  far = v;
+  vp.classList.toggle('far', v); vp.classList.add('far-move');
+  clearTimeout(farTimer); farTimer = setTimeout(() => vp.classList.remove('far-move'), FAR_MS + 40);
+  cancelAnimationFrame(farRaf);
+  const from = farF, to = v ? 0 : 1, t0 = performance.now(), ms = CALM.matches ? 0 : FAR_MS;
+  const step = now => { const t = ms ? Math.min(1, (now - t0) / ms) : 1; farF = from + (to - from) * farEase(t); drawEdges(); farRaf = t < 1 ? requestAnimationFrame(step) : 0; };
+  farRaf = requestAnimationFrame(step);
+}
+let edgeRaf = 0;
+const kRule = $('#far-k').sheet.cssRules[0].style;
 function applyCam() {
   const { x, y, z } = S.cam;
   world.style.transform = `translate(${x}px, ${y}px) scale(${z})`;
   vp.style.backgroundSize = `${24 * z}px ${24 * z}px`;
   vp.style.backgroundPosition = `${x * 0.85}px ${y * 0.85}px`; // the grid lags the cards a little: a hint of depth
-  const k = zoomK(z), f = zoomFade(z);
-  vp.style.setProperty('--k', k.toFixed(3)); vp.style.setProperty('--fade', f.toFixed(3));
-  vp.classList.toggle('far', f === 0); // the records have faded out: the head has the card to itself
-  if ((k !== edgeK || f !== edgeF) && !edgeRaf) edgeRaf = requestAnimationFrame(() => { edgeRaf = 0; drawEdges(); }); // the lines follow the heads as they grow
+  const r = z / zTop;
+  if (far ? r > 0.95 : r < 0.88) setFar(!far);
+  const k = far ? clamp(1 / r, 1, 3) : 1;
+  if (k !== camK) { // nothing to restyle while panning, or zooming with whole cards
+    camK = k; kRule.setProperty('--k', k.toFixed(3)); kRule.setProperty('--kw', Math.ceil(k * 4) / 4);
+    if (!farRaf && !edgeRaf) edgeRaf = requestAnimationFrame(() => { edgeRaf = 0; drawEdges(); }); // the lines follow the heads as they grow
+  }
   $('#zoom-reset').textContent = Math.round(z * 100) + '%';
 }
 /* ---- motion: only transform and opacity, and none under reduced motion or on a touch screen ---- */
@@ -2906,15 +2923,14 @@ function border(R, c, toward, gap) {
   return { x: c.x + dx * k, y: c.y + dy * k };
 }
 // Zoomed out, a line runs between the heads, not the emptied cards: each end slides from the card's box to its head as the records fade
-// (the same --fade the CSS uses), and the line, its arrow and gaps grow with the head (--k), so they keep the size they have at zTop.
+// (farF, in step with the CSS transition), and the line, its arrow and gaps grow with the head (--k), so they keep the size they have at zTop.
 function drawEdges() {
-  const k = zoomK(S.cam.z), f = zoomFade(S.cam.z);
-  edgeK = k; edgeF = f;
+  const f = farF, k = 1 + (camK - 1) * (1 - f); // mid-change, the head is on its way to camK
   const rects = new Map();
   for (const el of cardsEl.children) {
     const R = { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight }, hd = el.querySelector('.card-head');
     if (f < 1 && hd && !el.classList.contains('is-shut')) { // the head is scaled by k from its top left, and the card clips it
-      const H = { x: R.x + hd.offsetLeft, y: R.y + hd.offsetTop }; H.w = Math.min(hd.offsetWidth * k, R.x + R.w - H.x); H.h = Math.min(hd.offsetHeight * k, R.y + R.h - H.y);
+      const H = { x: R.x + hd.offsetLeft + 6 * k, y: R.y + hd.offsetTop + 6 * k }; H.w = Math.min(hd.offsetWidth * k, R.x + R.w - H.x); H.h = Math.min(hd.offsetHeight * k, R.y + R.h - H.y);
       for (const p of ['x', 'y', 'w', 'h']) R[p] = H[p] + (R[p] - H[p]) * f;
     }
     rects.set(el.dataset.tid, R);
@@ -2941,7 +2957,7 @@ function drawEdges() {
     return `<g class="edge edge-${L.kind} ${L.id && L.id === selE ? 'is-sel' : ''}" ${L.id ? `data-eid="${esc(L.id)}"` : ''}>
       <path class="e-line" d="M${p1.x.toFixed(1)} ${p1.y.toFixed(1)} L${hx.toFixed(1)} ${hy.toFixed(1)}" ${stroke}/>
       <polygon class="e-head" points="${p2.x.toFixed(1)},${p2.y.toFixed(1)} ${left.x.toFixed(1)},${left.y.toFixed(1)} ${right.x.toFixed(1)},${right.y.toFixed(1)}" ${fill}/>
-      <g class="e-label" transform="translate(${mx.toFixed(1)} ${my.toFixed(1)}) scale(${k.toFixed(3)})"><rect x="${-w / 2}" y="-10" width="${w}" height="20" rx="10"/><text>${esc(L.label)}</text></g>
+      <g class="e-label" transform="translate(${mx.toFixed(1)} ${my.toFixed(1)}) scale(${k.toFixed(3)})"${L.kind === 'rel' || f === 1 ? '' : ` opacity="${f.toFixed(2)}"`}><rect x="${-w / 2}" y="-10" width="${w}" height="20" rx="10"/><text>${esc(L.label)}</text></g>
     </g>`;
   }).join('');
 }
@@ -3017,7 +3033,7 @@ function fit(instant) {
   const padX = 24, padTop = 24, padBottom = 70;
   const availW = r.width - padX * 2, availH = r.height - padTop - padBottom;
   const z = clamp(Math.min(availW / (x1 - x0), availH / (y1 - y0)), r.width < 600 || matchMedia('(hover: none)').matches ? 0.6 : 0.3, 1.1); // a tablet: readable cards, pan for the rest
-  zTop = Math.min(0.62, z * 0.98); // see zoomK
+  zTop = Math.min(0.62, z * 0.98); // see applyCam
   const w = (x1 - x0) * z, hgt = (y1 - y0) * z;
   const to = {
     z,

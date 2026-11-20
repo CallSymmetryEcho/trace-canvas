@@ -84,9 +84,9 @@ test('a session bound through the tools says which agent and machine it is, befo
   // Seen from the Mac, it resumes over ssh, in the login shell there (ssh alone has no codex on its PATH).
   const d = readData(env), tid = Object.values(d.threads)[0].id;
   const cmd = threadSessions(d, tid, { ...s.env, TRACE_CANVAS_MACHINE: 'mac' })[0].command;
-  assert.equal(cmd, `ssh -t bsuperstation 'exec "$SHELL" -lc '\\''PATH="$HOME/.local/bin:$PATH"; codex resume cx9'\\'''`);
+  assert.match(cmd, /^ssh -t bsuperstation '/);
   // What the remote end gets, once this shell has taken the quotes off: the login shell runs the command.
-  assert.equal(execFileSync('sh', ['-c', `printf %s ${cmd.slice('ssh -t bsuperstation '.length)}`], { encoding: 'utf8' }), `exec "$SHELL" -lc 'PATH="$HOME/.local/bin:$PATH"; codex resume cx9'`);
+  assert.equal(execFileSync('sh', ['-c', `printf %s ${cmd.slice('ssh -t bsuperstation '.length)}`], { encoding: 'utf8' }), `exec "$SHELL" -lc 'PATH="$HOME/.local/bin:$PATH"; if command -v tmux >/dev/null; then exec tmux new-session -A -s tc-cx9 '\\''codex resume cx9'\\''; else codex resume cx9; fi'`);
 });
 
 test('a session resumes from the folder it started in, not one it cd-ed into later, here and from another machine', () => {
@@ -108,8 +108,14 @@ test('a session resumes from the folder it started in, not one it cd-ed into lat
   assert.equal(d.sessions.s7.cwd, s.repo);
   // bsuperstation has none of the Mac's transcripts: it goes by the synced folder, resumed over ssh on the Mac.
   const cmd = threadSessions(d, tid, { ...s.env, TRACE_CANVAS_MACHINE: 'bsuperstation' }).find(x => x.id === 's7').command;
-  assert.equal(execFileSync('sh', ['-c', `printf %s ${cmd.slice('ssh -t mac '.length)}`], { encoding: 'utf8' }),
-    `exec "$SHELL" -lc 'PATH="$HOME/.local/bin:$PATH"; cd '\\''${s.repo}'\\'' && claude --resume s7'`);
+  // What the Mac's end runs, with a stand-in tmux that prints what it is given: tmux session tc-<id> (attached to when
+  // it is already there, -A), running the resume from the session's folder. Without tmux there, the plain resume.
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-tmux-'));
+  fs.writeFileSync(path.join(bin, 'tmux'), '#!/bin/sh\nprintf "%s\\n" "$@"\n', { mode: 0o755 });
+  const there = PATH => execFileSync('/bin/sh', ['-c', `eval ${cmd.slice('ssh -t mac '.length)}`], { encoding: 'utf8', env: { HOME: bin, SHELL: '/bin/sh', PATH } });
+  assert.deepEqual(there(bin).trim().split('\n'), ['new-session', '-A', '-s', 'tc-s7', `cd '${s.repo}' && claude --resume s7`]);
+  fs.writeFileSync(path.join(bin, 'claude'), '#!/bin/sh\necho "plain $* in $PWD"\n', { mode: 0o755 }); fs.rmSync(path.join(bin, 'tmux'));
+  assert.equal(there(bin).trim(), `plain --resume s7 in ${fs.realpathSync(s.repo)}`);
   // Codex finds a session by its id anywhere: the folder first noted stays.
   handleHook({ session_id: 'c8', cwd: s.repo, transcript_path: path.join(s.root, 'rollout-c8.jsonl'), hook_event_name: 'UserPromptSubmit', prompt: 'Sort the receipts by date', _agent: 'codex' }, env);
   handleHook({ session_id: 'c8', cwd: drafts, transcript_path: path.join(s.root, 'rollout-c8.jsonl'), hook_event_name: 'Stop', last_assistant_message: 'ok', _agent: 'codex' }, env);

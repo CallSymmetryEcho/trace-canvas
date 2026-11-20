@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { COLS, addCommit, dataFile, home, mutate, readConfig, readData, toArrays, writeConfig } from './store.mjs';
 import { demoData } from './demo.mjs';
 import { liveDir, readLive, withCodexTerm } from './live.mjs';
-import { awayCache, bindLiveSession, findThreadLoose, handTo, liveSessions, sessionList, startAutopilot, stopAutopilot } from './ops.mjs';
+import { awayCache, bindLiveSession, findThreadLoose, handTo, liveSessions, sessionList, startAutopilot, stopAutopilot, threadSessions } from './ops.mjs';
 import { applyRetro, askAgent, retroRecord, runRetro } from './retro.mjs';
 import { AGENTS, focusTab, launchRow, openTerminal, terminalCommand } from './agents.mjs';
 import { draftLessons, rememberLesson } from './lessons.mjs';
@@ -126,7 +126,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         if (!phone || !phone.token || !(same(cookie, phone.token) || same(k, phone.token))) return send(res, 403, { error: 'Open the address trace-canvas phone printed' });
         if (same(k, phone.token) && !same(cookie, phone.token)) res.setHeader('Set-Cookie', `tc_k=${phone.token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000`);
         // These act on the computer itself (a terminal, git pushes, the claude CLI, the whole data set).
-        if (['/api/hand', '/api/focus', '/api/sync', '/api/ai', '/api/demo', '/api/retro', '/api/retro/apply', '/api/update', '/api/autopilot', '/api/lessons', '/api/lessons/save', '/api/git/explain'].includes(p)) return send(res, 403, { error: 'Only on the computer itself' });
+        if (['/api/hand', '/api/focus', '/api/resume', '/api/sync', '/api/ai', '/api/demo', '/api/retro', '/api/retro/apply', '/api/update', '/api/autopilot', '/api/lessons', '/api/lessons/save', '/api/git/explain'].includes(p)) return send(res, 403, { error: 'Only on the computer itself' });
       }
       const write = req.method !== 'GET' && req.method !== 'HEAD';
       if (write && req.headers['x-trace-canvas'] !== '1') return send(res, 403, { error: 'missing header' });
@@ -206,6 +206,14 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         const sid = String(body.session || ''), far = away.flatMap(m => m.sessions).find(s => s.id === sid && s.attach);
         if (far) { const failed = await openTerminal(far.attach); return send(res, 200, failed ? { error: failed, command: far.attach } : { ok: true }); }
         return send(res, 200, await focusTab(withCodexTerm()(readLive(sid)) || {}) ? { ok: true } : { error: 'not found' });
+      }
+      // Resume in a terminal: a session that is not running opens in a new terminal tab here, resumed from its folder;
+      // another machine's over ssh, in tmux there. The command is the server's own (threadSessions), never the page's.
+      if (req.method === 'POST' && p === '/api/resume') {
+        const sid = String(JSON.parse(await readBody(req)).session || ''), s = threadSessions(readData(), null).find(x => x.id === sid);
+        if (!s) return send(res, 200, { error: 'No such session' });
+        const failed = terminalCommand('') ? await openTerminal(s.command) : 'No terminal to open on this machine (macOS, or a Linux desktop); copy the command instead';
+        return send(res, 200, failed ? { error: failed, command: s.command } : { ok: true, command: s.command });
       }
       // ▶ Start: a Claude Code session on the line in a new Terminal window, with Remote Control on, so it
       // shows in the Claude app on the phone. Built from the line or to-do id like Open in Terminal; a line

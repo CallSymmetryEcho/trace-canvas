@@ -5,7 +5,7 @@ import { INBOX, COLS, isTodo, RETURN_LIMIT, evolveConfig, absorb, addCommit, cre
 import { headline, firstLine } from './git-events.mjs';
 import { AGENT, bindSession, gitRoot, logGitEvents, repoInfo, resumeLink, sessionThread, turnBody, rel } from './hook.mjs';
 import { listLive } from './live.mjs';
-import { AGENTS, q, remote } from './agents.mjs';
+import { AGENTS, q, remote, resumeThere } from './agents.mjs';
 import { desktopSessions } from './desktop.mjs';
 import { remoteLiveSync } from './remote.mjs';
 import { tr } from './i18n.mjs';
@@ -300,6 +300,11 @@ export function sessionList(d, tid = null) {
     const cwd = e.cwd || lineDir(th), resume = e.resume || r.resume || resumeLink(id);
     return { id, thread: th ? th.id : null, agent: e.agent || r.agent || AGENT, title: e.title || r.title || '', bound: !!e.bound, last: Math.max(e.last || 0, r.last || 0), machine: e.machine || r.machine || '', cwd, resume, command: `${cwd ? `cd ${q(cwd)} && ` : ''}${resume}` };
   }).sort((a, b) => b.last - a.last);
+  // A session with no machine noted takes the machine whose sessions share its home folder (/Users/x, /home/x): its
+  // folder says where it ran, and a resume command built as if it were here would not find it.
+  const home = p => (/^\/(?:Users|home)\/[^/]+/.exec(p || '') || [''])[0], homes = new Map();
+  for (const s of all) if (s.machine && home(s.cwd) && !homes.has(home(s.cwd))) homes.set(home(s.cwd), s.machine);
+  for (const s of all) if (!s.machine && homes.has(home(s.cwd))) s.machine = homes.get(home(s.cwd));
   return tid ? all.filter(s => s.thread === tid) : all;
 }
 
@@ -609,8 +614,8 @@ export function threadSessions(d, tid, env = process.env) {
   const live = new Map(listLive(env).map(s => [s.id, s])), me = readConfig(env).machine;
   return sessionList(d, tid).map(s => {
     const l = live.get(s.id), cwd = s.cwd || (l && l.cwd) || '', here = `${cwd ? `cd ${q(cwd)} && ` : ''}${s.resume}`;
-    // Another machine's session resumes there, over ssh (machine names are the ssh aliases).
-    return { ...s, status: l ? l.status : 'off', cwd, command: s.machine && s.machine !== me ? remote(s.machine, here) : here };
+    // Another machine's session resumes there, over ssh and in tmux (machine names are the ssh aliases).
+    return { ...s, status: l ? l.status : 'off', cwd, away: !!(s.machine && s.machine !== me), command: s.machine && s.machine !== me ? resumeThere(s.machine, here, s.id) : here };
   });
 }
 

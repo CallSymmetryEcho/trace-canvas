@@ -123,6 +123,11 @@ export function openTerminal(cmd, env = process.env) {
 // A command run on another machine over ssh, in its login shell. A login shell that is not interactive skips .zshrc
 // and .bashrc, where ~/.local/bin (claude's and codex's own installers) is usually put on PATH, so it is put first here.
 export const remote = (machine, cmd) => `ssh -t ${machine} ${q(`exec "$SHELL" -lc ${q(`PATH="$HOME/.local/bin:$PATH"; ${cmd}`)}`)}`;
+// Resuming another machine's session from here: over ssh, in tmux session tc-<id> there, so it keeps going when this
+// window closes or the network drops. A tmux session of that name (a dispatch started it, or an earlier resume) is
+// attached to instead of running the session twice. No tmux there: the plain resume over ssh. tmux runs the command
+// with the PATH this login shell hands a new tmux server (or the one the person's own tmux already has).
+export const resumeThere = (machine, cmd, id) => remote(machine, `if command -v tmux >/dev/null; then exec tmux new-session -A -s tc-${String(id).slice(0, 8)} ${q(cmd)}; else ${cmd}; fi`);
 // Opening another machine's session that runs in tmux: its pane (the hook notes it; for an older record, the pane with
 // its tty), shown and attached over ssh. '' when it is not in tmux.
 export function tmuxAttach(s) {

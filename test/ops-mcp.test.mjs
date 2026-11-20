@@ -215,3 +215,11 @@ test('trace_fork start: the new line gets its own agent through the canvas launc
     child.stdin.end();
   }
 });
+
+test('a link logged as a path relative to the session folder is kept as the full path; URLs, commands and missing files stay as written', async () => {
+  const { fullLinks } = await import('../src/mcp.mjs');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-links-'));
+  fs.mkdirSync(path.join(dir, 'notes')); fs.writeFileSync(path.join(dir, 'notes', 'reading_list.md'), '# x');
+  assert.deepEqual(fullLinks(['notes/reading_list.md', 'https://x.com/a', 'claude --resume abc', 'gone.md', '/abs/x.md'], dir),
+    [path.join(dir, 'notes', 'reading_list.md'), 'https://x.com/a', 'claude --resume abc', 'gone.md', '/abs/x.md']);
+});

@@ -19,6 +19,15 @@ const VERSION = JSON.parse(fs.readFileSync(path.join(here, '..', 'package.json')
 const PROTOCOLS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
 const projectDir = () => process.env.CLAUDE_PROJECT_DIR || process.cwd();
 const port = () => Number(process.env.TRACE_CANVAS_PORT || 4777);
+// A link written as a path relative to the session's folder (reading_list.md, out/fig.png) is stored as the full path,
+// so the record opens it from anywhere: another folder, the phone, another machine. Only when that file is there;
+// URLs, commands and other text stay as written.
+export const fullLinks = (links, dir = projectDir()) => (Array.isArray(links) ? links : []).map(l => {
+  const s = String(l).trim();
+  if (!s || /^[/~]|^[a-z][\w+.-]*:|\s/i.test(s)) return l;
+  const f = path.resolve(dir, s);
+  try { return fs.statSync(f).isFile() || fs.statSync(f).isDirectory() ? f : l; } catch { return l; }
+});
 // trace_log's to: a session id, a cross-session sender (cc-socks/<pid>.sock or the pid), or a record that session logged.
 export function replyTo(v, d = readData(), env = process.env) {
   const s = v.trim(), pid = /(?:^|\/)(\d+)(?:\.sock)?$/.exec(s);
@@ -280,7 +289,7 @@ async function callTool(name, a = {}) {
         const thread = q ? q.thread : a.thread ? ensureThread(d, a.thread) : INBOX, kind = a.kind || (a.assignee ? 'task' : 'agent');
         const same = kind === 'task' && Object.values(d.commits).find(x => x.kind === 'task' && !x.done && threadIdOf(d, x) === thread && norm(x.title) === norm(a.title));
         if (same) { dup = true; return same; }
-        return addCommit(d, { thread, kind, title: a.title, body: a.body || '', links: Array.isArray(a.links) ? a.links : [], agent: a.agent || agentOf(agentKey()).name, extra: { ...(a.assignee ? { assignee: a.assignee } : {}), ...(a.on ? { on: String(a.on) } : {}), ...(from ? { fromSession: from } : {}), ...(to ? { to } : {}), ...(q ? { quest: q.id } : {}) } });
+        return addCommit(d, { thread, kind, title: a.title, body: a.body || '', links: fullLinks(a.links), agent: a.agent || agentOf(agentKey()).name, extra: { ...(a.assignee ? { assignee: a.assignee } : {}), ...(a.on ? { on: String(a.on) } : {}), ...(from ? { fromSession: from } : {}), ...(to ? { to } : {}), ...(q ? { quest: q.id } : {}) } });
       });
       const where = c.thread === INBOX ? 'the inbox' : `"${readData().threads[c.thread].name}"`;
       // on: the to-do is dispatched now, as `trace-canvas dispatch <id> --on <machine>` would (it used to be only stored,

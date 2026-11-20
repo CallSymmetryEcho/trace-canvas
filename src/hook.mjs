@@ -263,7 +263,9 @@ export function handleHook(input, env = process.env) {
       if (EDIT_TOOLS.has(tool)) {
         // Codex's apply_patch can touch several files at once (normalize puts them in `files`).
         for (const f of ti.files || [ti.file_path || ti.notebook_path || out.filePath].filter(Boolean)) {
-          const r = rel(info ? info.root : cwd, path.resolve(cwd, f)); pushUnique(state.turnFiles, r); pushUnique(state.files, r);
+          const r = rel(info ? info.root : cwd, path.resolve(cwd, f));
+          if (path.isAbsolute(r)) continue; // outside the project (/tmp, a scratchpad, elsewhere): not its output
+          state.fileRoot = info ? info.root : cwd; pushUnique(state.turnFiles, r); pushUnique(state.files, r);
         }
       } else if (tool === 'TodoWrite' && Array.isArray(ti.todos)) {
         for (const td of ti.todos) {
@@ -273,8 +275,8 @@ export function handleHook(input, env = process.env) {
       } else if (tool === 'Bash') {
         const cmd = String(ti.command || '');
         const root = info ? info.root : cwd;
-        const targets = redirectTargets(cmd).map(f => rel(root, path.resolve(cwd, f)));
-        for (const f of targets) { pushUnique(state.turnFiles, f); pushUnique(state.files, f); }
+        const targets = redirectTargets(cmd, cwd).map(f => rel(root, f)).filter(f => !path.isAbsolute(f));
+        for (const f of targets) { state.fileRoot = root; pushUnique(state.turnFiles, f); pushUnique(state.files, f); }
         if (targets.length || BASH_WRITES.test(cmd)) state.turnActions = (state.turnActions || 0) + 1;
         const g = { ...gitEvents(cmd, out.stdout, out.stderr, out.gitOperation), repo: commitRepo };
         // Only when the commit did not fail, HEAD carries the message the command gave, and it is not on the canvas yet.
@@ -284,7 +286,7 @@ export function handleHook(input, env = process.env) {
       }
     } else if (ev === 'Stop') {
       const msg = String(input.last_assistant_message || '').trim();
-      const files = state.turnFiles, todos = state.turnTodos;
+      const files = outputs(state.turnFiles, state.fileRoot || cwd, msg), todos = state.turnTodos;
       const acted = files.length > 0 || (state.turnActions || 0) > 0;
       // Claude Code logs its own results (its skill and the session's context say how). Codex, Gemini and Antigravity
       // often answer without doing so: when such a turn logged nothing itself, its reply becomes the result of the to-do
@@ -313,6 +315,7 @@ export function handleHook(input, env = process.env) {
     } else if (ev === 'SessionEnd') {
       const th = threadById(d, s.thread), tid = th ? th.id : null;
       if (d.sessions[sid]) { s.last = Date.now(); changed = true; }
+      state.files = outputs(state.files, state.fileRoot || cwd);
       if (tid && (state.prompts || state.files.length || state.commits.length)) {
         const mins = Math.max(1, Math.round((Date.now() - state.startedAt) / 60000));
         const links = [ag.resume(sid)];
@@ -545,6 +548,20 @@ function lineContext(input, env) {
   return `Trace Canvas: you work on the line "${th.name}" (thread ${th.id}). If this message gives a new goal, idea or next step worth tracking, add each one now as a to-do with trace_log (kind "task", thread "${th.id}"), one short title per item; not the request in this message, which you are doing now, nor anything you will finish in this same turn${open.length ? `, and what is already open: ${open.slice(-8).map(c => firstLine(c.title, 60)).join('; ')}` : ''}.${apNote}`;
 }
 
+/**
+ * What a turn produced, from the files it wrote (paths relative to the project, root): only those still there when it
+ * ends (a check.py written and deleted again was a draft) and not ignored by git (logs, caches, builds); the ones its
+ * reply names come first. Files outside the project never get here.
+ */
+export function outputs(files, root, msg = '') {
+  const here = (files || []).filter(f => { try { return fs.statSync(path.join(root, f)).isFile(); } catch { return false; } });
+  let ignored = '';
+  // check-ignore prints the ignored ones; it exits 1 when none is, 128 outside a git repository (then nothing is ignored).
+  if (here.length) try { ignored = execFileSync('git', ['-C', root, 'check-ignore', '--stdin'], { input: here.join('\n'), encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'], timeout: 5000 }); } catch (e) { ignored = String(e.stdout || ''); }
+  const skip = new Set(ignored.split('\n').filter(Boolean)), kept = here.filter(f => !skip.has(f));
+  const named = f => msg.includes(f) || msg.includes(path.basename(f));
+  return [...kept.filter(named), ...kept.filter(f => !named(f))];
+}
 export function turnBody(lang, msg, files, todos = []) {
   return [String(msg || '').slice(0, 1500),
     files.length ? `${tr(lang, 'filesLabel')}:\n${files.slice(0, 30).map(f => '- ' + f).join('\n')}${files.length > 30 ? `\n- … +${files.length - 30}` : ''}` : '',

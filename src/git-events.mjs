@@ -59,18 +59,31 @@ export function commitMessage(cmd) {
 
 // Shell commands that change files, and the targets of `>` / `>>` redirects.
 export const BASH_WRITES = /(?:^|[\s;&|(])(?:tee|sed\s+-i\S*|perl\s+-pi\S*|mv|cp|rm|mkdir|touch|ln|git\s+(?:mv|rm|apply|restore|checkout\s+--))(?=\s)/;
-export function redirectTargets(cmd) {
+export function redirectTargets(cmd, cwd = '') {
   const out = [];
   // Drop heredoc bodies and quoted strings first, so a `>` inside a message is not read as a redirect.
   const bare = String(cmd)
     .replace(/<<-?[ \t]*(['"]?)(\w+)\1([^\n]*)\n[\s\S]*?\n[ \t]*\2(?=\s|$|\))/g, '<<$2$3')
     .replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, '""');
+  // With cwd: each target as a full path, from the folder the command had cd-ed into by then (`cd /tmp/x && cat > a.txt`
+  // writes /tmp/x/a.txt, not a.txt in the session's folder). A cd that cannot be followed ($VAR, -, quoted) drops a relative target: where it went is not known.
+  const cds = cwd ? [...bare.matchAll(/(?:^|[;&|(]|\s)cd\s+([^\s;&|)"]+)/g)] : [];
   for (const m of bare.matchAll(/(?<![0-9&<>=\-])>{1,2}[ \t]*([^\s|;&<>()'"]+)/g)) {
     const f = m[1];
-    if (f && !f.startsWith('&') && !f.startsWith('/dev/')) out.push(f);
+    if (!f || f.startsWith('&') || f.startsWith('/dev/')) continue;
+    if (!cwd) { out.push(f); continue; }
+    let dir = cwd, known = true;
+    for (const c of cds) if (c.index < m.index) { const to = c[1].replace(/^(~|\$HOME)(?=\/|$)/, os.homedir()); if (to === '-' || to.includes('$')) known = false; else dir = path.resolve(dir, to); }
+    if (known || path.isAbsolute(f)) out.push(path.resolve(dir, f));
   }
   return out;
 }
+// A file in a temporary folder (an agent's scratchpad, /tmp) outside the project: scratch work, not a change to the
+// person's files. A project that itself lives in a temporary folder keeps its files.
+const TMP = [...new Set(['/tmp', '/private/tmp', '/var/folders', '/private/var/folders', os.tmpdir()])];
+const unprivate = p => String(p).replace(/^\/private(?=\/(?:var|tmp)(?:\/|$))/, ''); // macOS: /tmp and /var are /private/tmp and /private/var
+const under = (f, d) => { if (!d) return false; f = unprivate(f); d = unprivate(d).replace(/\/$/, ''); return f === d || f.startsWith(d + '/'); };
+export const isScratch = (f, project = '') => path.isAbsolute(String(f)) && TMP.some(t => under(String(f), t)) && !under(String(f), project);
 
 export const EDIT_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
 
@@ -78,7 +91,7 @@ export const EDIT_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']
 export function headline(msg, n = 110) {
   const lines = String(msg || '').replace(/```[\s\S]*?```/g, '\n').split('\n').map(x => x.trim()).filter(Boolean);
   const pick = lines.find(l => !/^#{1,6}\s/.test(l) && l.replace(/[^\p{L}\p{N}]/gu, '').length > 2) || lines[0] || '';
-  const plain = pick.replace(/^#{1,6}\s+/, '').replace(/^([-*+]|\d+[.)])\s+/, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/[*_`>|]/g, '').trim();
+  const plain = pick.replace(/^#{1,6}\s+/, '').replace(/^([-*+]|\d+[.)])\s+/, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/(^|[^\w])_{1,2}([^_\n]+?)_{1,2}(?!\w)/g, '$1$2').replace(/[*`>|]/g, '').trim(); // _emphasis_ goes, snake_case stays
   const sentence = plain.split(/(?<=[.!?])\s+|(?<=[。！？])/)[0] || plain;
   return sentence.length > n ? sentence.slice(0, n - 1) + '…' : sentence;
 }

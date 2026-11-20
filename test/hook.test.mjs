@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { handleHook, headline, redirectTargets, whereFind } from '../src/hook.mjs';
+import { handleHook, headline, outputs, redirectTargets, whereFind } from '../src/hook.mjs';
+import { isScratch } from '../src/git-events.mjs';
 import { readData, mutate, createThread, addCommit } from '../src/store.mjs';
 import { fileURLToPath } from 'node:url';
 
@@ -30,6 +31,7 @@ function sandbox(lang = 'en') {
 test('a session leaves a task, a turn record, a commit and a summary on the repo thread', () => {
   const s = sandbox();
   s.fire('UserPromptSubmit', { prompt: 'Draft the methods section for chapter 3\nUse the outline in notes.md', prompt_id: 'p1' });
+  fs.writeFileSync(path.join(s.repo, 'chapter3.md'), '# Methods'); // the turn's output is still there when it ends
   s.fire('PostToolUse', { tool_name: 'Write', tool_input: { file_path: path.join(s.repo, 'chapter3.md') }, tool_response: {}, tool_use_id: 'u1' });
   s.fire('PostToolUse', { tool_name: 'TodoWrite', tool_input: { todos: [{ content: 'Outline', status: 'completed' }, { content: 'Draft', status: 'in_progress' }] }, tool_use_id: 'u2' });
   s.fire('PostToolUse', {
@@ -150,6 +152,7 @@ test('files written from Bash count as changes, and structured commit data is us
     tool_input: { command: "printf 'Phase 1\\n' > timeline.md && git add timeline.md && git commit -m 'Add timeline\n\nCo-Authored-By: x' 2>&1 | tail -0" },
     tool_response: { stdout: '', stderr: '', interrupted: false, gitOperation: { commit: { sha: '17636a1', kind: 'committed', branch: 'main' } } },
   });
+  fs.writeFileSync(path.join(s.repo, 'timeline.md'), 'Phase 1\n'); // what printf wrote
   s.fire('Stop', { last_assistant_message: 'I wrote timeline.md and committed it.', prompt_id: 'p1' });
   s.fire('SessionEnd', { reason: 'other' });
   assert.deepEqual(s.commits().map(c => c.title), [
@@ -180,6 +183,10 @@ test('redirectTargets ignores stream merges, /dev/null and arrows inside argumen
   assert.deepEqual(redirectTargets("git commit -m 'Add timeline\n\nCo-Authored-By: A <a@b.com>\nClaude-Session: https://x'"), []);
   assert.deepEqual(redirectTargets('git commit -m "$(cat <<\'EOF\'\nFix <parser>\nEOF\n)"'), []);
   assert.deepEqual(redirectTargets('cat <<EOF > out.md\nhello > not-a-file\nEOF'), ['out.md']);
+  // With the session's folder: full paths, after any cd the command made first; a cd it cannot follow drops the target.
+  assert.deepEqual(redirectTargets("cd /private/tmp/scratch && cat > dois.txt <<'EOF'\nx\nEOF", '/u/paper/learn'), ['/private/tmp/scratch/dois.txt']);
+  assert.deepEqual(redirectTargets('cd sub && echo > b.txt', '/u/p'), ['/u/p/sub/b.txt']);
+  assert.deepEqual(redirectTargets('cd $D && echo > e.txt', '/u/p'), []);
 });
 
 test('headline keeps the first real sentence and drops headings and markdown', () => {
@@ -397,4 +404,30 @@ test('Codex and Gemini take up a round, are pushed on when they stop, and are he
     assert.match(why, /turned Autopilot off/);
     assert.equal(run(agent, sid, { hook_event_name: tool, tool_name: own, tool_input: { title: 'Stopped at login' } }), null); // it may log where it stopped
   }
+});
+
+test('a file an agent writes in its scratchpad or /tmp is not a change to the project; a project kept in a temp folder still is', () => {
+  assert.equal(isScratch('/private/tmp/claude-501/x/scratchpad/dois.txt', '/Users/me/paper'), true);
+  assert.equal(isScratch('/var/folders/ab/T/tc-x/paper/a.md', '/private/var/folders/ab/T/tc-x/paper'), false);
+  assert.equal(isScratch('/Users/me/paper/a.md', '/Users/me/paper'), false);
+});
+
+test('a headline keeps the underscores in file names and drops only _emphasis_', () => {
+  assert.equal(headline('Bin，分层阅读清单已经写好：learning_si_contact_lifetime/reading_list.md'), 'Bin，分层阅读清单已经写好：learning_si_contact_lifetime/reading_list.md');
+  assert.equal(headline('This is _really_ done and __bold__ too.'), 'This is really done and bold too.');
+});
+
+test('what a turn produced: files still there at its end, in the project, not ignored by git; the ones its reply names first', () => {
+  const s = sandbox();
+  fs.writeFileSync(path.join(s.repo, '.gitignore'), 'run.log\n');
+  for (const f of ['notes.md', 'reading_list.md', 'run.log']) fs.writeFileSync(path.join(s.repo, f), 'x');
+  // check.py was written and deleted again (a draft); run.log is ignored by git.
+  assert.deepEqual(outputs(['notes.md', 'check.py', 'run.log', 'reading_list.md'], s.repo, 'The list is in reading_list.md.'), ['reading_list.md', 'notes.md']);
+  // Written in a scratchpad: never reaches the turn's files.
+  s.fire('UserPromptSubmit', { prompt: 'Collect DOIs', prompt_id: 'p1' });
+  s.fire('PostToolUse', { tool_name: 'Bash', tool_use_id: 'u1', tool_input: { command: "cd /private/tmp/pad && cat > dois.txt <<'EOF'\n10.1/x\nEOF" }, tool_response: { stdout: '' } });
+  s.fire('PostToolUse', { tool_name: 'Write', tool_use_id: 'u2', tool_input: { file_path: '/private/tmp/pad/todo.txt' }, tool_response: {} });
+  s.fire('PostToolUse', { tool_name: 'Write', tool_use_id: 'u3', tool_input: { file_path: path.join(s.repo, 'reading_list.md') }, tool_response: {} });
+  s.fire('Stop', { last_assistant_message: 'The reading list is in reading_list.md.', prompt_id: 'p1' });
+  assert.deepEqual(s.commits().find(c => c.kind === 'agent').files, ['reading_list.md']);
 });

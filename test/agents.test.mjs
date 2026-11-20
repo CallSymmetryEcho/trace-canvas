@@ -50,6 +50,7 @@ test('a Codex session is recorded as Codex, with its own resume command and a "n
   assert.deepEqual([live.agent, live.agentKey, live.resume, live.status], ['Codex', 'codex', 'codex resume cx1', 'waiting']);
   fire('PostToolUse', { tool_name: 'apply_patch', tool_use_id: 'u2', tool_input: { command: ['apply_patch', '*** Begin Patch\n*** Add File: export.js\n*** End Patch'] } });
   fire('PostToolUse', { tool_name: 'shell', tool_use_id: 'u3', tool_input: { command: ['bash', '-lc', 'git commit -am "CSV export"'] }, tool_response: '[main 9f8e7d6] CSV export\n 1 file changed' });
+  fs.writeFileSync(path.join(s.repo, 'export.js'), 'export {};'); // what the patch added
   fire('Stop', { last_assistant_message: 'Added the CSV export.' });
   const cs = Object.values(readData(s.env).commits).sort((a, b) => a.ts - b.ts);
   assert.deepEqual(cs.map(c => [c.title, c.agent]), [
@@ -63,6 +64,7 @@ test('a real Codex 0.164 session replays into the right records (test/fixtures/c
   const s = sandbox();
   const lines = fs.readFileSync(new URL('./fixtures/codex/session.jsonl', import.meta.url), 'utf8').trim().split('\n');
   let waiting;
+  fs.writeFileSync(path.join(s.repo, 'notes.md'), '# notes'); // what its apply_patch wrote
   for (const l of lines) {
     const p = normalize('codex', JSON.parse(l.replaceAll('/work/codex-probe', s.repo)));
     handleHook(p, s.env);

@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { gitEvents, commandDir, redirectTargets, BASH_WRITES, EDIT_TOOLS, cleanPrompt } from './git-events.mjs';
+import { gitEvents, commandDir, redirectTargets, isScratch, BASH_WRITES, EDIT_TOOLS, cleanPrompt } from './git-events.mjs';
 import { listLive } from './live.mjs';
 
 export function projectsRoot(env = process.env) {
@@ -134,9 +134,9 @@ export function parseTranscript(file) {
         else if (b.type === 'tool_use') {
           const input = b.input || {};
           pending.set(b.id, { name: b.name, input });
-          if (EDIT_TOOLS.has(b.name)) { const f = input.file_path || input.notebook_path; if (f && !turn.files.includes(f)) turn.files.push(f); }
+          if (EDIT_TOOLS.has(b.name)) { const f = input.file_path || input.notebook_path; if (f && !isScratch(f, j.cwd || s.cwd || '') && !turn.files.includes(f)) turn.files.push(f); }
           else if (b.name === 'Bash') {
-            const targets = redirectTargets(input.command || '');
+            const targets = redirectTargets(input.command || '', j.cwd || s.cwd || '').filter(f => !isScratch(f, j.cwd || s.cwd || ''));
             for (const f of targets) if (!turn.files.includes(f)) turn.files.push(f);
             if (targets.length || BASH_WRITES.test(input.command || '')) turn.actions++;
           } else if (b.name === 'TodoWrite' && Array.isArray(input.todos)) {

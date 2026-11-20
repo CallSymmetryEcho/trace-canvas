@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { q } from './agents.mjs';
 import { ARGS, otherMachines } from './remote.mjs';
-import { readConfig } from './store.mjs';
+import { home as dataHome, readConfig } from './store.mjs';
 
 const SHA = /^[0-9a-f]{7,40}$/;
 const CAP = 200 * 1024; // one diff
@@ -210,40 +210,86 @@ export async function explainCommit(d, id, lang, ask) {
 }
 
 const home = p => p.replace(/^~(?=\/|$)/, os.homedir());
-const linked = (d, p) => Object.values(d.commits || {}).some(c => (c.links || []).some(l => String(l).trim() === p));
+const links = (c, p) => (c.links || []).some(l => String(l).trim() === p);
+const isFile = f => { try { return fs.statSync(f).isFile(); } catch { return false; } };
+// A file a record changed opens when it is a report or an image; code and data an agent touched are read only when linked.
+const CHANGED = /\.(md|markdown|txt|png|jpe?g|gif|webp|svg)$/i;
+const MACHINE = /^[A-Za-z0-9][\w.-]*$/; // an ssh alias, never an option
+/**
+ * Where a file a record names is. The page reads nothing else: a path some record links, or (with rec) one that
+ * record lists among its changed files. A relative path is looked for from the session's folder upward (the hooks
+ * note changed files from the repository's root). Returns { file } here; { file, from, at, away } for a copy pulled
+ * from the machine that wrote the record; { error: 'away', away } when only that machine has it; or { error }.
+ * away: { machine, there (the path on it, or null), cwd, p, copy (where the pulled copy is kept) }.
+ */
+function place(d, p, rec, env) {
+  const c = rec ? d.commits[rec] : Object.values(d.commits || {}).find(x => links(x, p));
+  if (!c || !(links(c, p) || (rec && CHANGED.test(p) && (c.files || []).includes(p)))) return { error: 'unlinked' };
+  const s = (d.sessions || {})[c.session], cwd = (s && s.cwd) || '', abs = /^[/~]/.test(p);
+  const machine = c.machine || (s && s.machine) || '', here = !machine || machine === readConfig(env).machine;
+  if (abs) { if (isFile(home(p))) return { file: home(p) }; }
+  else if (here && path.isAbsolute(cwd)) for (let dir = cwd; ; dir = path.dirname(dir)) {
+    if (isFile(path.join(dir, p))) return { file: path.join(dir, p) };
+    if (dir === path.dirname(dir)) break;
+  }
+  if (here || !MACHINE.test(machine) || !(abs || cwd)) return { error: 'missing' };
+  const root = path.join(dataHome(env), 'files', machine), copy = path.join(root, (abs ? p : path.posix.join(cwd, p)).replace(/^~/, '_home'));
+  if (!copy.startsWith(root + path.sep)) return { error: 'missing' };
+  const away = { machine, p, cwd, abs, copy };
+  return isFile(copy) ? { file: copy, from: machine, at: fs.statSync(copy).mtimeMs, away } : { error: 'away', machine, away };
+}
+/** Pulls a file only another machine has (place() says which) over ssh, key login only, into this computer's copy. { ok } or { error }. */
+export function pullFile(d, want, rec, env = process.env) {
+  const p = String(want || '').trim(), at = place(d, p, rec, env), a = at.away, cap = 10 << 20;
+  if (!a) return Promise.resolve(at.error ? { error: at.error } : { ok: true });
+  const f = v => (v.startsWith('~/') ? `"$HOME"/${q(v.slice(2))}` : q(v));
+  const sh = a.abs ? `[ -f ${f(p)} ] && exec head -c ${cap + 1} ${f(p)}; exit 3`
+    : `d=${q(a.cwd)}; while :; do [ -f "$d"/${q(p)} ] && exec head -c ${cap + 1} "$d"/${q(p)}; [ "$d" = / ] && exit 3; d=$(dirname "$d"); done`;
+  return new Promise(resolve => execFile('ssh', [...ARGS, a.machine, sh], { timeout: 30000, maxBuffer: cap + 2, encoding: 'buffer' }, (e, out) => {
+    if (e) return resolve({ error: e.code === 3 ? 'gone' : 'pull', machine: a.machine });
+    if (out.length > cap) return resolve({ error: 'bigImg' });
+    fs.mkdirSync(path.dirname(a.copy), { recursive: true });
+    fs.writeFileSync(a.copy, out);
+    resolve({ ok: true });
+  }));
+}
 /** A local text file a record links (a report: .md, .markdown, .txt; or data and code a research card traces to: .csv, .tsv, .json,
- * .py, .r), as text for the page, or an error code. Only a path some record links is read, so the page cannot read anything else;
- * ~ is the home folder. */
+ * .py, .r), or with rec a report that record changed, as text for the page, or an error code; ~ is the home folder.
+ * from / at: it is this computer's copy of another machine's file, pulled then. */
 export const TEXT_FILE = /\.(md|markdown|txt|csv|tsv|json|py|r)$/i;
-export function readLinkedMd(d, want) {
+export function readLinkedMd(d, want, rec, env = process.env) {
   const p = String(want || '').trim();
   if (!TEXT_FILE.test(p)) return { error: 'type' };
-  if (!linked(d, p)) return { error: 'unlinked' };
+  const at = place(d, p, rec, env);
+  if (at.error) return { error: at.error, ...(at.machine ? { machine: at.machine } : {}) };
   try {
-    const file = home(p), st = fs.statSync(file);
-    if (st.size > 2 << 20) return { error: 'big' };
-    return { text: fs.readFileSync(file, 'utf8') };
+    if (fs.statSync(at.file).size > 2 << 20) return { error: 'big' };
+    return { text: fs.readFileSync(at.file, 'utf8'), ...(at.from ? { from: at.from, at: at.at } : {}) };
   } catch { return { error: 'missing' }; }
 }
 
 const IMG = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml' };
 /** An image for the reader: one a record links, or (with from) one a linked .md report shows as ![alt](src), a relative src
  * taken from the report's folder. Nothing else is read; 10 MB at most. Returns { type, data } or { error }. */
-export function readLinkedImage(d, want, from) {
+export function readLinkedImage(d, want, from, rec, env = process.env) {
   const p = String(want || '').trim(), type = IMG[((/\.(\w+)$/.exec(p) || [])[1] || '').toLowerCase()];
   if (!type) return { error: 'type' };
-  let file = home(p);
+  let file, more = {};
   if (from) {
-    const md = readLinkedMd(d, from);
+    const md = readLinkedMd(d, from, rec, env);
     if (md.error) return md;
     if (![...md.text.matchAll(/!\[[^\]]*\]\(\s*<?([^\s)>]+)>?(?:\s+"[^"]*")?\s*\)/g)].some(m => m[1] === p)) return { error: 'unlinked' };
     let src = p; try { src = decodeURI(p); } catch {}
     file = /^[/~]/.test(src) ? home(src) : path.resolve(path.dirname(home(String(from).trim())), src);
-  } else if (!linked(d, p)) return { error: 'unlinked' };
+  } else {
+    const at = place(d, p, rec, env);
+    if (at.error) return { error: at.error, ...(at.machine ? { machine: at.machine } : {}) };
+    file = at.file; if (at.from) more = { from: at.from, at: at.at };
+  }
   try {
     const st = fs.statSync(file);
     if (!st.isFile()) return { error: 'missing' };
     if (st.size > 10 << 20) return { error: 'bigImg' };
-    return { type, data: fs.readFileSync(file) };
+    return { type, data: fs.readFileSync(file), ...more };
   } catch { return { error: 'missing' }; }
 }

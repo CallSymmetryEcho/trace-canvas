@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { readLinkedImage, readLinkedMd } from '../src/git-view.mjs';
+import { pullFile, readLinkedImage, readLinkedMd } from '../src/git-view.mjs';
 
 // The page's own Markdown renderer, taken out of app/index.html between its markers.
 const page = fs.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
@@ -103,4 +103,37 @@ test('code in a diff is coloured by language: keywords, strings, comments, numbe
   assert.equal(hlLine('if [ -f x ]; then echo "hi" # c', 'sh'), '<i class="hk">if</i> [ -f x ]; <i class="hk">then</i> echo <i class="hs">&quot;hi&quot;</i><i class="hc"> # c</i>');
   assert.equal(hlLine('<b>x</b> const', ''), '&lt;b&gt;x&lt;/b&gt; const'); // an unknown language stays plain
   assert.deepEqual(['a/b.MJS', 'x.css', 'Makefile', 'p.lock'].map(hlLang), ['js', 'css', '', '']);
+});
+
+test('a report a record changed opens from that record, and one only another machine has is pulled into a copy', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-pull-')), env = { ...process.env, TRACE_CANVAS_HOME: path.join(root, 'home'), TRACE_CANVAS_MACHINE: 'here' };
+  const repo = path.join(root, 'repo'), there = path.join(root, 'there'); // `there` stands for the other machine's disk
+  fs.mkdirSync(path.join(repo, 'sub', 'deep'), { recursive: true }); fs.mkdirSync(path.join(there, 'proj', 'sub'), { recursive: true });
+  fs.writeFileSync(path.join(repo, 'reports.md'), '# Here'); fs.writeFileSync(path.join(repo, 'key.json'), '{}');
+  fs.writeFileSync(path.join(there, 'proj', 'far.md'), '# Far'); fs.writeFileSync(path.join(there, 'abs.md'), '# Abs');
+  const d = { commits: {
+    a: { id: 'a', session: 's1', machine: 'here', links: [], files: ['reports.md', 'key.json'] },
+    b: { id: 'b', session: 's2', machine: 'mac', links: [], files: ['far.md', path.join(there, 'abs.md'), 'nope.md'] },
+    c: { id: 'c', session: 's3', machine: '-oProxyCommand=x', links: [], files: ['far.md'] },
+  }, sessions: { s1: { id: 's1', cwd: path.join(repo, 'sub', 'deep') }, s2: { id: 's2', cwd: path.join(there, 'proj', 'sub') }, s3: { id: 's3', cwd: there } } };
+  assert.deepEqual(readLinkedMd(d, 'reports.md', 'a', env), { text: '# Here' }); // found from the session's folder upward
+  assert.equal(readLinkedMd(d, 'reports.md', null, env).error, 'unlinked'); // not without the record
+  assert.equal(readLinkedMd(d, 'key.json', 'a', env).error, 'unlinked'); // changed, but data: only when linked
+  assert.equal(readLinkedMd(d, 'reports.md', 'b', env).error, 'unlinked'); // another record's file
+  assert.deepEqual(readLinkedMd(d, 'far.md', 'b', env), { error: 'away', machine: 'mac' });
+  assert.equal(readLinkedMd(d, 'far.md', 'c', env).error, 'missing'); // a machine name that is not a plain name is never called
+  // A stand-in ssh that runs the command here: what the other machine would be asked to run.
+  const bin = path.join(root, 'bin'), old = process.env.PATH;
+  fs.mkdirSync(bin); fs.writeFileSync(path.join(bin, 'ssh'), '#!/bin/sh\nfor a; do last=$a; done\nexec /bin/sh -c "$last"\n', { mode: 0o755 });
+  process.env.PATH = `${bin}:${old}`;
+  try {
+    assert.deepEqual(await pullFile(d, 'far.md', 'b', env), { ok: true });
+    assert.deepEqual(await pullFile(d, path.join(there, 'abs.md'), 'b', env), { ok: true });
+    assert.deepEqual(await pullFile(d, 'nope.md', 'b', env), { error: 'gone', machine: 'mac' });
+    assert.equal((await pullFile(d, 'key.json', 'a', env)).error, 'unlinked');
+  } finally { process.env.PATH = old; }
+  const got = readLinkedMd(d, 'far.md', 'b', env);
+  assert.equal(got.text, '# Far'); assert.equal(got.from, 'mac'); assert.ok(got.at > 0);
+  assert.equal(readLinkedMd(d, path.join(there, 'abs.md'), 'b', env).text, '# Abs');
+  assert.ok(fs.existsSync(path.join(root, 'home', 'files', 'mac', there, 'proj', 'sub', 'far.md'))); // kept under the data folder, by machine
 });

@@ -1429,7 +1429,7 @@ apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent 
     gxChanges: 'Changes', gxLoading: 'Reading from git…', gxNoRepo: 'This repository is not on this computer.', gxNoRepoOn: m => `This repository is on ${m}, not on this computer.`, gxNoCommit: 'This commit is no longer in its repository (rewritten or cleaned up).',
     gxLine: n => `line ${n}`, gxOnly: 'Changed lines only', gxExplain: 'Have your local Claude explain each file in a sentence', gxExplaining: 'Your local Claude is reading this commit… (about a minute)', gxPrev: 'Previous file', gxNext: 'Next file', gxRole_test: 'test', gxRole_doc: 'docs', gxRole_gen: 'generated', gxFiles: n => `${n} file${n === 1 ? '' : 's'}`, gxMore: n => `${n} more`, gxQuiet: n => `${n} binary or generated`, gxBinary: 'binary',
     gxCompare: 'Compare with', gxThisOnly: 'this commit only', gxOtherRepo: 'That station is in another repository.', gxTruncated: 'Cut at 200 KB.',
-    gxLater: 'Committed later in', gxUncommitted: 'Not committed yet.', copyResume: 'Copy resume command', resumeHere: () => 'Resume in a terminal', resumeThere: m => `Resume on ${m} (ssh · tmux)`, lineSessionsHint: 'Resume one to keep working on this line instead of starting a new session.', liveBadge: (n, w) => `${n} running${w ? `, ${w} need${w === 1 ? 's' : ''} you` : ''}`,
+    gxLater: 'Committed later in', gxUncommitted: 'Not committed yet.', fileAway: m => `This file is on ${m}; this computer has no copy yet.`, filePull: m => `Pull it from ${m}`, filePulling: 'Pulling…', fileFrom: (m, when) => `A copy from ${m}, pulled ${when}`, fileRepull: 'Pull again', mdErr_pull: 'Could not pull it: the other computer is off or cannot be reached.', mdErr_gone: 'The file is not on the other computer any more.', copyResume: 'Copy resume command', resumeHere: () => 'Resume in a terminal', resumeThere: m => `Resume on ${m} (ssh · tmux)`, lineSessionsHint: 'Resume one to keep working on this line instead of starting a new session.', liveBadge: (n, w) => `${n} running${w ? `, ${w} need${w === 1 ? 's' : ''} you` : ''}`,
     tBound: n => `Bound to “${n}”`, tUnbound: 'Back to the repository and branch line',
     actorHuman: 'You', actorAgent: 'Agent', liveTipTime: 'now',
     goalsBtn: 'Goals', goalsBtnTitle: 'Goals and to-dos of every line', goalsTitle: 'Goals and to-dos',
@@ -1611,7 +1611,7 @@ apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的
     gxChanges: '改动', gxLoading: '正在从 git 读取…', gxNoRepo: '这台电脑上没有这个仓库。', gxNoRepoOn: m => `这个仓库在 ${m} 上，这台电脑上没有。`, gxNoCommit: '仓库里已经没有这个提交，可能被改写或清理了。',
     gxLine: n => `第 ${n} 行`, gxOnly: '只看改动的行', gxExplain: '让本机的 Claude 给每个文件写一句说明', gxExplaining: '本机的 Claude 正在读这次提交…（一分钟左右）', gxPrev: '上一个文件', gxNext: '下一个文件', gxRole_test: '测试', gxRole_doc: '文档', gxRole_gen: '生成', gxFiles: n => `${n} 个文件`, gxMore: n => `还有 ${n} 个`, gxQuiet: n => `${n} 个二进制或生成文件`, gxBinary: '二进制',
     gxCompare: '对比', gxThisOnly: '只看这次提交', gxOtherRepo: '那个站点不在同一个仓库。', gxTruncated: '超过 200 KB，已截断。',
-    gxLater: '之后提交于', gxUncommitted: '尚未提交。', copyResume: '复制恢复命令', resumeHere: () => '在终端里恢复', resumeThere: m => `在 ${m} 上恢复（ssh · tmux）`, lineSessionsHint: '恢复其中一个就能接着在这条线上做，不用新开会话。', liveBadge: (n, w) => `${n} 个运行中${w ? `，${w} 个等你` : ''}`,
+    gxLater: '之后提交于', gxUncommitted: '尚未提交。', fileAway: m => `这个文件在 ${m} 上，这台电脑还没有副本。`, filePull: m => `从 ${m} 拉取`, filePulling: '正在拉取…', fileFrom: (m, when) => `来自 ${m} 的副本，拉取于 ${when}`, fileRepull: '重新拉取', mdErr_pull: '没拉到：另一台电脑没开机或连不上。', mdErr_gone: '另一台电脑上已经没有这个文件了。', copyResume: '复制恢复命令', resumeHere: () => '在终端里恢复', resumeThere: m => `在 ${m} 上恢复（ssh · tmux）`, lineSessionsHint: '恢复其中一个就能接着在这条线上做，不用新开会话。', liveBadge: (n, w) => `${n} 个运行中${w ? `，${w} 个等你` : ''}`,
     tBound: n => `已绑定到「${n}」`, tUnbound: '已改回按仓库和分支自动归线',
     actorHuman: '你', actorAgent: 'Agent', liveTipTime: '此刻',
     goalsBtn: '目标', goalsBtnTitle: '每条线的目标和待办', goalsTitle: '目标和待办',
@@ -3654,39 +3654,52 @@ function mdHTML(src) {
   return out.join('');
 }
 // </md>
-function openReader(title, md, src, html) {
+function openReader(title, md, src, html, note) {
   S.sheet = 'read'; document.body.classList.add('sheet-open', 'read-page'); document.body.classList.remove('goals-page');
   S.gxRead = null; // set again by gxRead when the reader shows a commit's file
   for (const u of S.readBlobs || []) URL.revokeObjectURL(u);
   S.readBlobs = [];
   mdImgFrom = src || '';
-  try { setSheet(title, `${src ? `<div class="md-src">${esc(src)}</div>` : ''}<article class="md md-read">${html || (md === null ? `<p>${esc(t('gxLoading'))}</p>` : mdHTML(md))}</article>`); } finally { mdImgFrom = null; }
+  try { setSheet(title, `${src ? `<div class="md-src">${esc(src)}</div>` : ''}${note || ''}<article class="md md-read">${html || (md === null ? `<p>${esc(t('gxLoading'))}</p>` : mdHTML(md))}</article>`); } finally { mdImgFrom = null; }
   $('#sheet-body').scrollTop = 0;
   // A report's own images, fetched when the report opens, under the report's rule (src/git-view.mjs readLinkedImage).
-  for (const img of $$('#sheet-body img[data-img]')) imgBlob(img.dataset.img, src).then(r => { if (r.url) { S.readBlobs.push(r.url); img.src = r.url; } else img.outerHTML = `<span class="md-img-err">${esc(img.alt || img.dataset.img)}: ${esc(mdErr(r.error))}</span>`; });
+  for (const img of $$('#sheet-body img[data-img]')) imgBlob(img.dataset.img, src, S.readFor && S.readFor.path === src ? S.readFor.rec : '').then(r => { if (r.url) { S.readBlobs.push(r.url); img.src = r.url; } else img.outerHTML = `<span class="md-img-err">${esc(img.alt || img.dataset.img)}: ${esc(mdErr(r.error))}</span>`; });
 }
 const mdErr = e => (t('mdErr_' + e) === 'mdErr_' + e ? e : t('mdErr_' + e));
-async function imgBlob(path, from) {
-  const q = `path=${encodeURIComponent(path)}${from ? `&from=${encodeURIComponent(from)}` : ''}`;
+async function imgBlob(path, from, rec) {
+  const q = `path=${encodeURIComponent(path)}${from ? `&from=${encodeURIComponent(from)}` : ''}${rec ? `&record=${encodeURIComponent(rec)}` : ''}`;
   try {
     const r = await fetch(`/api/img?${q}`, { headers: { 'X-Trace-Canvas': '1' }, cache: 'no-store' });
-    if (/json/.test(r.headers.get('content-type') || '')) return { error: (await r.json()).error };
+    if (/json/.test(r.headers.get('content-type') || '')) return await r.json();
     const blob = await r.blob();
-    return { url: URL.createObjectURL(blob), blob }; // the reader revokes it when it shows something else
+    return { url: URL.createObjectURL(blob), blob, from: r.headers.get('x-from-machine'), at: Number(r.headers.get('x-pulled-at')) }; // the reader revokes it when it shows something else
   } catch { return { error: t('syncOfflineTitle') }; }
 }
-async function viewImage(path) {
+// A file only another machine has: the reader says where it is and offers to pull it; a pulled copy says where it came from.
+const pullBtn = (label, path, rec, img) => `<button class="${label === t('fileRepull') ? 'linkish' : 'btn'}" data-act="pull-file" data-path="${esc(path)}" data-rec="${esc(rec || '')}" ${img ? 'data-img="1"' : ''}>${esc(label)}</button>`;
+const awayHTML = (r, path, rec, img) => `<blockquote><p>${esc(r.error === 'away' ? t('fileAway', r.machine) : mdErr(r.error))}</p></blockquote>${r.machine ? `<p>${pullBtn(t('filePull', r.machine), path, rec, img)}</p>` : ''}`;
+const fromNote = (r, path, rec, img) => (r.from ? `<div class="md-src">${esc(t('fileFrom', r.from, fmtAbs(r.at)))} ${pullBtn(t('fileRepull'), path, rec, img)}</div>` : '');
+async function viewImage(path, rec) {
   const name = path.split('/').pop();
   openReader(name, null, path);
-  const r = await imgBlob(path);
+  const r = await imgBlob(path, '', rec);
   if (S.sheet !== 'read') { if (r.url) URL.revokeObjectURL(r.url); return; }
-  openReader(name, null, path, r.url ? `<img src="${r.url}" alt="${esc(name)}">` : `<blockquote><p>${esc(mdErr(r.error))}</p></blockquote>`);
+  openReader(name, null, path, r.url ? `<img src="${r.url}" alt="${esc(name)}">` : awayHTML(r, path, rec, true), fromNote(r, path, rec, true));
   if (r.url) S.readBlobs.push(r.url);
 }
-async function readFile(path) {
+async function readFile(path, rec) {
+  S.readFor = { path, rec }; // its images are read under the same record's rule
   openReader(path.split('/').pop(), null, path);
-  const r = await fetch(`/api/md?path=${encodeURIComponent(path)}`, { headers: { 'X-Trace-Canvas': '1' }, cache: 'no-store' }).then(x => x.json()).catch(() => ({ error: t('syncOfflineTitle') }));
-  if (S.sheet === 'read') openReader(path.split('/').pop(), r.error ? `> ${mdErr(r.error)}` : r.text, path, !r.error && !/\.(md|markdown)$/i.test(path) ? `<pre class="md-txt">${esc(r.text)}</pre>` : undefined);
+  const r = await fetch(`/api/md?path=${encodeURIComponent(path)}${rec ? `&record=${encodeURIComponent(rec)}` : ''}`, { headers: { 'X-Trace-Canvas': '1' }, cache: 'no-store' }).then(x => x.json()).catch(() => ({ error: t('syncOfflineTitle') }));
+  if (S.sheet === 'read') openReader(path.split('/').pop(), r.error ? null : r.text, path, r.error ? awayHTML(r, path, rec) : !/\.(md|markdown)$/i.test(path) ? `<pre class="md-txt">${esc(r.text)}</pre>` : undefined, fromNote(r, path, rec));
+}
+async function pullFileHere(b) {
+  const { path, rec, img } = b.dataset;
+  b.disabled = true; b.textContent = t('filePulling');
+  const r = await postJSON('/api/pull', { path, record: rec || null });
+  if (S.sheet !== 'read') return;
+  if (r.error) return openReader(path.split('/').pop(), null, path, awayHTML(r, path, rec, img));
+  (img ? viewImage : readFile)(path, rec || undefined);
 }
 const delUI = q => S.ui.del
   ? `<span class="confirm">${esc(q)}</span><button class="btn btn-danger" data-act="del-confirm">${esc(t('del'))}</button><button class="btn" data-act="del-cancel">${esc(t('cancel'))}</button>`
@@ -3794,8 +3807,11 @@ function changesHTML(c) {
   if (!gitSha(c)) {
     // An agent turn: its files may not be committed yet; point at the session's next commit if there is one.
     if (!c.files || !c.files.length || !c.session) return '';
+    // Its reports and images open from here (the server reads only these types of a record's changed files).
+    const open = (f, act, label) => `<button class="linkish" data-act="${act}" data-path="${esc(f)}" data-rec="${esc(c.id)}">${esc(t(label))}</button>`;
+    const list = `<div class="links">${c.files.map(f => `<div><code>${esc(f)}</code>${/\.(md|markdown|txt)$/i.test(f) ? open(f, 'read-file', 'mdRead') : isImgPath(f) ? open(f, 'view-img', 'mdView') : ''}</div>`).join('')}</div>`;
     const later = [...S.commits.values()].filter(x => x.session === c.session && gitSha(x) && x.ts >= c.ts).sort((a, b) => a.ts - b.ts)[0];
-    return head + `<p class="gx-note">${later ? `${esc(t('gxLater'))} <button class="linkish" data-act="goto-commit" data-cid="${esc(later.id)}">${esc(gitSha(later).slice(0, 7))}</button>` : esc(t('gxUncommitted'))}</p>`;
+    return head + list + `<p class="gx-note">${later ? `${esc(t('gxLater'))} <button class="linkish" data-act="goto-commit" data-cid="${esc(later.id)}">${esc(gitSha(later).slice(0, 7))}</button>` : esc(t('gxUncommitted'))}</p>`;
   }
   const against = GX.against.get(c.id) || '', key = `${c.id}|${against}`, q = `record=${encodeURIComponent(c.id)}${against ? `&against=${encodeURIComponent(against)}` : ''}`;
   const info = gxGet(GX.info, key, `/api/git/commit?${q}`);
@@ -4302,7 +4318,7 @@ detail.addEventListener('click', e => {
     case 'body-edit': S.ui = { edit: true, editBody: true }; S.focusAfter = '#d-body'; render(); break;
     case 'body-done': S.ui = {}; render(); break;
     case 'read-body': { const c = S.commits.get(s.id); if (c) openReader(c.title, c.body || ''); break; }
-    case 'read-file': readFile(b.dataset.path); break;
+    case 'read-file': readFile(b.dataset.path, b.dataset.rec); break;
     case 'rs-point': S.ui.rsOpen = true; rsTrace(S.commits.get(s.id), +b.dataset.k); break;
     case 'rs-run': { // once by default; a control from the same version. The key makes a retried click return the run it started.
       const c = S.commits.get(s.id), R = c.research, wb = ($('#rs-wb', detail) || {}).value, mode = b.dataset.mode;
@@ -4320,7 +4336,7 @@ detail.addEventListener('click', e => {
       postJSON('/api/research/return', { card: s.id, run: id, session, folder }).then(r => toast(r.error ? rsErr(r.error) : t('tRsReturned')));
       break;
     }
-    case 'view-img': viewImage(b.dataset.path); break;
+    case 'view-img': viewImage(b.dataset.path, b.dataset.rec); break;
     case 'del-confirm':
       if (s.type === 'commit') removeDoc('commits', s.id);
       else if (s.type === 'thread') deleteThread(s.id);
@@ -5031,6 +5047,7 @@ function handCommand(c) {
 }
 const sheetBody = $('#sheet-body');
 // In the reader on a commit's file, ‹ and › turn the page, and so does a swipe mostly sideways: left to the next file, right to the previous one.
+sheetBody.addEventListener('click', e => { const b = e.target.closest('[data-act="pull-file"]'); if (b) pullFileHere(b); });
 sheetBody.addEventListener('click', e => { const b = e.target.closest('[data-act="gx-page"]'); if (b && S.gxRead) gxRead(S.gxRead.dks, S.gxRead.i + Number(b.dataset.d), Number(b.dataset.d)); });
 { let sx = 0, sy = 0;
   sheetBody.addEventListener('touchstart', e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, { passive: true });

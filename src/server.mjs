@@ -18,7 +18,7 @@ import { applyRetro, askAgent, retroRecord, runRetro } from './retro.mjs';
 import { AGENTS, focusTab, launchRow, openTerminal, terminalCommand } from './agents.mjs';
 import { draftLessons, rememberLesson } from './lessons.mjs';
 import { otherMachines, remoteLive } from './remote.mjs';
-import { commitDiff, commitInfo, explainCommit, readLinkedImage, readLinkedMd } from './git-view.mjs';
+import { commitDiff, commitInfo, explainCommit, pullFile, readLinkedImage, readLinkedMd } from './git-view.mjs';
 import { autopilotSig, runSync, syncSoon, syncStatus } from './sync.mjs';
 import { doctor } from './doctor.mjs';
 import { createCard, refreshCard, resumeCommand, returnRun, startRun, workbenches } from './research.mjs';
@@ -143,15 +143,20 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
       // cannot be used to read anything else on the computer.
       if (req.method === 'GET' && p === '/api/md') {
         if (req.headers['x-trace-canvas'] !== '1') return send(res, 403, { error: 'missing header' });
-        return send(res, 200, readLinkedMd(readData(), url.searchParams.get('path')));
+        return send(res, 200, readLinkedMd(readData(), url.searchParams.get('path'), url.searchParams.get('record')));
       }
       // An image for the reader: one a record links, or one a linked report shows (same rule as above).
       if (req.method === 'GET' && p === '/api/img') {
         if (req.headers['x-trace-canvas'] !== '1') return send(res, 403, { error: 'missing header' });
-        const r = readLinkedImage(readData(), url.searchParams.get('path'), url.searchParams.get('from'));
+        const r = readLinkedImage(readData(), url.searchParams.get('path'), url.searchParams.get('from'), url.searchParams.get('record'));
         if (r.error) return send(res, 200, r);
-        res.writeHead(200, { 'Content-Type': r.type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox" });
+        res.writeHead(200, { ...(r.from ? { 'X-From-Machine': r.from, 'X-Pulled-At': String(Math.round(r.at)) } : {}), 'Content-Type': r.type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox" });
         return res.end(r.data);
+      }
+      // A file a record names that only the machine that wrote it has: pulled over ssh into this computer's copy (the same rule as above).
+      if (req.method === 'POST' && p === '/api/pull') {
+        const b = JSON.parse(await readBody(req));
+        return send(res, 200, await pullFile(readData(), b.path, b.record));
       }
       // What a commit record changed, read from git on demand (src/git-view.mjs).
       if (req.method === 'GET' && p === '/api/git/commit') return send(res, 200, await commitInfo(readData(), url.searchParams.get('record'), url.searchParams.get('against')));

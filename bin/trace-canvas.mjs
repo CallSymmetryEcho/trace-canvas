@@ -534,28 +534,37 @@ async function main() {
     case 'update': {
       // The newest version: a fast-forward of this clone (git refuses when local changes are in the way), skill copies
       // refreshed where they are copies rather than links, and the page server restarted on its port if one runs.
-      const root = path.join(path.dirname(SELF), '..'), check = !!flag('check', false);
+      // --restart: only restart a page server older than this clone (the server asks for it after a pull it did not make).
+      const root = path.join(path.dirname(SELF), '..'), check = !!flag('check', false), restartOnly = !!flag('restart', false);
       const git = (...a) => execFileSync('git', ['-C', root, ...a], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
       const why = e => String((e && e.stderr) || (e && e.message) || e).trim().split('\n').pop();
       try { git('rev-parse', '--git-dir'); } catch { console.error('This copy is not a git clone: get the newest release from https://github.com/CallSymmetryEcho/trace-canvas/releases'); process.exit(1); }
-      try { git('fetch', '-q'); } catch (e) { console.error(`Could not reach the remote: ${why(e)}`); process.exit(1); }
-      const before = git('rev-parse', '--short', 'HEAD'), behind = Number(git('rev-list', '--count', 'HEAD..@{u}')) || 0;
-      if (!behind) { console.log(`Up to date (${before}).`); break; }
-      const news = git('log', '--oneline', '--no-merges', '-20', 'HEAD..@{u}');
-      if (check) { console.log(`${behind} new commit${behind === 1 ? '' : 's'}:\n${news}\nGet them with: trace-canvas update`); break; }
-      try { git('merge', '--ff-only', '-q', '@{u}'); } catch (e) {
-        // git's last line is only "Aborting": name the files in the way instead.
-        const files = String((e && e.stderr) || '').split('\n').filter(l => l.startsWith('\t')).map(l => l.trim());
-        console.error(files.length ? `Could not update: local changes in ${files.join(', ')} are in the way (commit or stash them, then update again)` : `Could not update: ${why(e)}`);
-        process.exit(1);
-      }
-      console.log(`Updated ${before} → ${git('rev-parse', '--short', 'HEAD')}:\n${news}`);
-      for (const d of [path.join(os.homedir(), '.claude', 'skills', 'trace-canvas'), path.join(os.homedir(), '.agents', 'skills', 'trace-canvas')]) {
-        try { if (!fs.lstatSync(d).isSymbolicLink()) fs.copyFileSync(path.join(root, 'skill', 'SKILL.md'), path.join(d, 'SKILL.md')); } catch {}
+      let behind = 0;
+      if (!restartOnly) {
+        try { git('fetch', '-q'); } catch (e) { console.error(`Could not reach the remote: ${why(e)}`); process.exit(1); }
+        const before = git('rev-parse', '--short', 'HEAD'); behind = Number(git('rev-list', '--count', 'HEAD..@{u}')) || 0;
+        if (!behind) console.log(`Up to date (${before}).`);
+        else {
+          const news = git('log', '--oneline', '--no-merges', '-20', 'HEAD..@{u}');
+          if (check) { console.log(`${behind} new commit${behind === 1 ? '' : 's'}:\n${news}\nGet them with: trace-canvas update`); break; }
+          try { git('merge', '--ff-only', '-q', '@{u}'); } catch (e) {
+            // git's last line is only "Aborting": name the files in the way instead.
+            const files = String((e && e.stderr) || '').split('\n').filter(l => l.startsWith('\t')).map(l => l.trim());
+            console.error(files.length ? `Could not update: local changes in ${files.join(', ')} are in the way (commit or stash them, then update again)` : `Could not update: ${why(e)}`);
+            process.exit(1);
+          }
+          console.log(`Updated ${before} → ${git('rev-parse', '--short', 'HEAD')}:\n${news}`);
+          for (const d of [path.join(os.homedir(), '.claude', 'skills', 'trace-canvas'), path.join(os.homedir(), '.agents', 'skills', 'trace-canvas')]) {
+            try { if (!fs.lstatSync(d).isSymbolicLink()) fs.copyFileSync(path.join(root, 'skill', 'SKILL.md'), path.join(d, 'SKILL.md')); } catch {}
+          }
+        }
+        if (check) break;
       }
       // The page server, if one runs: stopped, then started again from this clone on the same port.
       let srv = null;
       try { srv = JSON.parse(fs.readFileSync(path.join(home(), 'server.json'), 'utf8')); process.kill(srv.pid, 0); } catch { srv = null; }
+      // Nothing new came in: restart it only when it was started from older code (a pull made by hand or by an agent).
+      if (srv && !behind && srv.head === git('rev-parse', 'HEAD')) srv = null;
       // A systemd service restarts it itself; starting one here would take the port from it.
       // Only when the server is that service's main process (a terminal's own service must never be restarted).
       const sysctl = u => ['systemctl', ...(u.user ? ['--user'] : [])];

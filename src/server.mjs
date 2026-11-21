@@ -98,6 +98,17 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
   });
   checkUpdate();
   setInterval(checkUpdate, 12 * 3600e3).unref();
+  // A pull this server did not make (an agent's git pull) leaves it on old code: when src/ or bin/ changed since it started,
+  // trace-canvas update --restart starts it again on the same port (the page reloads by itself); a page-only change needs nothing.
+  const gitHead = () => { try { return spawnSync('git', ['-C', ROOT, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim(); } catch { return ''; } };
+  const HEAD0 = gitHead();
+  let restarting = false;
+  if (HEAD0 && !process.env.TRACE_CANVAS_NO_RESTART) setInterval(() => {
+    const now = gitHead();
+    if (restarting || !now || now === HEAD0 || spawnSync('git', ['-C', ROOT, 'diff', '--quiet', HEAD0, now, '--', 'src', 'bin']).status !== 1) return;
+    restarting = true;
+    spawn(process.execPath, [CLI, 'update', '--restart'], { detached: true, stdio: 'ignore' }).unref();
+  }, 60e3).unref();
   // The other machines' changes come in (and this one's go out) every 2 minutes; the page refreshes when data.json changes.
   setInterval(() => syncSoon(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'trace-canvas.mjs')), 120000).unref();
   // Other machines' running sessions, over ssh every 15 s while a page is open (src/remote.mjs); a change is a live event.
@@ -374,7 +385,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
     server.listen(port, host, () => {
       port = server.address().port;
       // Where it runs, so trace-canvas update can restart it on the same port.
-      try { fs.writeFileSync(path.join(home(), 'server.json'), JSON.stringify({ pid: process.pid, port })); } catch {}
+      try { fs.writeFileSync(path.join(home(), 'server.json'), JSON.stringify({ pid: process.pid, port, head: HEAD0 })); } catch {}
       // With phone access on, a second listener on the Tailscale address (never 0.0.0.0 unless set).
       const phone = readConfig().phone;
       if (!phone || !phone.bind) return resolve({ server, url: `http://localhost:${port}/`, ai });

@@ -112,9 +112,11 @@ test('a session resumes from the folder it started in, not one it cd-ed into lat
   // it is already there, -A), running the resume from the session's folder. Without tmux there, the plain resume.
   const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-tmux-'));
   fs.writeFileSync(path.join(bin, 'tmux'), '#!/bin/sh\nprintf "%s\\n" "$@"\n', { mode: 0o755 });
-  const there = PATH => execFileSync('/bin/sh', ['-c', `eval ${cmd.slice('ssh -t mac '.length)}`], { encoding: 'utf8', env: { HOME: bin, SHELL: '/bin/sh', PATH } });
+  // The login shell's profile is left out: on macOS path_helper puts /opt/homebrew/bin (a real tmux) before the stand-ins.
+  fs.writeFileSync(path.join(bin, 'nologin'), '#!/bin/sh\nshift\nexec /bin/sh -c "$1"\n', { mode: 0o755 });
+  const there = PATH => execFileSync('/bin/sh', ['-c', `eval ${cmd.slice('ssh -t mac '.length)}`], { encoding: 'utf8', env: { HOME: bin, SHELL: path.join(bin, 'nologin'), PATH } });
   assert.deepEqual(there(bin).trim().split('\n'), ['new-session', '-A', '-s', 'tc-s7', `cd '${s.repo}' && claude --resume s7`]);
-  fs.writeFileSync(path.join(bin, 'claude'), '#!/bin/sh\necho "plain $* in $PWD"\n', { mode: 0o755 }); fs.rmSync(path.join(bin, 'tmux'));
+  fs.writeFileSync(path.join(bin, 'claude'), '#!/bin/sh\necho "plain $* in $(pwd -P)"\n', { mode: 0o755 }); fs.rmSync(path.join(bin, 'tmux'));
   assert.equal(there(bin).trim(), `plain --resume s7 in ${fs.realpathSync(s.repo)}`);
   // Codex finds a session by its id anywhere: the folder first noted stays.
   handleHook({ session_id: 'c8', cwd: s.repo, transcript_path: path.join(s.root, 'rollout-c8.jsonl'), hook_event_name: 'UserPromptSubmit', prompt: 'Sort the receipts by date', _agent: 'codex' }, env);

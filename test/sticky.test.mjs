@@ -6,7 +6,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { bindSession, claimFolder, handleHook } from '../src/hook.mjs';
 import { bindLiveSession, findThreadLoose, mergeThreads, readThread, threadSessions } from '../src/ops.mjs';
-import { addCommit, createThread, emptyData, mutate, readData } from '../src/store.mjs';
+import { addCommit, createThread, emptyData, mutate, readData, regroup } from '../src/store.mjs';
 
 function sandbox() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-sticky-'));
@@ -209,4 +209,27 @@ test('after a merge that keeps the source line, its sessions and open to-dos go 
   assert.equal(of('open one').movedFrom, undefined);
   assert.equal(of('stays').thread, promo);
   assert.match(promptContext({ session_id: 'b', prompt: 'go on', cwd: s.repo }, s.env), /merge of your line was undone[^]*you work on the line "tripsplit"/);
+});
+
+test('a line that changes group takes its forks and the lines merged into it along', () => {
+  const env = { TRACE_CANVAS_HOME: fs.mkdtempSync(path.join(os.tmpdir(), 'tc-group-')) };
+  const ids = mutate(d => {
+    const mk = (name, extra) => createThread(d, { name, extra }).id;
+    const main = mk('main', { group: 'trip' }), other = mk('other', { group: 'trip' });
+    const fork = mk('fork', { group: 'trip', parent: main }), nested = mk('nested', { group: 'trip', parent: fork });
+    const placed = mk('placed', { group: 'elsewhere', parent: main });
+    const old = mk('old', { status: 'merged', mergedInto: main }), oldFork = mk('oldFork', { group: 'trip', parent: old });
+    const chained = mk('chained', { status: 'merged', mergedInto: old, group: 'stale' });
+    return { main, other, fork, nested, placed, old, oldFork, chained };
+  }, env);
+  const groups = () => Object.fromEntries(Object.entries(ids).map(([k, id]) => [k, readData(env).threads[id].group || '']));
+  // Merged lines are in the group of the line they lead to, even before anything moves.
+  assert.deepEqual(groups(), { main: 'trip', other: 'trip', fork: 'trip', nested: 'trip', placed: 'elsewhere', old: 'trip', oldFork: 'trip', chained: 'trip' });
+  mutate(d => { d.threads[ids.main].group = 'work'; regroup(d, ids.main, 'trip', 'work'); }, env);
+  assert.deepEqual(groups(), { main: 'work', other: 'trip', fork: 'work', nested: 'work', placed: 'elsewhere', old: 'work', oldFork: 'work', chained: 'work' });
+  mutate(d => { delete d.threads[ids.main].group; regroup(d, ids.main, 'work', ''); }, env);
+  assert.deepEqual(groups(), { main: '', other: 'trip', fork: '', nested: '', placed: 'elsewhere', old: '', oldFork: '', chained: '' });
+  const d = readData(env);
+  assert.equal(d.threads[ids.old].mergedInto, ids.main);
+  assert.equal(d.threads[ids.nested].parent, ids.fork);
 });

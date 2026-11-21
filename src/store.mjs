@@ -154,7 +154,20 @@ function follow(d, x, from, to, movable) {
   delete x[from]; delete x[to];
   return 'undone';
 }
+// A line's group change takes along the lines under it: lines merged into it always (they sit in its card), and its
+// forks that were in the group it left, so a fork someone put elsewhere stays there.
+export function regroup(d, id, from, to, seen = new Set([id])) {
+  for (const t of Object.values(d.threads)) {
+    const merged = t.status === 'merged' && t.mergedInto === id;
+    if (seen.has(t.id) || !(merged || (t.parent === id && (t.group || '') === from))) continue;
+    seen.add(t.id);
+    if (to) t.group = to; else delete t.group;
+    regroup(d, t.id, from, to, seen);
+  }
+}
 export function settleMerged(d) {
+  // A merged line is drawn inside the card of the line it leads to, so it is in that line's group.
+  for (const t of Object.values(d.threads)) { const to = leadsTo(d, t); if (to !== t && (t.group || '') !== (to.group || '')) { if (to.group) t.group = to.group; else delete t.group; } }
   for (const s of Object.values(d.sessions || {})) { const how = follow(d, s, 'mergedFrom', 'mergedTo', true); if (how) s.mergedNote = how; }
   for (const c of Object.values(d.commits)) follow(d, c, 'movedFrom', 'movedTo', isTodo(c) && !c.done);
 }

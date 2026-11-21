@@ -10,7 +10,7 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import { execFile, spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { COLS, addCommit, dataFile, home, mutate, readConfig, readData, toArrays, writeConfig } from './store.mjs';
+import { COLS, addCommit, dataFile, home, mutate, readConfig, readData, regroup, toArrays, writeConfig } from './store.mjs';
 import { demoData } from './demo.mjs';
 import { liveDir, readLive, withCodexTerm } from './live.mjs';
 import { awayCache, bindLiveSession, findThreadLoose, handTo, liveSessions, sessionList, startAutopilot, stopAutopilot, threadSessions } from './ops.mjs';
@@ -188,7 +188,11 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
           doc = JSON.parse(await readBody(req));
           if (!doc || typeof doc !== 'object' || Array.isArray(doc)) return send(res, 400, { error: 'body must be an object' });
         }
-        mutate(d => { if (doc) d[col][id] = { ...doc, id }; else delete d[col][id]; });
+        mutate(d => {
+          const was = col === 'threads' && doc && d.threads[id];
+          if (doc) d[col][id] = { ...doc, id }; else delete d[col][id];
+          if (was && (was.group || '') !== (doc.group || '')) regroup(d, id, was.group || '', doc.group || '');
+        });
         return send(res, 200, { ok: true });
       }
       // Open in Terminal: the command is built here from the to-do, never taken from the request.

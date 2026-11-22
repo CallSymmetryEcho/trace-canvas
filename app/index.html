@@ -707,6 +707,9 @@ body.read-page .sheet { width: min(860px, 100%); }
 .swatches { display: flex; gap: 6px; flex-wrap: wrap; }
 .swatch { width: 24px; height: 24px; border-radius: 50%; border: 5px solid var(--c); background: var(--surface); cursor: pointer; padding: 0; }
 .swatch[aria-pressed="true"] { outline: 2px solid var(--ink); outline-offset: 2px; }
+.line-talk { display: flex; flex-direction: column; gap: 6px; }
+.line-talk .btn { justify-content: center; text-align: center; text-decoration: none; padding-block: 12px; font-size: 15px; }
+.line-talk small { color: var(--faint); font-size: 12px; }
 .d-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; border-top: 1px solid var(--rule-soft); padding-top: 12px; }
 .inline-form { display: flex; gap: 6px; flex-wrap: wrap; width: 100%; }
 .rt-range { align-items: center; } .rt-range-head { width: 100%; color: var(--muted); font-size: 12px; } .rt-range label { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); }
@@ -1429,7 +1432,7 @@ apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent 
     stWorking: 'Working', stWaiting: 'Needs you', stIdle: 'Idle',
     liveHead: 'Running session', liveUntitled: 'Untitled session', liveStarted: x => `Started ${x}`, liveSeen: x => ` · last activity ${x}`,
     livePrompt: 'Latest instruction', liveThread: 'Thread', liveAuto: 'Automatic (repository and branch)', liveNow: 'Now on',
-    liveResume: 'Resume in a terminal', openChat: 'Open the chat', openChatWeb: 'Open on claude.ai', goTerm: 'Go to its terminal', tNoTerm: 'Its terminal tab is no longer open', liveRunning: 'Running now', lineSessions: 'Sessions on this line', loggedIn: 'Logged in',
+    liveResume: 'Resume in a terminal', openChat: 'Open the chat', openChatWeb: 'Open on claude.ai', talkAgent: 'Talk to this line\'s agent', talkNoRc: 'Its session runs without Remote Control: type /remote-control in its terminal', talkNone: 'No session is running on this line', talkNoStart: 'No session is running on this line. To start one from here, run trace-canvas phone --allow-start on the computer', goTerm: 'Go to its terminal', tNoTerm: 'Its terminal tab is no longer open', liveRunning: 'Running now', lineSessions: 'Sessions on this line', loggedIn: 'Logged in',
     gxChanges: 'Changes', gxLoading: 'Reading from git…', gxNoRepo: 'This repository is not on this computer.', gxNoRepoOn: m => `This repository is on ${m}, not on this computer.`, gxNoCommit: 'This commit is no longer in its repository (rewritten or cleaned up).',
     gxLine: n => `line ${n}`, gxOnly: 'Changed lines only', gxExplain: 'Have your local Claude explain each file in a sentence', gxExplaining: 'Your local Claude is reading this commit… (about a minute)', gxPrev: 'Previous file', gxNext: 'Next file', gxRole_test: 'test', gxRole_doc: 'docs', gxRole_gen: 'generated', gxFiles: n => `${n} file${n === 1 ? '' : 's'}`, gxMore: n => `${n} more`, gxQuiet: n => `${n} binary or generated`, gxBinary: 'binary',
     gxCompare: 'Compare with', gxThisOnly: 'this commit only', gxOtherRepo: 'That station is in another repository.', gxTruncated: 'Cut at 200 KB.',
@@ -1611,7 +1614,7 @@ apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的
     stWorking: '工作中', stWaiting: '等你', stIdle: '空闲',
     liveHead: '运行中的会话', liveUntitled: '未命名会话', liveStarted: x => `开始于 ${x}`, liveSeen: x => ` · 最近活动 ${x}`,
     livePrompt: '最近的指令', liveThread: '所属线', liveAuto: '自动（按仓库和分支）', liveNow: '当前在',
-    liveResume: '在终端里恢复', openChat: '打开对话', openChatWeb: '在 claude.ai 打开', goTerm: '跳到终端', tNoTerm: '它的终端标签页已经关了', liveRunning: '正在运行', lineSessions: '这条线上的会话', loggedIn: '记在这个会话里',
+    liveResume: '在终端里恢复', openChat: '打开对话', openChatWeb: '在 claude.ai 打开', talkAgent: '和这条线的 agent 对话', talkNoRc: '它的会话没开 Remote Control：在它的终端里输入 /remote-control', talkNone: '这条线上现在没有开着的会话', talkNoStart: '这条线上现在没有开着的会话。想在手机上直接开一个，先在电脑上运行 trace-canvas phone --allow-start', goTerm: '跳到终端', tNoTerm: '它的终端标签页已经关了', liveRunning: '正在运行', lineSessions: '这条线上的会话', loggedIn: '记在这个会话里',
     gxChanges: '改动', gxLoading: '正在从 git 读取…', gxNoRepo: '这台电脑上没有这个仓库。', gxNoRepoOn: m => `这个仓库在 ${m} 上，这台电脑上没有。`, gxNoCommit: '仓库里已经没有这个提交，可能被改写或清理了。',
     gxLine: n => `第 ${n} 行`, gxOnly: '只看改动的行', gxExplain: '让本机的 Claude 给每个文件写一句说明', gxExplaining: '本机的 Claude 正在读这次提交…（一分钟左右）', gxPrev: '上一个文件', gxNext: '下一个文件', gxRole_test: '测试', gxRole_doc: '文档', gxRole_gen: '生成', gxFiles: n => `${n} 个文件`, gxMore: n => `还有 ${n} 个`, gxQuiet: n => `${n} 个二进制或生成文件`, gxBinary: '二进制',
     gxCompare: '对比', gxThisOnly: '只看这次提交', gxOtherRepo: '那个站点不在同一个仓库。', gxTruncated: '超过 200 KB，已截断。',
@@ -2056,12 +2059,14 @@ const chatHref = id => `claude://claude.ai/epitaxy/${encodeURIComponent(id)}`;
 // cls styles it; text overrides the label.
 function jumpTo(s, cls, text) {
   // Another machine's session: its chat and terminal are not here, but one in tmux opens in a tab here over ssh.
-  if (s.away) return s.attach && !S.remote ? `<button class="${cls}" data-act="focus-term" data-sid="${esc(s.id)}" title="${esc(s.attach)}">${text || esc(t('openTmux'))}</button>` : '';
+  // Remote Control on: the same session's chat on claude.ai. The only way in from the phone, where the Claude app opens it.
+  const rc = s.rc && /^https:\/\/claude\.ai\//.test(s.rc) ? `<a class="${cls}" href="${esc(s.rc)}" target="_blank" rel="noopener" title="${esc(t('openChat'))}">${text || esc(t('openChat'))}</a>` : '';
+  if (S.remote) return rc;
+  if (s.away) return s.attach ? `<button class="${cls}" data-act="focus-term" data-sid="${esc(s.id)}" title="${esc(s.attach)}">${text || esc(t('openTmux'))}</button>` : rc;
   const a = (href, key) => `<a class="${cls}" href="${esc(href)}" title="${esc(t(key))}">${text || esc(t(key))}</a>`;
   if (s.desktopId) return a(chatHref(s.desktopId), 'openChat');
   if (!S.remote && (s.tty && ['Apple_Terminal', 'iTerm.app'].includes(s.term) || s.tab && ['gnome-terminal', 'konsole'].includes(s.term) || s.tmux && s.pane)) return `<button class="${cls}" data-act="focus-term" data-sid="${esc(s.id)}" title="${esc(t('goTerm'))}">${text || esc(t('goTerm'))}</button>`;
-  // Remote Control on (▶ Start, claude --bg --remote-control): the same session's chat on claude.ai, also from the phone.
-  if (s.rc && /^https:\/\/claude\.ai\//.test(s.rc)) return `<a class="${cls}" href="${esc(s.rc)}" target="_blank" rel="noopener" title="${esc(t('openChat'))}">${text || esc(t('openChat'))}</a>`;
+  if (rc) return rc;
   if (!s.tty && (s.agentKey === 'codex' || /^codex /.test(s.resume || ''))) return a(`codex://threads/${encodeURIComponent(s.id)}`, 'openChat');
   return '';
 }
@@ -2089,7 +2094,7 @@ function liveDetail(s) {
     <div class="d-scroll">
       <div class="l-title">${esc(liveTitle(s))}</div>
       <div class="l-status st-${esc(s.status)}"><span class="ldot"></span>${esc(stLabel(s.status))}${s.activity ? `<span class="act">${esc(s.activity)}</span>` : ''}</div>
-      ${s.away ? `<div class="meta"><span>${esc(t('onMachine', s.machine))}</span></div>${s.attach && !S.remote ? `<div class="d-actions">${jumpTo(s, 'btn btn-primary')}</div>` : ''}` : jumpTo(s, 'btn btn-primary') || rcLink(s) ? `<div class="d-actions">${jumpTo(s, 'btn btn-primary')}${jumpTo(s, 'x').includes(esc(s.rc || '\u0000')) ? '' : rcLink(s)}</div>` : ''}
+      ${s.away ? `<div class="meta"><span>${esc(t('onMachine', s.machine))}</span></div>${jumpTo(s, 'btn btn-primary') ? `<div class="d-actions">${jumpTo(s, 'btn btn-primary')}</div>` : ''}` : jumpTo(s, 'btn btn-primary') || rcLink(s) ? `<div class="d-actions">${jumpTo(s, 'btn btn-primary')}${jumpTo(s, 'x').includes(esc(s.rc || '\u0000')) ? '' : rcLink(s)}</div>` : ''}
       <div class="meta">
         ${where ? `<span>${esc(where)}</span>` : ''}
         ${s.cwd ? `<span class="mono">${esc(s.cwd)}</span>` : ''}
@@ -4111,7 +4116,7 @@ function sessionItem(s, l, latest = '') {
   // Running there in tmux: attach to it, not a second copy (l.attach, from the page server).
   const away = s.machine && S.machine && s.machine !== S.machine, cmd = l && l.attach ? l.attach : away ? resumeThere(s.machine, here, s.id) : here;
   // Not running: one press resumes it in a terminal tab here (another machine's over ssh, in tmux there).
-  const jump = (away ? (l && l.attach ? jumpTo(l, 'btn btn-primary') : '') : jumpTo({ ...l, ...s, desktopId: s.desktopId || (l && l.desktopId), tty: l && l.tty }, 'btn btn-primary'))
+  const jump = (away ? (l ? jumpTo(l, 'btn btn-primary') : '') : jumpTo({ ...l, ...s, desktopId: s.desktopId || (l && l.desktopId), tty: l && l.tty }, 'btn btn-primary'))
     || (!l && SERVER && !S.remote ? `<button class="btn btn-primary" data-act="resume-term" data-sid="${esc(s.id)}" title="${esc(cmd)}">${esc(t(away ? 'resumeThere' : 'resumeHere', s.machine))}</button>` : '');
   const sub = [l && stLabel(st), s.agent || (l && l.agent) || 'Claude Code', away && s.machine, s.id.slice(0, 8), s.last && fmtRel(s.last)].filter(Boolean).join(' · ');
   return `<li class="st-${esc(st)}${l ? ' is-live' : ''}"${l ? ` data-act="goto-live" data-sid="${esc(s.id)}"` : ''}><span class="ldot"></span><span class="s-name">${latest ? `<span class="s-latest">${esc(t('latestOn', latest))}</span>` : ''}${esc(s.title || (l ? liveTitle(l) : s.id))}</span><span class="act">${esc(sub)}</span><span class="s-acts">${jump}<button class="btn" data-act="copy-cmd" data-cmd="${esc(cmd)}" title="${esc(cmd)}">${esc(t('copyResume'))}</button></span></li>`;
@@ -4137,6 +4142,14 @@ function lineSessions(tid) {
   return `<div class="sec-label">${esc(t('lineSessions'))}</div><ul class="l-list s-list">${shown.map(s => sessionItem(s, byId.get(s.id), mark.get(s.id))).join('')}</ul>
       <p style="margin:0;color:var(--faint);font-size:12px">${rows.length > 8 ? `+${rows.length - 8} · ` : ''}${esc(t('lineSessionsHint'))}</p>`;
 }
+// On a phone the way to the line's agent comes first: its running session's chat in the Claude app, or ▶ Start.
+function lineTalk(th) {
+  if (!(S.remote || PHONE.matches) || th.id === INBOX || th.status === 'merged') return '';
+  const live = liveOn(th.id).sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0)), s = live.find(x => jumpTo(x, 'x'));
+  if (s) return `<div class="line-talk">${jumpTo(s, 'btn btn-primary', esc(t('talkAgent')))}<small>${esc([stLabel(s.status), s.agent || 'Claude Code', s.machine].filter(Boolean).join(' · '))}</small></div>`;
+  if (!S.remote) return '';
+  return `<div class="line-talk">${S.start ? `<button class="btn btn-primary" data-act="start">${esc(t('start'))}</button>` : ''}<small>${esc(t(live.length ? 'talkNoRc' : S.start ? 'talkNone' : 'talkNoStart'))}</small></div>`;
+}
 function threadDetail(th) {
   const cs = (byThread().get(th.id) || []).slice().reverse();
   const isInbox = th.id === INBOX;
@@ -4147,6 +4160,7 @@ function threadDetail(th) {
       <button class="icon-btn" data-act="close" aria-label="${esc(t('close'))}">×</button>
     </div>
     <div class="d-scroll">
+      ${lineTalk(th)}
       ${isInbox ? `<p style="margin:0;color:var(--muted)">${esc(t('inboxDesc'))}</p>` : `
       <label class="fld"><span>${esc(t('threadName'))}</span><input id="t-name" class="big-input" value="${esc(th.name)}"></label>
       <div class="fld"><span>${esc(t('threadStatus'))}</span><div class="seg">${['active', 'parked', 'done'].map(s => `<button data-act="status" data-status="${s}" aria-pressed="${th.status === s}">${esc(statusLabel(s))}</button>`).join('')}${th.status === 'merged' ? `<button aria-pressed="true" disabled>${esc(statusLabel('merged'))}</button>` : ''}</div></div>

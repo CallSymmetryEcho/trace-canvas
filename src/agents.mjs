@@ -41,8 +41,10 @@ export const macTerminal = (env = process.env, has = p => fs.existsSync(p)) => {
 // (dispatch run by an agent: gnome-terminal --tab hands the new tab the caller's environment) would think itself that
 // session's child: no session file, unreachable by messages, the hooks taking it for the caller. Settings a person
 // sets (CLAUDE_CONFIG_DIR, CLAUDE_CODE_USE_BEDROCK…) are kept. TMUX and TMUX_PANE too: a terminal opened from a tmux
-// pane would hand them to every tab, which then looked to be in that pane (tmuxOf).
-const SESSION_VAR = /^(TMUX|TMUX_PANE|CLAUDECODE|CLAUDE_PID|CLAUDE_EFFORT|CLAUDE_CODE_(SESSION_\w+|CHILD_SESSION|ENTRYPOINT|EXECPATH|MESSAGING_\w+|BRIDGE_\w+|SSE_PORT))$/;
+// pane would hand them to every tab, which then looked to be in that pane (tmuxOf). TRACE_CANVAS_THREAD is the caller's
+// line: a session resumed by a dispatch run from an agent would bind itself to that line (a new one names its own line
+// in its command). TERM_PROGRAM is the caller's terminal (tmux), not the new tab's.
+const SESSION_VAR = /^(TMUX|TMUX_PANE|TERM_PROGRAM|TERM_PROGRAM_VERSION|TRACE_CANVAS_THREAD|CLAUDECODE|CLAUDE_PID|CLAUDE_EFFORT|CLAUDE_CODE_(SESSION_\w+|CHILD_\w+|ENTRYPOINT|EXECPATH|MESSAGING_\w+|BRIDGE_\w+|SSE_PORT))$/;
 export const agentEnv = env => Object.fromEntries(Object.entries(env).filter(([k]) => !SESSION_VAR.test(k)));
 function desktopEnv(env) {
   env = agentEnv(env);

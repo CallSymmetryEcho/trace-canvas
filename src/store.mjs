@@ -169,7 +169,11 @@ export function settleMerged(d) {
   // A merged line is drawn inside the card of the line it leads to, so it is in that line's group.
   for (const t of Object.values(d.threads)) { const to = leadsTo(d, t); if (to !== t && (t.group || '') !== (to.group || '')) { if (to.group) t.group = to.group; else delete t.group; } }
   for (const s of Object.values(d.sessions || {})) { const how = follow(d, s, 'mergedFrom', 'mergedTo', true); if (how) s.mergedNote = how; }
-  for (const c of Object.values(d.commits)) follow(d, c, 'movedFrom', 'movedTo', isTodo(c) && !c.done);
+  // Open to-dos go to the line theirs was merged into; so does anything written on a merged line after its merge
+  // (a session that had not followed yet, or another machine's older copy): it was never part of what was merged.
+  const mergedAt = {};
+  for (const c of Object.values(d.commits)) if (c.kind === 'merge' && c.mergeOf) mergedAt[c.mergeOf] = Math.max(mergedAt[c.mergeOf] || 0, c.ts);
+  for (const c of Object.values(d.commits)) follow(d, c, 'movedFrom', 'movedTo', (isTodo(c) && !c.done) || (c.kind !== 'merge' && c.ts > mergedAt[c.thread]));
 }
 
 // Points everything that refers to line `from` at line `to`.

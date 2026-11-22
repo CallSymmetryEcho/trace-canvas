@@ -194,6 +194,10 @@ test('after a merge that keeps the source line, its sessions and open to-dos go 
   assert.equal(Object.values(d.commits).filter(c => c.thread === folder).length, before);
   assert.equal(of('logged by id on the old line').thread, big);
   assert.equal(d.sessions.a.thread, big);
+  // Written straight onto the merged line after the merge (an older copy on another machine): it follows too.
+  const late = mutate(dd => { const c = addCommit(dd, { thread: big, kind: 'note', title: 'left on the old line' }); c.thread = folder; c.ts = Date.now() + 1000; return c.id; }, s.env);
+  assert.equal(readData(s.env).commits[late].thread, big);
+  mutate(dd => { delete dd.commits[late]; }, s.env);
   // Undoing the merges takes them back, one step at a time; what was moved by hand since stays where it was put.
   mutate(dd => { dd.threads[promo].status = 'active'; dd.threads[promo].mergedInto = null; }, s.env);
   d = readData(s.env);

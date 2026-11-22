@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Records written on a merged line after its merge move to the line it went into.** A session that had not followed yet, or another machine's older copy, could still leave records on the merged line, where the branch view drew them above the merge. They now go to the target line, and undoing the merge takes them back.
+
 - **A line that changes group takes its branches along.** Moving a line to another group (or out of one) now moves the lines merged into it, which sit in its card, and its forks that were in the group it left, nested ones too; a fork you put in a different group stays there. A merged line is always in the group of the line it went into.
 
 - **Search finds lines, and can look in one field only.** The search box now matches line names, groups and folders as well as records, and lists what it found under the box: lines first, then the newest records; click one to go to it. Type `#` to pick one field to search: `#line`, `#title`, `#body`, `#type` or `#links` (`#线路`, `#标题`, `#正文`, `#类型`, `#链接`), then the text.

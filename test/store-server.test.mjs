@@ -98,3 +98,19 @@ test('two paths to one folder are one place, and no file compares a working fold
   });
   assert.deepEqual(bad, []);
 });
+
+test('a process knows when its clone has moved on under it: only a change to src/ or bin/ makes it stale', async () => {
+  const { repoHead, staleAgainst } = await import('../src/version.mjs');
+  const fsx = await import('node:fs'), osx = await import('node:os'), px = await import('node:path'), { execFileSync } = await import('node:child_process');
+  const root = fsx.mkdtempSync(px.join(osx.tmpdir(), 'tc-stale-')), git = (...a) => execFileSync('git', ['-C', root, ...a], { stdio: 'ignore' });
+  const commit = (file, text) => { fsx.mkdirSync(px.dirname(px.join(root, file)), { recursive: true }); fsx.writeFileSync(px.join(root, file), text); git('add', '-A'); git('commit', '-q', '-m', file); };
+  git('init', '-q', '-b', 'main'); commit('src/a.mjs', '1');
+  const started = repoHead(root);
+  assert.match(started, /^[0-9a-f]{40}$/);
+  assert.equal(staleAgainst(started, root), '');
+  commit('docs/readme.md', 'words'); commit('app/index.html', 'page');
+  assert.equal(staleAgainst(started, root), ''); // docs and the page: nothing to restart for
+  commit('src/a.mjs', '2');
+  assert.equal(staleAgainst(started, root), repoHead(root));
+  assert.equal(staleAgainst('', root), ''); assert.equal(staleAgainst(started, px.join(root, 'nowhere')), ''); // not a clone: never stale
+});

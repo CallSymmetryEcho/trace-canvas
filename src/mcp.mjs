@@ -1,5 +1,6 @@
 // Trace Canvas MCP server (stdio, newline-delimited JSON-RPC 2.0, no dependencies).
 // Lets an agent put its session on the canvas, log moments, read threads and merge them.
+import { repoHead, staleAgainst } from './version.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -209,6 +210,7 @@ function openBrowser(url) {
 }
 const pageUrl = async () => { const url = `http://localhost:${port()}/`; return (await healthy(url)) ? url : null; };
 
+const MCP_HEAD = repoHead(); // the commit this MCP server's code was loaded from
 async function callTool(name, a = {}) {
   switch (name) {
     case 'trace_capture_session': {
@@ -365,7 +367,9 @@ async function callTool(name, a = {}) {
       if (!thread && !a.all && !a.mine && !a.assignee) try { const sid = currentSessionId({ sessionId: a.session_id, projectDir: projectDir() }); thread = (sid && sessionThread(d, { id: sid }).threadId) || undefined; } catch {}
       const rows = listTasks(d, { thread, includeDone: !!a.include_done, assignee: a.mine ? agentKey() : a.assignee });
       const open = rows.reduce((n, r) => n + (r.total - r.done), 0);
-      return { text: `${open} open to-do${open === 1 ? '' : 's'} on ${rows.length} thread${rows.length === 1 ? '' : 's'}.`, data: { threads: rows } };
+      // This MCP server lives as long as its session and does not restart when the clone is updated: said here, where every agent looks.
+      const behind = staleAgainst(MCP_HEAD);
+      return { text: `${open} open to-do${open === 1 ? '' : 's'} on ${rows.length} thread${rows.length === 1 ? '' : 's'}.${behind ? ` Note: this session's Trace Canvas tools run older code (${MCP_HEAD.slice(0, 7)}; the clone is at ${behind.slice(0, 7)}), so a tool or fix added since is not in them: start a new session to get it.` : ''}`, data: { threads: rows, ...(behind ? { stale: true, head: MCP_HEAD.slice(0, 7), repoHead: behind.slice(0, 7) } : {}) } };
     }
     case 'trace_task_done': {
       const done = a.done !== false;

@@ -18,6 +18,7 @@ import { applyRetro, askAgent, retroRecord, runRetro } from './retro.mjs';
 import { AGENTS, deliverRow, focusTab, openTerminal, terminalCommand } from './agents.mjs';
 import { draftLessons, rememberLesson } from './lessons.mjs';
 import { otherMachines, remoteLive } from './remote.mjs';
+import { repoHead, staleAgainst } from './version.mjs';
 import { commitDiff, commitInfo, explainCommit, pullFile, readLinkedImage, readLinkedMd } from './git-view.mjs';
 import { autopilotSig, runSync, syncSoon, syncStatus } from './sync.mjs';
 import { doctor } from './doctor.mjs';
@@ -100,12 +101,10 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
   setInterval(checkUpdate, 12 * 3600e3).unref();
   // A pull this server did not make (an agent's git pull) leaves it on old code: when src/ or bin/ changed since it started,
   // trace-canvas update --restart starts it again on the same port (the page reloads by itself); a page-only change needs nothing.
-  const gitHead = () => { try { return spawnSync('git', ['-C', ROOT, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim(); } catch { return ''; } };
-  const HEAD0 = gitHead();
+  const HEAD0 = repoHead(ROOT);
   let restarting = false;
   if (HEAD0 && !process.env.TRACE_CANVAS_NO_RESTART) setInterval(() => {
-    const now = gitHead();
-    if (restarting || !now || now === HEAD0 || spawnSync('git', ['-C', ROOT, 'diff', '--quiet', HEAD0, now, '--', 'src', 'bin']).status !== 1) return;
+    if (restarting || !staleAgainst(HEAD0, ROOT)) return;
     restarting = true;
     spawn(process.execPath, [CLI, 'update', '--restart'], { detached: true, stdio: 'ignore' }).unref();
   }, 60e3).unref();
@@ -143,7 +142,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
       if (write && req.headers['x-trace-canvas'] !== '1') return send(res, 403, { error: 'missing header' });
 
       if (req.method === 'GET' && (p === '/' || p === '/index.html')) return send(res, 200, page(readConfig(), ai), 'text/html; charset=utf-8');
-      if (req.method === 'GET' && p === '/api/health') return send(res, 200, { ok: true, version: VERSION, ai, dataFile: dataFile(), ...(!remote && phone ? { phone: phoneUrl(phone, port) } : {}) });
+      if (req.method === 'GET' && p === '/api/health') return send(res, 200, { ok: true, version: VERSION, ai, dataFile: dataFile(), head: HEAD0.slice(0, 7), ...(staleAgainst(HEAD0, ROOT) ? { stale: true, repoHead: staleAgainst(HEAD0, ROOT).slice(0, 7) } : {}), ...(!remote && phone ? { phone: phoneUrl(phone, port) } : {}) });
       if (req.method === 'GET' && p === '/api/data') {
         // desktopId: the Claude desktop app's id of a session, so the page can open its chat (claude://…).
         const d = readData(), desk = desktopSessions();

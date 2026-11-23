@@ -25,6 +25,7 @@ The first visit with the key sets a cookie on the phone; after that the plain ad
 - **Read:** the canvas, a line's records and its goal and to-dos, the branches and the timeline, as on the computer.
 - **Add ideas:** the box at the bottom. Pick a line and a kind (idea, to-do, …), or start with `#line name` to file it on that line.
 - **Send an agent to a line:** open the line and press **Prompt for an agent**. It copies a prompt that tells an agent to read the line with `trace_read_thread` and `trace_tasks`, carry on with its open to-dos and tick them off. Paste it to a session, for example one you drive from the Claude app on the phone through Remote Control.
+- **Talk to a line's agent:** on the phone a line's page starts with **Talk to this line's agent**. It opens the running session's chat in the Claude app, on this machine or another one. The session must have Remote Control on (`/remote-control` in its terminal, or started with **▶ Start**); when it has not, the page says so.
 
 ## Start work from the phone (macOS)
 

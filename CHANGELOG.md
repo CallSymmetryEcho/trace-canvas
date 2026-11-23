@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **An archived line can be put back from its own panel.** Marking a line done archives it into History, and the only way back was History's Restore, which brings back the whole project. Clicking In progress on such a line changed its status but left it archived, so it stayed off the canvas. Now a status other than done brings the line back, and its panel says it is archived with **Put it back on the canvas**.
+
 - **The side panel has a way back.** Going from a line's panel into one of its records, or on to a line a record names, left only ×. The panel now shows ← whenever it showed something else before, one step at a time; closing it forgets the trail. On a phone the one ← goes a step back first, then closes.
 
 - **Merging is done in one place, with checks, and can be undone.** The page had its own copy of the merge rules and it had drifted from the server's. The page now asks the server (`/api/merge`, `/api/unmerge`), as MCP and the command line do. A merge into the inbox or into a line that is itself merged is refused, so lines can no longer be merged into a circle and vanish. Lines of one group merged into a new line stay in that group, and so does the new line. A merged line's panel has **Undo the merge**: its status, its group and its to-dos are as before and the merge record is gone; a line the merge itself made goes once nothing is left on it. Clicking a status on a merged line does the same. The panel's "Merge into…" no longer offers the inbox. Deleting a line gives the lines merged into it back as they were, not as done. Without a server (the page on browser storage or an artifact database) merging is not offered any more.

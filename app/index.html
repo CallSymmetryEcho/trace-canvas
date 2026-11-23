@@ -1399,7 +1399,7 @@ apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent 
     tReadOnly: 'You can only view this page', tReadOnlyNotSaved: 'You can only view this page, so that change wasn’t saved',
     tQuota: 'Storage is full: export a backup, then delete some old records', tSlow: 'Too many changes at once. Wait a few seconds and try again.',
     tSaveFail: 'Couldn’t save. Check the connection and try again.', tConnLost: 'Lost the data connection. Reload the page to reconnect.',
-    tForked: ti => `Forked a new thread from “${ti}”`, tMerged: (a, b) => `Merged “${a}” into “${b}”`, tUnmerged: n => `“${n}” is a line of its own again, as before the merge`, unmergeBtn: 'Undo the merge', unmergeTitle: 'The line is as it was before: its status, its group, its to-dos; the merge record goes', tCleared: n => `Cleared ${n} example item${n === 1 ? '' : 's'}`,
+    tForked: ti => `Forked a new thread from “${ti}”`, tMerged: (a, b) => `Merged “${a}” into “${b}”`, tUnmerged: n => `“${n}” is a line of its own again, as before the merge`, lineArchived: d => `Archived ${d}: not on the canvas, kept in History`, lineRestore: 'Put it back on the canvas', tLineBack: n => `“${n}” is back on the canvas, in progress`, unmergeBtn: 'Undo the merge', unmergeTitle: 'The line is as it was before: its status, its group, its to-dos; the merge record goes', tCleared: n => `Cleared ${n} example item${n === 1 ? '' : 's'}`,
     tMoved: n => `Moved to “${n}”`, tLogged: n => `Logged to “${n}”`, tImported: n => `Imported ${n} record${n === 1 ? '' : 's'}`,
     tDeleted: 'Deleted', tCopied: 'Copied', tCopyFail: 'This page can’t write to the clipboard. The text below is selected: copy it from here.',
     tSaved: 'Saved', tCopiedAll: 'Copied all data', tSaveFallback: 'Saving didn’t work here, so the JSON is on your clipboard instead',
@@ -1580,7 +1580,7 @@ apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的
     tReadOnly: '你对这页只有查看权限', tReadOnlyNotSaved: '你对这页只有查看权限，刚才的修改没有保存',
     tQuota: '存储已满：先导出备份，再删除一些旧记录', tSlow: '操作太快了，稍等几秒再试',
     tSaveFail: '保存失败，请检查网络后重试', tConnLost: '数据连接中断，刷新页面可恢复',
-    tForked: ti => `已从「${ti}」分出新线程`, tMerged: (a, b) => `「${a}」已合并到「${b}」`, tUnmerged: n => `「${n}」已恢复成合并前的样子`, unmergeBtn: '撤销合并', unmergeTitle: '这条线回到合并前：状态、分组、待办都还原，合并记录删掉', tCleared: n => `已清除 ${n} 条示例数据`,
+    tForked: ti => `已从「${ti}」分出新线程`, tMerged: (a, b) => `「${a}」已合并到「${b}」`, tUnmerged: n => `「${n}」已恢复成合并前的样子`, lineArchived: d => `已于 ${d} 归档：不在画布上，收在「历史」里`, lineRestore: '恢复到画布', tLineBack: n => `「${n}」已回到画布，状态为进行中`, unmergeBtn: '撤销合并', unmergeTitle: '这条线回到合并前：状态、分组、待办都还原，合并记录删掉', tCleared: n => `已清除 ${n} 条示例数据`,
     tMoved: n => `已移到「${n}」`, tLogged: n => `已记到「${n}」`, tImported: n => `已导入 ${n} 条记录`,
     tDeleted: '已删除', tCopied: '已复制', tCopyFail: '这个页面没法直接写入剪贴板。下面的文字已经选中，在这里复制即可。',
     tSaved: '已保存', tCopiedAll: '已复制全部数据', tSaveFallback: '这里不能直接保存文件，已把 JSON 复制到剪贴板',
@@ -4327,6 +4327,7 @@ function threadDetail(th) {
       <label class="fld"><span>${esc(t('threadGoal'))}</span><textarea id="t-goal" rows="3" placeholder="${esc(t('threadGoalPh'))}">${esc(goalOf(th))}</textarea></label>
       <label class="fld"><span>${esc(t('threadGroup'))}</span><input id="t-group" list="group-list" value="${esc(th.group || '')}" placeholder="${esc(t('threadGroupPh'))}"></label>
       <div class="meta">
+        ${th.archived ? `<span>${esc(t('lineArchived', fmtAbs(th.archived)))} · <button class="linkish" data-act="t-restore">${esc(t('lineRestore'))}</button></span>` : ''}
         <span>${esc(t('createdAt', fmtAbs(th.createdAt || Date.now())))}${cs[0] ? esc(t('lastUpdate', fmtRel(cs[0].ts))) : ''}</span>
         ${th.parent ? `<span>${esc(t('forkedFromThread'))} <button class="linkish" data-act="goto-thread" data-tid="${esc(th.parent)}">${esc(getThread(th.parent).name)}</button>${forkC ? ` ${esc(t('of'))} <button class="linkish" data-act="goto-commit" data-cid="${esc(forkC.id)}">${esc(forkC.title.slice(0, 40))}</button>` : ''} · <button class="linkish" data-act="detach" title="${esc(t('detachTitle'))}">${esc(t('detach'))}</button></span>` : ''}
         ${mergedIn(th.id).length ? `<span>${esc(t('mergedInLabel'))} ${mergedIn(th.id).map(x => `<button class="linkish" data-act="goto-thread" data-tid="${esc(x.id)}">${esc(x.name)}</button>`).join('、')}</span>` : ''}
@@ -4447,7 +4448,7 @@ detail.addEventListener('click', e => {
   if (handClick(e)) return;
   const b = e.target.closest('[data-act]'); if (!b) return;
   const act = b.dataset.act, s = S.sel;
-  const writeActs = ['star', 'detach', 'fork-open', 'fork-create', 'del-open', 'del-confirm', 'status', 'color', 'merge-open', 'merge', 'unmerge', 'label', 'flip', 'g-arrange', 'g-ungroup', 'g-join'];
+  const writeActs = ['star', 'detach', 'fork-open', 'fork-create', 'del-open', 'del-confirm', 'status', 'color', 'merge-open', 'merge', 'unmerge', 't-restore', 'label', 'flip', 'g-arrange', 'g-ungroup', 'g-join'];
   if (writeActs.includes(act) && !canWrite()) return;
   switch (act) {
     case 'close': if (PHONE.matches && trail.some(selAlive)) selectBack(); else select(null); break;
@@ -4534,7 +4535,9 @@ detail.addEventListener('click', e => {
     case 'status':
       if (b.dataset.status === 'done' && getThread(s.id).status !== 'done') { S.wrapLine = s.id; openSheet('wrap'); break; }
       if (getThread(s.id).status === 'merged') { if (SERVER) unmerge(s.id).then(th => { if (th && b.dataset.status !== getThread(s.id).status) patchDoc('threads', s.id, { status: b.dataset.status }, 0); }); break; }
+      if (getThread(s.id).archived && b.dataset.status !== 'done') { patchDoc('threads', s.id, unarchive(getThread(s.id), b.dataset.status), 0); toast(t('tLineBack', getThread(s.id).name)); requestAnimationFrame(() => reveal(s.id)); break; }
       patchDoc('threads', s.id, { status: b.dataset.status }, 0); break;
+    case 't-restore': patchDoc('threads', s.id, unarchive(getThread(s.id)), 0); toast(t('tLineBack', getThread(s.id).name)); requestAnimationFrame(() => reveal(s.id)); break;
     case 'unmerge': unmerge(s.id); break;
     case 'color': patchDoc('threads', s.id, { color: b.dataset.color }, 0); break;
     case 'capture-here': setCaptureThread(s.id); $('#cap-text').focus(); break;
@@ -5034,6 +5037,8 @@ const tube = (x1, y1, x2, y2, c, w) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y
 const soloArchive = (th, at) => ({ archived: at, archivedSolo: true, group: th.name });
 // Marking a line done puts it in History at once: under its group (the group's plaque shows it while the rest goes on),
 // or, in no group, as a project of its own.
+// An archived line back on the canvas, in progress again (History's Restore does this for a whole project).
+const unarchive = (th, status) => ({ archived: null, status: status || (th.status === 'done' ? 'active' : th.status), ...(th.archivedSolo ? { archivedSolo: null, group: '' } : {}) });
 function wrapDone(id) {
   const th = getThread(id), at = Date.now(); closeSheet();
   patchDoc('threads', id, { status: 'done', ...(th.group ? { archived: at } : soloArchive(th, at)) }, 0); select(null);
@@ -5157,7 +5162,7 @@ $('#history').addEventListener('click', e => {
   const lb = e.target.closest('[data-hist-lessons]'); if (lb) { S.lessons = { group: lb.dataset.histLessons, list: null }; openSheet('lessons'); draftLessonsFor(S.lessons); return; }
   const rp = e.target.closest('[data-hist-replay]'); if (rp) return openReplay(Number(rp.dataset.histReplay));
   const r = e.target.closest('[data-hist-restore]');
-  if (r) { const g = r.dataset.histRestore; for (const th of S.threads.values()) if (th.group === g && th.archived) patchDoc('threads', th.id, { archived: null, ...(th.status === 'done' ? { status: 'active' } : {}), ...(th.archivedSolo ? { archivedSolo: null, group: '' } : {}) }, 0); toast(t('tRestored', g)); renderHistory(); }
+  if (r) { const g = r.dataset.histRestore; for (const th of S.threads.values()) if (th.group === g && th.archived) patchDoc('threads', th.id, unarchive(th), 0); toast(t('tRestored', g)); renderHistory(); }
 });
 // A capsule and its plaque light up together.
 for (const [ev, on] of [['pointerover', true], ['pointerout', false]]) $('#history').addEventListener(ev, e => {

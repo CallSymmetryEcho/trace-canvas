@@ -109,14 +109,17 @@ test('a report a record changed opens from that record, and one only another mac
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-pull-')), env = { ...process.env, TRACE_CANVAS_HOME: path.join(root, 'home'), TRACE_CANVAS_MACHINE: 'here' };
   const repo = path.join(root, 'repo'), there = path.join(root, 'there'); // `there` stands for the other machine's disk
   fs.mkdirSync(path.join(repo, 'sub', 'deep'), { recursive: true }); fs.mkdirSync(path.join(there, 'proj', 'sub'), { recursive: true });
-  fs.writeFileSync(path.join(repo, 'reports.md'), '# Here'); fs.writeFileSync(path.join(repo, 'key.json'), '{}');
-  fs.writeFileSync(path.join(there, 'proj', 'far.md'), '# Far'); fs.writeFileSync(path.join(there, 'abs.md'), '# Abs');
+  fs.writeFileSync(path.join(repo, 'reports.md'), '# Here'); fs.writeFileSync(path.join(repo, 'here.png'), 'PNG-here'); fs.writeFileSync(path.join(repo, 'key.json'), '{}');
+  fs.mkdirSync(path.join(there, 'proj', 'fig')); fs.writeFileSync(path.join(there, 'proj', 'fig', 'a b.png'), 'PNG-far');
+  fs.writeFileSync(path.join(there, 'proj', 'far.md'), '# Far\n![a](fig/a%20b.png) ![gone](fig/no.png) ![out](../../../../../../../../etc/x.png) ![web](https://x.org/y.png)'); fs.writeFileSync(path.join(there, 'abs.md'), '# Abs');
   const d = { commits: {
     a: { id: 'a', session: 's1', machine: 'here', links: [], files: ['reports.md', 'key.json'] },
     b: { id: 'b', session: 's2', machine: 'mac', links: [], files: ['far.md', path.join(there, 'abs.md'), 'nope.md'] },
     c: { id: 'c', session: 's3', machine: '-oProxyCommand=x', links: [], files: ['far.md'] },
   }, sessions: { s1: { id: 's1', cwd: path.join(repo, 'sub', 'deep') }, s2: { id: 's2', cwd: path.join(there, 'proj', 'sub') }, s3: { id: 's3', cwd: there } } };
-  assert.deepEqual(readLinkedMd(d, 'reports.md', 'a', env), { text: '# Here' }); // found from the session's folder upward
+  fs.writeFileSync(path.join(repo, 'reports.md'), '# Here\n![h](here.png)');
+  assert.deepEqual(readLinkedMd(d, 'reports.md', 'a', env), { text: '# Here\n![h](here.png)' }); // found from the session's folder upward
+  assert.equal(String(readLinkedImage(d, 'here.png', 'reports.md', 'a', env).data), 'PNG-here'); // its image: beside the report where it really is
   assert.equal(readLinkedMd(d, 'reports.md', null, env).error, 'unlinked'); // not without the record
   assert.equal(readLinkedMd(d, 'key.json', 'a', env).error, 'unlinked'); // changed, but data: only when linked
   assert.equal(readLinkedMd(d, 'reports.md', 'b', env).error, 'unlinked'); // another record's file
@@ -133,7 +136,12 @@ test('a report a record changed opens from that record, and one only another mac
     assert.equal((await pullFile(d, 'key.json', 'a', env)).error, 'unlinked');
   } finally { process.env.PATH = old; }
   const got = readLinkedMd(d, 'far.md', 'b', env);
-  assert.equal(got.text, '# Far'); assert.equal(got.from, 'mac'); assert.ok(got.at > 0);
+  assert.match(got.text, /^# Far/); assert.equal(got.from, 'mac');
+  // The report brought its image along; one that is gone there, or outside this machine's folder for that one, is left.
+  const img = readLinkedImage(d, 'fig/a%20b.png', 'far.md', 'b', env);
+  assert.equal(String(img.data), 'PNG-far'); assert.equal(img.from, 'mac');
+  assert.equal(readLinkedImage(d, 'fig/no.png', 'far.md', 'b', env).error, 'missing');
+  assert.equal(readLinkedImage(d, '../../../../../../../../etc/x.png', 'far.md', 'b', env).error, 'missing'); assert.ok(got.at > 0);
   assert.equal(readLinkedMd(d, path.join(there, 'abs.md'), 'b', env).text, '# Abs');
   assert.ok(fs.existsSync(path.join(root, 'home', 'files', 'mac', there, 'proj', 'sub', 'far.md'))); // kept under the data folder, by machine
 });

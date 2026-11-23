@@ -96,7 +96,19 @@ export function setTaskDone(d, { task, thread, done = true, by = 'human', result
  * that starts that agent on the thread. TRACE_CANVAS_THREAD binds the new session through the
  * SessionStart hook; the prompt also asks for trace_bind in case the hook cannot see it.
  */
-export function handTo(d, { ref, to, thread, remote = false, here = true, prompt: own = null }, env = process.env) {
+// The folder a new session on a line starts in when the line has none of its own and no session running: where its
+// sessions last worked, else the same of the line it was forked from. Without one it started in the home folder and
+// stopped at the agent's "trust this folder?" prompt, with nobody there to answer. on: another machine's sessions.
+function startDir(d, th, env, on = '') {
+  const me = readConfig(env).machine;
+  for (let t = th, n = 0; t && n < 8; t = d.threads[t.parent], n++) {
+    if (!on && lineDir(t)) return lineDir(t);
+    const s = Object.values(d.sessions || {}).filter(s => s.thread === t.id && s.cwd && (on ? s.machine === on : (!s.machine || s.machine === me) && fs.existsSync(s.cwd))).sort((a, b) => (b.last || 0) - (a.last || 0))[0];
+    if (s) return s.cwd;
+  }
+  return '';
+}
+export function handTo(d, { ref, to, thread, remote = false, here = true, on = '', prompt: own = null }, env = process.env) {
   const ag = AGENTS[to];
   if (!ag) throw new Error(`Hand to whom? One of ${Object.keys(AGENTS).join(', ')}`);
   let todo = null, tid = d.commits[ref] && d.commits[ref].kind !== 'task' ? null : resolveThreadRef(d, ref);
@@ -104,10 +116,11 @@ export function handTo(d, { ref, to, thread, remote = false, here = true, prompt
   const th = tid === INBOX ? null : d.threads[tid];
   if (!th) throw new Error('Put the to-do on a line first; the inbox has no folder or goal to hand over');
   const live = listLive(env).filter(s => sessionThreadOf(d, s, env) === tid).sort((a, b) => b.lastSeen - a.lastSeen);
-  const dir = here ? lineDir(th) || (live[0] ? live[0].cwd : '') : ''; // here: false for a command run on another machine
+  const dir = here ? lineDir(th) || (live[0] ? live[0].cwd : '') || startDir(d, th, env) : ''; // here: false for a command run on another machine
+  const far = !here && on ? startDir(d, th, env, on) : ''; // there: where that machine's sessions on the line worked, if the folder is still there
   const prompt = own ? oneLine(own) : oneLine(`You are taking over the Trace Canvas line "${th.name}" (thread ${tid}). First call the MCP tool trace_bind with thread "${tid}". Then read the line with trace_read_thread (ideas logged on it are there) and call trace_tasks with mine: true for the goal and your to-dos, work through them, and tick each one with trace_task_done when it is done. Log decisions and results with trace_log.${todo ? ` Start with: ${todo.title}` : ''}`);
   const run = remote && ag.remote ? ag.remote(oneLine(th.name), prompt) : ag.launch(prompt);
-  return { thread: th, todo, live, command: `${dir ? `cd ${q(dir)} && ` : ''}TRACE_CANVAS_THREAD=${tid} ${run}` };
+  return { thread: th, todo, live, command: `${dir ? `cd ${q(dir)} && ` : far ? `cd ${q(far)} 2>/dev/null; ` : ''}TRACE_CANVAS_THREAD=${tid} ${run}` };
 }
 /**
  * Dispatch: hands each line's new to-dos to the agent that works on that line and says how to wake it.
@@ -197,14 +210,14 @@ export function dispatch(d, { refs = [], all = false, self = null, on = '', away
       const row = { thread: { id: tid, name: th.name }, agent: key, todos: todos.map(c => ({ id: c.id, title: c.title })), ...(machine ? { on: machine } : {}) };
       if (!s) {
         // A new session; on another machine over ssh, from its home folder (the line's folder is this machine's).
-        const cmd = handTo(d, { ref: todos[0].id, to: key, remote: key === 'claude', here: !away, prompt: promptFor && promptFor(th, tid, todos) }, env).command;
+        const cmd = handTo(d, { ref: todos[0].id, to: key, remote: key === 'claude', here: !away, on: away, prompt: promptFor && promptFor(th, tid, todos) }, env).command;
         rows.push({ ...row, action: 'start', ...(away ? { machine: away, ...awayRun(away, cmd, todos[0].id) } : hereRun(cmd, todos[0].id)) });
         continue;
       }
       const prompt = promptFor ? oneLine(promptFor(th, tid, todos)) : oneLine(`New to-dos on the Trace Canvas line "${th.name}" (thread ${tid}) are yours: ${todos.map((c, i) => `${i + 1}) ${c.title} [${c.id}]`).join('; ')}. Do them in order; read the line with trace_read_thread for context, tick each with trace_task_done when it is done, and log results with trace_log.`);
       const session = { id: sid, title: s.title || (run && (run.title || run.prompt)) || '', status: run ? run.status : 'off', ...(away ? { machine: away } : {}), ...(run && run.desktopId ? { desktopId: run.desktopId } : {}), ...(run && run.name ? { name: run.name } : {}) };
       const action = sid === self ? 'self' : away ? (run ? 'busy' : 'resume') : run && key === 'claude' ? 'message' : run && run.status === 'working' ? 'busy' : 'resume';
-      const freshCmd = () => handTo(d, { ref: todos[0].id, to: key, remote: key === 'claude', here: !away, prompt: promptFor && promptFor(th, tid, todos) }, env).command;
+      const freshCmd = () => handTo(d, { ref: todos[0].id, to: key, remote: key === 'claude', here: !away, on: away, prompt: promptFor && promptFor(th, tid, todos) }, env).command;
       const fresh = () => (away ? remote(away, freshCmd()) : freshCmd());
       // On another machine the session's folder may be gone (its transcript sits under it): then a new session.
       const name = oneLine(th.name), wake = !s.cwd ? AGENTS[key].wake(sid, prompt, name) : away

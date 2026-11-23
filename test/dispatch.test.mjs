@@ -345,3 +345,21 @@ test('a running session is woken, not pasted into: typed into its tmux pane when
   assert.doesNotMatch(promptContext({ session_id: 'x1', prompt: `do ${ids[0]} now`, cwd: tmp }, env), /New to-dos on the Trace Canvas line/);
   assert.equal(readData(env).sessions.x1.handed, undefined);
 });
+
+test('a new session on a line with no folder of its own starts where the line it was forked from worked, not in the home folder', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-forkdir-'));
+  const env = { ...process.env, TRACE_CANVAS_HOME: path.join(tmp, 'home'), TRACE_CANVAS_DESKTOP_DIR: path.join(tmp, 'desk'), TRACE_CANVAS_LANG: 'en', TRACE_CANVAS_MACHINE: 'here' };
+  const d = emptyData(), now = Date.now();
+  const parent = createThread(d, { name: 'Promo' }).id, child = createThread(d, { name: 'Video 40', parent }).id;
+  d.sessions.p1 = { id: 'p1', thread: parent, agent: 'Claude Code', cwd: tmp, last: now - 5e3, machine: 'here' };
+  d.sessions.p0 = { id: 'p0', thread: parent, agent: 'Claude Code', cwd: path.join(tmp, 'gone'), last: now, machine: 'here' }; // its folder is gone
+  d.sessions.f1 = { id: 'f1', thread: parent, agent: 'Claude Code', cwd: '/Users/u/promo', last: now, machine: 'lab' };
+  addCommit(d, { thread: child, kind: 'task', title: 'Cut it', ts: now - 6e5 });
+  const [row] = dispatch(d, { refs: ['Video 40'] }, env);
+  assert.equal(row.action, 'start');
+  assert.ok(row.command.startsWith(`cd '${tmp}' && TRACE_CANVAS_THREAD=${child} claude `));
+  // On another machine: that machine's folder, and still started when it is gone there.
+  addCommit(d, { thread: child, kind: 'task', title: 'Post it', ts: now - 5e5 });
+  const [far] = dispatch(d, { refs: ['Post it'], on: 'lab', awayLive: () => ({ sessions: [] }) }, env);
+  assert.match(far.tmux.cmd, new RegExp(`^cd '/Users/u/promo' 2>/dev/null; TRACE_CANVAS_THREAD=${child} claude `));
+});

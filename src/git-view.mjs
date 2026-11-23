@@ -233,13 +233,21 @@ function elsewhere(d, c, p, me) {
 function place(d, p, rec, env) {
   const c = rec ? d.commits[rec] : Object.values(d.commits || {}).find(x => links(x, p));
   if (!c || !(links(c, p) || (rec && CHANGED.test(p) && (c.files || []).includes(p)))) return { error: 'unlinked' };
-  const s = (d.sessions || {})[c.session], cwd = (s && s.cwd) || '', abs = /^[/~]/.test(p);
+  const s = (d.sessions || {})[c.session], cwd = (s && s.cwd) || '';
   const me = readConfig(env).machine;
-  let machine = c.machine || (s && s.machine) || '', here = !machine || machine === me;
+  let machine = c.machine || (s && s.machine) || '', here = !machine || machine === me, abs = /^[/~]/.test(p);
+  // A changed file is noted from the repository's root, which need not be the session's folder (a session started in
+  // the home folder, working in a project under it): the record keeps that root.
+  if (!abs && c.root) { p = path.posix.join(c.root, p); abs = true; }
   if (abs) { if (isFile(home(p))) return { file: home(p) }; }
-  else if (here && path.isAbsolute(cwd)) for (let dir = cwd; ; dir = path.dirname(dir)) {
-    if (isFile(path.join(dir, p))) return { file: path.join(dir, p) };
-    if (dir === path.dirname(dir)) break;
+  else {
+    if (here && path.isAbsolute(cwd)) for (let dir = cwd; ; dir = path.dirname(dir)) {
+      if (isFile(path.join(dir, p))) return { file: path.join(dir, p) };
+      if (dir === path.dirname(dir)) break;
+    }
+    // A record from before roots were kept: the full path its own text gives for that file.
+    const full = (String(c.body || '').match(/(?:~|\/)[^\s`'"<>()，。；、：]*/g) || []).find(x => x.endsWith('/' + p));
+    if (full) { p = full; abs = true; if (isFile(home(p))) return { file: home(p) }; }
   }
   // Written here but not here: an agent on this machine can write a file on another one over ssh and link its path there.
   if (here && abs && me) { machine = elsewhere(d, c, p, me); here = !machine; }

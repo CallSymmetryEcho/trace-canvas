@@ -158,3 +158,20 @@ test('a file this machine does not have is looked for on the machine whose home 
   const { namedReports } = await import('../src/hook.mjs');
   assert.deepEqual(namedReports('Saved on the Mac at `~/cv/roles.md`，also /home/me/proj/in.md, /home/me/out.txt and https://x.org/home/a.md', '/home/me/proj'), ['~/cv/roles.md', '/home/me/out.txt']);
 });
+
+// 2026-11-23: a session started in the home folder wrote proposal/talk/FINAL_OUTPUTS.md in a repository under it; the
+// record listed the file from the repository's root and the reader looked from the session's folder: "missing".
+test('a changed file opens when the session started above its repository: by the root the record keeps, or the full path its text gives', () => {
+  const homeDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'tc-root-'))), repo = path.join(homeDir, 'Desktop', 'proj');
+  fs.mkdirSync(path.join(repo, 'talk'), { recursive: true }); fs.writeFileSync(path.join(repo, 'talk', 'OUT.md'), '# Out');
+  const env = { ...process.env, TRACE_CANVAS_HOME: path.join(homeDir, 'tc'), TRACE_CANVAS_MACHINE: 'here' };
+  const d = { sessions: { s1: { id: 's1', cwd: homeDir, machine: 'here' } }, commits: {
+    kept: { id: 'kept', session: 's1', machine: 'here', links: [], files: ['talk/OUT.md'], root: repo },
+    told: { id: 'told', session: 's1', machine: 'here', links: [], files: ['talk/OUT.md'], body: `文件：\`${repo}/talk/OUT.md\`，共五部分` },
+    lost: { id: 'lost', session: 's1', machine: 'here', links: [], files: ['talk/OUT.md'], body: 'see talk/OUT.md' },
+  } };
+  assert.deepEqual(readLinkedMd(d, 'talk/OUT.md', 'kept', env), { text: '# Out' });
+  assert.deepEqual(readLinkedMd(d, 'talk/OUT.md', 'told', env), { text: '# Out' });
+  assert.equal(readLinkedMd(d, 'talk/OUT.md', 'lost', env).error, 'missing');
+  assert.equal(readLinkedMd(d, 'talk/secret.md', 'told', env).error, 'unlinked', 'still only the files the record lists');
+});

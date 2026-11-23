@@ -16,7 +16,7 @@ import { lessonsFor } from './lessons.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { RETURN_LIMIT, dataFile, home, mutate, readConfig, readData, createThread, addCommit, lastCommit, goalOf, hashId, threadById, threadByKey, leadsTo, isTodo, AUTOPILOT_ASK, AUTOPILOT_WORKER, AUTOPILOT_END, EVOLVE_ROUND } from './store.mjs';
+import { RETURN_LIMIT, samePlace, dataFile, home, mutate, readConfig, readData, createThread, addCommit, lastCommit, goalOf, hashId, threadById, threadByKey, leadsTo, isTodo, AUTOPILOT_ASK, AUTOPILOT_WORKER, AUTOPILOT_END, EVOLVE_ROUND } from './store.mjs';
 import { gitEvents, redirectTargets, BASH_WRITES, EDIT_TOOLS, GIT_COMMIT, commandDir, commitMessage, headline, firstLine, cleanPrompt } from './git-events.mjs';
 import { tr } from './i18n.mjs';
 const threadIdOfLocal = (d, c) => (c && c.thread && d.threads[c.thread] ? c.thread : 'inbox');
@@ -311,7 +311,7 @@ export function handleHook(input, env = process.env) {
       const log = cfg.turns === 'all' ? !!(msg || acted) : cfg.turns === 'changes' ? acted : false;
       if (log) {
         const t = thread(state.lastPrompt);
-        addCommit(d, { thread: t.id, kind: 'agent', title: headline(msg) || tr(cfg.lang, 'turnChanged', files.length), body: turnBody(cfg.lang, msg, files, todos), agent: ag.name, links: [ag.resume(sid), ...namedReports(msg, cwd)], extra: { session: sid, files: files.slice(0, 50) } });
+        addCommit(d, { thread: t.id, kind: 'agent', title: headline(msg) || tr(cfg.lang, 'turnChanged', files.length), body: turnBody(cfg.lang, msg, files, todos), agent: ag.name, links: [ag.resume(sid), ...namedReports(msg, state.fileRoot || cwd)], extra: { session: sid, files: files.slice(0, 50), ...(files.length && state.fileRoot && !samePlace(state.fileRoot, cwd) ? { root: state.fileRoot } : {}) } });
       }
       state.turnFiles = []; state.turnTodos = []; state.turnActions = 0; state.turnLogged = false; state.turnTask = ''; state.turnPrompt = '';
     } else if (ev === 'SessionEnd') {
@@ -588,13 +588,14 @@ function lineContext(input, env) {
 /**
  * Reports and images a reply names by their full path (/… or ~/…), for the turn's record to link, so they open from
  * it: also one the agent wrote on another machine over ssh, which the hooks never saw being written (the page then
- * offers to pull it from there). At most four; a path in the project is listed among the changed files already.
+ * offers to pull it from there). At most four; a path under root (the folder the turn's changed files are listed
+ * from: the repository's root, else the session's folder) is among the changed files already.
  */
-export function namedReports(msg, cwd = '') {
+export function namedReports(msg, root = '') {
   const out = [];
   for (const m of String(msg || '').matchAll(/(?<![\w/.~-])(~|\/(?:Users|home|mnt|tmp))\/[^\s`'"<>()，。；、：]+\.(?:md|markdown|txt|pdf|png|jpe?g|gif|webp|svg)\b/gi)) {
     const p = m[0];
-    if (!out.includes(p) && !(cwd && p.startsWith(cwd + '/'))) out.push(p); // path-text: a path as a reply wrote it, maybe another machine's
+    if (!out.includes(p) && !(root && p.startsWith(root + '/'))) out.push(p); // path-text: a path as a reply wrote it, maybe another machine's
     if (out.length === 4) break;
   }
   return out;

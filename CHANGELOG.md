@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **A changed file opens when the session started above its repository.** A session started in the home folder and working in a repository under it listed its changed files from the repository's root, and Read looked for them from the session's folder: "missing". The record now keeps that root; older records are found by the full path their own text gives. A report the reply names by its full path is linked unless it is under that root (it used to be skipped whenever it was under the session's folder).
+
+- **"#" finds any line.** In the capture box, `#name` also lists finished and archived lines, marked, after the ones in progress; picking an archived one opens its panel. In the search box, `#pre` looks for a line when it begins no scope's name.
+
 - **An archived line can be put back from its own panel.** Marking a line done archives it into History, and the only way back was History's Restore, which brings back the whole project. Clicking In progress on such a line changed its status but left it archived, so it stayed off the canvas. Now a status other than done brings the line back, and its panel says it is archived with **Put it back on the canvas**.
 
 - **The side panel has a way back.** Going from a line's panel into one of its records, or on to a line a record names, left only ×. The panel now shows ← whenever it showed something else before, one step at a time; closing it forgets the trail. On a phone the one ← goes a step back first, then closes.

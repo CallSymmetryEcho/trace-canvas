@@ -516,10 +516,18 @@ body.history-open .hist-btn span { display: inline; }
 .q-ask { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 13px; color: var(--muted); }
 .q-ask span { margin-right: 4px; }
 .kind-chip.is-sel { background: var(--accent-soft); border-color: var(--accent); }
-.g-level { flex: none; }
-.g-level button { padding: 3px 9px; font-size: 12px; }
-.g-count { flex: none; color: var(--faint); font-size: 11px; }
-.g-count:empty { display: none; }
+/* The zoom switch floats over the bottom right of the graph, above the capture box: translucent, with a thumb that
+   slides between the levels and follows a pinch while it is under way. */
+.g-zoom { --i: 0; --w: 56px; position: absolute; right: max(22px, env(safe-area-inset-right, 0px)); bottom: 12px; z-index: 4; display: flex; padding: 3px; border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 62%, transparent); -webkit-backdrop-filter: blur(16px) saturate(1.6); backdrop-filter: blur(16px) saturate(1.6);
+  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent); box-shadow: 0 6px 22px -6px rgba(20, 24, 28, .28), inset 0 1px 0 color-mix(in srgb, #fff 35%, transparent); }
+.g-zoom button { position: relative; width: var(--w); border: 0; background: none; padding: 6px 0; font-size: 12.5px; color: var(--muted); cursor: pointer; border-radius: 999px; transition: color .2s; }
+.g-zoom button[aria-pressed="true"] { color: var(--ink); font-weight: 600; }
+.gz-thumb { position: absolute; top: 3px; bottom: 3px; left: 3px; width: var(--w); border-radius: 999px; transform: translateX(calc(var(--i) * var(--w)));
+  background: color-mix(in srgb, var(--surface) 88%, transparent); box-shadow: 0 1px 5px rgba(20, 24, 28, .22), inset 0 0 0 .5px color-mix(in srgb, var(--ink) 10%, transparent);
+  transition: transform .5s cubic-bezier(.3, 1.35, .5, 1); }
+.g-zoom.is-drag .gz-thumb { transition: none; }
+@media (prefers-reduced-motion: reduce) { .gz-thumb { transition: none; } }
 .g-row.g-mini { border: 0; min-height: 0; padding-block: 0; cursor: default; }
 .g-row.g-mini:hover { background: none; }
 .g-more { color: var(--faint); font-size: 10.5px; opacity: .8; }
@@ -1204,6 +1212,7 @@ button.gl-prog[aria-pressed="true"] { color: var(--ink); background: var(--surfa
         <div class="git-legend" id="git-legend"></div>
         <div class="git-body" id="git-body"></div>
       </div>
+      <div class="g-zoom" id="g-zoom" role="group" data-i18n-title="glTitle"><i class="gz-thumb"></i><button data-glevel="0" data-i18n="gl0">All</button><button data-glevel="1" data-i18n="gl1">Decisions</button><button data-glevel="2" data-i18n="gl2">Starred</button></div>
     </section>
 
     <section class="view" id="view-agents" hidden>
@@ -3209,11 +3218,12 @@ function renderGit() {
   // The kind filter drops rows here (forks and merges stay so lines keep their shape); search only dims.
   const kindOk = c => !S.kinds.size || S.kinds.has(c.kind) || c.kind === 'fork' || c.kind === 'merge';
   const lvl = S.gitLevel, inView = [...S.commits.values()].filter(c => visible.has(tidOf(c)) && kindOk(c));
-  const list = inView.sort((a, b) => b.ts - a.ts), isBead = c => !gitKeep(c, lvl), nFull = lvl ? list.filter(c => !isBead(c)).length : list.length;
-  const levelCtl = `<span class="seg g-level" title="${esc(t('glTitle'))}">${[0, 1, 2].map(n => `<button data-glevel="${n}" aria-pressed="${n === lvl}">${esc(t('gl' + n))}</button>`).join('')}</span>`;
+  const list = inView.sort((a, b) => b.ts - a.ts), isBead = c => !gitKeep(c, lvl);
   // Live tips: sessions working on a visible line right now take the top rows, above its newest record.
   const tips = S.live.filter(s => s.threadId && visible.has(s.threadId));
-  const body = $('#git-body'), legend = $('#git-legend');
+  const body = $('#git-body'), legend = $('#git-legend'), gz = $('#g-zoom');
+  gz.style.setProperty('--i', lvl); gz.classList.remove('is-drag');
+  for (const b of gz.querySelectorAll('button')) b.setAttribute('aria-pressed', +b.dataset.glevel === lvl);
   if (!list.length && !tips.length) { body.innerHTML = ''; legend.innerHTML = ''; return; }
   const tipLines = new Set(tips.map(s => s.threadId));
   const laneOrder = [INBOX, ...orderedThreads().map(th => th.id)].filter(id => visible.has(id) && (by.has(id) || tipLines.has(id)));
@@ -3276,7 +3286,7 @@ function renderGit() {
   const selC = S.sel && S.sel.type === 'commit' ? S.sel.id : null;
   legend.classList.toggle('open', !!S.lanesOpen);
   const chipIds = laneOrder.filter(id => !isHidden(getThread(id)));
-  legend.innerHTML = levelCtl + `<span class="g-count mono">${lvl ? `${nFull}/${list.length}` : ''}</span><span class="legend-label">${esc(t('legend'))}</span><span class="lane-chips">` + chipIds.map(id => {
+  legend.innerHTML = `<span class="legend-label">${esc(t('legend'))}</span><span class="lane-chips">` + chipIds.map(id => {
     const th = getThread(id);
     return `<button class="lane-chip ${selT === id ? 'is-sel' : ''}" data-tid="${esc(id)}" style="--c:${th.color}"><i></i>${esc(th.name)}<span class="mono" style="color:var(--faint);font-size:11px">${(by.get(id) || []).length}</span></button>`;
   }).join('') + `</span><button class="lane-chip lane-more" data-lanes-toggle>${esc(S.lanesOpen ? t('lanesLess') : t('lanesAll', chipIds.length))}</button><span class="legend-label" style="margin-left:10px">${esc(t('legendKinds'))}</span>` + USER_KINDS.map(k => `<button class="lane-chip kind-chip ${S.kinds.has(k) ? 'is-sel' : ''}" data-kind="${k}" title="${esc(kindLabel(k))}" aria-label="${esc(kindLabel(k))}" aria-pressed="${S.kinds.has(k)}">${mini(k, 'var(--ink)', false)}<span>${esc(kindLabel(k))}</span></button>`).join('') + `<span class="legend-actors">${ACTOR_ICON.human ? `<span class="actor a-human">${ACTOR_ICON.human}</span>${esc(t('actorHuman'))}` : ''}<span class="actor a-agent" style="margin-left:8px">${ACTOR_ICON.agent}</span>${esc(t('actorAgent'))}</span>`;
@@ -3378,8 +3388,6 @@ $('#git-scroll').addEventListener('click', e => {
     if (best) { const tid = best.dataset.tid; select(S.sel && S.sel.type === 'thread' && S.sel.id === tid ? null : { type: 'thread', id: tid }); }
     return;
   }
-  const lv = e.target.closest('[data-glevel]');
-  if (lv) { gitZoom(+lv.dataset.glevel - S.gitLevel); return; }
   if (e.target.closest('[data-lanes-toggle]')) { S.lanesOpen = !S.lanesOpen; ls.set('tc.lanesOpen', S.lanesOpen); render(); return; }
   const kc = e.target.closest('[data-kind]');
   if (kc) { const k = kc.dataset.kind; S.kinds.has(k) ? S.kinds.delete(k) : S.kinds.add(k); ls.set('tc.kinds', [...S.kinds]); render(); return; }
@@ -3425,27 +3433,53 @@ function gitZoom(dir, cy) {
     motion(() => rowOf(id), came ? [{ transform: from, opacity: 0 }, { transform: 'none' }] : [{ transform: from }, { transform: 'none' }], opts);
   }
 }
+// While the fingers move and before a step is taken, the page follows them: the switch's thumb slides toward the next
+// level and the graph gives a little about the fingers (p: 1 = a whole step smaller, -1 larger; null = let go). At the
+// last level in that direction both only give slightly, then spring back.
+function gitFeel(p, cy) {
+  const z = $('#g-zoom'), body = $('#git-body'), wrap = $('#git-scroll');
+  if (p == null) { z.classList.remove('is-drag'); z.style.setProperty('--i', S.gitLevel); body.style.transition = `transform .3s ${EASE_ZOOM}`; body.style.transform = ''; return; }
+  const q = clamp(S.gitLevel + Math.sign(p), 0, GIT_LEVELS - 1) === S.gitLevel ? p * 0.2 : p;
+  z.classList.add('is-drag'); z.style.setProperty('--i', S.gitLevel + q);
+  if (CALM.matches) return;
+  body.style.transition = 'none';
+  body.style.transformOrigin = `0 ${cy - wrap.getBoundingClientRect().top + wrap.scrollTop - body.offsetTop}px`;
+  body.style.transform = `scaleY(${1 - 0.1 * q})`;
+}
+function gitStep(dir, cy) {
+  const body = $('#git-body'); body.style.transition = 'none'; body.style.transform = ''; // measured without the give
+  gitZoom(dir, cy);
+  gitFeel(null);
+}
 {
-  const wrap = $('#git-scroll');
-  // Trackpad pinch (a wheel with ctrl): one step per gesture, however long the fingers keep moving.
-  let acc = 0, quiet = 0, stepped = false;
+  const wrap = $('#git-scroll'), z = $('#g-zoom');
+  z.addEventListener('click', e => { const b = e.target.closest('[data-glevel]'); if (b) gitZoom(+b.dataset.glevel - S.gitLevel); });
+  // Trackpad pinch (a wheel with ctrl): a step each time the fingers have moved far enough, then a short rest so one
+  // long pinch can go through the levels without skipping one.
+  const FAR = 45;
+  let acc = 0, quiet = 0, rest = 0;
   wrap.addEventListener('wheel', e => {
     if (!e.ctrlKey && !e.metaKey) return;
     e.preventDefault();
-    clearTimeout(quiet); quiet = setTimeout(() => { acc = 0; stepped = false; }, 220);
+    clearTimeout(quiet); quiet = setTimeout(() => { acc = 0; gitFeel(null); }, 180);
+    if (e.timeStamp < rest) return;
     acc += e.deltaY;
-    if (!stepped && Math.abs(acc) > 30) { stepped = true; gitZoom(acc > 0 ? 1 : -1, e.clientY); }
+    if (Math.abs(acc) >= FAR && clamp(S.gitLevel + Math.sign(acc), 0, GIT_LEVELS - 1) !== S.gitLevel) { gitStep(Math.sign(acc), e.clientY); acc = 0; rest = e.timeStamp + 380; }
+    else gitFeel(clamp(acc / FAR, -1, 1), e.clientY);
   }, { passive: false });
-  // Two fingers on a touch screen: each time they close or open by about a third, one step.
+  // Two fingers on a touch screen: a step each time they close to 70% or open to 143%.
   let d0 = 0;
   const span = e => Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
   wrap.addEventListener('touchstart', e => { d0 = e.touches.length === 2 ? span(e) : 0; }, { passive: true });
   wrap.addEventListener('touchmove', e => {
     if (e.touches.length !== 2 || !d0) return;
     e.preventDefault();
-    const d = span(e), k = d / d0;
-    if (k < 0.7 || k > 1.4) { d0 = d; gitZoom(k < 1 ? 1 : -1, (e.touches[0].clientY + e.touches[1].clientY) / 2); }
+    const d = span(e), p = -Math.log(d / d0) / Math.log(1 / 0.7), cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+    if (Math.abs(p) >= 1 && clamp(S.gitLevel + Math.sign(p), 0, GIT_LEVELS - 1) !== S.gitLevel) { d0 = d; gitStep(Math.sign(p), cy); }
+    else gitFeel(clamp(p, -1, 1), cy);
   }, { passive: false });
+  const letGo = e => { if (e.touches.length < 2 && d0) { d0 = 0; gitFeel(null); } };
+  wrap.addEventListener('touchend', letGo); wrap.addEventListener('touchcancel', letGo);
   wrap.addEventListener('gesturestart', e => e.preventDefault()); // Safari's own page zoom
 }
 

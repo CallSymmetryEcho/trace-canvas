@@ -520,7 +520,9 @@ body.history-open .hist-btn span { display: inline; }
 .g-level button { padding: 3px 9px; font-size: 12px; }
 .g-count { flex: none; color: var(--faint); font-size: 11px; }
 .g-count:empty { display: none; }
-.g-none { margin: 24px 16px; color: var(--faint); }
+.g-row.g-mini { border: 0; min-height: 0; padding: 0; }
+.git-svg .bead { stroke: var(--bg); stroke-width: .6; }
+.git-svg .bead.hit { stroke: var(--ink); stroke-width: 1.2; }
 .git-body { position: relative; padding-left: max(4px, env(safe-area-inset-left, 0px)); }
 .git-svg { position: absolute; top: 0; overflow: visible; }
 .git-svg .lane { stroke-width: 3; stroke-linecap: round; fill: none; }
@@ -1353,7 +1355,7 @@ apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent 
     justNow: 'just now', minAgo: n => `${n} min ago`, hAgo: n => `${n} h ago`, yesterday: 'yesterday', daysAgo: n => `${n} days ago`,
     edgeRelated: 'related', edgeFork: 'fork', edgeMerge: 'merge', labelChips: ['depends on', 'references', 'derived from', 'blocks', 'conflicts', 'same goal'],
     connectFrom: n => `From <b>${n}</b>: now pick a second thread`, connectPick: 'Pick the thread to start from',
-    legend: 'Lines', legendKinds: 'Show', lanesAll: n => `All ${n}`, lanesLess: 'Collapse', gl0: 'All', gl1: 'Decisions', gl2: 'Starred', glTitle: 'How much to show: pinch in for less, out for more', glNone: 'Nothing here is starred yet. Pinch out, or pick another level above.', tlCorner: 'Threads', tlNowLabel: 'now',
+    legend: 'Lines', legendKinds: 'Show', lanesAll: n => `All ${n}`, lanesLess: 'Collapse', gl0: 'All', gl1: 'Decisions', gl2: 'Starred', glTitle: 'Which records are shown in full; the rest shrink to beads on their lines. Pinch in for less, out for more', tlCorner: 'Threads', tlNowLabel: 'now',
     week: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
     months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
     dayLabel: d => `${I18N.en.week[d.getDay()]} ${d.getMonth() + 1}/${d.getDate()}`,
@@ -1536,7 +1538,7 @@ apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的
     justNow: '刚刚', minAgo: n => `${n} 分钟前`, hAgo: n => `${n} 小时前`, yesterday: '昨天', daysAgo: n => `${n} 天前`,
     edgeRelated: '相关', edgeFork: '分叉', edgeMerge: '合并', labelChips: ['依赖', '参考', '衍生', '阻塞', '冲突', '同一目标'],
     connectFrom: n => `从「<b>${n}</b>」出发，再点一条线程完成连线`, connectPick: '点一条线程作为起点',
-    legend: '线路', legendKinds: '只看', lanesAll: n => `全部 ${n}`, lanesLess: '收起', gl0: '全部', gl1: '决定', gl2: '星标', glTitle: '显示多少：捏合收起，张开展开', glNone: '这里还没有标星的记录。张开手指，或在上面换一档。', tlCorner: '线程', tlNowLabel: '现在',
+    legend: '线路', legendKinds: '只看', lanesAll: n => `全部 ${n}`, lanesLess: '收起', gl0: '全部', gl1: '决定', gl2: '星标', glTitle: '哪些记录完整显示，其余缩成线上的小点。捏合缩小，张开放大', tlCorner: '线程', tlNowLabel: '现在',
     week: ['日', '一', '二', '三', '四', '五', '六'],
     dayLabel: d => `${d.getMonth() + 1}/${d.getDate()} 周${I18N.zh.week[d.getDay()]}`,
     monthLabel: d => `${d.getFullYear()} 年 ${d.getMonth() + 1} 月`,
@@ -3194,8 +3196,9 @@ function createThreadAndEdit() {
 /* ================= git graph ================= */
 // Another machine's name, next to what it wrote or runs (this machine is never named).
 const machineTag = m => (m && S.machine && m !== S.machine ? `<span class="agent-tag m-tag" title="${esc(t('onMachine', m))}">${esc(m)}</span>` : '');
-// Zoom levels of the Branches view: 0 every record, 1 decisions and starred (forks and merges stay, so the lines keep
-// their shape), 2 starred only. The record that is open stays at every level.
+// Zoom levels of the Branches view: 0 every record in full, 1 decisions, starred, forks and merges, 2 starred only.
+// The others stay on their lines as small beads in thin rows, so every line, fork and merge keeps its place and
+// only the scale changes. The record that is open is always in full.
 const GIT_LEVELS = 3;
 const gitKeep = (c, lvl) => !lvl || !!c.starred || (lvl === 1 && (c.kind === 'decision' || c.kind === 'fork' || c.kind === 'merge')) || (S.sel && S.sel.type === 'commit' && S.sel.id === c.id);
 function renderGit() {
@@ -3204,12 +3207,12 @@ function renderGit() {
   // The kind filter drops rows here (forks and merges stay so lines keep their shape); search only dims.
   const kindOk = c => !S.kinds.size || S.kinds.has(c.kind) || c.kind === 'fork' || c.kind === 'merge';
   const lvl = S.gitLevel, inView = [...S.commits.values()].filter(c => visible.has(tidOf(c)) && kindOk(c));
-  const list = inView.filter(c => gitKeep(c, lvl)).sort((a, b) => b.ts - a.ts);
+  const list = inView.sort((a, b) => b.ts - a.ts), isBead = c => !gitKeep(c, lvl), nFull = lvl ? list.filter(c => !isBead(c)).length : list.length;
   const levelCtl = `<span class="seg g-level" title="${esc(t('glTitle'))}">${[0, 1, 2].map(n => `<button data-glevel="${n}" aria-pressed="${n === lvl}">${esc(t('gl' + n))}</button>`).join('')}</span>`;
   // Live tips: sessions working on a visible line right now take the top rows, above its newest record.
   const tips = S.live.filter(s => s.threadId && visible.has(s.threadId));
   const body = $('#git-body'), legend = $('#git-legend');
-  if (!list.length && !tips.length) { body.innerHTML = lvl && inView.length ? `<p class="g-none">${esc(t('glNone'))}</p>` : ''; legend.innerHTML = lvl && inView.length ? levelCtl : ''; return; }
+  if (!list.length && !tips.length) { body.innerHTML = ''; legend.innerHTML = ''; return; }
   const tipLines = new Set(tips.map(s => s.threadId));
   const laneOrder = [INBOX, ...orderedThreads().map(th => th.id)].filter(id => visible.has(id) && (by.has(id) || tipLines.has(id)));
   const row = new Map(list.map((c, i) => [c.id, i + tips.length]));
@@ -3250,13 +3253,24 @@ function renderGit() {
   // the rows off its edge); a phone also gives each row two lines (ROW matches .g-row's height in the narrow-screen CSS).
   const phone = PHONE.matches, ROW = phone ? 52 : 44, PADX = phone ? 10 : 16;
   const LW = Math.max(phone ? 6 : 9, Math.min(phone ? 22 : 28, Math.floor((innerWidth * (phone ? 0.28 : 0.42) - 2 * PADX) / Math.max(1, nCols - 1))));
-  const lx = i => PADX + i * LW, ry = i => i * ROW + ROW / 2;
+  // A bead's row is thin, and a long run of beads shares 160px, so months of work between two starred records shrink
+  // to a short stretch whose density still shows how much happened. runs: where each run starts, for the row list.
+  const MINI = lvl === 2 ? 3 : 6, hs = [...tips.map(() => ROW), ...list.map(() => ROW)], yAt = [0], runs = new Map();
+  for (let i = 0; i < list.length; i++) {
+    if (!isBead(list[i])) continue;
+    let j = i; while (j < list.length && isBead(list[j])) j++;
+    const total = Math.round(Math.min((j - i) * MINI, 160));
+    for (let k = i; k < j; k++) hs[tips.length + k] = total / (j - i);
+    runs.set(i, total); i = j - 1;
+  }
+  for (const h of hs) yAt.push(yAt[yAt.length - 1] + h);
+  const lx = i => PADX + i * LW, ry = i => (i < 0 ? i * ROW + ROW / 2 : yAt[i] + hs[i] / 2);
   const gw = PADX * 2 + (nCols - 1) * LW;
   const selT = selThreadId();
   const selC = S.sel && S.sel.type === 'commit' ? S.sel.id : null;
   legend.classList.toggle('open', !!S.lanesOpen);
   const chipIds = laneOrder.filter(id => !isHidden(getThread(id)));
-  legend.innerHTML = levelCtl + `<span class="g-count mono">${lvl ? `${list.length}/${inView.length}` : ''}</span><span class="legend-label">${esc(t('legend'))}</span><span class="lane-chips">` + chipIds.map(id => {
+  legend.innerHTML = levelCtl + `<span class="g-count mono">${lvl ? `${nFull}/${list.length}` : ''}</span><span class="legend-label">${esc(t('legend'))}</span><span class="lane-chips">` + chipIds.map(id => {
     const th = getThread(id);
     return `<button class="lane-chip ${selT === id ? 'is-sel' : ''}" data-tid="${esc(id)}" style="--c:${th.color}"><i></i>${esc(th.name)}<span class="mono" style="color:var(--faint);font-size:11px">${(by.get(id) || []).length}</span></button>`;
   }).join('') + `</span><button class="lane-chip lane-more" data-lanes-toggle>${esc(S.lanesOpen ? t('lanesLess') : t('lanesAll', chipIds.length))}</button><span class="legend-label" style="margin-left:10px">${esc(t('legendKinds'))}</span>` + USER_KINDS.map(k => `<button class="lane-chip kind-chip ${S.kinds.has(k) ? 'is-sel' : ''}" data-kind="${k}" title="${esc(kindLabel(k))}" aria-label="${esc(kindLabel(k))}" aria-pressed="${S.kinds.has(k)}">${mini(k, 'var(--ink)', false)}<span>${esc(kindLabel(k))}</span></button>`).join('') + `<span class="legend-actors">${ACTOR_ICON.human ? `<span class="actor a-human">${ACTOR_ICON.human}</span>${esc(t('actorHuman'))}` : ''}<span class="actor a-agent" style="margin-left:8px">${ACTOR_ICON.agent}</span>${esc(t('actorAgent'))}</span>`;
@@ -3305,6 +3319,7 @@ function renderGit() {
     const th = getThread(tidOf(c));
     const cx = lx(lane.get(tidOf(c))), cy = ry(row.get(c.id));
     const hit = S.kinds.has(c.kind) && matches(c);
+    if (isBead(c)) { svg += `<circle class="bead${off(tidOf(c))}${hit ? ' hit' : ''}" data-cid="${esc(c.id)}" cx="${cx}" cy="${cy}" r="${Math.min(MINI / 2, 2.2)}" style="fill:${stationColor(c, th)}"/>`; continue; }
     svg += `<g data-cid="${esc(c.id)}" class="${off(tidOf(c))}">${hit ? `<circle class="g-hit" cx="${cx}" cy="${cy}" r="10" style="fill:${th.color}"/>` : ''}${glyph(c.kind, stationColor(c, th), cx, cy, 6, { done: c.done, dim: filtering() && !matches(c) })}${c.id === selC ? `<circle cx="${cx}" cy="${cy}" r="11" fill="none" style="stroke:var(--accent)" stroke-width="2"/>` : ''}</g>`;
   }
   const selS = S.sel && S.sel.type === 'live' ? S.sel.id : null;
@@ -3320,8 +3335,9 @@ ${machineTag(s.away && s.machine)}
       <span class="g-time">${esc(t('liveTipTime'))}</span><span class="g-ago">${esc(t('liveTipTime'))}</span>
     </div>`;
   }).join('');
-  const rows = tipRows + list.map(c => {
+  const rows = tipRows + list.map((c, i) => {
     const th = getThread(tidOf(c));
+    if (isBead(c)) return runs.has(i) ? `<div class="g-row g-mini" style="height:${runs.get(i)}px"></div>` : ''; // one spacer for the whole run
     return `<div class="g-row k-${c.kind} ${c.done ? 'done' : ''} ${selT && tidOf(c) !== selT ? 'is-other' : ''} ${c.id === selC ? 'is-sel' : ''} ${filtering() && !matches(c) ? 'is-dim' : ''}" tabindex="0" data-kb data-cid="${esc(c.id)}" style="padding-left:${gw + 6}px">
       ${c.kind === 'fork' || c.kind === 'merge' ? '<span class="actor"></span>' : actorMark(c, th.color)}
       <span class="g-title">${starMark(c)}${esc(c.title)}</span>
@@ -3331,7 +3347,7 @@ ${machineTag(s.away && s.machine)}
       <span class="g-time">${fmtAbs(c.ts)}</span><span class="g-ago">${fmtShort(c.ts)}</span>
     </div>`;
   }).join('');
-  body.innerHTML = `<svg class="git-svg" width="${gw}" height="${(list.length + tips.length) * ROW}" style="left:max(4px, env(safe-area-inset-left, 0px))">${svg}</svg>${rows}`;
+  body.innerHTML = `<svg class="git-svg" width="${gw}" height="${yAt[yAt.length - 1]}" style="left:max(4px, env(safe-area-inset-left, 0px))">${svg}</svg>${rows}`;
 }
 $('#git-scroll').addEventListener('click', e => {
   const tip = e.target.closest('[data-sid]');
@@ -3359,9 +3375,8 @@ $('#git-scroll').addEventListener('click', e => {
   if (r) select({ type: 'commit', id: r.dataset.cid });
 });
 
-// Pinch in the Branches view: one step fewer or more records. The row nearest the fingers that is in both levels stays
-// where it is on the screen; the rows that stay glide to their new places on a strong ease-out, the ones that come
-// back slide out from under the row above them, and the lines are redrawn underneath with a short fade.
+// Pinch in the Branches view: one step smaller or larger. The row nearest the fingers stays where it is on the screen
+// and the graph and the titles scale to their new places about it on a strong ease-out.
 const EASE_ZOOM = 'cubic-bezier(.16,1,.3,1)';
 function gitZoom(dir, cy) {
   const to = clamp(S.gitLevel + dir, 0, GIT_LEVELS - 1), wrap = $('#git-scroll'), body = $('#git-body');
@@ -3369,27 +3384,31 @@ function gitZoom(dir, cy) {
   const box = wrap.getBoundingClientRect(), y0 = cy == null ? box.top + box.height / 2 : cy;
   // Where each row is, from the top of the scroller (the body starts below the legend).
   const top = () => { const b = body.getBoundingClientRect().top - box.top; return new Map([...body.querySelectorAll('.g-row[data-cid]')].map(r => [r.dataset.cid, b + r.offsetTop])); };
-  const was = top(), both = lvl => id => S.commits.has(id) && gitKeep(S.commits.get(id), lvl);
-  // The anchor: in both levels, nearest the fingers.
-  let anchor = null, ad = Infinity;
-  for (const [id, y] of was) { const d = Math.abs(y + box.top - y0); if (d < ad && both(to)(id)) { anchor = id; ad = d; } }
+  const was = top();
+  // The anchor: the row nearest the fingers, a full one in the new level when one is on the screen.
+  const near = (ok, max) => { let best = null, bd = max; for (const [id, y] of was) { const d = Math.abs(y + box.top - y0); if (d < bd && ok(id)) { best = id; bd = d; } } return best; };
+  const anchor = near(id => S.commits.has(id) && gitKeep(S.commits.get(id), to), box.height) || near(() => true, Infinity), wasH = body.offsetHeight;
   S.gitLevel = to; ls.set('tc.gitLevel', to);
   renderGit(); // now, not on the next frame: the new places are measured below
+  if (!anchor) return;
   let now = top();
-  if (anchor && now.has(anchor)) { wrap.scrollTop += now.get(anchor) - was.get(anchor); now = top(); }
+  wrap.scrollTop += now.get(anchor) - was.get(anchor); now = top();
   if (CALM.matches) return;
-  const H = box.height, opts = { duration: 460, easing: EASE_ZOOM, fill: 'backwards' };
-  let dy = 0, n = 0; // dy: how far the last row that was there before has to travel; a row that comes back starts with it
-  for (const [id, y] of now) {
-    if (y > H + 60) break;
-    const old = was.has(id);
-    if (old) dy = clamp(was.get(id) - y, -H, H);
-    if (y < -60 || (old && !dy) || n++ > 80) continue;
-    const frames = old ? [{ transform: `translateY(${dy}px)` }, { transform: 'none' }] : [{ transform: `translateY(${dy}px)`, opacity: 0 }, { transform: 'none' }];
-    motion(() => rowOf(id), frames, opts);
-    motion(() => dotOf('git', id), frames, opts);
+  // One scale about the anchor for everything, so it reads as a zoom: how much longer (or shorter) the stretch of
+  // rows on the screen was before, kept within 5x so the start is not a blur.
+  const ay = now.get(anchor), H = box.height, on = [...now].filter(([, y]) => y > -H && y < 2 * H);
+  const far = on.filter(([id]) => was.has(id)).reduce((m, e) => (Math.abs(e[1] - ay) > Math.abs(m[1] - ay) ? e : m), [anchor, ay]);
+  const k = clamp(far[1] === ay ? wasH / body.offsetHeight : (was.get(far[0]) - was.get(anchor)) / (far[1] - ay), 0.2, 5);
+  if (!k || Math.abs(k - 1) < 0.02) return;
+  const opts = { duration: 480, easing: EASE_ZOOM, fill: 'backwards' }, svgTop = body.getBoundingClientRect().top - box.top;
+  motion(() => body.querySelector('.git-svg'), [{ transformOrigin: `0 ${ay - svgTop}px`, transform: `scaleY(${k})`, opacity: .35 }, { transformOrigin: `0 ${ay - svgTop}px`, transform: 'none', opacity: 1 }], opts);
+  let n = 0;
+  for (const [id, y] of on) {
+    if (y < -60 || y > H + 60 || n > 80 || !gitKeep(S.commits.get(id), to)) continue;
+    n++;
+    const from = `translateY(${(y - ay) * (k - 1)}px)`, came = !gitKeep(S.commits.get(id), to - dir);
+    motion(() => rowOf(id), came ? [{ transform: from, opacity: 0 }, { transform: 'none' }] : [{ transform: from }, { transform: 'none' }], opts);
   }
-  motion(() => body.querySelector('.git-svg'), [{ opacity: .15 }, { opacity: 1 }], { duration: 380, easing: 'ease-out', fill: 'backwards' });
 }
 {
   const wrap = $('#git-scroll');

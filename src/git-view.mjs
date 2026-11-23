@@ -220,7 +220,7 @@ const MACHINE = /^[A-Za-z0-9][\w.-]*$/; // an ssh alias, never an option
 function elsewhere(d, c, p, me) {
   const ss = Object.values(d.sessions || {}).filter(x => x.machine && x.machine !== me).sort((a, b) => (b.last || 0) - (a.last || 0));
   const homeDir = (/^\/(?:Users|home)\/[^/]+/.exec(p) || [])[0];
-  const s = homeDir ? ss.find(x => String(x.cwd || '').startsWith(homeDir)) : p.startsWith('~') ? ss.find(x => x.thread === c.thread) : null;
+  const s = homeDir ? ss.find(x => String(x.cwd || '').startsWith(homeDir)) : p.startsWith('~') ? ss.find(x => x.thread === c.thread) : null; // path-text: another machine's folder, which this one cannot resolve
   return s ? s.machine : '';
 }
 /**

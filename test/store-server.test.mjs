@@ -75,3 +75,26 @@ test('server serves the page and data, and refuses writes without its header', a
     fs.unwatchFile(path.join(process.env.TRACE_CANVAS_HOME, 'data.json'));
   }
 });
+
+test('two paths to one folder are one place, and no file compares a working folder with === any more', async () => {
+  const { samePlace, insidePlace } = await import('../src/store.mjs');
+  const fsx = await import('node:fs'), osx = await import('node:os'), px = await import('node:path');
+  // The same folder reached two ways, as /tmp and /private/tmp are on a Mac: here through a symlink.
+  const root = fsx.mkdtempSync(px.join(osx.tmpdir(), 'tc-place-')), real = px.join(root, 'private', 'proj'), link = px.join(root, 'proj');
+  fsx.mkdirSync(px.join(real, 'sub'), { recursive: true }); fsx.symlinkSync(real, link);
+  assert.equal(samePlace(link, real), true);
+  assert.equal(samePlace(link + '/', real), true);
+  assert.equal(samePlace(px.join(link, 'sub', '..'), real), true);
+  assert.equal(samePlace(px.join(link, 'sub'), real), false);
+  assert.equal(insidePlace(px.join(link, 'sub'), real), true);
+  assert.equal(insidePlace(real, px.join(link, 'sub')), false);
+  assert.equal(insidePlace(real + '-other', link), false);           // a name that only starts the same
+  assert.equal(samePlace(px.join(root, 'gone'), px.join(root, 'gone') + '/'), true); // not there any more: as written
+  assert.equal(samePlace('', real), false);
+  // A scan in place of a lint rule. A line that means the text of a path (another machine's, a note being set right) says so: // path-text:
+  const src = new URL('../src/', import.meta.url), bad = [];
+  for (const f of fsx.readdirSync(src).filter(f => f.endsWith('.mjs'))) fsx.readFileSync(new URL(f, src), 'utf8').split('\n').forEach((l, i) => {
+    if ((/\b(cwd|projectDir)\b[^=\n]{0,30}(===|!==)|(===|!==)[^=\n]{0,30}\b(cwd|projectDir)\b|\bcwd\b[^\n]{0,12}\.startsWith\(/.test(l)) && !/path-text:|process\.cwd\(\)|fs\.existsSync\(s\.cwd\)|samePlace\(|insidePlace\(/.test(l)) bad.push(`${f}:${i + 1}: ${l.trim().slice(0, 90)}`);
+  });
+  assert.deepEqual(bad, []);
+});

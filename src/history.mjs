@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { addCommit, hashId, readConfig } from './store.mjs';
+import { addCommit, hashId, insidePlace, readConfig, samePlace } from './store.mjs';
 import { firstLine } from './git-events.mjs';
 import { gitRoot, repoInfo } from './hook.mjs';
 import { tr } from './i18n.mjs';
@@ -98,7 +98,7 @@ function transcriptFiles(root, sub, env) {
   return out.length ? out : findTranscripts(root, env).map(f => ({ ...f, exact: true }));
 }
 // A subfolder counts when it is the same repository (a worktree is), not one nested inside; one gone since is let in.
-const inside = (cwd, root, sub) => cwd === root || (sub && String(cwd || '').startsWith(`${root}/`) && (!fs.existsSync(cwd) || gitRoot(cwd) === root));
+const inside = (cwd, root, sub) => samePlace(cwd, root) || (sub && insidePlace(cwd, root) && (!fs.existsSync(cwd) || samePlace(gitRoot(cwd), root)));
 
 function claudeSessions(root, sub, known, env) {
   const out = [];

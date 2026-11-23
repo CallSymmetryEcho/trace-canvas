@@ -5,7 +5,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createCard } from './research.mjs';
-import { addCommit, dataFile, ensureThread, findThreadByName, importText, INBOX, mutate, readConfig, readData, threadById, threadIdOf } from './store.mjs';
+import { addCommit, dataFile, ensureThread, insidePlace, findThreadByName, importText, INBOX, mutate, readConfig, readData, threadById, threadIdOf } from './store.mjs';
 import { handedThread, sessionThread, whereFind } from './hook.mjs';
 import { agentEnv, agentKey, agentOf } from './agents.mjs';
 import { sessionOfPid } from './live.mjs';
@@ -375,7 +375,7 @@ async function callTool(name, a = {}) {
     case 'trace_live': {
       const d = readData();
       const dir = a.project_dir ? path.resolve(a.project_dir) : null;
-      const sessions = liveSessions(d).sessions.filter(s => !dir || (s.cwd || '').startsWith(dir)).map(s => ({
+      const sessions = liveSessions(d).sessions.filter(s => !dir || insidePlace(s.cwd, dir)).map(s => ({
         sessionId: s.id, status: s.status, activity: s.activity, title: s.title || s.prompt || '', repo: s.repo, branch: s.branch, cwd: s.cwd,
         thread: s.threadId ? d.threads[s.threadId].name : null, bound: s.bound, startedBy: s.parent,
         subagents: s.agents.map(a => ({ type: a.type, description: a.description, status: a.status, last: a.last || '' })),

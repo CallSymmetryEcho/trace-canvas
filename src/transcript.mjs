@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { gitEvents, commandDir, redirectTargets, isScratch, BASH_WRITES, EDIT_TOOLS, cleanPrompt } from './git-events.mjs';
 import { listLive } from './live.mjs';
+import { samePlace } from './store.mjs';
 
 export function projectsRoot(env = process.env) {
   return env.CLAUDE_PROJECTS_DIR || path.join(env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude'), 'projects');
@@ -57,7 +58,7 @@ export function currentSessionId({ sessionId, projectDir, env = process.env, now
   // Codex and Gemini set no such variable; their hooks keep a live file per session, with the agent and cwd.
   const key = env.TRACE_CANVAS_AGENT;
   if (key && key !== 'claude') {
-    const mine = listLive(env).filter(s => s.agentKey === key && (!projectDir || s.cwd === path.resolve(projectDir)) && now - s.lastSeen < 10 * 60e3);
+    const mine = listLive(env).filter(s => s.agentKey === key && (!projectDir || samePlace(s.cwd, projectDir)) && now - s.lastSeen < 10 * 60e3);
     if (mine.length > 1) throw new Error(`${mine.length} ${key} sessions are active in ${projectDir}, so it is not clear which one is calling; pass session_id`);
     if (mine.length) return mine[0].id;
   }

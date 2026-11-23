@@ -213,7 +213,7 @@ export function handleHook(input, env = process.env) {
     const s = d.sessions[sid] || adoptSession(d, sid, state);
     // A folder noted by an older version (the one the session had cd-ed into) is set right by its next event.
     const dir = sessionDir(cwd, s.cwd, input.transcript_path);
-    if (d.sessions[sid] && s.cwd && dir !== s.cwd) { s.cwd = dir; changed = true; }
+    if (d.sessions[sid] && s.cwd && dir !== s.cwd) { s.cwd = dir; changed = true; } // path-text: the folder as noted, set right when it differs at all
     // A session noted before machines were (or only ever ended since) has none: any event of its gives it this one.
     if (d.sessions[sid] && !s.machine && cfg.machine) { s.machine = cfg.machine; changed = true; }
     const touch = () => { d.sessions[sid] = Object.assign(s, { id: sid, agent: ag.name, agentKey: input._agent || 'claude', resume: ag.resume(sid), cwd: dir, machine: cfg.machine, last: Date.now() }); changed = true; };
@@ -594,7 +594,7 @@ export function namedReports(msg, cwd = '') {
   const out = [];
   for (const m of String(msg || '').matchAll(/(?<![\w/.~-])(~|\/(?:Users|home|mnt|tmp))\/[^\s`'"<>()，。；、：]+\.(?:md|markdown|txt|pdf|png|jpe?g|gif|webp|svg)\b/gi)) {
     const p = m[0];
-    if (!out.includes(p) && !(cwd && p.startsWith(cwd + '/'))) out.push(p);
+    if (!out.includes(p) && !(cwd && p.startsWith(cwd + '/'))) out.push(p); // path-text: a path as a reply wrote it, maybe another machine's
     if (out.length === 4) break;
   }
   return out;

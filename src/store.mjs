@@ -114,6 +114,12 @@ export function machineName(env = process.env) {
   if (!machines.has(h)) machines.set(h, readConfig(env).machine);
   return machines.get(h);
 }
+// Two paths to one place are one place: a folder reached through a symlink (macOS's /tmp and /var are /private/tmp and
+// /private/var), with or without a trailing slash, relative or not. Every comparison of folders on this machine goes
+// through these two; a path that no longer exists is compared as written. (A path on another machine is only text: not for these.)
+const realPlace = p => { try { return fs.realpathSync(String(p)); } catch { return path.resolve(String(p)); } };
+export const samePlace = (a, b) => !!a && !!b && realPlace(a) === realPlace(b);
+export const insidePlace = (p, dir) => { if (!p || !dir) return false; const a = realPlace(p), b = realPlace(dir); return a === b || a.startsWith(b.endsWith(path.sep) ? b : b + path.sep); };
 export function writeConfig(patch, env) {
   fs.mkdirSync(home(env), { recursive: true });
   let file = {};

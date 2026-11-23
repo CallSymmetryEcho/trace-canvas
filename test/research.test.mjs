@@ -19,7 +19,7 @@ function setup() {
   const d = emptyData(), th = createThread(d, { name: 'research' });
   const c = createCard(d, { question: 'Does the bright region pass the midpoint?', thread: th.id, inputs: [input] }, env);
   const started = [];
-  const fake = (dir, cmd, e) => { started.push({ dir, cmd, thread: e.TRACE_CANVAS_THREAD }); return 999999; };
+  const fake = (dir, cmd, e) => { started.push({ dir, cmd, thread: e.TRACE_CANVAS_THREAD, env: e }); return 999999; };
   return { tmp, env, d, th, c, input, started, fake };
 }
 
@@ -30,7 +30,9 @@ test('saving freezes the question and a copy of each input with its hash; a run 
   assert.equal(F.version, 1);
   assert.match(fs.readFileSync(F.task, 'utf8'), /Does the bright region pass the midpoint\?[\s\S]*input\/blind-input\.zip（原文件 [^）]+）· SHA-256 [0-9a-f]{64}/);
   fs.writeFileSync(input, 'changed later'); // the original changing later does not touch the frozen copy
-  const a = startRun(d, c.id, { workbench: 'codex', key: 'k1' }, env, fake, BENCHES).run;
+  // Started from inside a session: none of that session's own variables go along, and the line is the card's.
+  const a = startRun(d, c.id, { workbench: 'codex', key: 'k1' }, { ...env, CLAUDECODE: '1', TMUX: '/tmp/tmux-1/default,1,0', TMUX_PANE: '%4', TRACE_CANVAS_THREAD: 'tcaller' }, fake, BENCHES).run;
+  assert.deepEqual([started[0].env.CLAUDECODE, started[0].env.TMUX, started[0].env.TMUX_PANE, started[0].env.TRACE_CANVAS_THREAD], [undefined, undefined, undefined, th.id]);
   assert.deepEqual([a.status, a.mode, a.packageSha, a.requestedModel, started.length, started[0].thread], ['submitted', 'single', F.sha256, 'gpt-x · high', 1, th.id]);
   assert.match(started[0].cmd, /^codex exec --json/);
   assert.equal(fs.readFileSync(path.join(a.dir, 'input', 'blind-input.zip'), 'utf8'), 'frames');

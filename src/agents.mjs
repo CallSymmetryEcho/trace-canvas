@@ -46,6 +46,14 @@ export const macTerminal = (env = process.env, has = p => fs.existsSync(p)) => {
 // in its command). TERM_PROGRAM is the caller's terminal (tmux), not the new tab's.
 const SESSION_VAR = /^(TMUX|TMUX_PANE|TERM_PROGRAM|TERM_PROGRAM_VERSION|TRACE_CANVAS_THREAD|CLAUDECODE|CLAUDE_PID|CLAUDE_EFFORT|CLAUDE_CODE_(SESSION_\w+|CHILD_\w+|ENTRYPOINT|EXECPATH|MESSAGING_\w+|BRIDGE_\w+|SSE_PORT))$/;
 export const agentEnv = env => Object.fromEntries(Object.entries(env).filter(([k]) => !SESSION_VAR.test(k)));
+/**
+ * Starts an agent's own program (claude, codex, gemini, agy, or a shell that runs one). The one way to do it: the
+ * caller's own session variables never go along (agentEnv), so the new agent is not taken for the caller's child, its
+ * terminal or its line. extra: what the new agent is meant to get (its line). test/agents.test.mjs fails on a start that goes round this.
+ */
+export function spawnAgent(file, args, { env = process.env, extra = {}, ...opts } = {}, start = spawn) {
+  return start(file, args, { ...opts, env: { ...agentEnv(env), ...extra } });
+}
 function desktopEnv(env) {
   env = agentEnv(env);
   if (env.DISPLAY || env.WAYLAND_DISPLAY) return env;

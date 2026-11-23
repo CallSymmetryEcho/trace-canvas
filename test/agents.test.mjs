@@ -272,3 +272,22 @@ test('a line handed by the environment binds a new session only: not a resumed o
   assert.equal(handedThread({ TRACE_CANVAS_THREAD: other }, () => true), '');
   assert.equal(handedThread({ TRACE_CANVAS_THREAD: other }, () => false), other);
 });
+
+test('an agent is started one way: without the caller\'s session variables, on the line it is meant for', async () => {
+  const { spawnAgent } = await import('../src/agents.mjs'); // a research run's own line: test/research.test.mjs
+  const caller = { PATH: '/bin', HOME: '/h', CLAUDECODE: '1', TMUX: '/tmp/tmux-1/default,1,0', TMUX_PANE: '%4', TRACE_CANVAS_THREAD: 'tcaller', CLAUDE_CONFIG_DIR: '/h/.c' };
+  let got;
+  spawnAgent('claude', ['-p'], { env: caller, extra: { TRACE_CANVAS_THREAD: 'tcard' }, cwd: '/x' }, (f, a, o) => { got = o; });
+  assert.deepEqual(got, { cwd: '/x', env: { PATH: '/bin', HOME: '/h', CLAUDE_CONFIG_DIR: '/h/.c', TRACE_CANVAS_THREAD: 'tcard' } });
+  const fsx = await import('node:fs');
+  // Nothing in src starts claude, codex, gemini or agy round spawnAgent: not by name, and not from a file that writes their command lines.
+  const src = new URL('../src/', import.meta.url), bad = [];
+  for (const f of fsx.readdirSync(src).filter(f => f.endsWith('.mjs') && f !== 'agents.mjs')) {
+    const text = fsx.readFileSync(new URL(f, src), 'utf8');
+    text.split('\n').forEach((l, i) => {
+      if (/\b(spawn|spawnSync|execFile|execFileSync)\(\s*'(claude|codex|gemini|agy)'/.test(l) && !/'--version'|\['mcp',|\['status'/.test(l)) bad.push(`${f}:${i + 1}`);
+    });
+    if (/'(claude|codex) (exec|-p)\b|\['-p',|\['exec',/.test(text) && /(?<![.\w])spawn\(/.test(text)) bad.push(`${f}: writes an agent's command line and calls spawn() itself`);
+  }
+  assert.deepEqual(bad, []);
+});

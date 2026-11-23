@@ -9,7 +9,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
+import { agentEnv, spawnAgent } from './agents.mjs';
 import { addCommit, home, uid } from './store.mjs';
 import { headline } from './git-events.mjs';
 
@@ -96,7 +97,7 @@ const COMMANDS = {
   claude: 'claude -p --output-format stream-json --verbose --permission-mode acceptEdits --allowedTools "WebSearch WebFetch Bash(python3:*) Bash(python:*) Bash(ls:*) Bash(mkdir:*) Bash(unzip:*) Bash(shasum:*) Bash(wc:*) Bash(cat:*) Bash(head:*) Bash(tail:*) Bash(file:*)" -- "$(cat prompt.md)"',
 };
 export function spawnRun(dir, cmd, env) {
-  const ch = spawn('sh', ['-c', `${cmd} < /dev/null > events.jsonl 2> stderr.log; echo $? > exit_code`], { cwd: dir, detached: true, stdio: 'ignore', env });
+  const ch = spawnAgent('sh', ['-c', `${cmd} < /dev/null > events.jsonl 2> stderr.log; echo $? > exit_code`], { cwd: dir, detached: true, stdio: 'ignore', env });
   ch.unref();
   return ch.pid;
 }
@@ -117,7 +118,7 @@ export function startRun(d, id, { workbench, mode = 'single', key }, env = proce
   fs.cpSync(path.join(R.frozen.dir, 'package'), dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'prompt.md'), PROMPT(R));
   const r = { id: rid, key: key || rid, workbench, mode, version: R.frozen.version, packageSha: R.frozen.sha256, dir, startedAt: Date.now(), requestedModel: wb.model || '' };
-  if (wb.auto) Object.assign(r, { status: 'submitted', pid: run(dir, COMMANDS[workbench], { ...env, TRACE_CANVAS_THREAD: c.thread }) });
+  if (wb.auto) Object.assign(r, { status: 'submitted', pid: run(dir, COMMANDS[workbench], { ...agentEnv(env), TRACE_CANVAS_THREAD: c.thread }) }); // the card's line, never the caller's session
   else r.status = 'waiting';
   R.runs.push(r);
   return { run: r };

@@ -679,6 +679,7 @@ body.history-open .hist-btn span { display: inline; }
   display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; box-shadow: var(--shadow); overflow: hidden;
 }
 .d-head { display: flex; align-items: center; gap: 8px; padding: 10px 10px 8px 14px; border-bottom: 1px solid var(--rule-soft); }
+.d-head .d-back { order: -1; margin-left: -6px; }
 .d-eyebrow { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px; font-family: var(--f-display); font-weight: 600; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .d-eyebrow .mono { text-transform: none; letter-spacing: 0; font-weight: 400; font-size: 12px; color: var(--faint); }
 .d-scroll { flex: 1 1 auto; overflow: auto; overflow-x: hidden; padding: 12px 14px 16px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-content: start; }
@@ -889,6 +890,7 @@ body.sheet-open .top { z-index: 80; }
   body.goals-page .sheet-head { display: none; }
   body.goals-page .sheet-body { padding: 12px 12px 32px; gap: 12px; }
   .detail { position: fixed; z-index: 85; inset: 0; width: auto; border: 0; border-radius: 0; box-shadow: none; padding-top: env(safe-area-inset-top, 0px); }
+  .d-head .d-back { display: none; }
   .d-head [data-act="close"] { order: -1; width: 40px; height: 40px; font-size: 0; }
   .d-head [data-act="close"]::before { content: "←"; font-size: 20px; }
   .d-actions .btn { min-height: 40px; }
@@ -1357,7 +1359,7 @@ apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent 
     tlDay: 'Day', tlWeek: 'Week', tlMonth: 'Month', tlNow: 'Now', tlHint: 'One row per thread. The band shows when it was active; dashed curves are forks and merges.',
     detailAria: 'Details', capThreadAria: 'Thread to log to', kindsAria: 'Record type',
     capPh: 'Log an idea, a task or what an agent produced…  Enter to save. Start with #thread to file it. Paste JSON to import.',
-    capSubmit: 'Log', close: 'Close', cancel: 'Cancel', copy: 'Copy',
+    capSubmit: 'Log', close: 'Close', back: 'Back', cancel: 'Cancel', copy: 'Copy',
     loading: 'Loading your traces…',
     emptyTitle: 'Turn scattered ideas and parallel work into one transit map',
     emptyBody: 'Each <b>thread</b> is a piece of work in progress. Each <b>record</b> is a station on it. Type your first one below and press Enter.',
@@ -1539,7 +1541,7 @@ apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的
     tlDay: '日', tlWeek: '周', tlMonth: '月', tlNow: '回到现在', tlHint: '每一行是一条线程，色带是它活跃的时段，虚线是分叉与合并',
     detailAria: '详情', capThreadAria: '记到哪条线程', kindsAria: '记录类型',
     capPh: '记下一个想法、任务或 agent 的产出…  回车留痕，#线程名 开头可直接归类，粘贴 JSON 可批量导入',
-    capSubmit: '留痕', close: '关闭', cancel: '取消', copy: '复制',
+    capSubmit: '留痕', close: '关闭', back: '返回', cancel: '取消', copy: '复制',
     loading: '正在载入你的留痕…',
     emptyTitle: '把零碎的想法和并行的工作，画成一张线路图',
     emptyBody: '每条<b>线程</b>是一件在推进的事，每条<b>记录</b>是一个站点。在下方输入框写下第一条，回车即可留痕。',
@@ -2122,7 +2124,7 @@ function liveDetail(s) {
   const where = [[s.repo, s.branch].filter(Boolean).join(' · '), s.model].filter(Boolean).join(' · ');
   return `<div class="d-head">
       <span class="d-eyebrow"><span class="ldot st-${esc(s.status)}"></span>${esc(t('liveHead'))}<span class="mono">${esc(s.agent || 'Claude Code')}</span></span>
-      <button class="icon-btn" data-act="close" aria-label="${esc(t('close'))}">×</button>
+      ${backBtn()}<button class="icon-btn" data-act="close" aria-label="${esc(t('close'))}">×</button>
     </div>
     <div class="d-scroll">
       <div class="l-title">${esc(liveTitle(s))}</div>
@@ -2885,7 +2887,7 @@ function groupDetail(name) {
   const ths = orderedThreads().filter(th => th.group === name);
   return `<div class="d-head">
       <span class="d-eyebrow">${esc(t('groupLabel'))}<span class="mono">${esc(t('groupCount', ths.length))}</span></span>
-      <button class="icon-btn" data-act="close" aria-label="${esc(t('close'))}">×</button>
+      ${backBtn()}<button class="icon-btn" data-act="close" aria-label="${esc(t('close'))}">×</button>
     </div>
     <div class="d-scroll">
       <label class="fld"><span>${esc(t('groupName'))}</span><input id="g-name" class="big-input" value="${esc(S.ui.gJoin || name)}"></label>
@@ -3603,7 +3605,19 @@ addEventListener('keydown', e => {
   select(el.dataset.cid ? { type: 'commit', id: el.dataset.cid } : { type: 'thread', id: el.dataset.tid });
   requestAnimationFrame(() => { detail.tabIndex = -1; detail.focus(); });
 });
+// The panel remembers what it showed before (a line, then one of its records, then a line that record names), so
+// each step in has a way back; closing the panel forgets the trail.
+const trail = [];
+const selAlive = x => (x.type === 'thread' ? x.id === INBOX || S.threads.has(x.id) : x.type === 'commit' ? S.commits.has(x.id) : x.type === 'edge' ? S.edges.has(x.id) : x.type === 'group' ? groupNames().includes(x.id) : true);
+const backBtn = () => (trail.some(selAlive) ? `<button class="icon-btn d-back" data-act="back" aria-label="${esc(t('back'))}" title="${esc(t('back'))}">←</button>` : '');
+function selectBack() {
+  let to; do to = trail.pop(); while (to && !selAlive(to));
+  if (!to) return select(null);
+  S.sel = to; S.ui = {}; render();
+}
 function select(sel) {
+  if (!sel) trail.length = 0;
+  else if (S.sel && (S.sel.type !== sel.type || S.sel.id !== sel.id)) { trail.push(S.sel); if (trail.length > 30) trail.shift(); }
   // On a phone a panel is a page of its own: opening one adds a history entry, so ← and the back gesture both close it.
   if (PHONE.matches && !sel && S.sel && history.state && history.state.tcPanel) { history.back(); return; }
   if (PHONE.matches && sel && !S.sel) history.pushState({ tcPanel: 1 }, '');
@@ -3614,6 +3628,7 @@ function select(sel) {
   if (S.view === 'canvas' && sel && sel.type === 'commit' && !CALM.matches) requestAnimationFrame(() => motion(() => liOf(sel.id)?.querySelector('.g'), [{ transform: 'scale(.82)' }, { transform: 'scale(1)' }], { duration: 380, easing: SPRING }));
 }
 window.addEventListener('popstate', () => {
+  trail.length = 0;
   if (S.sel) { S.sel = null; S.ui = {}; render(); }
   try { history.replaceState(null, '', location.pathname + location.search + '#' + S.view); } catch {} // the entry gone back to may name an older view
 });
@@ -4015,7 +4030,7 @@ function commitDetail(c) {
       <span class="d-eyebrow">${mini(c.kind, stationColor(c, th), c.done)}${esc(kindLabel(c.kind))}<span class="mono">${fmtAbs(c.ts)}</span></span>
       ${S.readOnly ? '' : `<button class="icon-btn d-star${c.starred ? ' on' : ''}" data-act="star" aria-pressed="${!!c.starred}" title="${esc(t(c.starred ? 'starOff' : 'starOn'))}" aria-label="${esc(t(c.starred ? 'starOff' : 'starOn'))}">${c.starred ? '★' : '☆'}</button>`}
       ${S.readOnly ? '' : `<button class="btn d-edit" data-act="${edit ? 'rec-done' : 'rec-edit'}">${esc(t(edit ? 'mdDone' : 'mdEdit'))}</button>`}
-      <button class="icon-btn" data-act="close" aria-label="${esc(t('close'))}">×</button>
+      ${backBtn()}<button class="icon-btn" data-act="close" aria-label="${esc(t('close'))}">×</button>
     </div>
     <div class="d-scroll">
       ${edit ? '' : `<h2 class="d-read-title">${esc(c.title)}</h2>
@@ -4298,7 +4313,7 @@ function threadDetail(th) {
   const items = cs.slice(0, 40).map(c => `<li data-act="goto-commit" data-cid="${esc(c.id)}">${mini(c.kind, stationColor(c, th), c.done)}<span class="s-title" title="${esc(c.title)}">${starMark(c)}${esc(c.title)}</span><time class="s-time">${fmtShort(c.ts)}</time></li>`).join('');
   return `<div class="d-head">
       <span class="d-eyebrow"><span class="roundel" style="--c:${th.color}"></span>${esc(isInbox ? t('inbox') : t('threadLabel'))}<span class="mono">${esc(t('countRecords', cs.length))}</span></span>
-      <button class="icon-btn" data-act="close" aria-label="${esc(t('close'))}">×</button>
+      ${backBtn()}<button class="icon-btn" data-act="close" aria-label="${esc(t('close'))}">×</button>
     </div>
     <div class="d-scroll">
       ${lineTalk(th)}
@@ -4337,7 +4352,7 @@ function threadDetail(th) {
 function edgeDetail(e) {
   return `<div class="d-head">
       <span class="d-eyebrow">${esc(t('edgeHead'))}</span>
-      <button class="icon-btn" data-act="close" aria-label="${esc(t('close'))}">×</button>
+      ${backBtn()}<button class="icon-btn" data-act="close" aria-label="${esc(t('close'))}">×</button>
     </div>
     <div class="d-scroll">
       <div class="meta"><span><button class="linkish" data-act="goto-thread" data-tid="${esc(e.from)}">${esc(getThread(e.from).name)}</button> → <button class="linkish" data-act="goto-thread" data-tid="${esc(e.to)}">${esc(getThread(e.to).name)}</button></span></div>
@@ -4435,7 +4450,8 @@ detail.addEventListener('click', e => {
   const writeActs = ['star', 'detach', 'fork-open', 'fork-create', 'del-open', 'del-confirm', 'status', 'color', 'merge-open', 'merge', 'unmerge', 'label', 'flip', 'g-arrange', 'g-ungroup', 'g-join'];
   if (writeActs.includes(act) && !canWrite()) return;
   switch (act) {
-    case 'close': select(null); break;
+    case 'close': if (PHONE.matches && trail.some(selAlive)) selectBack(); else select(null); break;
+    case 'back': selectBack(); break;
     case 'star': if (s && s.type === 'commit') patchDoc('commits', s.id, { starred: S.commits.get(s.id).starred ? null : Date.now() }, 0); break;
     case 'goto-commit': select({ type: 'commit', id: b.dataset.cid }); break;
     case 'gx-file': { const k = b.dataset.dk; if (GX.open.has(k)) GX.open.delete(k); else GX.open.add(k); render(); break; }

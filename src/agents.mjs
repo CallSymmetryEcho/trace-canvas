@@ -164,8 +164,10 @@ export function startDetached({ machine, name, cmd }, run = execFile, wait = 3) 
 }
 /** Opens what a dispatch or Autopilot row needs. With row.tmux (another machine): starts it there in tmux, then opens
  * a window attached to it, which may fail without failing the row; no tmux there: the plain ssh -t window, as before. */
-export async function launchRow(r, { open = openTerminal, start = startDetached } = {}) {
-  if (!r.tmux) return { failed: await open(r.command) };
+export async function launchRow(r, { open = openTerminal, start = startDetached, detach = () => readConfig().detach || !terminalCommand('') } = {}) {
+  // On this machine the agent opens in a terminal tab, where the person sees it, unless they chose the background
+  // (More → New agents: in the background) or no terminal can open here (no desktop, a server).
+  if (!r.tmux || (!r.tmux.machine && !detach())) return { failed: await open(r.command) };
   const s = await start(r.tmux);
   if (s === 'no-tmux') return { failed: await open(r.command), noTmux: true };
   if (s && s !== 'exists') return { failed: s };

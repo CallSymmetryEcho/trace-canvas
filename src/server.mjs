@@ -147,7 +147,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
       if (req.method === 'GET' && p === '/api/data') {
         // desktopId: the Claude desktop app's id of a session, so the page can open its chat (claude://…).
         const d = readData(), desk = desktopSessions();
-        return send(res, 200, { ...toArrays(d), sessions: sessionList(d).map(s => ({ ...s, desktopId: (desk.get(s.id) || {}).desktopId || null })), machine: readConfig().machine, platform: process.platform, remote, update, start: canStart(remote), awayLive: readConfig().awayLive, awayGit: readConfig().awayGit, sync: syncStatus(), machines: otherMachines(d) });
+        return send(res, 200, { ...toArrays(d), sessions: sessionList(d).map(s => ({ ...s, desktopId: (desk.get(s.id) || {}).desktopId || null })), machine: readConfig().machine, platform: process.platform, remote, update, start: canStart(remote), awayLive: readConfig().awayLive, detach: readConfig().detach, awayGit: readConfig().awayGit, sync: syncStatus(), machines: otherMachines(d) });
       }
       if (req.method === 'GET' && p === '/api/live') return send(res, 200, { ...liveSessions(readData()), away });
       // A report a record links (a local .md file), for the reader. Only files some record links, so the page
@@ -317,6 +317,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         if (body.lang === 'en' || body.lang === 'zh') patch.lang = body.lang;
         if (typeof body.awayLive === 'boolean') patch.awayLive = body.awayLive;
         if (typeof body.awayGit === 'boolean') patch.awayGit = body.awayGit;
+        if (typeof body.detach === 'boolean' && !remote) patch.detach = body.detach;
         writeConfig(patch);
         if ('awayLive' in patch) pollAway();
         return send(res, 200, { ok: true });

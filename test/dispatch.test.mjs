@@ -263,8 +263,12 @@ test('another machine\'s agent starts in tmux there and a window watches it; wit
   assert.deepEqual(await launchRow(row, { open: async () => 'no window', start: async () => '' }), { detached: true, noWatch: 'no window' });
   assert.deepEqual(await launchRow(row, { open, start: async () => 'no-tmux' }), { failed: null, noTmux: true });
   assert.deepEqual(await launchRow(row, { open, start: async () => 'refused' }), { failed: 'refused' });
+  // On this machine: a terminal tab, unless the person chose the background or no terminal can open.
+  const here = { command: 'claude here', tmux: { machine: '', name: 'tc-c1', cmd: 'claude here', attach: 'tmux attach -t tc-c1' } };
+  assert.deepEqual(await launchRow(here, { open, start: async () => { throw new Error('not detached'); }, detach: () => false }), { failed: null });
+  assert.deepEqual(await launchRow(here, { open, start: async () => '', detach: () => true }), { detached: true });
   assert.deepEqual(await launchRow({ command: 'claude here' }, { open, start: async () => { throw new Error('not for this machine'); } }), { failed: null });
-  assert.deepEqual(opened, ['ssh -t lab attach', 'ssh -t lab attach', 'ssh -t lab plain', 'claude here']);
+  assert.deepEqual(opened, ['ssh -t lab attach', 'ssh -t lab attach', 'ssh -t lab plain', 'claude here', 'tmux attach -t tc-c1', 'claude here']);
 });
 
 test('another machine\'s session in tmux opens by its pane, or for an older record the pane with its tty', async () => {

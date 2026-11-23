@@ -98,6 +98,8 @@ export function readConfig(env = process.env) {
     phone: file.phone || null,
     // The live bar also shows other machines' running sessions, read over ssh (More → Other machines' sessions).
     awayLive: !!file.awayLive,
+    // Agents a dispatch or Autopilot starts on this machine run in a detached tmux session instead of a terminal tab.
+    detach: !!file.detach,
     // macOS: the terminal agents open in, 'iterm' (a new tab) or 'terminal' (a new window); empty: iTerm2 when installed.
     terminal: file.terminal || '',
     // A commit made on another machine, with no clone here, is read from that machine over ssh (More → Other machines' changes).

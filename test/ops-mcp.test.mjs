@@ -192,13 +192,13 @@ test('the MCP server speaks JSON-RPC over stdio and captures the current session
   }
 });
 
-test('trace_fork start: the new line gets its own agent through the canvas launcher, not a terminal the agent picks', { skip: process.platform !== 'darwin' }, async () => {
+test('trace_fork start: the new line gets its own agent through the canvas launcher, not a terminal the agent picks', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-fork-'));
   const bin = path.join(root, 'bin'), said = path.join(root, 'osascript.txt'), project = path.join(root, 'paper');
   fs.mkdirSync(bin); fs.mkdirSync(project);
   fs.writeFileSync(path.join(bin, 'osascript'), `#!/bin/sh\nprintf '%s' "$2" > '${said}'\n`, { mode: 0o755 }); // records the script, opens nothing
   const child = spawn(process.execPath, [path.join(here, '..', 'bin', 'trace-canvas.mjs'), 'mcp'], {
-    env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, TRACE_CANVAS_TERMINAL: 'iterm', TRACE_CANVAS_HOME: path.join(root, 'home'), CLAUDE_PROJECT_DIR: project, CLAUDE_PROJECTS_DIR: path.join(root, 'projects'), TRACE_CANVAS_LANG: 'en' },
+    env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, TRACE_CANVAS_TERMINAL: 'iterm', TRACE_CANVAS_PLATFORM: 'darwin', TRACE_CANVAS_HOME: path.join(root, 'home'), CLAUDE_PROJECT_DIR: project, CLAUDE_PROJECTS_DIR: path.join(root, 'projects'), TRACE_CANVAS_LANG: 'en' },
     stdio: ['pipe', 'pipe', 'inherit'],
   });
   const call = rpc(child);

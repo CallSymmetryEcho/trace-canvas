@@ -12,12 +12,12 @@ const post = (port, p, body) => new Promise((resolve, reject) => {
   req.on('error', reject); req.end(JSON.stringify(body));
 });
 
-test('▶ Start opens the agent a to-do is handed to, and keeps it handed to that agent', { skip: process.platform !== 'linux' }, async () => {
+test('▶ Start opens the agent a to-do is handed to, and keeps it handed to that agent', async () => {
   const home = process.env.TRACE_CANVAS_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-start-'));
   // A stand-in terminal that writes down what it was asked to run.
   const bin = path.join(home, 'bin'), log = path.join(home, 'ran');
   fs.mkdirSync(bin); fs.writeFileSync(path.join(bin, 'xterm'), `#!/bin/sh\nprintf '%s\\n' "$@" >> '${log}'\n`, { mode: 0o755 });
-  Object.assign(process.env, { PATH: `${bin}:${process.env.PATH}`, DISPLAY: ':0', TERMINAL: 'xterm' });
+  Object.assign(process.env, { PATH: `${bin}:${process.env.PATH}`, DISPLAY: ':0', TERMINAL: 'xterm', TRACE_CANVAS_PLATFORM: 'linux' }); // the Linux branch, on any machine
   const ts = Date.now();
   fs.writeFileSync(path.join(home, 'data.json'), JSON.stringify({ version: 1, threads: { t1: { id: 't1', name: 'Line', ts } },
     commits: { c1: { id: 'c1', thread: 't1', kind: 'task', title: 'do it', assignee: 'codex', ts } }, edges: {}, sessions: {} }));

@@ -94,7 +94,9 @@ export function agentScreen(env = process.env) {
   const s = live.filter(s => s.term === 'gnome-terminal' && /^\/org\/gnome\/Terminal\/screen\//.test(s.tab || '') && alive(s.pid)).sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0))[0];
   return s ? s.tab : '';
 }
-export function terminalCommand(cmd, env = process.env, platform = process.platform, screen = null) {
+// platform: this machine's, or the one named in TRACE_CANVAS_PLATFORM, so each platform's branch is tested on every
+// machine with a stand-in terminal (the Linux one used to be skipped on a Mac and the Mac one on Linux).
+export function terminalCommand(cmd, env = process.env, platform = env.TRACE_CANVAS_PLATFORM || process.platform, screen = null) {
   if (platform === 'darwin') return ['osascript', ['-e', (macTerminal(env) === 'iterm' ? itermScript : terminalScript)(typeable(cmd))], agentEnv(env)];
   if (platform !== 'linux') return null;
   const shown = desktopEnv(env);

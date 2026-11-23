@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **An archived line's outputs can be found again.** On the History wall a plaque now lists its archived lines and, under each, its key records: the ones you starred, its wrap-up, and records an agent logged with links to files. A line's name opens its panel (with "Put back on the canvas"), a record opens with its links and Read. For agents, `trace_list_threads` marks an archived line and gives the same key records with their links.
+
+- **What a to-do was ticked with stays after Pass.** The result and how it was checked showed only while a to-do waited for review; after Pass they were shown nowhere. The to-do's record now keeps them: who ticked it and when, the result, the check, and when it was passed.
+
 - **A changed file opens when the session started above its repository.** A session started in the home folder and working in a repository under it listed its changed files from the repository's root, and Read looked for them from the session's folder: "missing". The record now keeps that root; older records are found by the full path their own text gives. A report the reply names by its full path is linked unless it is under that root (it used to be skipped whenever it was under the session's folder).
 
 - **"#" finds any line.** In the capture box, `#name` also lists finished and archived lines, marked, after the ones in progress; picking an archived one opens its panel. In the search box, `#pre` looks for a line when it begins no scope's name.

@@ -653,6 +653,10 @@ export function mergeDataset(d, incoming) {
   return { threads, commits, edges, unified: [...map.entries()].filter(([a, b]) => a !== b).length };
 }
 
+// What to find again on a finished line: starred records, its wrap-up, and records that link a file (not a session's own turn
+// records). Starred first, // then the latest. (The page's History wall uses the same rule.)
+export const keyRecords = cs => cs.filter(c => c.starred || (c.kind === 'note' && /^(收尾总结：|Wrap-up: )/.test(c.title)) || (!c.session && (c.links || []).some(l => /^~?\//.test(l))))
+  .sort((a, b) => !!b.starred - !!a.starred || b.ts - a.ts).slice(0, 5);
 export function listThreads(d, { query, includeDone = true } = {}) {
   const q = norm(query);
   const by = {};
@@ -668,6 +672,8 @@ export function listThreads(d, { query, includeDone = true } = {}) {
         ...(cs.some(c => c.session) ? { sessions: new Set(cs.map(c => c.session).filter(Boolean)).size } : {}),
         ...(t.parent ? { forkedFrom: (d.threads[t.parent] || {}).name || 'Inbox' } : {}),
         ...(t.mergedInto ? { mergedInto: (d.threads[t.mergedInto] || {}).name } : {}),
+        // An archived line is off the canvas: its key records say where its outputs are without reading the whole line.
+        ...(t.archived ? { archived: new Date(t.archived).toISOString(), key: keyRecords(cs).map(c => ({ id: c.id, title: c.title.slice(0, 120), ...(c.links && c.links.length ? { links: c.links } : {}) })) } : {}),
         ...(q ? { matches: hits } : {}),
         latest: cs.length ? cs[cs.length - 1].title.slice(0, 80) : '',
       };

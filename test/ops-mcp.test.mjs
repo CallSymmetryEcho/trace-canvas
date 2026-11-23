@@ -99,6 +99,19 @@ test('merging a data set from another computer joins lines by key and skips what
   assert.equal(listThreads(mine).find(x => x.id === t.id).records, 2);
 });
 
+test('an archived line lists its key records: starred first, then the wrap-up and records that link a file', () => {
+  const rec = (id, ts, x = {}) => ({ id, thread: 'tA', kind: 'agent', title: id, body: '', ts, parents: [], links: [], ...x });
+  const d = { threads: { tA: { id: 'tA', name: 'Talk', status: 'done', archived: 5000 }, tB: { id: 'tB', name: 'Open', status: 'active' } }, edges: {}, commits: {
+    turn: rec('turn', 1, { links: ['claude --resume abc'] }), turnFiles: rec('turnFiles', 8, { session: 's1', links: ['/x/changed.md'] }), git: rec('git', 2, { links: ['http://host/commit/1'] }),
+    files: rec('files', 3, { links: ['/Users/x/talk/FINAL.md', '~/talk/deck.pptx'] }), star: rec('star', 4, { starred: 9 }),
+    wrap: rec('wrap', 6, { kind: 'note', title: '收尾总结：Talk' }), other: { ...rec('other', 7, { links: ['/x/y.md'] }), thread: 'tB' } } };
+  const rows = listThreads(d), a = rows.find(x => x.id === 'tA');
+  assert.deepEqual(a.key.map(k => k.id), ['star', 'wrap', 'files']);
+  assert.deepEqual(a.key[2].links, ['/Users/x/talk/FINAL.md', '~/talk/deck.pptx']);
+  assert.equal(a.archived, new Date(5000).toISOString());
+  assert.equal('key' in rows.find(x => x.id === 'tB'), false);
+});
+
 function rpc(child) {
   let buf = ''; const waiting = new Map();
   child.stdout.on('data', c => {

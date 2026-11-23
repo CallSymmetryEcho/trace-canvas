@@ -79,7 +79,7 @@ const TOOLS = [
   {
     name: 'trace_list_threads',
     title: 'List threads',
-    description: 'Lists the threads on the canvas with status, record count, last update and latest record. Pass query to find threads by name or record text.',
+    description: 'Lists the threads on the canvas with status, record count, last update and latest record. Pass query to find threads by name or record text. A finished line the person archived (off the canvas, on the History wall) carries archived and key: its starred records, its wrap-up and the records that link files, with their links; read one in full with trace_read_thread.',
     inputSchema: { type: 'object', properties: { query: { type: 'string' }, include_done: { type: 'boolean', description: 'Include done and merged threads (default true).' } } },
     annotations: { readOnlyHint: true },
   },

@@ -1839,7 +1839,10 @@ function parseQ(v) {
   const m = /^#(\S*)(?:\s+(.*))?$/.exec(v.trim() ? v.trimStart() : '');
   if (!m) return { q: v.trim(), scope: '' };
   const scope = Object.keys(SCOPES).find(k => SCOPES[k].includes(m[1].toLowerCase()));
-  return scope && m[2] !== undefined ? { q: m[2].trim(), scope } : { q: '', scope: '', pick: m[1].toLowerCase() };
+  if (scope && m[2] !== undefined) return { q: m[2].trim(), scope };
+  const pick = m[1].toLowerCase();
+  // "#pre" that begins no scope's name is a line's name, as "#" is in the capture box.
+  return m[2] === undefined && Object.keys(SCOPES).some(k => [k, t('sc_' + k).toLowerCase(), ...SCOPES[k]].some(n => n.startsWith(pick))) ? { q: '', scope: '', pick } : { q: [m[1], m[2] || ''].join(' ').trim(), scope: 'thread' };
 }
 const hasQ = vs => vs.some(v => v && String(v).toLowerCase().includes(S.q.toLowerCase()));
 const REC_FIELDS = { title: c => [c.title], body: c => [c.body], kind: c => [c.kind, kindLabel(c.kind)], links: c => c.links || [] };
@@ -4579,11 +4582,11 @@ function autosize() { capText.style.height = 'auto'; capText.style.height = Math
 capText.addEventListener('input', autosize);
 // <capsuggest>
 // "#tr" alone in the box: the lines whose name holds "tr", those starting with it first.
-function capMatches(text, threads) {
+function capMatches(text, threads, last = () => false) {
   const m = /^#([^\n#]*)$/.exec(text); if (!m) return [];
   const q = m[1].trim().toLowerCase();
   return threads.filter(th => th.name.toLowerCase().includes(q))
-    .sort((a, b) => b.name.toLowerCase().startsWith(q) - a.name.toLowerCase().startsWith(q)).slice(0, 8);
+    .sort((a, b) => last(a) - last(b) || b.name.toLowerCase().startsWith(q) - a.name.toLowerCase().startsWith(q)).slice(0, 8);
 }
 // "/qu" (or "、qu" from a Chinese keyboard) alone at the start of the box: the commands it begins. A second slash
 // (a path such as /home/…), a space or no match closes the menu, and the text stays plain: a command only takes
@@ -4595,20 +4598,24 @@ function capCommands(text) {
   return CAP_CMDS.filter(c => c.names.some(n => n.startsWith(q)));
 }
 // </capsuggest>
+// Lines in progress come first under "#"; the rest (done, archived, outside the focus) follow, marked.
+const capShut = th => !!th.archived || !inFocus(th) || !(th.status === 'active' || th.status === 'parked');
 const capSuggest = $('#cap-suggest');
 let sugg = [], suggAt = 0;
 function renderSuggest() {
   const v = capText.value, cmds = document.activeElement === capText && !S.remote && S.captureKind !== 'question' ? capCommands(v) : [];
-  sugg = cmds.length ? cmds.map(c => ({ cmd: c.id })) : document.activeElement === capText ? capMatches(v, orderedThreads().filter(th => inFocus(th) && (th.status === 'active' || th.status === 'parked'))) : [];
+  sugg = cmds.length ? cmds.map(c => ({ cmd: c.id })) : document.activeElement === capText ? capMatches(v, orderedThreads().filter(th => th.status !== 'merged'), capShut) : [];
   suggAt = Math.min(suggAt, Math.max(0, sugg.length - 1));
   capSuggest.hidden = !sugg.length;
   capSuggest.innerHTML = sugg.map((th, i) => th.cmd
     ? `<li role="option" data-cmd="${esc(th.cmd)}" aria-selected="${i === suggAt}"><b class="mono">/${esc(th.cmd)}</b><span class="cap-cmd">${esc(kindLabel('question'))} · ${esc(t('cmdQuest'))}</span></li>`
-    : `<li role="option" data-tid="${esc(th.id)}" aria-selected="${i === suggAt}" style="--c:${esc(th.color)}"><i></i>${esc(th.name)}</li>`).join('');
+    : `<li role="option" data-tid="${esc(th.id)}" aria-selected="${i === suggAt}" style="--c:${esc(th.color)}"><i></i>${esc(th.name)}${capShut(th) ? `<span class="cap-cmd">${esc(th.archived ? t('histArchived') : th.status === 'done' ? statusLabel('done') : th.group || '')}</span>` : ''}</li>`).join('');
 }
 // The picked line goes into the selector rather than the text, so names with spaces work too.
 function pickSuggest(s) {
   capText.value = ''; autosize();
+  // A line that is not on the canvas (archived) opens its panel, where it can be put back.
+  if (s.id && getThread(s.id).archived) { capText.blur(); select({ type: 'thread', id: s.id }); return; }
   if (s.cmd) { S.captureKind = 'question'; renderKinds(); } else setCaptureThread(s.id);
   capText.focus(); renderSuggest();
 }

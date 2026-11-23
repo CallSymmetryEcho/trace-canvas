@@ -292,6 +292,16 @@ async function callTool(name, a = {}) {
         return addCommit(d, { thread, kind, title: a.title, body: a.body || '', links: fullLinks(a.links), agent: a.agent || agentOf(agentKey()).name, extra: { ...(a.assignee ? { assignee: a.assignee } : {}), ...(a.on ? { on: String(a.on) } : {}), ...(from ? { fromSession: from } : {}), ...(to ? { to } : {}), ...(q ? { quest: q.id } : {}) } });
       });
       const where = c.thread === INBOX ? 'the inbox' : `"${readData().threads[c.thread].name}"`;
+      // A reply for a session that sits idle in tmux here is not left to wait for the person's next message: one line is
+      // typed into its pane, and the reply itself comes with that turn (takeReplies). A working one gets it when its turn
+      // ends (its Stop hook). ponytail: idle and not in tmux, or on another machine: at its next turn, as before.
+      let woke = false;
+      if (to && !dup) {
+        try {
+          const t = liveSessions(readData()).sessions.find(x => x.id.startsWith(to) && x.id !== from && x.status === 'idle' && x.pane && x.tty);
+          if (t) woke = await (await import('./agents.mjs')).typeInto({ socket: t.tmux || '', pane: t.pane, tty: t.tty }, `A reply was left for you on Trace Canvas: ${String(a.title).replace(/\s+/g, ' ').slice(0, 160)} [${c.id}]`);
+        } catch {}
+      }
       // on: the to-do is dispatched now, as `trace-canvas dispatch <id> --on <machine>` would (it used to be only stored,
       // so nothing started until someone ran dispatch by hand). A failed dispatch never loses the record.
       let sent = null;
@@ -312,7 +322,7 @@ async function callTool(name, a = {}) {
         : s.action === 'message' ? ` A session runs it here (${s.session}): send it this message: ${s.prompt}`
           : s.action === 'busy' ? ` Its session ${s.session} is busy: give it this when it stops, or start a new one with: ${s.command}`
             : s.action === 'self' ? ' It is yours: this session is the line\'s agent.' : ` ${s.action === 'start' ? 'A new session' : `Session ${s.session}`} ${s.action === 'start' ? 'started' : 'resumed'} on ${s.on}${s.attach ? `; watch it: ${s.attach}` : ''}.`).join('') || ' Nothing to dispatch.';
-      return { text: (dup ? `Already an open to-do on ${where}.` : `Logged to ${where}.`) + say, data: { id: c.id, thread: c.thread, ...(dup ? { existing: true } : {}), ...(sent ? { dispatched: sent } : {}) } };
+      return { text: (dup ? `Already an open to-do on ${where}.` : `Logged to ${where}.`) + (woke ? ' Its session was idle in tmux: it was woken and reads this now.' : '') + say, data: { id: c.id, thread: c.thread, ...(dup ? { existing: true } : {}), ...(sent ? { dispatched: sent } : {}) } };
     }
     case 'trace_import_data': {
       const text = a.path ? fs.readFileSync(a.path, 'utf8') : String(a.json || '');

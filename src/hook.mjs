@@ -555,7 +555,8 @@ const takeHanded = (sid, env, got = '') => {
   }, env);
   return got.includes(h.prompt.slice(0, 60)) || (h.ids || []).some(id => got.includes(id)) ? '' : h.prompt;
 };
-export const handedStop = (input, env = process.env) => (input.session_id ? takeHanded(input.session_id, env) : '');
+// Replies other sessions left while this one worked come with it: read as soon as its turn ends, not at the person's next message.
+export const handedStop = (input, env = process.env) => (input.session_id ? [takeHanded(input.session_id, env), takeReplies(input.session_id, env)].filter(Boolean).join('\n') : '');
 export function promptContext(input, env = process.env) {
   if (!input.session_id || cleanPrompt(input.prompt).startsWith('/')) return '';
   const replies = [takeReplies(input.session_id, env), takeHanded(input.session_id, env, String(input.prompt || ''))].filter(Boolean).join('\n');

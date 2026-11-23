@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **A reply left for another session reaches it without the person.** A reply logged for a session (`trace_log` with `to`) used to wait for that session's next message from the person. A session that is working now reads it when its turn ends; one idle in tmux on this machine is woken with one typed line and reads it at once. Idle outside tmux, or on another machine: at its next turn, as before.
+
 - **A report pulled from another machine brings its images.** Only the report itself came over, so its figures showed as missing. Pulling now also fetches the images it shows (up to 20). An image of a report this machine has is also found beside the report where it really is, when the record names the report by a relative path.
 
 - **A new session on a forked line starts in the right folder.** A line with no folder of its own and no session yet (a line just forked off another) had its new agent start in the home folder, where it stopped at the "trust this folder?" prompt with nobody to answer. It now starts where the line's sessions last worked, else where the line it was forked from works; on another machine, in that machine's folder for the line.

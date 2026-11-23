@@ -348,6 +348,10 @@ test('a running session is woken, not pasted into: typed into its tmux pane when
   mutate(d => { d.sessions.x1.handed = { prompt: row.prompt, ids, at: now }; }, env);
   assert.doesNotMatch(promptContext({ session_id: 'x1', prompt: `do ${ids[0]} now`, cwd: tmp }, env), /New to-dos on the Trace Canvas line/);
   assert.equal(readData(env).sessions.x1.handed, undefined);
+  // A reply left for it while it worked (trace_log to:) comes when its turn ends, once.
+  mutate(d => { addCommit(d, { thread: Object.keys(d.threads)[0], kind: 'note', title: 'The figure is ready', extra: { to: 'x1' } }); }, env);
+  assert.match(handedStop({ session_id: 'x1' }, env), /^Replies other sessions left for you on Trace Canvas: \[\w+\] The figure is ready/);
+  assert.equal(handedStop({ session_id: 'x1' }, env), '');
 });
 
 test('a new session on a line with no folder of its own starts where the line it was forked from worked, not in the home folder', () => {

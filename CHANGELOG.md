@@ -2,19 +2,23 @@
 
 ## Unreleased
 
-- **A resumed session stays on its line.** A Codex session woken by a dispatch landed on another line: Codex runs every session's hooks under one background daemon, and a daemon first started by a hand-over kept that line's id in its environment. A line handed through the environment now binds only a session that has not taken a prompt yet, and is ignored under Codex's daemon.
+## 0.3.8 (2026-11-23)
+
+A long project you can still read at a glance: pinch the Branches view down to its milestones or its starred records. Search finds lines, merges take their agents and to-dos along, and the phone opens a line's agent in one tap.
+
 - **Pinch the Branches view to zoom.** Three levels: every record in full, milestones (decisions, starred, forks and merges in full, with finished to-dos under them as short rows), starred only. The other records shrink to small beads on their lines, spaced like a transit map, not to scale: a fork or merge keeps a slot of its own so its curve has room to turn, a run of plain records shares a stretch that grows with the square root of its count, and a faint +N beside it says how many are there. Pinch with two fingers or on the trackpad, or use the translucent switch floating at the bottom right. While you pinch, its thumb and the graph follow your fingers; the row under them stays where it is and the graph scales about it.
-- On the phone, a line's page starts with **Talk to this line's agent**: it opens the running session's chat in the Claude app (Remote Control). Sessions on another machine get the same link, and the phone no longer offers links only the computer can open.
-- A session resumed by a dispatch that an agent ran no longer moves onto that agent's line.
-- **Records written on a merged line after its merge move to the line it went into.** A session that had not followed yet, or another machine's older copy, could still leave records on the merged line, where the branch view drew them above the merge. They now go to the target line, and undoing the merge takes them back.
-
-- **A line that changes group takes its branches along.** Moving a line to another group (or out of one) now moves the lines merged into it, which sit in its card, and its forks that were in the group it left, nested ones too; a fork you put in a different group stays there. A merged line is always in the group of the line it went into.
-
 - **Search finds lines, and can look in one field only.** The search box now matches line names, groups and folders as well as records, and lists what it found under the box: lines first, then the newest records; click one to go to it. Type `#` to pick one field to search: `#line`, `#title`, `#body`, `#type` or `#links` (`#线路`, `#标题`, `#正文`, `#类型`, `#链接`), then the text.
-
-- **Open what an agent wrote, from any of your machines.** A turn's record now lists the files it changed, and its reports (.md, .txt) and images open in the reader from there, without the agent having to link them; code and data still open only when linked. When the file is on the machine that wrote the record and not on this one, the reader says so and offers to pull it over ssh (key login only); the copy is kept under the data folder (`files/<machine>/`), opens straight away the next time, and says where it came from, with "Pull again" beside it.
-
 - **After a merge, the agents go with the line.** Merging a line into another (keeping the merged line) now takes its sessions and its open to-dos along: what those agents log from then on lands on the line it went into, each is told once at its next turn, and finished to-dos stay behind as history. A record logged to a merged line by its id goes there too. Undoing the merge takes them back (not the ones you moved by hand since); what the agents logged on the other line meanwhile stays there.
+- **Records written on a merged line after its merge move to the line it went into.** A session that had not followed yet, or another machine's older copy, could still leave records on the merged line, where the branch view drew them above the merge. They now go to the target line, and undoing the merge takes them back.
+- **A line that changes group takes its branches along.** Moving a line to another group (or out of one) now moves the lines merged into it, which sit in its card, and its forks that were in the group it left, nested ones too; a fork you put in a different group stays there. A merged line is always in the group of the line it went into.
+- **Open what an agent wrote, from any of your machines.** A turn's record now lists the files it changed, and its reports (.md, .txt) and images open in the reader from there, without the agent having to link them; code and data still open only when linked. When the file is on the machine that wrote the record and not on this one, the reader says so and offers to pull it over ssh (key login only); the copy is kept under the data folder (`files/<machine>/`), opens straight away the next time, and says where it came from, with "Pull again" beside it.
+- On the phone, a line's page starts with **Talk to this line's agent**: it opens the running session's chat in the Claude app (Remote Control). Sessions on another machine get the same link, and the phone no longer offers links only the computer can open.
+- **Resume another machine's session from here.** The resume command goes over ssh into a tmux session there, so it keeps running when the window closes or the network drops.
+- `trace_fork` can start the new line's agent (`start`: claude, codex, gemini or agy), in the terminal you chose and bound to the line.
+- **A resumed session stays on its line.** A Codex session woken by a dispatch landed on another line: Codex runs every session's hooks under one background daemon, and a daemon first started by a hand-over kept that line's id in its environment. A line handed through the environment now binds only a session that has not taken a prompt yet, and is ignored under Codex's daemon.
+- A session resumed by a dispatch that an agent ran no longer moves onto that agent's line.
+- A turn records what it produced, not its scratch work: files that are in the project and still there when the turn ends.
+- The page server restarts itself after a `git pull` it did not make, so it no longer keeps running old code.
 
 ## 0.3.7 (2026-11-19)
 

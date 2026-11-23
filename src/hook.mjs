@@ -214,6 +214,8 @@ export function handleHook(input, env = process.env) {
     // A folder noted by an older version (the one the session had cd-ed into) is set right by its next event.
     const dir = sessionDir(cwd, s.cwd, input.transcript_path);
     if (d.sessions[sid] && s.cwd && dir !== s.cwd) { s.cwd = dir; changed = true; }
+    // A session noted before machines were (or only ever ended since) has none: any event of its gives it this one.
+    if (d.sessions[sid] && !s.machine && cfg.machine) { s.machine = cfg.machine; changed = true; }
     const touch = () => { d.sessions[sid] = Object.assign(s, { id: sid, agent: ag.name, agentKey: input._agent || 'claude', resume: ag.resume(sid), cwd: dir, machine: cfg.machine, last: Date.now() }); changed = true; };
     const thread = prompt => {
       const t = leadsTo(d, (s.bound && threadById(d, s.thread)) || resolveThread(d, info, { cfg, sid, prevThreadId: s.thread, promptForName: prompt || state.lastPrompt, agent: ag.name, cwd }));

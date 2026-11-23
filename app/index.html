@@ -2076,6 +2076,7 @@ function qrSvg(text, scale = 6) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n} ${n}" width="${n * scale}" height="${n * scale}" shape-rendering="crispEdges"><rect width="${n}" height="${n}" fill="#fff"/><path d="${d}" fill="#000"/></svg>`;
 }
 // </qr>
+// <jump> (taken out by test/phone.test.mjs: every agent's way in, on the computer and on the phone)
 // The Claude desktop app opens a session's chat from this link (desktopId comes from its session records).
 const chatHref = id => `claude://claude.ai/epitaxy/${encodeURIComponent(id)}`;
 // Where a session's chat is: the Claude desktop app, the Codex app (its thread id is the session id),
@@ -2097,6 +2098,7 @@ function jumpTo(s, cls, text) {
   if (!s.tty) return codex;
   return '';
 }
+// </jump>
 // The same session's chat on claude.ai (Remote Control), beside its terminal or app: also where the phone continues it.
 const rcLink = s => s.rc && /^https:\/\/claude\.ai\//.test(s.rc) ? `<a class="btn" href="${esc(s.rc)}" target="_blank" rel="noopener">${esc(t('openChatWeb'))}</a>` : '';
 async function focusTerm(sid) {

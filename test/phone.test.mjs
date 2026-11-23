@@ -87,3 +87,24 @@ test('trace-canvas phone sets up the address and key, makes a new key on --rotat
   assert.equal(cfg(), null);
   assert.throws(() => run('--host', 'phone.test'), /also pass --bind/);
 });
+
+// One table for every agent's way in, so narrowing one branch cannot silently take another agent's away
+// (0.3.8 made the phone's jump Remote Control only, and Codex sessions lost their app link).
+test('each agent keeps its way in: on the computer and on the phone', () => {
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const jumpAs = remote => new Function('esc', 't', 'S', `${page.slice(page.indexOf('// <jump>'), page.indexOf('// </jump>'))}; return jumpTo;`)(esc, k => k, { remote });
+  const way = h => (/href="([a-z]+):/.exec(h) || /data-act="([\w-]+)"/.exec(h) || [, ''])[1];
+  const sessions = {
+    'claude, Remote Control': { id: 'a', agentKey: 'claude', rc: 'https://claude.ai/code/session_1', tty: '/dev/ttys1', term: 'iTerm.app' },
+    'claude, desktop app': { id: 'b', agentKey: 'claude', desktopId: 'local_1' },
+    'claude, terminal only': { id: 'c', agentKey: 'claude', tty: '/dev/ttys2', term: 'iTerm.app' },
+    'codex, app': { id: 'd', agentKey: 'codex' },
+    'codex, terminal': { id: 'e', agentKey: 'codex', tty: '/dev/ttys3', term: 'iTerm.app' },
+    'codex, another machine': { id: 'f', resume: 'codex resume f', away: true },
+    'codex, another machine in tmux': { id: 'g', agentKey: 'codex', away: true, attach: 'ssh -t lab tmux attach' },
+    'agy, terminal': { id: 'h', agentKey: 'agy', tty: '/dev/ttys4', term: 'Apple_Terminal' },
+  };
+  const table = remote => Object.fromEntries(Object.entries(sessions).map(([k, s]) => [k, way(jumpAs(remote)(s, 'btn'))]));
+  assert.deepEqual(table(true), { 'claude, Remote Control': 'https', 'claude, desktop app': 'claude', 'claude, terminal only': '', 'codex, app': 'codex', 'codex, terminal': 'codex', 'codex, another machine': 'codex', 'codex, another machine in tmux': 'codex', 'agy, terminal': '' });
+  assert.deepEqual(table(false), { 'claude, Remote Control': 'focus-term', 'claude, desktop app': 'claude', 'claude, terminal only': 'focus-term', 'codex, app': 'codex', 'codex, terminal': 'focus-term', 'codex, another machine': '', 'codex, another machine in tmux': 'focus-term', 'agy, terminal': 'focus-term' });
+});

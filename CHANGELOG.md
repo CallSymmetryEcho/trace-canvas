@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Phone: a Codex session opens in its app again.** Since 0.3.8 the phone offered only Claude Code's Remote Control link, so a Codex session (and a Claude session known only to the desktop app) had no way in. The phone gets the app link back, now also for a Codex session that runs in a terminal or on another machine.
+
 - **A reply left for another session reaches it without the person.** A reply logged for a session (`trace_log` with `to`) used to wait for that session's next message from the person. A session that is working now reads it when its turn ends; one idle in tmux on this machine is woken with one typed line and reads it at once. Idle outside tmux, or on another machine: at its next turn, as before.
 
 - **A report pulled from another machine brings its images.** Only the report itself came over, so its figures showed as missing. Pulling now also fetches the images it shows (up to 20). An image of a report this machine has is also found beside the report where it really is, when the record names the report by a relative path.

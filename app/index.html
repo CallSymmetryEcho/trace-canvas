@@ -2085,13 +2085,16 @@ function jumpTo(s, cls, text) {
   // Another machine's session: its chat and terminal are not here, but one in tmux opens in a tab here over ssh.
   // Remote Control on: the same session's chat on claude.ai. The only way in from the phone, where the Claude app opens it.
   const rc = s.rc && /^https:\/\/claude\.ai\//.test(s.rc) ? `<a class="${cls}" href="${esc(s.rc)}" target="_blank" rel="noopener" title="${esc(t('openChat'))}">${text || esc(t('openChat'))}</a>` : '';
-  if (S.remote) return rc;
-  if (s.away) return s.attach ? `<button class="${cls}" data-act="focus-term" data-sid="${esc(s.id)}" title="${esc(s.attach)}">${text || esc(t('openTmux'))}</button>` : rc;
   const a = (href, key) => `<a class="${cls}" href="${esc(href)}" title="${esc(t(key))}">${text || esc(t(key))}</a>`;
+  const codex = s.agentKey === 'codex' || /^codex /.test(s.resume || '') ? a(`codex://threads/${encodeURIComponent(s.id)}`, 'openChat') : '';
+  // On the phone a terminal is no way in: the chat on claude.ai, else the app that has the thread (Claude's, or Codex's
+  // by its thread id, also for a session in a terminal or on another machine: the phone's app is the same either way).
+  if (S.remote) return rc || (s.desktopId && !s.away ? a(chatHref(s.desktopId), 'openChat') : '') || codex;
+  if (s.away) return s.attach ? `<button class="${cls}" data-act="focus-term" data-sid="${esc(s.id)}" title="${esc(s.attach)}">${text || esc(t('openTmux'))}</button>` : rc;
   if (s.desktopId) return a(chatHref(s.desktopId), 'openChat');
   if (!S.remote && (s.tty && ['Apple_Terminal', 'iTerm.app'].includes(s.term) || s.tab && ['gnome-terminal', 'konsole'].includes(s.term) || s.tmux && s.pane)) return `<button class="${cls}" data-act="focus-term" data-sid="${esc(s.id)}" title="${esc(t('goTerm'))}">${text || esc(t('goTerm'))}</button>`;
   if (rc) return rc;
-  if (!s.tty && (s.agentKey === 'codex' || /^codex /.test(s.resume || ''))) return a(`codex://threads/${encodeURIComponent(s.id)}`, 'openChat');
+  if (!s.tty) return codex;
   return '';
 }
 // The same session's chat on claude.ai (Remote Control), beside its terminal or app: also where the phone continues it.

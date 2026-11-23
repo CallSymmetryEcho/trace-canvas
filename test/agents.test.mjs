@@ -291,3 +291,20 @@ test('an agent is started one way: without the caller\'s session variables, on t
   }
   assert.deepEqual(bad, []);
 });
+
+test('a start says whether the program really started: not when it fails at once or dies within a second', async () => {
+  const { startProbe, deliverRow } = await import('../src/agents.mjs');
+  const sh = c => startProbe('/bin/sh', ['-c', c], {}, { wait: 600 });
+  const bad = await sh('echo "cannot open display" >&2; exit 1');
+  assert.deepEqual([bad.started, bad.why], [false, 'cannot open display']);
+  assert.equal((await sh('sleep 3')).started, true);                    // a window that stays
+  assert.equal((await sh('exit 0')).started, true);                     // a launcher that hands over and ends cleanly
+  const died = await sh('sleep 0.2; exit 3');
+  assert.deepEqual([died.started, died.why], [false, 'it ended at once with exit code 3']);
+  assert.equal((await startProbe('/bin/sh', ['-c', 'exit 0'], {}, { wait: 600, stay: true })).started, false); // an agent that ends at once has not started
+  const none = await startProbe('/no/such/program-xyz', [], {}, { wait: 600 });
+  assert.equal(none.started, false); assert.match(none.why, /ENOENT/);
+  // A row's result has the same shape whichever way it was started.
+  assert.deepEqual(await deliverRow({ command: 'claude x', action: 'start' }, { open: async () => 'no display' }), { failed: 'no display', started: false, why: 'no display' });
+  assert.deepEqual(await deliverRow({ command: 'claude x', action: 'start' }, { open: async () => null }), { failed: null, started: true, why: '' });
+});

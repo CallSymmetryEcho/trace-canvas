@@ -157,6 +157,7 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
   background: var(--surface); border: 1px solid var(--rule); border-radius: 999px; box-shadow: var(--shadow); font-size: 13px; color: var(--muted);
 }
 .banner b { color: var(--ink); font-weight: 600; }
+.sync-chip { color: var(--warn); border-color: var(--warn); cursor: help; }
 .multi-banner { flex-wrap: wrap; justify-content: center; border-radius: 14px; padding: 8px 10px; gap: 8px; width: max-content; }
 .multi-banner select, .multi-banner input { padding: 4px 8px; border: 1px solid var(--rule); border-radius: 6px; background: var(--surface-2); font-size: 13px; max-width: 180px; }
 .multi-banner .btn { border-radius: 6px; }
@@ -1143,6 +1144,7 @@ button.gl-prog[aria-pressed="true"] { color: var(--ink); background: var(--surfa
       <button class="tab" role="tab" id="tab-agents" data-view="agents" aria-selected="false" data-i18n="tabAgents">Agents</button>
     </nav>
     <span class="sync" id="sync" data-mode="loading"><span class="sync-text" id="sync-text"></span></span>
+    <span class="ex-chip sync-chip" id="sync-banner" hidden></span>
     <span class="ex-chip" id="ex-banner" hidden data-i18n-title="exChipTitle"><span data-i18n="exChip">Example data</span><button id="ex-clear" data-i18n="exClear">Clear</button></span>
     <span class="spacer"></span>
     <label class="search" for="q">
@@ -1341,7 +1343,7 @@ apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent 
     tApStarted: n => `Autopilot is on: "${n}"'s agent has its to-dos`, tApStopped: 'Autopilot stops before the next to-do', tApNoted: 'Its session is working: it takes the round up when its turn ends', apSendTitle: 'Send this to the running session', apSendP: n => `"${n}" is open right now, so only you or another agent can give it the round: paste this into it (or ask an agent to message it).`, copy2: 'Copy',
     agentAsk: 'Prompt for an agent', agentPromptTitle: 'Copy a prompt that sends an agent to read this line and carry on', tAgentPrompt: 'Prompt copied: paste it to an agent, for example in the Claude app on your phone',
     agentPromptText: (name, id) => `Read the Trace Canvas line "${name}" (thread ${id}): use trace_read_thread and trace_tasks for its goal and open to-dos, carry on with them, and tick each one with trace_task_done when it is done.`, tSyncing: 'Syncing…', tSyncBusy: 'A sync is already running', tSyncFailed: e => `Sync failed: ${e}`,
-    syncFailedAt: (when, why) => `Failed ${when}: ${why}`, syncOkAt: when => `Last good sync ${when}`, syncNowBtn: 'Sync now', syncStale: (m, when) => `${m} last updated ${when}`, tSynced: (n, off) => `Synced: ${n} change${n === 1 ? '' : 's'} from other machines${off ? ' (offline; pushes next time)' : ''}`, onMachine: m => `On ${m}`, latestOn: m => `${m} · latest`,
+    syncFailedAt: (when, why) => `Failed ${when}: ${why}`, syncLong: when => `Sync failing since ${when}`, syncOkAt: when => `Last good sync ${when}`, syncNowBtn: 'Sync now', syncStale: (m, when) => `${m} last updated ${when}`, tSynced: (n, off) => `Synced: ${n} change${n === 1 ? '' : 's'} from other machines${off ? ' (offline; pushes next time)' : ''}`, onMachine: m => `On ${m}`, latestOn: m => `${m} · latest`,
     menuAgent: 'Connect an AI agent', menuIO: 'Import / export', menuClearEx: 'Clear example data', menuHelp: 'Shortcuts and help', menuDoctor: 'Check setup', doctorWait: 'Checking…', doctorAllGood: 'All good.', doctorFaq: 'Common questions',
     zoomOut: 'Zoom out', zoomIn: 'Zoom in', zoomReset: 'Reset to 100%', fit: 'Fit', connect: 'Connect', connectTitle: 'Draw a link between two threads', newThread: 'New thread',
     selectMode: 'Select', selectTitle: 'Pick several threads (or Shift-click cards), then merge them',
@@ -1524,7 +1526,7 @@ apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的
     tApStarted: n => `Autopilot 已开始：「${n}」的 agent 拿到了待办`, tApStopped: 'Autopilot 会在下一条待办之前停下', tApNoted: '它的会话正在干活：这一轮停下就接手', apSendTitle: '发给正在运行的会话', apSendP: n => `「${n}」现在开着，只有你或别的 agent 能把这一轮交给它：把下面这段粘贴进去（或者让一个 agent 给它发消息）。`, copy2: '复制',
     agentAsk: '给 agent 的提示', agentPromptTitle: '复制一段提示，让 agent 去读这条线并接着做', tAgentPrompt: '提示已复制：粘贴给 agent，比如手机 Claude app 里的会话',
     agentPromptText: (name, id) => `读 Trace Canvas 上的线「${name}」（thread ${id}）：用 trace_read_thread 和 trace_tasks 看它的目标和未完成的待办，接着做，每做完一项就用 trace_task_done 勾掉。`, tSyncing: '正在同步…', tSyncBusy: '已经有一个同步在进行', tSyncFailed: e => `同步失败：${e}`,
-    syncFailedAt: (when, why) => `${when}失败：${why}`, syncOkAt: when => `上次成功同步：${when}`, syncNowBtn: '立即同步', syncStale: (m, when) => `${m} 最后更新：${when}`, tSynced: (n, off) => `已同步：从其他电脑收到 ${n} 处改动${off ? '（离线，下次再推送）' : ''}`, onMachine: m => `在 ${m} 上`, latestOn: m => `${m} 最新`,
+    syncFailedAt: (when, why) => `${when}失败：${why}`, syncLong: when => `同步从${when}起一直失败`, syncOkAt: when => `上次成功同步：${when}`, syncNowBtn: '立即同步', syncStale: (m, when) => `${m} 最后更新：${when}`, tSynced: (n, off) => `已同步：从其他电脑收到 ${n} 处改动${off ? '（离线，下次再推送）' : ''}`, onMachine: m => `在 ${m} 上`, latestOn: m => `${m} 最新`,
     menuAgent: '接入 AI agent', menuIO: '导入 / 导出', menuClearEx: '清除示例数据', menuHelp: '快捷键与用法', menuDoctor: '检查设置', doctorWait: '正在检查…', doctorAllGood: '都正常。', doctorFaq: '常见问题',
     zoomOut: '缩小', zoomIn: '放大', zoomReset: '重置为 100%', fit: '适配', connect: '连线', connectTitle: '在两个线程之间画一条关联', newThread: '新线程',
     selectMode: '多选', selectTitle: '点选多条线程（或 Shift+点击卡片），然后合并',
@@ -1736,6 +1738,10 @@ function showSync() {
   const bad = syncTrouble().length > 0;
   $('#sync-item').classList.toggle('has-dot', bad);
   $('#more-btn').classList.toggle('has-sync-fail', bad);
+  // Failing for over an hour is not a dot any more: it says so at the top (it once failed for 25 hours unnoticed).
+  const s = S.sync, long = !!(s && s.failed && Date.now() - (s.failedSince || s.lastOk || s.at) > 36e5), b = $('#sync-banner');
+  b.hidden = !long;
+  if (long) { b.textContent = t('syncLong', fmtRel(s.failedSince || s.lastOk || s.at)); b.title = s.failed; }
 }
 function fmtAbs(ts) { const d = new Date(ts); return `${pad2(d.getMonth() + 1)}/${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
 function fmtRel(ts) {

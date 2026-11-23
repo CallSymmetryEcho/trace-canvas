@@ -332,7 +332,7 @@ test('a running session is woken, not pasted into: typed into its tmux pane when
   }, env);
   assert.deepEqual(row.pane, { machine: '', socket: '/tmp/tmux-1/default', pane: '%3', tty: '/dev/pts/7' });
   // Typed in: nothing else is opened. Not typed (the pane is gone): what the row said before.
-  assert.deepEqual(await deliverRow(row, { type: async (p, text) => text === row.prompt, open: async () => { throw new Error('no window'); } }), { woken: true });
+  assert.deepEqual(await deliverRow(row, { type: async (p, text) => text === row.prompt, open: async () => { throw new Error('no window'); } }), { woken: true, started: true, why: '' });
   assert.deepEqual(await deliverRow({ action: 'busy', command: 'x', pane: row.pane, prompt: 'p' }, { type: async () => false }), {});
   // The script checks the pane is still the session's, types the text literally, then Enter.
   const ran = [];

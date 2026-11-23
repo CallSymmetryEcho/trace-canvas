@@ -125,9 +125,24 @@ export function openTerminal(cmd, env = process.env) {
     done(/-1743|not allowed|Not authorized/i.test(why) ? `macOS did not allow this app to control the terminal (System Settings → Privacy & Security → Automation): ${why}`
       : /-1712|timed out/i.test(why) || err.killed ? `Terminal did not answer in time; an Automation prompt may be waiting for an answer: ${why}` : why);
   }));
+  return startProbe(t[0], t[1], { env: t[2] }).then(r => (r.started ? null : r.why));
+}
+/**
+ * Starts a program and says whether it really started: { started, why, pid }. Not started: it could not be run, or it
+ * ended with an error within `wait` ms (a terminal with no display, a wrong flag); its last error line is the why.
+ * A launcher that ends cleanly at once (gnome-terminal hands the tab to its server) has started. stay: a program meant
+ * to keep running (an agent) that ends within `wait`, even cleanly, has not.
+ */
+export function startProbe(file, args, opts = {}, { wait = 1000, stay = false } = {}) {
   return new Promise(done => {
-    const c = spawn(t[0], t[1], { stdio: 'ignore', detached: true, env: t[2] });
-    c.on('error', e => done(e.message)).on('spawn', () => { c.unref(); done(null); });
+    let err = '', over = false;
+    const end = r => { if (over) return; over = true; clearTimeout(timer); try { c.stderr.destroy(); c.unref(); } catch {} done(r); };
+    const c = spawn(file, args, { ...opts, stdio: ['ignore', 'ignore', 'pipe'], detached: true });
+    const timer = setTimeout(() => end({ started: true, why: '', pid: c.pid }), wait);
+    c.stderr.on('data', b => { err = (err + b).slice(-2000); });
+    c.on('error', e => end({ started: false, why: e.message }));
+    c.on('exit', (code, sig) => end(code === 0 && !stay ? { started: true, why: '', pid: c.pid }
+      : { started: false, why: err.trim().split('\n').pop() || (code === 0 ? `it ended at once` : `it ended at once with ${sig || `exit code ${code}`}`) }));
   });
 }
 // A command run on another machine over ssh, in its login shell. A login shell that is not interactive skips .zshrc
@@ -196,8 +211,11 @@ export function typeInto({ machine = '', socket = '', pane = '', tty = '' }, tex
 }
 /** What a dispatch or Autopilot row needs done: typed into the idle session's tmux pane (row.pane), else its window opened. */
 export async function deliverRow(r, { type = typeInto, ...deps } = {}) {
-  if (r.pane && await type(r.pane, r.prompt)) return { woken: true };
-  return r.command && r.action !== 'busy' ? launchRow(r, deps) : {};
+  if (r.pane && await type(r.pane, r.prompt)) return { woken: true, started: true, why: '' };
+  if (!r.command || r.action === 'busy') return {};
+  // One shape for every way of starting: started (it really runs: the window opened, the tmux session is up), and why not.
+  const res = await launchRow(r, deps);
+  return { ...res, started: !res.failed, why: res.failed || '' };
 }
 // tmux is often not on the page server's PATH (a login item, a systemd service).
 // A process's environment: /proc on Linux, ps -E on a Mac (values cut at the first space, enough for these keys).

@@ -179,7 +179,7 @@ const statusFile = env => path.join(home(env), '.sync-status.json');
 export function syncStatus(env = process.env) { try { return JSON.parse(fs.readFileSync(statusFile(env), 'utf8')); } catch { return null; } }
 function noteStatus(env, failed, others) {
   const old = syncStatus(env) || {}, at = Date.now();
-  try { fs.writeFileSync(statusFile(env), JSON.stringify({ at, failed: failed || null, lastOk: failed ? old.lastOk || null : at, others: others || old.others || {} })); } catch {}
+  try { fs.writeFileSync(statusFile(env), JSON.stringify({ at, failed: failed || null, failedSince: failed ? old.failedSince || at : null, lastOk: failed ? old.lastOk || null : at, others: others || old.others || {} })); } catch {}
 }
 const firstErr = out => String(out || '').split('\n').map(l => l.trim()).filter(Boolean).pop() || 'unknown error';
 

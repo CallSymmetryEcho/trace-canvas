@@ -6,7 +6,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createCard } from './research.mjs';
 import { addCommit, dataFile, ensureThread, findThreadByName, importText, INBOX, mutate, readConfig, readData, threadById, threadIdOf } from './store.mjs';
-import { sessionThread, whereFind } from './hook.mjs';
+import { handedThread, sessionThread, whereFind } from './hook.mjs';
 import { agentEnv, agentKey, agentOf } from './agents.mjs';
 import { sessionOfPid } from './live.mjs';
 import { bindLiveSession, captureSession, detachThread, forkThread, listTasks, listThreads, liveSessions, mergeDataset, mergeThreads, readThread, setTaskDone } from './ops.mjs';
@@ -346,7 +346,8 @@ async function callTool(name, a = {}) {
     }
     case 'trace_tasks': {
       const d = readData();
-      let thread = a.thread || (process.env.TRACE_CANVAS_THREAD && threadById(d, process.env.TRACE_CANVAS_THREAD) ? process.env.TRACE_CANVAS_THREAD : undefined);
+      const handed = handedThread();
+      let thread = a.thread || (handed && threadById(d, handed) ? handed : undefined);
       // Without a thread: the line this session works on, so the answer stays small as the canvas grows; every line
       // with all: true, for mine or an assignee, or when the session's line is not known.
       if (!thread && !a.all && !a.mine && !a.assignee) try { const sid = currentSessionId({ sessionId: a.session_id, projectDir: projectDir() }); thread = (sid && sessionThread(d, { id: sid }).threadId) || undefined; } catch {}

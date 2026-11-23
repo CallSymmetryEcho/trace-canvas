@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { focusScript, focusTab, normalize, terminalScript } from '../src/agents.mjs';
-import { handleHook, sessionStartContext, sessionThread } from '../src/hook.mjs';
+import { handleHook, handedThread, sessionStartContext, sessionThread } from '../src/hook.mjs';
 import { readLive, terminalOf, updateLive } from '../src/live.mjs';
 import { codexHooks, codexWritable, install, installAgy } from '../src/install.mjs';
 import { handTo, listTasks } from '../src/ops.mjs';
@@ -255,4 +255,20 @@ test('Go to the terminal on Linux: the hook notes the GNOME Terminal or Konsole 
     for (const tab of [':1.223 /Windows/1 /Sessions/2;x', 'x /Windows/1 /Sessions/2', screen + "'"]) assert.equal(await focusTab({ term: tab.startsWith('/') ? 'gnome-terminal' : 'konsole', tab }), false);
     assert.equal(await focusTab({ tty: '/dev/pts/2', term: '' }), false);
   } finally { process.env.PATH = PATH; }
+});
+
+test('a line handed by the environment binds a new session only: not a resumed one, and not under a shared daemon', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-handed-')), env = { ...process.env, TRACE_CANVAS_HOME: home };
+  delete env.TRACE_CANVAS_DISABLE;
+  const [mine, other] = mutate(d => [createThread(d, { name: 'Video ops' }).id, createThread(d, { name: 'Paper' }).id], env);
+  // A session that already took a prompt on its line is resumed where another line's id is in the environment.
+  mutate(d => { d.sessions.old = { id: 'old', thread: mine, prompted: true }; }, env);
+  sessionStartContext({ session_id: 'old', cwd: home, hook_event_name: 'SessionStart' }, { ...env, TRACE_CANVAS_THREAD: other });
+  assert.equal(readData(env).sessions.old.thread, mine);
+  // A new one is bound by it.
+  sessionStartContext({ session_id: 'new', cwd: home, hook_event_name: 'SessionStart' }, { ...env, TRACE_CANVAS_THREAD: other });
+  assert.equal(readData(env).sessions.new.thread, other);
+  // Under Codex's app-server daemon the variable is whoever started the daemon's.
+  assert.equal(handedThread({ TRACE_CANVAS_THREAD: other }, () => true), '');
+  assert.equal(handedThread({ TRACE_CANVAS_THREAD: other }, () => false), other);
 });

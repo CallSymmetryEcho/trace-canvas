@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **A resumed session stays on its line.** A Codex session woken by a dispatch landed on another line: Codex runs every session's hooks under one background daemon, and a daemon first started by a hand-over kept that line's id in its environment. A line handed through the environment now binds only a session that has not taken a prompt yet, and is ignored under Codex's daemon.
 - **Pinch the Branches view to zoom.** Three levels: every record in full, milestones (decisions, starred, forks and merges in full, with finished to-dos under them as short rows), starred only. The other records shrink to small beads on their lines, spaced like a transit map, not to scale: a fork or merge keeps a slot of its own so its curve has room to turn, a run of plain records shares a stretch that grows with the square root of its count, and a faint +N beside it says how many are there. Pinch with two fingers or on the trackpad, or use the translucent switch floating at the bottom right. While you pinch, its thumb and the graph follow your fingers; the row under them stays where it is and the graph scales about it.
 - On the phone, a line's page starts with **Talk to this line's agent**: it opens the running session's chat in the Claude app (Remote Control). Sessions on another machine get the same link, and the phone no longer offers links only the computer can open.
 - A session resumed by a dispatch that an agent ran no longer moves onto that agent's line.

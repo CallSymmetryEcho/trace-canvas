@@ -406,6 +406,23 @@ function whereHere(cfg, cwd) {
   } catch { return []; }
 }
 
+// Codex runs every session's hooks and MCP server under one app-server daemon, which keeps the environment of the
+// session that happened to start it: a daemon started by a hand-over gave its TRACE_CANVAS_THREAD to every later
+// Codex session on the machine. Under such a daemon the variable is not this session's.
+function underSharedDaemon(pid = process.ppid) {
+  try {
+    for (let i = 0; i < 8 && pid > 1; i++) {
+      const [, ppid, cmd] = /^\s*(\d+)\s+(.*)$/.exec(execFileSync('ps', ['-ww', '-o', 'ppid=,command=', '-p', String(pid)], { encoding: 'utf8', timeout: 1500, stdio: ['ignore', 'pipe', 'ignore'] })) || [];
+      if (!ppid) break;
+      if (/codex\S*\s+app-server/.test(cmd)) return true;
+      pid = Number(ppid);
+    }
+  } catch {}
+  return false;
+}
+/** The line this process was handed with TRACE_CANVAS_THREAD (`hand`), '' when the variable is a shared daemon's. */
+export const handedThread = (env = process.env, shared = env === process.env ? underSharedDaemon : () => false) => (env.TRACE_CANVAS_THREAD && !shared() ? env.TRACE_CANVAS_THREAD : '');
+
 /**
  * What a new session should know first: its line and goal, the open to-dos for this agent, who else
  * works on the line, and where things are on this machine. TRACE_CANVAS_THREAD (set by `hand`) binds
@@ -415,7 +432,10 @@ export function sessionStartContext(input, env = process.env) {
   const sid = input.session_id, cwd = input.cwd || process.cwd(), key = input._agent || 'claude', ag = agentOf(key);
   const cfg = readConfig(env);
   const d = readData(env);
-  const handed = env.TRACE_CANVAS_THREAD && threadById(d, env.TRACE_CANVAS_THREAD);
+  // A session that has already taken a prompt is being resumed or compacted: it stays on its line, whatever the
+  // environment says now.
+  const handedId = !(sid && d.sessions[sid] && d.sessions[sid].prompted) && handedThread(env);
+  const handed = handedId && threadById(d, handedId);
   let tid = handed ? handed.id : null;
   if (tid && sid) mutate(dd => bindSession(dd, sid, tid, env), env);
   if (!tid && sid && !(d.sessions[sid] && d.sessions[sid].bound)) { const t = folderLine(d, repoInfo(cwd), cwd); if (t) tid = t.id; }

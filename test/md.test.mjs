@@ -137,3 +137,16 @@ test('a report a record changed opens from that record, and one only another mac
   assert.equal(readLinkedMd(d, path.join(there, 'abs.md'), 'b', env).text, '# Abs');
   assert.ok(fs.existsSync(path.join(root, 'home', 'files', 'mac', there, 'proj', 'sub', 'far.md'))); // kept under the data folder, by machine
 });
+
+test('a file this machine does not have is looked for on the machine whose home it is under, and a reply\'s full paths are linked', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-else-')), env = { ...process.env, TRACE_CANVAS_HOME: path.join(root, 'home'), TRACE_CANVAS_MACHINE: 'here' };
+  // An agent here wrote /Users/ann/cv/roles.md on the Mac over ssh and linked that path; its record says "here".
+  const d = { commits: {
+    a: { id: 'a', thread: 't1', machine: 'here', links: ['/Users/ann/cv/roles.md', '~/cv/notes.md', '/home/nobody/x.md'] },
+  }, sessions: { m1: { id: 'm1', machine: 'mac', thread: 't1', cwd: '/Users/ann/cv', last: 2 }, h1: { id: 'h1', machine: 'here', thread: 't1', cwd: '/home/me', last: 3 } } };
+  assert.deepEqual(readLinkedMd(d, '/Users/ann/cv/roles.md', 'a', env), { error: 'away', machine: 'mac' }); // by its home folder
+  assert.deepEqual(readLinkedMd(d, '~/cv/notes.md', 'a', env), { error: 'away', machine: 'mac' }); // ~: the other machine on the line
+  assert.equal(readLinkedMd(d, '/home/nobody/x.md', 'a', env).error, 'missing'); // nobody's home: nowhere to ask
+  const { namedReports } = await import('../src/hook.mjs');
+  assert.deepEqual(namedReports('Saved on the Mac at `~/cv/roles.md`，also /home/me/proj/in.md, /home/me/out.txt and https://x.org/home/a.md', '/home/me/proj'), ['~/cv/roles.md', '/home/me/out.txt']);
+});

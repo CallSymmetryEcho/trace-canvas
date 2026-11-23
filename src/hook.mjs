@@ -309,7 +309,7 @@ export function handleHook(input, env = process.env) {
       const log = cfg.turns === 'all' ? !!(msg || acted) : cfg.turns === 'changes' ? acted : false;
       if (log) {
         const t = thread(state.lastPrompt);
-        addCommit(d, { thread: t.id, kind: 'agent', title: headline(msg) || tr(cfg.lang, 'turnChanged', files.length), body: turnBody(cfg.lang, msg, files, todos), agent: ag.name, links: [ag.resume(sid)], extra: { session: sid, files: files.slice(0, 50) } });
+        addCommit(d, { thread: t.id, kind: 'agent', title: headline(msg) || tr(cfg.lang, 'turnChanged', files.length), body: turnBody(cfg.lang, msg, files, todos), agent: ag.name, links: [ag.resume(sid), ...namedReports(msg, cwd)], extra: { session: sid, files: files.slice(0, 50) } });
       }
       state.turnFiles = []; state.turnTodos = []; state.turnActions = 0; state.turnLogged = false; state.turnTask = ''; state.turnPrompt = '';
     } else if (ev === 'SessionEnd') {
@@ -566,6 +566,21 @@ function lineContext(input, env) {
   if (!th) return apNote.trim();
   const open = Object.values(d.commits).filter(c => threadIdOfLocal(d, c) === th.id && c.kind === 'task' && !c.done && !(c.session && !c.highlight)).sort((a, b) => a.ts - b.ts);
   return `Trace Canvas: you work on the line "${th.name}" (thread ${th.id}). If this message gives a new goal, idea or next step worth tracking, add each one now as a to-do with trace_log (kind "task", thread "${th.id}"), one short title per item; not the request in this message, which you are doing now, nor anything you will finish in this same turn${open.length ? `, and what is already open: ${open.slice(-8).map(c => firstLine(c.title, 60)).join('; ')}` : ''}.${apNote}`;
+}
+
+/**
+ * Reports and images a reply names by their full path (/… or ~/…), for the turn's record to link, so they open from
+ * it: also one the agent wrote on another machine over ssh, which the hooks never saw being written (the page then
+ * offers to pull it from there). At most four; a path in the project is listed among the changed files already.
+ */
+export function namedReports(msg, cwd = '') {
+  const out = [];
+  for (const m of String(msg || '').matchAll(/(?<![\w/.~-])(~|\/(?:Users|home|mnt|tmp))\/[^\s`'"<>()，。；、：]+\.(?:md|markdown|txt|pdf|png|jpe?g|gif|webp|svg)\b/gi)) {
+    const p = m[0];
+    if (!out.includes(p) && !(cwd && p.startsWith(cwd + '/'))) out.push(p);
+    if (out.length === 4) break;
+  }
+  return out;
 }
 
 /**

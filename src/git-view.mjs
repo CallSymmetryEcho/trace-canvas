@@ -215,6 +215,14 @@ const isFile = f => { try { return fs.statSync(f).isFile(); } catch { return fal
 // A file a record changed opens when it is a report or an image; code and data an agent touched are read only when linked.
 const CHANGED = /\.(md|markdown|txt|png|jpe?g|gif|webp|svg)$/i;
 const MACHINE = /^[A-Za-z0-9][\w.-]*$/; // an ssh alias, never an option
+// The other machine a path this one does not have is likely on: one whose sessions run under the same home folder
+// (/Users/ann is the Mac's), or for a ~ path the machine that last worked on the record's line. '' when none.
+function elsewhere(d, c, p, me) {
+  const ss = Object.values(d.sessions || {}).filter(x => x.machine && x.machine !== me).sort((a, b) => (b.last || 0) - (a.last || 0));
+  const homeDir = (/^\/(?:Users|home)\/[^/]+/.exec(p) || [])[0];
+  const s = homeDir ? ss.find(x => String(x.cwd || '').startsWith(homeDir)) : p.startsWith('~') ? ss.find(x => x.thread === c.thread) : null;
+  return s ? s.machine : '';
+}
 /**
  * Where a file a record names is. The page reads nothing else: a path some record links, or (with rec) one that
  * record lists among its changed files. A relative path is looked for from the session's folder upward (the hooks
@@ -226,12 +234,15 @@ function place(d, p, rec, env) {
   const c = rec ? d.commits[rec] : Object.values(d.commits || {}).find(x => links(x, p));
   if (!c || !(links(c, p) || (rec && CHANGED.test(p) && (c.files || []).includes(p)))) return { error: 'unlinked' };
   const s = (d.sessions || {})[c.session], cwd = (s && s.cwd) || '', abs = /^[/~]/.test(p);
-  const machine = c.machine || (s && s.machine) || '', here = !machine || machine === readConfig(env).machine;
+  const me = readConfig(env).machine;
+  let machine = c.machine || (s && s.machine) || '', here = !machine || machine === me;
   if (abs) { if (isFile(home(p))) return { file: home(p) }; }
   else if (here && path.isAbsolute(cwd)) for (let dir = cwd; ; dir = path.dirname(dir)) {
     if (isFile(path.join(dir, p))) return { file: path.join(dir, p) };
     if (dir === path.dirname(dir)) break;
   }
+  // Written here but not here: an agent on this machine can write a file on another one over ssh and link its path there.
+  if (here && abs && me) { machine = elsewhere(d, c, p, me); here = !machine; }
   if (here || !MACHINE.test(machine) || !(abs || cwd)) return { error: 'missing' };
   const root = path.join(dataHome(env), 'files', machine), copy = path.join(root, (abs ? p : path.posix.join(cwd, p)).replace(/^~/, '_home'));
   if (!copy.startsWith(root + path.sep)) return { error: 'missing' };

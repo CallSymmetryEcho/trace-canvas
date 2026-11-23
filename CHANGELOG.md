@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **A file an agent wrote on another machine opens from its record.** An agent here can write a file on another machine over ssh and link its path there; the page looked for it only on the machine the record came from and said it was missing. It now asks the machine whose home folder the path is under (or, for a `~` path, the other machine working on that line) and offers to pull it. A turn's record also links the reports and images its reply names by full path.
+
 - Search results: the mark before each record no longer sits on top of the others. A session's buttons stack when their labels are long (English), so its title keeps its width.
 
 ## 0.3.8 (2026-11-23)

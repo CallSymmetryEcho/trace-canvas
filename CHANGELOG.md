@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Dispatch and Autopilot no longer need someone at the keyboard.** An agent started or resumed on this machine now runs in a detached tmux session (`tc-…`), as on another machine: it starts with nobody at the computer and keeps going when its window closes; on a desktop a window attached to it still opens. A resumed Claude Code session has Remote Control on, like a new one, so it shows in the Claude app. A session that is already running is no longer handed back to be pasted into: idle in tmux (here or on another machine), the to-dos are typed into its pane and it starts; working, a note is left and its Stop hook hands the to-dos over when its turn ends. A session waiting at a permission prompt is never typed into. Still by hand: an idle session that is not in tmux, and a working one on another machine.
+
 - **A file an agent wrote on another machine opens from its record.** An agent here can write a file on another machine over ssh and link its path there; the page looked for it only on the machine the record came from and said it was missing. It now asks the machine whose home folder the path is under (or, for a `~` path, the other machine working on that line) and offers to pull it. A turn's record also links the reports and images its reply names by full path.
 
 - Search results: the mark before each record no longer sits on top of the others. A session's buttons stack when their labels are long (English), so its title keeps its width.

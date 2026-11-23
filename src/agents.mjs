@@ -15,7 +15,7 @@ export const q = s => `'${String(s).replace(/'/g, `'\\''`)}'`; // POSIX shell qu
 export const AGENTS = {
   // remote: Remote Control on, named after the line, so the session shows in the Claude app (▶ Start).
   // wake: resume the session with a first message (Dispatch).
-  claude: { name: 'Claude Code', resume: id => `claude --resume ${id}`, wake: (id, p) => `claude --resume ${id} ${q(p)}`, launch: p => `claude ${q(p)}`, remote: (name, p) => `claude --remote-control=${q(name)} ${q(p)}` },
+  claude: { name: 'Claude Code', resume: id => `claude --resume ${id}`, wake: (id, p, name = '') => `claude --resume ${id} ${name ? `--remote-control=${q(name)} ` : ''}${q(p)}`, launch: p => `claude ${q(p)}`, remote: (name, p) => `claude --remote-control=${q(name)} ${q(p)}` },
   codex: { name: 'Codex', resume: id => `codex resume ${id}`, wake: (id, p) => `codex resume ${id} ${q(p)}`, launch: p => `codex ${q(p)}` },
   // ponytail: Gemini's resume flag is unverified until a current gemini-cli is installed.
   gemini: { name: 'Gemini CLI', resume: id => `gemini --resume ${id}`, wake: (id, p) => `gemini --resume ${id} -i ${q(p)}`, launch: p => `gemini -i ${q(p)}` },
@@ -154,10 +154,12 @@ export function startDetached({ machine, name, cmd }, run = execFile, wait = 3) 
   const script = `command -v tmux >/dev/null || exit 3; tmux has-session -t ${n} 2>/dev/null && exit 4; `
     + `tmux new-session -d -s ${n} ${q(`exec "$SHELL" -lc ${q(`PATH="$HOME/.local/bin:$PATH"; ${cmd}`)}`)} \\; set-option -t ${n} remain-on-exit on 3>&- 4>&- 5>&- 6>&- 7>&- 8>&- 9>&-; sleep ${wait}; `
     + `if [ "$(tmux display-message -p -t ${n} '#{pane_dead}')" = 1 ]; then tmux capture-pane -p -S -200 -t ${n} | grep -v -e '^[[:space:]]*$' -e '^Pane is dead' | tail -5; tmux kill-session -t ${n}; exit 5; fi; tmux set-option -t ${n} remain-on-exit off`;
-  return new Promise(done => run('ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', machine, `exec "$SHELL" -lc ${q(script)}`], { timeout: 30e3 }, (err, out, errOut) => {
+  // No machine: this one, from a login shell (the page server's own PATH often lacks tmux), without the caller's own session variables.
+  const [file, args, opts] = machine ? ['ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', machine, `exec "$SHELL" -lc ${q(script)}`], {}] : [process.env.SHELL || '/bin/sh', ['-lc', script], { env: agentEnv(process.env) }];
+  return new Promise(done => run(file, args, { timeout: 30e3, ...opts }, (err, out, errOut) => {
     if (!err) return done('');
-    done(err.code === 3 ? 'no-tmux' : err.code === 4 ? 'exists' : err.code === 5 ? `the agent stopped at once on ${machine}: ${String(out).trim().split('\n').join(' / ')}`
-      : String(errOut || err.message).trim() || `ssh exited ${err.code}`);
+    done(err.code === 3 ? 'no-tmux' : err.code === 4 ? 'exists' : err.code === 5 ? `the agent stopped at once${machine ? ` on ${machine}` : ''}: ${String(out).trim().split('\n').join(' / ')}`
+      : String(errOut || err.message).trim() || `${machine ? 'ssh' : 'tmux'} exited ${err.code}`);
   }));
 }
 /** Opens what a dispatch or Autopilot row needs. With row.tmux (another machine): starts it there in tmux, then opens
@@ -169,6 +171,23 @@ export async function launchRow(r, { open = openTerminal, start = startDetached 
   if (s && s !== 'exists') return { failed: s };
   const watch = await open(r.tmux.attach);
   return { detached: true, ...(s ? { already: true } : {}), ...(watch ? { noWatch: watch } : {}) };
+}
+/**
+ * Types a prompt into an idle session's tmux pane and presses Enter, here or on another machine over ssh: it starts on it
+ * at once, with nobody at the keyboard. Only while the pane is still the session's own (its tty). The caller sends
+ * idle sessions only: Enter in a session that waits at a permission prompt would answer the prompt.
+ */
+export function typeInto({ machine = '', socket = '', pane = '', tty = '' }, text, exec = execFile) {
+  if (!/^%\d+$/.test(pane) || !tty) return Promise.resolve(false);
+  const t = `${machine ? 'tmux' : q(tmuxBin())}${socket ? ` -S ${q(socket)}` : ''}`, p = q(pane);
+  const script = `[ "$(${t} display-message -p -t ${p} '#{pane_tty}')" = ${q(tty)} ] || exit 1; ${t} send-keys -t ${p} -l -- ${q(text)} && sleep 1 && ${t} send-keys -t ${p} Enter`;
+  const [file, args] = machine ? ['ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', machine, `exec "$SHELL" -lc ${q(script)}`]] : ['/bin/sh', ['-c', script]];
+  return new Promise(done => exec(file, args, { timeout: 20e3 }, err => done(!err)));
+}
+/** What a dispatch or Autopilot row needs done: typed into the idle session's tmux pane (row.pane), else its window opened. */
+export async function deliverRow(r, { type = typeInto, ...deps } = {}) {
+  if (r.pane && await type(r.pane, r.prompt)) return { woken: true };
+  return r.command && r.action !== 'busy' ? launchRow(r, deps) : {};
 }
 // tmux is often not on the page server's PATH (a login item, a systemd service).
 // A process's environment: /proc on Linux, ps -E on a Mac (values cut at the first space, enough for these keys).

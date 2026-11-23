@@ -50,7 +50,9 @@ test('dispatch hands each line\'s new to-dos to the agent working on it, and say
     ['Thesis', 'resume', 'claude', 's1', ['Redo figure 3', 'Cite the 2024 survey']],
     ['Videos', 'resume', 'claude', 'v', ['Post the vertical cut']],
   ]);
-  assert.equal(by.Thesis.command, `cd '${tmp}' && claude --resume s1 '${by.Thesis.prompt}'`);
+  assert.equal(by.Thesis.command, `cd '${tmp}' && claude --resume s1 --remote-control='Thesis' '${by.Thesis.prompt}'`);
+  assert.deepEqual([by.Thesis.tmux.machine, by.Thesis.tmux.name, by.Thesis.tmux.cmd === by.Thesis.command], ['', 'tc-s1', true]); // here too: detached, in tmux
+  assert.equal(by.Promo.tmux.name, `tc-${cut.id}`);
   assert.match(by.Thesis.prompt, new RegExp(`are yours: 1\\) Redo figure 3 \\[${fig.id}\\]; 2\\) Cite`));
   assert.match(by.Scripts.command, /&& codex resume c1 'New to-dos/);
   assert.match(by.Promo.command, new RegExp(`TRACE_CANVAS_THREAD=${promo} claude --remote-control='Promo' `));
@@ -63,6 +65,10 @@ test('dispatch hands each line\'s new to-dos to the agent working on it, and say
   const [busy] = dispatch(d, { refs: ['Scripts'] }, env);
   assert.equal(busy.action, 'busy');
   assert.match(busy.command, /TRACE_CANVAS_THREAD=.* codex /); // B: a new session, when the person would rather not wait
+  // A note is left on the running session: the Stop hook hands it over once when its turn ends; nothing to paste.
+  assert.equal(busy.noted, true);
+  assert.equal(busy.pane, undefined); // working: never typed into (Enter would answer a permission prompt)
+  assert.equal(d.sessions.c1.handed.prompt, busy.prompt);
   assert.deepEqual(dispatch(d, { refs: ['Thesis'], all: true }, env)[0].todos.map(c => c.title), ['Its own to-do', 'An older agent to-do']);
   // A to-do named goes to its line's agent, even one that agent logged itself.
   assert.deepEqual(dispatch(d, { refs: ['Its own to-do'] }, env).map(r => [r.thread.name, r.session.id, r.todos.map(c => c.title)]), [['Thesis', 's1', ['Its own to-do']]]);
@@ -169,7 +175,7 @@ test('Autopilot hands every open to-do on a line to its agent with the decision 
   const [row] = startAutopilot(d, { thread: 'App' }, env);
   assert.deepEqual(row.todos.map(c => c.id).sort(), [a.id, b.id].sort()); // every open one, its own agent's too
   assert.equal(row.action, 'resume');
-  assert.match(row.command, /^cd .* && claude --resume s1 'Autopilot \(beta\) on the Trace Canvas line "App"/);
+  assert.match(row.command, /^cd .* && claude --resume s1 --remote-control='App' 'Autopilot \(beta\) on the Trace Canvas line "App"/);
   assert.match(row.prompt, new RegExp(`decision profile, record ${p.id}`));
   assert.match(row.prompt, /open this round's Quest.*trace_quest.*quest: its id.*Questions and the Autopilot summary go on the line itself.*close the Quest/);
   assert.match(row.prompt, /Push your own commits[^;]*never force[^;]*; never send email[^:]*publish anything outside, force-push/);
@@ -303,4 +309,39 @@ test('an Autopilot round goes to one session whatever the to-dos say, is not sta
   const away = awayCache(m => { reads++; return { machine: m, sessions: [] }; });
   away('gpubox'); away('gpubox');
   assert.equal(reads, 1);
+});
+
+test('a running session is woken, not pasted into: typed into its tmux pane when idle, else a note its Stop hook hands over', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-wake-'));
+  const env = { ...process.env, TRACE_CANVAS_HOME: path.join(tmp, 'home'), TRACE_CANVAS_DESKTOP_DIR: path.join(tmp, 'desk'), TRACE_CANVAS_LANG: 'en', TRACE_CANVAS_MACHINE: machineName() };
+  const { mutate, readData } = await import('../src/store.mjs'), { handedStop, promptContext } = await import('../src/hook.mjs'), { deliverRow, typeInto } = await import('../src/agents.mjs');
+  const now = Date.now(), live = path.join(tmp, 'home', 'live');
+  fs.mkdirSync(live, { recursive: true });
+  // pid: this process, so the live record is not looked up again; pane and tty as the hook noted them.
+  fs.writeFileSync(path.join(live, 'x1.json'), JSON.stringify({ id: 'x1', agent: 'Codex', agentKey: 'codex', status: 'idle', startedAt: now - 9e5, lastSeen: now, cwd: tmp, pid: process.pid, tty: '/dev/pts/7', term: 'tmux', tmux: '/tmp/tmux-1/default', pane: '%3', tmuxChecked: true }));
+  let ids;
+  const [row] = mutate(d => {
+    const t = createThread(d, { name: 'Wake' }).id;
+    d.sessions.x1 = { id: 'x1', thread: t, agent: 'Codex', cwd: tmp, last: now };
+    ids = [addCommit(d, { thread: t, kind: 'task', title: 'Tidy the notes', ts: now - 6e5 }).id];
+    return dispatch(d, { refs: ['Wake'] }, env);
+  }, env);
+  assert.deepEqual(row.pane, { machine: '', socket: '/tmp/tmux-1/default', pane: '%3', tty: '/dev/pts/7' });
+  // Typed in: nothing else is opened. Not typed (the pane is gone): what the row said before.
+  assert.deepEqual(await deliverRow(row, { type: async (p, text) => text === row.prompt, open: async () => { throw new Error('no window'); } }), { woken: true });
+  assert.deepEqual(await deliverRow({ action: 'busy', command: 'x', pane: row.pane, prompt: 'p' }, { type: async () => false }), {});
+  // The script checks the pane is still the session's, types the text literally, then Enter.
+  const ran = [];
+  assert.equal(await typeInto(row.pane, "it's yours", (f, a, o, cb) => { ran.push([f, a[1]]); cb(null); }), true);
+  assert.match(ran[0][1], /display-message -p -t '%3' '#\{pane_tty\}'\)" = '\/dev\/pts\/7' \] \|\| exit 1; .* send-keys -t '%3' -l -- 'it'\\''s yours' && sleep 1 && .* send-keys -t '%3' Enter$/);
+  assert.equal(await typeInto({ ...row.pane, machine: 'lab' }, 'x', (f, a, o, cb) => { ran.push(f); cb(new Error('gone')); }), false);
+  assert.equal(ran[1], 'ssh');
+  assert.equal(await typeInto({ pane: '', tty: '' }, 'x'), false);
+  // The note: a prompt that already carries the to-dos clears it; otherwise the Stop hook hands it over, once.
+  assert.equal(readData(env).sessions.x1.handed.prompt, row.prompt);
+  assert.equal(handedStop({ session_id: 'x1' }, env), row.prompt);
+  assert.equal(handedStop({ session_id: 'x1' }, env), '');
+  mutate(d => { d.sessions.x1.handed = { prompt: row.prompt, ids, at: now }; }, env);
+  assert.doesNotMatch(promptContext({ session_id: 'x1', prompt: `do ${ids[0]} now`, cwd: tmp }, env), /New to-dos on the Trace Canvas line/);
+  assert.equal(readData(env).sessions.x1.handed, undefined);
 });

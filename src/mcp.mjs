@@ -297,16 +297,18 @@ async function callTool(name, a = {}) {
       let sent = null;
       if (a.on && !dup && c.kind === 'task' && c.thread !== INBOX) {
         try {
-          const { dispatch, awayCache } = await import('./ops.mjs'), { launchRow } = await import('./agents.mjs');
+          const { dispatch, awayCache } = await import('./ops.mjs'), { deliverRow } = await import('./agents.mjs');
           const ask = { refs: [c.id], on: String(a.on), self: from, awayLive: awayCache() };
           try { dispatch(readData(), ask); } catch {} // other machines read over ssh outside the data lock (src/ops.mjs)
           const rows = mutate(d => dispatch(d, ask));
-          for (const r of rows) if (r.command && r.action !== 'busy') Object.assign(r, await launchRow(r));
-          sent = rows.map(r => ({ action: r.action, ...(r.on ? { on: r.on } : {}), ...(r.session ? { session: r.session.id } : {}), ...(r.failed ? { failed: r.failed, command: r.command } : {}),
+          for (const r of rows) Object.assign(r, await deliverRow(r));
+          sent = rows.map(r => ({ action: r.woken ? 'woken' : r.noted && r.session.status === 'working' ? 'noted' : r.action, ...(r.on ? { on: r.on } : {}), ...(r.session ? { session: r.session.id } : {}), ...(r.failed ? { failed: r.failed, command: r.command } : {}),
             ...(r.tmux ? { attach: r.tmux.attach } : {}), ...(r.action === 'message' || r.action === 'busy' ? { prompt: r.prompt } : {}), ...(r.action === 'busy' ? { command: r.command } : {}) }));
         } catch (e) { sent = [{ action: 'error', failed: e.message }]; }
       }
       const say = !sent ? '' : sent.map(s => s.failed ? ` Not started on ${s.on || 'its machine'}: ${s.failed}${s.command ? `; run it by hand: ${s.command}` : ''}.`
+        : s.action === 'woken' ? ` Its idle session ${s.session} got it typed into its tmux pane and has started.`
+        : s.action === 'noted' ? ` Its session ${s.session} is working: a note is left, it takes this up when its turn ends.`
         : s.action === 'message' ? ` A session runs it here (${s.session}): send it this message: ${s.prompt}`
           : s.action === 'busy' ? ` Its session ${s.session} is busy: give it this when it stops, or start a new one with: ${s.command}`
             : s.action === 'self' ? ' It is yours: this session is the line\'s agent.' : ` ${s.action === 'start' ? 'A new session' : `Session ${s.session}`} ${s.action === 'start' ? 'started' : 'resumed'} on ${s.on}${s.attach ? `; watch it: ${s.attach}` : ''}.`).join('') || ' Nothing to dispatch.';

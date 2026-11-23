@@ -540,9 +540,23 @@ export function takeReplies(sid, env = process.env, now = Date.now()) {
   return got.length ? `Replies other sessions left for you on Trace Canvas: ${got.map(c => `[${c.id}] ${firstLine(c.title, 160)}${c.body ? ` — ${String(c.body).replace(/\s+/g, ' ').slice(0, AUTOPILOT_PROMPT.test(c.body) ? 8000 : 600)}` : ''}`).join(' | ')}` : '';
 }
 
+// To-dos a dispatch left for this running session (src/ops.mjs): handed over when its turn ends (Stop: {decision: block}),
+// so a session that was working takes them up as soon as it stops; with its next prompt when it was idle. Once only.
+// A prompt that already carries them (typed into its pane, sent by another agent) clears the note. A note that hands
+// over an Autopilot round lights the switch, as the prompt itself would.
+const takeHanded = (sid, env, got = '') => {
+  const h = (readData(env).sessions[sid] || {}).handed;
+  if (!h) return '';
+  mutate(d => {
+    delete d.sessions[sid].handed;
+    for (const t of Object.values(d.threads)) if (AUTOPILOT_PROMPT.test(h.prompt) && t.autopilot && !t.autopilot.session && h.prompt.includes(t.id)) t.autopilot = { ...t.autopilot, session: sid, on: Date.now() };
+  }, env);
+  return got.includes(h.prompt.slice(0, 60)) || (h.ids || []).some(id => got.includes(id)) ? '' : h.prompt;
+};
+export const handedStop = (input, env = process.env) => (input.session_id ? takeHanded(input.session_id, env) : '');
 export function promptContext(input, env = process.env) {
   if (!input.session_id || cleanPrompt(input.prompt).startsWith('/')) return '';
-  const replies = takeReplies(input.session_id, env);
+  const replies = [takeReplies(input.session_id, env), takeHanded(input.session_id, env, String(input.prompt || ''))].filter(Boolean).join('\n');
   return [replies, mergedNote(input.session_id, env), NUDGE.test(cleanPrompt(input.prompt)) ? '' : lineContext(input, env)].filter(Boolean).join('\n');
 }
 // Told once to a session whose line was merged into another (from then on it works on that line), or whose merge was undone.

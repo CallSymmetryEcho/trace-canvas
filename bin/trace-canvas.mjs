@@ -138,9 +138,9 @@ Data: ${dataFile()}`;
 
 // Opens the terminals a dispatch (or Autopilot) needs and says what happened to each line, or prints the rows as JSON.
 async function runRows(rows, { run, json }) {
-  const { AGENTS, launchRow } = await import('../src/agents.mjs');
+  const { AGENTS, deliverRow } = await import('../src/agents.mjs');
   // Each window is waited for, so a terminal that did not open is reported, not taken for a started agent.
-  for (const r of rows) if (r.command && run && r.action !== 'busy') Object.assign(r, await launchRow(r));
+  for (const r of rows) if (run) Object.assign(r, await deliverRow(r));
   if (rows.some(r => r.failed)) process.exitCode = 1;
   if (json) { console.log(JSON.stringify(rows, null, 2)); return; }
   if (!rows.length) { console.log('Nothing new to dispatch: every open to-do has an agent, or was logged by the agent working on its line (--all takes those too).'); return; }
@@ -149,11 +149,13 @@ async function runRows(rows, { run, json }) {
     console.log(`\n${r.thread.name}: ${r.todos.length} to-do${r.todos.length === 1 ? '' : 's'} for ${who}${r.on ? ` on ${r.on}` : ''}`);
     for (const c of r.todos) console.log(`  □ ${c.title}  [${c.id}]`);
     if (r.action === 'self') console.log(`  → Your own line: they are yours.${r.prompt ? ` Work them by this:\n    ${r.prompt}` : ''}`); // Autopilot's rules reach the caller too
+    else if (r.woken) console.log(`  → Running session ${name}${s.machine ? ` on ${s.machine}` : ''} was idle in tmux: the to-dos were typed into it, and it has started on them.`);
+    else if (r.noted && s.status === 'working') console.log(`  → Session ${name} is working: a note is left, and it takes them up when its turn ends. Nothing to paste.${r.command ? `\n    Not to wait, start a new session for them:\n    ${r.command}` : ''}`);
     else if (r.action === 'message') console.log(`  → Running session ${name} (${s.status}${s.name ? `, messaged as ${s.name}` : ''}${s.desktopId ? `, ${s.desktopId}` : ''}): send it this message:\n    ${r.prompt}`);
     else if (r.action === 'busy') console.log(`  → ${who} session ${name} is busy. Choose:\n    A) paste this into it when it stops:\n       ${r.prompt}\n    B) or start a new session for them:\n       ${r.command}`);
     else if (r.failed) console.log(`  → No terminal window opened: ${r.failed}\n    Run it yourself:\n    ${r.command}`);
-    else if (r.detached) console.log(`  → ${r.already ? `Already running on ${r.tmux.machine} in tmux session ${r.tmux.name}` : `${r.action === 'start' ? `A new ${who} session` : `Session ${name} resumed`} on ${r.tmux.machine}, in tmux session ${r.tmux.name}: it keeps running if the window closes or the network drops`}.${r.noWatch ? ` No window opened to watch it (${r.noWatch}).` : ''}\n    Watch it:  ${r.tmux.attach}\n    By hand, without tmux:  ${r.command}`);
-    else console.log(`  → ${r.action === 'start' ? `A new ${who} session` : `Session ${name} resumed`}${run ? ' in a new terminal window' : '; run'}:\n    ${r.command}${r.noTmux ? `\n    ${r.tmux.machine} has no tmux: install it there, and agents sent to it keep running when the window closes.` : ''}`);
+    else if (r.detached) console.log(`  → ${r.already ? `Already running${r.tmux.machine ? ` on ${r.tmux.machine}` : ''} in tmux session ${r.tmux.name}` : `${r.action === 'start' ? `A new ${who} session` : `Session ${name} resumed`}${r.tmux.machine ? ` on ${r.tmux.machine}` : ''}, in tmux session ${r.tmux.name}: it keeps running if the window closes or the network drops`}.${r.noWatch ? ` No window opened to watch it (${r.noWatch}).` : ''}\n    Watch it:  ${r.tmux.attach}\n    By hand, without tmux:  ${r.command}`);
+    else console.log(`  → ${r.action === 'start' ? `A new ${who} session` : `Session ${name} resumed`}${run ? ' in a new terminal window' : '; run'}:\n    ${r.command}${r.noTmux && r.tmux.machine ? `\n    ${r.tmux.machine} has no tmux: install it there, and agents sent to it keep running when the window closes.` : ''}`);
   }
 }
 
@@ -223,8 +225,8 @@ async function main() {
       // (--gate), so their one tool hook refuses the tool itself: Codex with Claude's answer, Gemini with its own.
       try {
         if (process.env.TRACE_CANVAS_DISABLE !== '1' && raw.trim()) {
-          const { autopilotStop, autopilotGate } = await import('../src/hook.mjs'), p = agent === 'agy' ? normalize(agent, JSON.parse(raw)) : JSON.parse(raw);
-          const stop = (event === 'Stop' || event === 'AfterAgent') && autopilotStop(p);
+          const { autopilotStop, autopilotGate, handedStop } = await import('../src/hook.mjs'), p = agent === 'agy' ? normalize(agent, JSON.parse(raw)) : JSON.parse(raw);
+          const stop = (event === 'Stop' || event === 'AfterAgent') && (autopilotStop(p) || handedStop(p));
           if (stop) process.stdout.write(JSON.stringify({ decision: agent === 'agy' ? 'continue' : 'block', reason: stop }));
           const gate = agent !== 'claude' && (event === 'PreToolUse' || event === 'BeforeTool') && autopilotGate(p);
           if (gate) process.stdout.write(JSON.stringify(agent === 'gemini' || agent === 'agy' ? { decision: 'deny', reason: gate } : { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: gate } }));

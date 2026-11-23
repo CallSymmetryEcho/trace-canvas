@@ -120,6 +120,8 @@ export function handTo(d, { ref, to, thread, remote = false, here = true, prompt
  *            desktopId its address in the Claude app)
  *   busy     another agent working right now, or a session running on another machine: it takes the prompt only there;
  *            `command` starts a new session instead, so the person can choose: paste it there when it stops, or start anew
+ *            a row with `pane` is an idle session in tmux: deliverRow types the prompt into it (`woken`); `noted`: a note is
+ *            left on a running session here, handed over by its Stop hook when its turn ends (handedStop in src/hook.mjs)
  *   resume   run `command`, which resumes the session with the prompt (over ssh for another machine's session)
  *   start    run `command`: a new session        self  the caller's own line: the to-dos are the caller's
  * on: the machine to do them on (a to-do can carry its own, `on`); they go to that machine's session, or a new one there.
@@ -196,7 +198,7 @@ export function dispatch(d, { refs = [], all = false, self = null, on = '', away
       if (!s) {
         // A new session; on another machine over ssh, from its home folder (the line's folder is this machine's).
         const cmd = handTo(d, { ref: todos[0].id, to: key, remote: key === 'claude', here: !away, prompt: promptFor && promptFor(th, tid, todos) }, env).command;
-        rows.push({ ...row, action: 'start', ...(away ? { machine: away, ...awayRun(away, cmd, todos[0].id) } : { command: cmd }) });
+        rows.push({ ...row, action: 'start', ...(away ? { machine: away, ...awayRun(away, cmd, todos[0].id) } : hereRun(cmd, todos[0].id)) });
         continue;
       }
       const prompt = promptFor ? oneLine(promptFor(th, tid, todos)) : oneLine(`New to-dos on the Trace Canvas line "${th.name}" (thread ${tid}) are yours: ${todos.map((c, i) => `${i + 1}) ${c.title} [${c.id}]`).join('; ')}. Do them in order; read the line with trace_read_thread for context, tick each with trace_task_done when it is done, and log results with trace_log.`);
@@ -205,10 +207,18 @@ export function dispatch(d, { refs = [], all = false, self = null, on = '', away
       const freshCmd = () => handTo(d, { ref: todos[0].id, to: key, remote: key === 'claude', here: !away, prompt: promptFor && promptFor(th, tid, todos) }, env).command;
       const fresh = () => (away ? remote(away, freshCmd()) : freshCmd());
       // On another machine the session's folder may be gone (its transcript sits under it): then a new session.
-      const wake = !s.cwd ? AGENTS[key].wake(sid, prompt) : away
-        ? `if cd ${q(s.cwd)} 2>/dev/null; then ${AGENTS[key].wake(sid, prompt)}; else echo ${q(`${s.cwd} is gone: a new session instead`)}; ${freshCmd()}; fi`
-        : `cd ${q(s.cwd)} && ${AGENTS[key].wake(sid, prompt)}`;
-      rows.push({ ...row, action, session, prompt, ...(action === 'resume' ? (away ? awayRun(away, wake, sid.slice(0, 8)) : { command: wake }) : action === 'busy' ? { command: fresh() } : {}) });
+      const name = oneLine(th.name), wake = !s.cwd ? AGENTS[key].wake(sid, prompt, name) : away
+        ? `if cd ${q(s.cwd)} 2>/dev/null; then ${AGENTS[key].wake(sid, prompt, name)}; else echo ${q(`${s.cwd} is gone: a new session instead`)}; ${freshCmd()}; fi`
+        : `cd ${q(s.cwd)} && ${AGENTS[key].wake(sid, prompt, name)}`;
+      // A running session is not left to the person to paste into. Idle in tmux (here or there): the prompt is typed into
+      // its pane (deliverRow). Here, a note is left on it as well: the Stop hook hands it over when its turn ends
+      // (handedStop), so one that is working takes the to-dos up as soon as it stops; cleared when the prompt reaches it.
+      // ponytail: a session on another machine gets no note (its hooks read that machine's data); it is typed into or reported busy.
+      const there = run && sid !== self;
+      const pane = there && run.status === 'idle' && run.pane && run.tty ? { pane: { machine: away, socket: run.tmux || '', pane: run.pane, tty: run.tty } } : {};
+      const noted = there && !away && d.sessions && d.sessions[sid];
+      if (noted) d.sessions[sid].handed = { prompt, ids: [tid, ...todos.map(c => c.id)], at: Date.now() };
+      rows.push({ ...row, action, session, prompt, ...pane, ...(noted ? { noted: true } : {}), ...(action === 'resume' ? (away ? awayRun(away, wake, sid.slice(0, 8)) : hereRun(wake, sid.slice(0, 8))) : action === 'busy' ? { command: fresh() } : {}) });
     }
   }
   return rows;
@@ -608,6 +618,9 @@ export function listThreads(d, { query, includeDone = true } = {}) {
 export { remote };
 // Dispatched to another machine: it runs there in tmux session tc-<id> (a new one by its first to-do, a resumed one by
 // its session), started by launchRow; command stays the plain ssh -t, for a person to run by hand.
+// Here too an agent starts in a detached tmux session (tc-<id>), so it runs with nobody at this computer (asked from the
+// phone, over ssh) and keeps going when its window closes; a window attached to it opens where there is a desktop.
+const hereRun = (cmd, id) => ({ command: cmd, tmux: { machine: '', name: `tc-${id}`, cmd, attach: `tmux attach -t tc-${id}` } });
 const awayRun = (machine, cmd, id) => ({ command: remote(machine, cmd), tmux: { machine, name: `tc-${id}`, cmd, attach: remote(machine, `tmux attach -t tc-${id}`) } });
 // A line's sessions with their live status ('off' when not running).
 export function threadSessions(d, tid, env = process.env) {

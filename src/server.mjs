@@ -15,7 +15,7 @@ import { demoData } from './demo.mjs';
 import { liveDir, readLive, withCodexTerm } from './live.mjs';
 import { awayCache, bindLiveSession, findThreadLoose, handTo, liveSessions, sessionList, startAutopilot, stopAutopilot, threadSessions } from './ops.mjs';
 import { applyRetro, askAgent, retroRecord, runRetro } from './retro.mjs';
-import { AGENTS, focusTab, launchRow, openTerminal, terminalCommand } from './agents.mjs';
+import { AGENTS, deliverRow, focusTab, openTerminal, terminalCommand } from './agents.mjs';
 import { draftLessons, rememberLesson } from './lessons.mjs';
 import { otherMachines, remoteLive } from './remote.mjs';
 import { commitDiff, commitInfo, explainCommit, pullFile, readLinkedImage, readLinkedMd } from './git-view.mjs';
@@ -215,7 +215,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
           const evolve = body.evolve || null;
           try { startAutopilot(readData(), { thread, awayLive, evolve }); } catch {}
           const rows = mutate(d => startAutopilot(d, { thread, awayLive, evolve }));
-          for (const r of rows) if (r.command && r.action !== 'busy') Object.assign(r, await launchRow(r));
+          for (const r of rows) Object.assign(r, await deliverRow(r));
           broadcast('change');
           return send(res, 200, { rows });
         } catch (e) { return send(res, 200, { error: e.message }); }

@@ -1337,7 +1337,7 @@ apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent 
     apAsk: 'It stops and asks you when something touches security, no rule covers it, or the rule is still swinging.',
     apEnd: 'While it is on the line shows Autopilot and this button turns into Stop. Each time it stops to ask it logs a summary on the line; the switch stays on until you turn it off.',
     apProfile: 'The decision profile it follows', apNoProfile: 'No decision profile yet: it follows four basic rules (do the core first; a hand-over counts once the other session starts; ask before anything risky; ask about what no rule covers).', apDiagram: 'How it decides (diagram)',
-    tApStarted: n => `Autopilot is on: "${n}"'s agent has its to-dos`, tApStopped: 'Autopilot stops before the next to-do', apSendTitle: 'Send this to the running session', apSendP: n => `"${n}" is open right now, so only you or another agent can give it the round: paste this into it (or ask an agent to message it).`, copy2: 'Copy',
+    tApStarted: n => `Autopilot is on: "${n}"'s agent has its to-dos`, tApStopped: 'Autopilot stops before the next to-do', tApNoted: 'Its session is working: it takes the round up when its turn ends', apSendTitle: 'Send this to the running session', apSendP: n => `"${n}" is open right now, so only you or another agent can give it the round: paste this into it (or ask an agent to message it).`, copy2: 'Copy',
     agentAsk: 'Prompt for an agent', agentPromptTitle: 'Copy a prompt that sends an agent to read this line and carry on', tAgentPrompt: 'Prompt copied: paste it to an agent, for example in the Claude app on your phone',
     agentPromptText: (name, id) => `Read the Trace Canvas line "${name}" (thread ${id}): use trace_read_thread and trace_tasks for its goal and open to-dos, carry on with them, and tick each one with trace_task_done when it is done.`, tSyncing: 'Syncing…', tSyncBusy: 'A sync is already running', tSyncFailed: e => `Sync failed: ${e}`,
     syncFailedAt: (when, why) => `Failed ${when}: ${why}`, syncOkAt: when => `Last good sync ${when}`, syncNowBtn: 'Sync now', syncStale: (m, when) => `${m} last updated ${when}`, tSynced: (n, off) => `Synced: ${n} change${n === 1 ? '' : 's'} from other machines${off ? ' (offline; pushes next time)' : ''}`, onMachine: m => `On ${m}`, latestOn: m => `${m} · latest`,
@@ -1520,7 +1520,7 @@ apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的
     apAsk: '遇到安全相关的事、没有规则覆盖的事、或者规则还在摇摆的事，它会停下来问你。',
     apEnd: '开着的时候线上亮着 Autopilot，这个按钮变成「停止」。每次停下来问你，它都在线上写一条小结；开关一直亮着，直到你关掉。',
     apProfile: '它照着的决策画像', apNoProfile: '还没有决策画像：它照四条基本规则做（先做核心；对方会话开工才算交出去；有风险的事先问；规则没覆盖的先问）。', apDiagram: '它怎么做决定（架构图）',
-    tApStarted: n => `Autopilot 已开始：「${n}」的 agent 拿到了待办`, tApStopped: 'Autopilot 会在下一条待办之前停下', apSendTitle: '发给正在运行的会话', apSendP: n => `「${n}」现在开着，只有你或别的 agent 能把这一轮交给它：把下面这段粘贴进去（或者让一个 agent 给它发消息）。`, copy2: '复制',
+    tApStarted: n => `Autopilot 已开始：「${n}」的 agent 拿到了待办`, tApStopped: 'Autopilot 会在下一条待办之前停下', tApNoted: '它的会话正在干活：这一轮停下就接手', apSendTitle: '发给正在运行的会话', apSendP: n => `「${n}」现在开着，只有你或别的 agent 能把这一轮交给它：把下面这段粘贴进去（或者让一个 agent 给它发消息）。`, copy2: '复制',
     agentAsk: '给 agent 的提示', agentPromptTitle: '复制一段提示，让 agent 去读这条线并接着做', tAgentPrompt: '提示已复制：粘贴给 agent，比如手机 Claude app 里的会话',
     agentPromptText: (name, id) => `读 Trace Canvas 上的线「${name}」（thread ${id}）：用 trace_read_thread 和 trace_tasks 看它的目标和未完成的待办，接着做，每做完一项就用 trace_task_done 勾掉。`, tSyncing: '正在同步…', tSyncBusy: '已经有一个同步在进行', tSyncFailed: e => `同步失败：${e}`,
     syncFailedAt: (when, why) => `${when}失败：${why}`, syncOkAt: when => `上次成功同步：${when}`, syncNowBtn: '立即同步', syncStale: (m, when) => `${m} 最后更新：${when}`, tSynced: (n, off) => `已同步：从其他电脑收到 ${n} 处改动${off ? '（离线，下次再推送）' : ''}`, onMachine: m => `在 ${m} 上`, latestOn: m => `${m} 最新`,
@@ -5430,6 +5430,8 @@ function runAutopilot(tid, evolve = null) {
     const r0 = (r.rows || [])[0];
     if (!r0) return;
     if (r0.failed) return toast(r0.failed);
+    if (r0.woken) return toast(t('tApStarted', getThread(tid).name)); // typed into its idle session's tmux pane
+    if (r0.noted && r0.session && r0.session.status === 'working') return toast(t('tApNoted')); // its Stop hook hands the round over
     if (r0.action === 'message' || r0.action === 'busy') { S.apSend = { name: (r0.session && (r0.session.name || r0.session.title)) || '', prompt: r0.prompt }; openSheet('ap-send'); return; }
     toast(t('tApStarted', getThread(tid).name));
   });

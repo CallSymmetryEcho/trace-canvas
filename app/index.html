@@ -5233,7 +5233,7 @@ function returnTodo(id) {
 // The command `trace-canvas hand` prints, built here too: start the assigned agent on the to-do's
 // line, in the line's folder (its repository path, else where a session on it works now).
 const AGENT_NAMES = { claude: 'Claude Code', codex: 'Codex', gemini: 'Gemini CLI' };
-const AGENT_LAUNCH = { claude: p => `claude ${shq(p)}`, codex: p => `codex ${shq(p)}`, gemini: p => `gemini -i ${shq(p)}` };
+const AGENT_LAUNCH = { claude: p => `claude ${shq(p)}`, codex: p => `codex ${shq(p)}`, gemini: p => `gemini -i ${shq(p)}`, agy: p => `agy -i ${shq(p)}` };
 const shq = v => `'${String(v).replace(/'/g, `'\\''`)}'`;
 // A command on another machine, as the server's remote() (src/agents.mjs) writes it: its login shell, with ~/.local/bin
 // first on PATH, where claude's and codex's installers put them and a non-interactive login shell does not look.
@@ -5251,7 +5251,8 @@ function handClick(e) {
   const start = e.target.closest('[data-start]');
   if (start) { startOn({ todo: start.dataset.start }); return true; }
   const hand = e.target.closest('[data-hand]');
-  if (hand) { const cmd = handCommand(S.commits.get(hand.dataset.hand)); if (cmd) copyText(cmd, t('tHandCopied')); return true; }
+  // The server writes the command (the folder it starts in, the agent's own flags); the page's own is for a page with no server.
+  if (hand) { const c = S.commits.get(hand.dataset.hand); (SERVER && c && c.assignee ? postJSON('/api/hand?copy=1', { todo: c.id, to: c.assignee }).then(r => r.command || handCommand(c), () => handCommand(c)) : Promise.resolve(handCommand(c))).then(cmd => { if (cmd) copyText(cmd, t('tHandCopied')); }); return true; }
   return false;
 }
 // Who does an open to-do, and the buttons that hand it over: in Goals' rows and in the to-do's own panel.

@@ -197,6 +197,8 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
       }
       // Open in Terminal: the command is built here from the to-do, never taken from the request.
       if (req.method === 'POST' && p === '/api/hand') {
+        // copy: only the command, for the page's Copy button (one writer for it, so the page's own cannot fall behind).
+        if (url.searchParams.get('copy')) { const b = JSON.parse(await readBody(req)); return send(res, 200, { command: handTo(readData(), { ref: String(b.todo || ''), to: String(b.to || '') }).command }); }
         if (!terminalCommand('')) return send(res, 200, { error: 'No terminal to open on this machine (macOS, or a Linux desktop); copy the command instead' });
         const body = JSON.parse(await readBody(req));
         const r = mutate(d => handTo(d, { ref: String(body.todo || ''), to: String(body.to || '') }));

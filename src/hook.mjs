@@ -11,6 +11,7 @@
 // by hand. Which line a session is on lives in the data's session table, so it
 // survives the session process ending and being resumed. The hook never prints to
 // stdout and never fails the session.
+import { HEADS, isHandoff, isNudge } from './prompts.mjs';
 import { lessonsFor } from './lessons.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -151,9 +152,8 @@ const LIVE_EVENTS = [...LOG_EVENTS, 'SessionStart', 'PreToolUse', 'Notification'
 // The openings of the prompts Trace Canvas itself writes to hand a line over (src/ops.mjs, app/index.html).
 // Keystrokes typed into the session rather than asked of it (":q", "login", "ok"): never a to-do.
 export const notTask = prompt => { const p = String(prompt || '').trim(); return p.length < 3 || (!/\s/.test(p) && (/^:/.test(p) || /^(login|logout|exit|quit|clear|yes|no|ok|okay)$/i.test(p))); };
-export const HANDOFF = /^(Autopilot \(beta\) on the Trace Canvas line|You are taking over the Trace Canvas line|New to-dos on the Trace Canvas line|Read the Trace Canvas line|读 Trace Canvas 上的线|Autopilot (self-iteration )?is on for the line)/;
 // autopilotStop's own push. Gemini CLI fires BeforeAgent again with it as the prompt: that is not the person speaking.
-const NUDGE = /^Autopilot (self-iteration )?is on for the line /;
+const NUDGE = { test: isNudge };
 
 // The folder a session resumes from. Claude Code keeps a conversation under the folder it started in
 // (~/.claude/projects/<that path, each character other than a letter or digit as ->), and a later cd does not move it,
@@ -228,7 +228,7 @@ export function handleHook(input, env = process.env) {
       if (prompt && !prompt.startsWith('/')) state.lastPrompt = firstLine(prompt, 200);
       const isCommand = prompt.startsWith('/');
       // A hand-off prompt written by dispatch, hand or the page restates to-dos that are already on the line: not a new one.
-      const handoff = HANDOFF.test(prompt);
+      const handoff = isHandoff(input.prompt);
       if (handoff) s.prompted = true;
       // An Autopilot round counts as running only once its prompt reaches a session: the switch lights here, not on the click.
       // Looked for in the raw prompt: pasted in with a word or two of the person's own, the paste is shortened in `prompt`.
@@ -506,9 +506,9 @@ export function autopilotStop(input, env = process.env) {
     if ((!open.length && !evolving) || (st.apNudged && progress <= st.apDoneAtNudge)) return '';
     if (!todo.length && open.some(c => named(handed, c) && !named(asks, c))) return ''; // waiting for its workers: their results wake it
     saveState(sid, { ...st, apNudged: (st.apNudged || 0) + 1, apDoneAtNudge: progress }, env);
-    const head = `Autopilot is on for the line "${th.name}" (thread ${th.id}), to clear its to-dos: ${open.length} open`;
+    const head = `${HEADS.nudge} "${th.name}" (thread ${th.id}), to clear its to-dos: ${open.length} open`;
     reason = !todo.length && evolving
-      ? `Autopilot self-iteration is on for the line "${th.name}" (thread ${th.id}): ${rounds} of ${ev.rounds} rounds done, its to-dos are ${open.length ? 'all waiting on the person' : 'cleared'}. Measure by "${firstLine(ev.metric, 200)}", log "Evolve round ${rounds + 1}: kept|reverted · <before → after>" for the round just done if not yet logged, then set the next 1-3 "Evolve: …" to-dos that should move the measure and do them. Stop with the "Autopilot summary" only when two rounds in a row kept nothing or the next step needs the person.`
+      ? `${HEADS.evolve} "${th.name}" (thread ${th.id}): ${rounds} of ${ev.rounds} rounds done, its to-dos are ${open.length ? 'all waiting on the person' : 'cleared'}. Measure by "${firstLine(ev.metric, 200)}", log "Evolve round ${rounds + 1}: kept|reverted · <before → after>" for the round just done if not yet logged, then set the next 1-3 "Evolve: …" to-dos that should move the measure and do them. Stop with the "Autopilot summary" only when two rounds in a row kept nothing or the next step needs the person.`
       : todo.length
       ? `${head}, next: ${firstLine(todo[0].title, 120)} [${todo[0].id}]. Go on by the decision profile, with this line's to-dos only. One you cannot decide: log "Question: <the question> [<its id>]" and go on with the next; write the "Autopilot summary" only when the rest all wait on the person or on another running session.`
       : `${head}, each with a question asked. Log the "Autopilot summary" with the count (cleared N · M wait on you · K with others) and the questions together, close the round's Quest with its conclusion (trace_quest), then stop.`;

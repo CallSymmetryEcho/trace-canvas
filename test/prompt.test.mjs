@@ -55,3 +55,38 @@ test('a hand-off prompt Trace Canvas wrote, or a stray keystroke, is not logged 
   handleHook({ session_id: 'h3', cwd: repo, hook_event_name: 'UserPromptSubmit', prompt: 'Split the bill by item' }, env);
   assert.deepEqual(Object.values(readData(env).commits).filter(c => c.kind === 'task').map(c => c.title), ['Split the bill by item']);
 });
+
+// Every prompt Trace Canvas writes for an agent comes back as that session's first prompt. Whatever writes one and the
+// hook that must know it go by one table (src/prompts.mjs); this feeds each writer's real output back through the hook.
+test('a prompt Trace Canvas wrote itself is never logged as a new to-do: either language, pasted, or after the person\'s own words', async () => {
+  const fsx = await import('node:fs'), osx = await import('node:os'), px = await import('node:path');
+  const { handleHook, autopilotStop } = await import('../src/hook.mjs'), { readData, mutate, createThread, addCommit } = await import('../src/store.mjs');
+  const { handTo, dispatch, autopilotPrompt } = await import('../src/ops.mjs'), { HEADS, isHandoff } = await import('../src/prompts.mjs');
+  const root = fsx.mkdtempSync(px.join(osx.tmpdir(), 'tc-heads-'));
+  const env = { ...process.env, TRACE_CANVAS_HOME: px.join(root, 'home'), TRACE_CANVAS_DESKTOP_DIR: px.join(root, 'desk'), TRACE_CANVAS_MAP: '', TRACE_CANVAS_MACHINE: 'heads', TRACE_CANVAS_PROMPTS: 'all' };
+  delete env.TRACE_CANVAS_DISABLE; delete env.TRACE_CANVAS_THREAD;
+  // What the server writes.
+  const made = mutate(d => {
+    const t = createThread(d, { name: 'Trip' }), c = addCommit(d, { thread: t.id, kind: 'task', title: 'Split the bill' });
+    d.sessions.old = { id: 'old', thread: t.id, agent: 'Claude Code', cwd: root, last: 1 };
+    const todos = dispatch(d, { refs: [c.id] }, env)[0].prompt;
+    return { todos, hand: handTo(d, { ref: c.id, to: 'codex' }, env).command, autopilot: autopilotPrompt(d, t, t.id) };
+  }, env);
+  const prompts = { ...made, hand: /codex '(.*)'$/.exec(made.hand)[1], nudge: `${HEADS.nudge} "Trip" (thread t1), to clear its to-dos: 1 open, next: x`, evolve: `${HEADS.evolve} "Trip" (thread t1): 0 of 3 rounds done`, reply: `${HEADS.reply}: the figure is ready [c1]` };
+  // What the page writes: every handPrompt and agentPromptText it has, both languages.
+  const page = fsx.readFileSync(new URL('../app/index.html', import.meta.url), 'utf8');
+  const fns = [...page.matchAll(/(handPrompt|agentPromptText): (\([^)]*\) => `[^\n]*?`),[ \n]/g)];
+  assert.equal(fns.length, 4);
+  fns.forEach((m, i) => { prompts[`page ${m[1]} ${i}`] = eval(`(${m[2]})`)('Trip', 't1', 'Split the bill'); });
+  let n = 0;
+  for (const [k, p] of Object.entries(prompts)) {
+    assert.ok(isHandoff(p), k);
+    for (const text of [p, `<pasted_content id="1a">\n${p}\n</pasted_content id="1a">`, `接着这个做 <pasted_content id="2b">${p}</pasted_content id="2b">`, `please go on: ${p}`])
+      handleHook({ session_id: `s${n++}`, cwd: root, hook_event_name: 'UserPromptSubmit', prompt: text }, env);
+  }
+  assert.deepEqual(Object.values(readData(env).commits).filter(c => c.kind === 'task').map(c => c.title), ['Split the bill']);
+  // The person's own prompt still is one.
+  handleHook({ session_id: 'me', cwd: root, hook_event_name: 'UserPromptSubmit', prompt: 'Add a currency switch to the trip page' }, env);
+  assert.equal(Object.values(readData(env).commits).filter(c => c.kind === 'task').length, 2);
+  assert.equal(typeof autopilotStop, 'function');
+});

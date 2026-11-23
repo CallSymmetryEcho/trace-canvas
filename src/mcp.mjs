@@ -299,7 +299,7 @@ async function callTool(name, a = {}) {
       if (to && !dup) {
         try {
           const t = liveSessions(readData()).sessions.find(x => x.id.startsWith(to) && x.id !== from && x.status === 'idle' && x.pane && x.tty);
-          if (t) woke = await (await import('./agents.mjs')).typeInto({ socket: t.tmux || '', pane: t.pane, tty: t.tty }, `A reply was left for you on Trace Canvas: ${String(a.title).replace(/\s+/g, ' ').slice(0, 160)} [${c.id}]`);
+          if (t) woke = await (await import('./agents.mjs')).typeInto({ socket: t.tmux || '', pane: t.pane, tty: t.tty }, `${(await import('./prompts.mjs')).HEADS.reply}: ${String(a.title).replace(/\s+/g, ' ').slice(0, 160)} [${c.id}]`);
         } catch {}
       }
       // on: the to-do is dispatched now, as `trace-canvas dispatch <id> --on <machine>` would (it used to be only stored,

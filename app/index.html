@@ -2451,15 +2451,9 @@ function renderAll() {
   // The History wall follows new data (a restore, lessons kept) when records or lines change, not on every live tick.
   const hs = S.commits.size + ':' + S.threads.size;
   if (S.history && !S.replay && S.histSig !== hs) { S.histSig = hs; renderHistory(); }
-  // The goals list holds still only while a to-do is being typed: a checkbox or menu keeps focus
-  // after a click, and that must not stop new to-dos from showing.
-  const f = document.activeElement, adding = f && f.classList.contains('gl-add') ? f.dataset.thread : null;
-  const editing = f && f.matches('.gl-t-in, .gl-goal-in, .gl-ret');
-  if (S.sheet === 'goals' && !(adding && f.value) && !editing) {
-    renderGoals();
-    const again = adding && $(`.gl-add[data-thread="${CSS.escape(adding)}"]`);
-    if (again) again.focus({ preventScroll: true }); // a redraw must not pull the list back to the box
-  }
+  // The goals list follows new data also while something is being typed: renderGoals puts the box back as it was
+  // (its text, the focus, the caret). Only a word half composed with an input method holds it still: a rebuilt box ends the composition.
+  if (S.sheet === 'goals' && !S.composing) renderGoals();
   renderCaptureThreads();
   $('#ex-banner').hidden = !(loaded() && hasExamples());
   $('#clear-ex-item').hidden = !hasExamples();
@@ -4793,6 +4787,8 @@ document.addEventListener('keydown', e => {
 });
 window.addEventListener('resize', () => render());
 PHONE.addEventListener('change', () => { markTabs(); if (S.sheet === 'goals') renderGoals(); });
+document.addEventListener('compositionstart', () => { S.composing = true; });
+document.addEventListener('compositionend', () => { S.composing = false; });
 // The Goals page starts where the header ends (or the focus bar under it), whatever their height.
 const topH = new ResizeObserver(() => document.documentElement.style.setProperty('--top-h', `${($('#focus-banner').hidden ? $('.top') : $('#focus-banner')).getBoundingClientRect().bottom}px`));
 topH.observe($('.top')); topH.observe($('#focus-banner'));
@@ -5225,7 +5221,13 @@ function renderGoals() {
   // The row may go (passed, ticked): then its line holds its place instead.
   const sec = anchor && anchor.closest('section[data-k]'), keep = sb.scrollTop, offOf = el => el.getBoundingClientRect().top - top;
   const marks = [anchor, sec].filter(Boolean).map(el => [el.dataset.k, offOf(el)]);
+  // The box being typed in is found again by what it is (its class and data-* keys), and gets back what a rebuilt box
+  // loses: the text as typed (also a half-composed word no input event has reported yet), the focus and the caret.
+  const act = document.activeElement, typing = S.sheet === 'goals' && act && sb.contains(act) && /^(INPUT|TEXTAREA)$/.test(act.tagName)
+    ? { sel: act.tagName + [...act.classList].map(c => '.' + CSS.escape(c)).join('') + [...act.attributes].filter(x => x.name.startsWith('data-')).map(x => `[${x.name}="${CSS.escape(x.value)}"]`).join(''), v: act.value, a: act.selectionStart, b: act.selectionEnd } : null;
   setSheet(t('goalsTitle'), body);
+  const again = typing && sb.querySelector(typing.sel);
+  if (again) { again.value = typing.v; again.focus({ preventScroll: true }); try { again.setSelectionRange(typing.a, typing.b); } catch {} }
   const hit = marks.map(([k, off]) => [sb.querySelector(`[data-k="${CSS.escape(k)}"]`), off]).find(([el]) => el);
   sb.scrollTop = hit ? sb.scrollTop + offOf(hit[0]) - hit[1] : keep;
 }

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Goals keeps up while you type.** The list used to hold still as long as a box had the cursor, so new to-dos waited until you clicked away. It now redraws under you and puts the box back as it was: its text, the focus and the caret. Only a word being composed with an input method holds it still.
+
+- **A terminal that fails to open is reported, and a sync failing for over an hour shows at the top.** On Linux a terminal counted as opened even when it ended at once with an error.
+
 - **A machine's sync file belongs to one data folder.** A second folder syncing under the same machine name (a test or demo instance, a stale copy) is refused before anything is read in or written, and says why; `trace-canvas sync --adopt` takes the file over on purpose (a data folder that was moved or restored). `npm test` now runs with a home folder of its own and without your Trace Canvas variables.
 
 - **The Chinese hand-over prompt is no longer logged as a new to-do.** The hooks know the prompts Trace Canvas writes itself (hand-over, dispatch, Autopilot, a reply's wake-up) by one shared table now, also when one is pasted or follows a few words of yours. The page's Copy command for a to-do comes from the server, so it starts in the right folder and covers Antigravity.

@@ -123,6 +123,52 @@ export function handTo(d, { ref, to, thread, remote = false, here = true, on = '
   const run = remote && ag.remote ? ag.remote(oneLine(th.name), prompt) : ag.launch(prompt);
   return { thread: th, todo, live, command: `${dir ? `cd ${q(dir)} && ` : far ? `cd ${q(far)} 2>/dev/null; ` : ''}TRACE_CANVAS_THREAD=${tid} ${run}` };
 }
+// What deciding a line's agent needs, read once: every session the canvas knows, and which of them run now (here from
+// the live files; on another machine from its own, read once per machine, over ssh by default).
+export function agentContext(d, env = process.env, awayLive = remoteLiveSync) {
+  const me = readConfig(env).machine, known = new Map(threadSessions(d, null, env).map(s => [s.id, s]));
+  const live = new Map(liveSessions(d, env).sessions.map(s => [s.id, s])), away = new Map();
+  const machineOf = id => known.get(id).machine || me;
+  const runOf = id => {
+    const m = machineOf(id);
+    if (m === me) return live.get(id);
+    if (!away.has(m)) away.set(m, new Map(awayLive(m).sessions.map(x => [x.id, x])));
+    return away.get(m).get(id);
+  };
+  return { me, known, machineOf, runOf, ranked: new Map() };
+}
+/**
+ * The session that is a line's agent: the one question dispatch, Autopilot and the page's "talk to this line's agent"
+ * all ask, answered in one place (each used to answer it its own way, and each was patched apart from the others).
+ * machine: only that machine's sessions; agent: only that kind (claude, codex…). Returns its id, or undefined: a new one.
+ */
+export function lineAgent(d, tid, { machine = '', agent = '' } = {}, ctx = agentContext(d)) {
+  const { me, known, machineOf, runOf } = ctx, onLine = id => known.has(id) && known.get(id).thread === tid;
+  if (!ctx.ranked.has(tid)) {
+    const cs = Object.values(d.commits).filter(c => threadIdOf(d, c) === tid);
+    const at = new Map(), past = new Map(), worked = (id, ts, m = at) => { if (id && ts > (m.get(id) || 0)) m.set(id, ts); };
+    // Work here: what a session did while on this line, or a result it logged here from another line. A to-do, idea or
+    // decision it logs for this line from elsewhere hands work over, and a session bound to another line since has left.
+    // The note the hooks write when a session ends is not work: any idle session leaves one.
+    for (const c of cs) {
+      const id = c.fromSession || (c.kind !== 'note' && c.session);
+      if (id && (onLine(id) || (c.fromSession && c.kind === 'agent'))) worked(id, c.ts);
+      else if (id && c.kind !== 'note') worked(id, c.ts, past);
+    }
+    // No session has worked here yet: the sessions the line has (bound to it, or there by their folder), else one that
+    // worked here and moved to another line since: it may well still be open, and it knows the line.
+    if (!at.size) for (const [id, e] of Object.entries(d.sessions || {})) if (e.thread === tid) worked(id, e.last || 1);
+    if (!at.size) for (const [id, ts] of past) worked(id, ts);
+    // Automated prompts (a Codex <heartbeat> and the like) are not anyone working on the line.
+    ctx.ranked.set(tid, [...at].sort((a, b) => b[1] - a[1]).map(([id]) => id).filter(id => known.has(id) && !/^<[\w-]+>/.test(String(known.get(id).title || '').trim())));
+  }
+  // Among those on one machine when the to-dos are for it: the line's own sessions first (one that only logged a result
+  // here from its own line, when none has worked here); of those a running one, this machine's before another's (whose
+  // messages do not reach it yet); then this machine's latest; then the latest anywhere. A to-do assigned to an agent
+  // goes only to that agent's sessions (or a new one of it).
+  const pool = ctx.ranked.get(tid).filter(id => (!machine || machineOf(id) === machine) && (!agent || known.get(id).agent === AGENTS[agent].name)), own = pool.filter(onLine), c = own.length ? own : pool;
+  return c.find(id => machineOf(id) === me && runOf(id)) || c.find(id => runOf(id)) || c.find(id => machineOf(id) === me) || c[0];
+}
 /**
  * Dispatch: hands each line's new to-dos to the agent that works on that line and says how to wake it.
  * The line's agent is the session that last did work there, on this machine or another: its turns' records while it is
@@ -143,7 +189,7 @@ export function handTo(d, { ref, to, thread, remote = false, here = true, on = '
  * sessions (over ssh by default).
  */
 export function dispatch(d, { refs = [], all = false, self = null, on = '', awayLive = remoteLiveSync, prompt: promptFor = null, ownSession = false } = {}, env = process.env) {
-  const me = readConfig(env).machine, lines = new Set(), named = new Set();
+  const lines = new Set(), named = new Set();
   for (const ref of refs) {
     const id = d.commits[ref] ? null : findThreadLoose(d, ref);
     if (id && id !== INBOX) { lines.add(id); continue; }
@@ -154,42 +200,11 @@ export function dispatch(d, { refs = [], all = false, self = null, on = '', away
   }
   if (!refs.length) for (const t of Object.values(d.threads)) if (!['done', 'merged'].includes(t.status) && !t.archived) lines.add(t.id);
   const tids = [...lines, ...[...named].map(id => threadIdOf(d, d.commits[id]))].filter((t, i, a) => a.indexOf(t) === i);
-  const known = new Map(threadSessions(d, null, env).map(s => [s.id, s]));
-  const live = new Map(liveSessions(d, env).sessions.map(s => [s.id, s])), awayCache = new Map();
-  const machineOf = id => known.get(id).machine || me;
-  // Running now: here from the live files, on another machine from its own (read once per machine, over ssh by default).
-  const runOf = id => {
-    const m = machineOf(id);
-    if (m === me) return live.get(id);
-    if (!awayCache.has(m)) awayCache.set(m, new Map(awayLive(m).sessions.map(x => [x.id, x])));
-    return awayCache.get(m).get(id);
-  };
+  const ctx = agentContext(d, env, awayLive), { known, me, runOf } = ctx;
   const rows = [];
   for (const tid of tids) {
     const th = d.threads[tid], cs = Object.values(d.commits).filter(c => threadIdOf(d, c) === tid);
-    const at = new Map(), past = new Map(), worked = (id, ts, m = at) => { if (id && ts > (m.get(id) || 0)) m.set(id, ts); };
-    // Work here: what a session did while on this line, or a result it logged here from another line. A to-do, idea or
-    // decision it logs for this line from elsewhere hands work over, and a session bound to another line since has left.
-    const onLine = id => known.has(id) && known.get(id).thread === tid;
-    for (const c of cs) {
-      const id = c.fromSession || (c.kind !== 'note' && c.session);
-      if (id && (onLine(id) || (c.fromSession && c.kind === 'agent'))) worked(id, c.ts);
-      else if (id && c.kind !== 'note') worked(id, c.ts, past);
-    }
-    // No session has worked here yet: the sessions the line has (bound to it, or there by their folder), else one that
-    // worked here and moved to another line since: it may well still be open, and it knows the line.
-    if (!at.size) for (const [id, e] of Object.entries(d.sessions || {})) if (e.thread === tid) worked(id, e.last || 1);
-    if (!at.size) for (const [id, ts] of past) worked(id, ts);
-    // Automated prompts (a Codex <heartbeat> and the like) are not anyone working on the line.
-    const ranked = [...at].sort((a, b) => b[1] - a[1]).map(([id]) => id).filter(id => known.has(id) && !/^<[\w-]+>/.test(String(known.get(id).title || '').trim()));
-    // Which session, among those on one machine when the to-dos are for it: the line's own sessions first (one that only
-    // logged a result here from its own line, when none has worked here); of those a running one, this machine's before
-    // another's (whose messages do not reach it yet); then this machine's latest; then the latest anywhere.
-    // A to-do assigned to an agent goes only to that agent's sessions (or a new one of it).
-    const pick = (machine, agent) => {
-      const pool = ranked.filter(id => (!machine || machineOf(id) === machine) && (!agent || known.get(id).agent === AGENTS[agent].name)), own = pool.filter(onLine), c = own.length ? own : pool;
-      return c.find(id => machineOf(id) === me && runOf(id)) || c.find(id => runOf(id)) || c.find(id => machineOf(id) === me) || c[0];
-    };
+    const pick = (machine, agent) => lineAgent(d, tid, { machine, agent }, ctx);
     // The line's open to-dos nobody has, in one group per machine they are for (dispatch's `on`, else the to-do's own).
     const groups = new Map();
     for (const c of cs) if (isTodo(c) && !c.done && (named.has(c.id) || (lines.has(tid) && !c.assignee))) {

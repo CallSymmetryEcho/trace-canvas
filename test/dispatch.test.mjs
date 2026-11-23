@@ -371,3 +371,44 @@ test('a new session on a line with no folder of its own starts where the line it
   const [far] = dispatch(d, { refs: ['Post it'], on: 'lab', awayLive: () => ({ sessions: [] }) }, env);
   assert.match(far.tmux.cmd, new RegExp(`^cd '/Users/u/promo' 2>/dev/null; TRACE_CANVAS_THREAD=${child} claude `));
 });
+
+// One row per real incident: who a line's agent is, asked of the one function every caller uses.
+test('who a line\'s agent is: one answer, a row for each time it went wrong', async () => {
+  const { lineAgent, agentContext, startAutopilot } = await import('../src/ops.mjs'), { handleHook } = await import('../src/hook.mjs'), { mutate, readData } = await import('../src/store.mjs');
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-agent-'));
+  const env = { ...process.env, TRACE_CANVAS_HOME: path.join(tmp, 'home'), TRACE_CANVAS_DESKTOP_DIR: path.join(tmp, 'desk'), TRACE_CANVAS_LANG: 'en', TRACE_CANVAS_MACHINE: 'here', TRACE_CANVAS_MAP: '' };
+  const now = Date.now(), live = path.join(tmp, 'home', 'live'); fs.mkdirSync(live, { recursive: true });
+  const run = (id, agentKey, status, more = {}) => fs.writeFileSync(path.join(live, `${id}.json`), JSON.stringify({ id, agent: agentKey === 'codex' ? 'Codex' : 'Claude Code', agentKey, status, startedAt: now - 9e5, lastSeen: now, cwd: tmp, pid: process.pid, ...more }));
+  const rows = [
+    // [what happened, the sessions and records on the line, who to ask for, the answer]
+    ['a session that only ended on the line is not its agent', d => { ses(d, 'worker', 'L', 9e6); rec(d, 'L', 'agent', 'worker', 5e5); ses(d, 'idler', 'L', 0); rec(d, 'L', 'note', 'idler', 1e3, 'Session ended · 600 min'); }, {}, 'worker'],
+    ['a session that only handed a to-do over from its own line is not its agent', d => { ses(d, 'own', 'L', 9e6); rec(d, 'L', 'agent', 'own', 5e5); ses(d, 'giver', 'X', 0); rec(d, 'L', 'task', null, 1e3, 'Do this', 'giver'); }, {}, 'own'],
+    ['a session that logged a result here from another line is', d => { ses(d, 'old', 'L', 9e6); ses(d, 'visitor', 'X', 0); rec(d, 'L', 'agent', null, 1e3, 'Video 21 is scheduled', 'visitor'); }, {}, 'visitor'],
+    ['a to-do for Claude Code does not go to a Codex heartbeat, or to Codex at all', d => { ses(d, 'beat', 'L', 0, 'Codex', '<heartbeat> check'); rec(d, 'L', 'agent', 'beat', 1e3); ses(d, 'cx', 'L', 5e3, 'Codex'); rec(d, 'L', 'agent', 'cx', 5e3); ses(d, 'cl', 'L', 9e6); rec(d, 'L', 'agent', 'cl', 9e6); }, { agent: 'claude' }, 'cl'],
+    ['a running session comes before a later one that has stopped', d => { ses(d, 'stopped', 'L', 0); rec(d, 'L', 'agent', 'stopped', 1e3); ses(d, 'up', 'L', 9e5); rec(d, 'L', 'agent', 'up', 9e5); run('up', 'claude', 'idle'); }, {}, 'up'],
+    ['nobody has worked here: a new session', () => {}, {}, undefined],
+  ];
+  let L, X;
+  const ses = (d, id, line, ago, agent = 'Claude Code', title = '') => { d.sessions[id] = { id, thread: line === 'L' ? L : X, agent, cwd: tmp, last: now - ago, machine: 'here', title }; };
+  const rec = (d, line, kind, session, ago, title = 'did it', fromSession) => addCommit(d, { thread: line === 'L' ? L : X, kind, title, ts: now - ago, extra: { ...(session ? { session } : {}), ...(fromSession ? { fromSession } : {}) } });
+  for (const [what, setup, ask, want] of rows) {
+    for (const f of fs.readdirSync(live)) fs.rmSync(path.join(live, f));
+    const d = emptyData(); L = createThread(d, { name: 'Line' }).id; X = createThread(d, { name: 'Other' }).id;
+    setup(d);
+    assert.equal(lineAgent(d, L, ask, agentContext(d, env, () => ({ sessions: [] }))), want, what);
+  }
+  // A working or waiting session is never typed into (Enter would answer its permission prompt); an idle one in tmux is.
+  for (const [status, typed] of [['working', false], ['waiting', false], ['idle', true]]) {
+    for (const f of fs.readdirSync(live)) fs.rmSync(path.join(live, f));
+    const d = emptyData(); L = createThread(d, { name: 'Line' }).id;
+    ses(d, 'cx', 'L', 0, 'Codex'); rec(d, 'L', 'agent', 'cx', 1e3); rec(d, 'L', 'task', null, 500, 'Next thing');
+    run('cx', 'codex', status, { tty: '/dev/pts/7', term: 'tmux', tmux: '/tmp/tmux-1/default', pane: '%3', tmuxChecked: true });
+    assert.equal(!!dispatch(d, { refs: ['Line'] }, env)[0].pane, typed, status);
+  }
+  // One Autopilot agent per line at a time: a second session pasting the round's prompt does not take it from the first.
+  const tid = mutate(d => { const t = createThread(d, { name: 'Auto' }); addCommit(d, { thread: t.id, kind: 'task', title: 'One thing' }); startAutopilot(d, { thread: t.id, awayLive: () => ({ sessions: [] }) }, env); return t.id; }, env);
+  const prompt = `Autopilot (beta) on the Trace Canvas line "Auto" (thread ${tid}): go`;
+  handleHook({ session_id: 'first', cwd: tmp, hook_event_name: 'UserPromptSubmit', prompt }, env);
+  handleHook({ session_id: 'second', cwd: tmp, hook_event_name: 'UserPromptSubmit', prompt }, env);
+  assert.equal(readData(env).threads[tid].autopilot.session, 'first');
+});

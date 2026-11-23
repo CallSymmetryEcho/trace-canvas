@@ -1950,7 +1950,7 @@ async function loadLive() {
   try {
     const j = await (await fetch('/api/live', { cache: 'no-store' })).json();
     // Other machines' running sessions (read over ssh by the server) join the list, marked away with their machine.
-    S.live = [...(j.sessions || []), ...(j.away || []).flatMap(m => m.sessions || [])]; S.liveOthers = j.others || []; S.away = j.away || []; S.liveOk = true;
+    S.live = [...(j.sessions || []), ...(j.away || []).flatMap(m => m.sessions || [])]; S.liveOthers = j.others || []; S.away = j.away || []; S.lineAgents = j.lineAgents || {}; S.liveOk = true;
   } catch { S.live = []; S.liveOthers = []; S.away = []; S.liveOk = false; }
   render();
 }
@@ -4297,7 +4297,8 @@ function lineSessions(tid) {
 // On a phone the way to the line's agent comes first: its running session's chat in the Claude app, or ▶ Start.
 function lineTalk(th) {
   if (!(S.remote || PHONE.matches) || th.id === INBOX || th.status === 'merged') return '';
-  const live = liveOn(th.id).sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0)), s = live.find(x => jumpTo(x, 'x'));
+  // Which of several sessions is the line's agent is the server's answer (lineAgent in src/ops.mjs): it comes first.
+  const ag = (S.lineAgents || {})[th.id], live = liveOn(th.id).sort((a, b) => (b.id === ag) - (a.id === ag) || (b.lastSeen || 0) - (a.lastSeen || 0)), s = live.find(x => jumpTo(x, 'x'));
   if (s) return `<div class="line-talk">${jumpTo(s, 'btn btn-primary', esc(t('talkAgent')))}<small>${esc([stLabel(s.status), s.agent || 'Claude Code', s.machine].filter(Boolean).join(' · '))}</small></div>`;
   if (!S.remote) return '';
   return `<div class="line-talk">${S.start ? `<button class="btn btn-primary" data-act="start">${esc(t('start'))}</button>` : ''}<small>${esc(t(live.length ? 'talkNoRc' : S.start ? 'talkNone' : 'talkNoStart'))}</small></div>`;

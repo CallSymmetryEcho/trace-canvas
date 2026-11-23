@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { COLS, addCommit, dataFile, home, mutate, readConfig, readData, regroup, toArrays, writeConfig } from './store.mjs';
 import { demoData } from './demo.mjs';
 import { liveDir, readLive, withCodexTerm } from './live.mjs';
-import { awayCache, bindLiveSession, findThreadLoose, handTo, liveSessions, sessionList, startAutopilot, stopAutopilot, threadSessions } from './ops.mjs';
+import { agentContext, lineAgent, awayCache, bindLiveSession, findThreadLoose, handTo, liveSessions, sessionList, startAutopilot, stopAutopilot, threadSessions } from './ops.mjs';
 import { applyRetro, askAgent, retroRecord, runRetro } from './retro.mjs';
 import { AGENTS, deliverRow, focusTab, openTerminal, terminalCommand } from './agents.mjs';
 import { draftLessons, rememberLesson } from './lessons.mjs';
@@ -149,7 +149,14 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
         const d = readData(), desk = desktopSessions();
         return send(res, 200, { ...toArrays(d), sessions: sessionList(d).map(s => ({ ...s, desktopId: (desk.get(s.id) || {}).desktopId || null })), machine: readConfig().machine, platform: process.platform, remote, update, start: canStart(remote), awayLive: readConfig().awayLive, detach: readConfig().detach, awayGit: readConfig().awayGit, sync: syncStatus(), machines: otherMachines(d) });
       }
-      if (req.method === 'GET' && p === '/api/live') return send(res, 200, { ...liveSessions(readData()), away });
+      if (req.method === 'GET' && p === '/api/live') {
+        // Where several sessions run on one line, the page asks who its agent is; the answer is lineAgent's (src/ops.mjs), not the page's own.
+        const d = readData(), l = liveSessions(d), all = [...l.sessions, ...away.flatMap(m => m.sessions)], n = {};
+        for (const s of all) if (s.threadId) n[s.threadId] = (n[s.threadId] || 0) + 1;
+        const ctx = agentContext(d, process.env, m => ({ sessions: (away.find(x => x.machine === m) || { sessions: [] }).sessions }));
+        const lineAgents = Object.fromEntries(Object.keys(n).filter(t => n[t] > 1).map(t => [t, lineAgent(d, t, {}, ctx)]).filter(x => x[1]));
+        return send(res, 200, { ...l, away, lineAgents });
+      }
       // A report a record links (a local .md file), for the reader. Only files some record links, so the page
       // cannot be used to read anything else on the computer.
       if (req.method === 'GET' && p === '/api/md') {

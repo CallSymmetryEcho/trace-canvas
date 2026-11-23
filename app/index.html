@@ -103,7 +103,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .cap-suggest.q-suggest { top: calc(100% + 6px); bottom: auto; left: auto; right: 0; width: max(100%, 340px); max-width: calc(100vw - 24px); max-height: min(420px, 70vh); }
 .q-suggest .q-name { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .cap-suggest.q-suggest .cap-cmd { flex: 1 0 20%; text-align: right; }
-.search svg { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--faint); pointer-events: none; }
+.search > svg { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--faint); pointer-events: none; }
 .btn {
   display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; font-size: 13px; font-weight: 500;
   border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); color: var(--ink); cursor: pointer; white-space: nowrap;
@@ -961,7 +961,8 @@ body.sheet-open .top { z-index: 80; }
 .l-list.s-list li { grid-template-columns: 10px 1fr auto; cursor: default; }
 .l-list.s-list li.is-live { cursor: pointer; }
 .l-list.s-list .s-name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.l-list.s-list .s-acts { grid-column: 3; grid-row: 1 / span 2; display: flex; gap: 6px; }
+/* Long labels (English) stack instead of squeezing the title into a sliver. */
+.l-list.s-list .s-acts { grid-column: 3; grid-row: 1 / span 2; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; max-width: 200px; }
 .l-list.s-list .btn { padding: 3px 9px; font-size: 12px; text-decoration: none; }
 .ag-open { margin-left: auto; padding: 0 4px; color: var(--accent); font: inherit; font-weight: 600; text-decoration: none; background: none; border: 0; cursor: pointer; }
 .ag-open:hover { text-decoration: underline; }

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Search results: the mark before each record no longer sits on top of the others. A session's buttons stack when their labels are long (English), so its title keeps its width.
+
 ## 0.3.8 (2026-11-23)
 
 A long project you can still read at a glance: pinch the Branches view down to its milestones or its starred records. Search finds lines, merges take their agents and to-dos along, and the phone opens a line's agent in one tap.

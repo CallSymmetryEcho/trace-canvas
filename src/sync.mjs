@@ -7,7 +7,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawn } from 'node:child_process';
-import { COLS, canonicalize, dataFile, home, mutate, readConfig } from './store.mjs';
+import crypto from 'node:crypto';
+import { COLS, canonicalize, dataFile, home, mutate, readConfig, writeConfig } from './store.mjs';
 
 const KINDS = [...COLS, 'sessions'];
 const RED = '[redacted]';
@@ -65,7 +66,7 @@ function readFile(file) {
 // seen: the documents this data folder held at its last sync (null: not known, as before .sync-keys). A document in
 // this machine's file that the folder never held was written there by another folder under the same name (a copy, a
 // dev instance with an old snapshot): it is taken in, not deleted. deleted: tombstones this sync writes.
-export function syncDocs(d, { dir, machine, host = os.hostname(), now = Date.now(), seen = null }) {
+export function syncDocs(d, { dir, machine, host = os.hostname(), now = Date.now(), seen = null, home: homeId = '' }) {
   const moved = canonicalize(d);
   for (const k of KINDS) d[k] = d[k] || {};
   const own = readFile(path.join(dir, `${machine}.jsonl`)).docs;
@@ -108,7 +109,7 @@ export function syncDocs(d, { dir, machine, host = os.hostname(), now = Date.now
     else if (R) out.push(R.del ? { k, id, t: R.t, del: true } : { k, id, t: R.t, doc: R.doc });
   }
   out.sort((a, b) => (a.k < b.k ? -1 : a.k > b.k ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-  const text = [canonical({ k: 'machine', id: machine, host }), ...out.map(x => canonical(x.del ? { del: true, id: x.id, k: x.k, t: x.t } : { doc: x.doc, id: x.id, k: x.k, t: x.t }))].join('\n') + '\n';
+  const text = [canonical({ k: 'machine', id: machine, host, ...(homeId ? { home: homeId } : {}) }), ...out.map(x => canonical(x.del ? { del: true, id: x.id, k: x.k, t: x.t } : { doc: x.doc, id: x.id, k: x.k, t: x.t }))].join('\n') + '\n';
   return { text, imported, changed, moved, deleted, keys: out.filter(x => !x.del).map(x => `${x.k}/${x.id}`) };
 }
 
@@ -182,7 +183,7 @@ function noteStatus(env, failed, others) {
 }
 const firstErr = out => String(out || '').split('\n').map(l => l.trim()).filter(Boolean).pop() || 'unknown error';
 
-export function runSync(env = process.env, { allowDeletes = env.TRACE_CANVAS_ALLOW_DELETES === '1' } = {}) {
+export function runSync(env = process.env, { allowDeletes = env.TRACE_CANVAS_ALLOW_DELETES === '1', adopt = env.TRACE_CANVAS_ADOPT === '1' } = {}) {
   const cfg = readConfig(env), mapDir = cfg.map, machine = cfg.machine;
   if (!mapDir || !fs.existsSync(path.join(mapDir, '.git'))) return { error: 'No location map repository (setup --map, or clone it to ~/agent-map)' };
   const lock = path.join(home(env), '.sync-lock');
@@ -193,6 +194,18 @@ export function runSync(env = process.env, { allowDeletes = env.TRACE_CANVAS_ALL
     const dir = path.join(mapDir, 'canvas'), file = path.join(dir, `${machine}.jsonl`);
     fs.mkdirSync(dir, { recursive: true });
     const pulled = pull(mapDir);
+    // One data folder writes a machine's file. A second folder under the same name (a test or demo instance with the
+    // real machine name and the map in its environment, a stale copy) is refused before anything is read in or
+    // written: on 11-04 such a copy deleted 124 records, twice. The file's head names the folder that writes it; a
+    // file from before that is taken over only by a folder that has synced already, never by a new one.
+    const head = readFile(file).head, synced = fs.existsSync(path.join(home(env), '.sync-last'));
+    if (!adopt && head && (head.home ? head.home !== cfg.homeId : !synced)) {
+      const error = `canvas/${machine}.jsonl is written by another data folder${head.host ? ` (on ${head.host})` : ''}, so nothing was written. A second copy of the data syncs under a machine name of its own (setup --machine <name>); if this folder takes that one's place, run: trace-canvas sync --adopt`;
+      noteStatus(env, error);
+      return { machine, error, refused: 'owner' };
+    }
+    const homeId = cfg.homeId || crypto.randomUUID();
+    if (!cfg.homeId) writeConfig({ homeId }, env);
     const keysFile = path.join(home(env), '.sync-keys');
     let seen = null; // a folder that synced before .sync-keys existed deletes as before, once; a new folder deletes nothing
     try { seen = new Set(fs.readFileSync(keysFile, 'utf8').split('\n').filter(Boolean)); } catch { if (!fs.existsSync(path.join(home(env), '.sync-last'))) seen = new Set(); }
@@ -202,7 +215,7 @@ export function runSync(env = process.env, { allowDeletes = env.TRACE_CANVAS_ALL
     let res;
     let refused = false;
     mutate(d => {
-      res = syncDocs(d, { dir, machine, seen });
+      res = syncDocs(d, { dir, machine, seen, home: homeId });
       if (res.deleted > DELETE_LIMIT && !allowDeletes) { refused = true; return false; }
       return res.imported || res.moved ? undefined : false;
     }, env);

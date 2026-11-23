@@ -129,6 +129,7 @@ Setup (pass --user for every project, or --project dir for one)
   trace-canvas where <words> [--machine M]   Look things up in the location map (~/agent-map)
   trace-canvas sync             Sync the canvas with your other machines through the location map
                 [--allow-deletes]      (more than 50 deletions in one sync are refused without it)
+                [--adopt]              (this data folder takes over a sync file another folder wrote under the same machine name)
   trace-canvas doctor           Check the setup: Node, hooks, page server, start with the computer, version, sync, phone
   trace-canvas update [--check] Get the newest version (git pull in this clone) and restart the page server;
                                --check only says whether there is one (the page also offers it under More)
@@ -751,7 +752,7 @@ async function main() {
     }
     case 'sync': {
       const { runSync } = await import('../src/sync.mjs');
-      const r = runSync(process.env, { allowDeletes: flag('allow-deletes', false) });
+      const r = runSync(process.env, { allowDeletes: flag('allow-deletes', false), adopt: flag('adopt', false) });
       // --nudge: what this sync pushed, the other machines pull now (their own sync, over ssh), not in 2 minutes.
       // Only after pushing changes made here, so a machine that only took them in does not nudge back.
       if (flag('nudge', false) && r.pushed && r.changed) {

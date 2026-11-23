@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **A machine's sync file belongs to one data folder.** A second folder syncing under the same machine name (a test or demo instance, a stale copy) is refused before anything is read in or written, and says why; `trace-canvas sync --adopt` takes the file over on purpose (a data folder that was moved or restored). `npm test` now runs with a home folder of its own and without your Trace Canvas variables.
+
+- **The Chinese hand-over prompt is no longer logged as a new to-do.** The hooks know the prompts Trace Canvas writes itself (hand-over, dispatch, Autopilot, a reply's wake-up) by one shared table now, also when one is pasted or follows a few words of yours. The page's Copy command for a to-do comes from the server, so it starts in the right folder and covers Antigravity.
+
 - **Phone: a Codex session opens in its app again.** Since 0.3.8 the phone offered only Claude Code's Remote Control link, so a Codex session (and a Claude session known only to the desktop app) had no way in. The phone gets the app link back, now also for a Codex session that runs in a terminal or on another machine.
 
 - **A reply left for another session reaches it without the person.** A reply logged for a session (`trace_log` with `to`) used to wait for that session's next message from the person. A session that is working now reads it when its turn ends; one idle in tmux on this machine is woken with one typed line and reads it at once. Idle outside tmux, or on another machine: at its next turn, as before.

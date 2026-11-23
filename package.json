@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "node bin/trace-canvas.mjs serve",
-    "test": "node --test test/*.test.mjs"
+    "test": "node test/run.mjs"
   },
   "engines": {
     "node": ">=18.17"

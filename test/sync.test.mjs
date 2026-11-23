@@ -175,7 +175,7 @@ test('an Autopilot switch that changed syncs at once and nudges the other machin
   assert.deepEqual(runs, [['sync', '--quiet', '--nudge']]);
 });
 
-test('a copy of the data that syncs under the same name takes in what it never had instead of deleting it (11-04: 124 deletions)', () => {
+test('a copy of the data that syncs under the same machine name is refused; taken over on purpose, it takes in what it never had instead of deleting it (11-04: 124 deletions)', () => {
   const { root, a, b } = twoMachines();
   mutate(d => { const th = createThread(d, { name: 'thesis' }); addCommit(d, { thread: th.id, kind: 'note', title: 'early', ts: 1 }); }, a.env);
   a.sync();
@@ -184,7 +184,15 @@ test('a copy of the data that syncs under the same name takes in what it never h
   fs.mkdirSync(dev.TRACE_CANVAS_HOME); fs.copyFileSync(path.join(a.env.TRACE_CANVAS_HOME, 'data.json'), path.join(dev.TRACE_CANVAS_HOME, 'data.json'));
   const later = mutate(d => addCommit(d, { thread: Object.keys(d.threads)[0], kind: 'agent', title: 'written after the copy', ts: 5 }).id, a.env);
   a.sync();
-  const r = runSync(dev);
+  // It is refused outright: mac's file belongs to mac's own data folder, and not one byte of it changes.
+  const macFile = path.join(a.map, 'canvas', 'mac.jsonl'), was = fs.readFileSync(macFile, 'utf8');
+  const no = runSync(dev);
+  assert.equal(no.refused, 'owner'); assert.match(no.error, /written by another data folder/);
+  assert.equal(fs.readFileSync(macFile, 'utf8'), was);
+  assert.equal(readData(dev).commits[later], undefined);
+  assert.equal(a.sync().error, null); // the folder it belongs to goes on as before
+  // Taking it over on purpose still never deletes what the copy did not have.
+  const r = runSync(dev, { adopt: true });
   assert.equal(r.error, null);
   assert.ok(readData(dev).commits[later], 'the copy takes in the record it never had');
   b.sync();

@@ -520,7 +520,9 @@ body.history-open .hist-btn span { display: inline; }
 .g-level button { padding: 3px 9px; font-size: 12px; }
 .g-count { flex: none; color: var(--faint); font-size: 11px; }
 .g-count:empty { display: none; }
-.g-row.g-mini { border: 0; min-height: 0; padding: 0; }
+.g-row.g-mini { border: 0; min-height: 0; padding-block: 0; cursor: default; }
+.g-row.g-mini:hover { background: none; }
+.g-more { color: var(--faint); font-size: 10.5px; opacity: .8; }
 .git-svg .bead { stroke: var(--bg); stroke-width: .6; }
 .git-svg .bead.hit { stroke: var(--ink); stroke-width: 1.2; }
 .git-body { position: relative; padding-left: max(4px, env(safe-area-inset-left, 0px)); }
@@ -3253,15 +3255,19 @@ function renderGit() {
   // the rows off its edge); a phone also gives each row two lines (ROW matches .g-row's height in the narrow-screen CSS).
   const phone = PHONE.matches, ROW = phone ? 52 : 44, PADX = phone ? 10 : 16;
   const LW = Math.max(phone ? 6 : 9, Math.min(phone ? 22 : 28, Math.floor((innerWidth * (phone ? 0.28 : 0.42) - 2 * PADX) / Math.max(1, nCols - 1))));
-  // A bead's row is thin, and a long run of beads shares 160px, so months of work between two starred records shrink
-  // to a short stretch whose density still shows how much happened. runs: where each run starts, for the row list.
-  const MINI = lvl === 2 ? 3 : 6, hs = [...tips.map(() => ROW), ...list.map(() => ROW)], yAt = [0], runs = new Map();
+  // Spacing below the level is schematic, like a transit map, not to scale. A fork or a merge keeps a slot of its own, so
+  // its curve has room to turn. A run of plain records between two such points shares a stretch that grows with the
+  // square root of how many there are: 3 and 30 look different, and 300 still fit on the screen. runs: where each
+  // stretch starts in the row list, its height and how many records it holds.
+  const SLOT = 20, knot = c => c.kind === 'fork' || c.kind === 'merge';
+  const hs = [...tips.map(() => ROW), ...list.map(() => ROW)], yAt = [0], runs = new Map();
   for (let i = 0; i < list.length; i++) {
     if (!isBead(list[i])) continue;
-    let j = i; while (j < list.length && isBead(list[j])) j++;
-    const total = Math.round(Math.min((j - i) * MINI, 160));
-    for (let k = i; k < j; k++) hs[tips.length + k] = total / (j - i);
-    runs.set(i, total); i = j - 1;
+    if (knot(list[i])) { hs[tips.length + i] = SLOT; runs.set(i, { h: SLOT, n: 0 }); continue; }
+    let j = i; while (j < list.length && isBead(list[j]) && !knot(list[j])) j++;
+    const n = j - i, h = Math.round(Math.min(160, 8 + 6 * Math.sqrt(n)));
+    for (let k = i; k < j; k++) hs[tips.length + k] = h / n;
+    runs.set(i, { h, n }); i = j - 1;
   }
   for (const h of hs) yAt.push(yAt[yAt.length - 1] + h);
   const lx = i => PADX + i * LW, ry = i => (i < 0 ? i * ROW + ROW / 2 : yAt[i] + hs[i] / 2);
@@ -3315,11 +3321,20 @@ function renderGit() {
     const bend = Math.min(y1, y2 + ROW);
     svg += `<path class="link${off2(c.mergeOf, tidOf(c))}" d="M${x1} ${y1} L${x1} ${bend} C${x1} ${(bend + y2) / 2} ${x2} ${(bend + y2) / 2} ${x2} ${y2}" style="stroke:${st.color}"/>`;
   }
+  const beadY = new Map(); // each line's last bead drawn
   for (const c of list) {
     const th = getThread(tidOf(c));
     const cx = lx(lane.get(tidOf(c))), cy = ry(row.get(c.id));
     const hit = S.kinds.has(c.kind) && matches(c);
-    if (isBead(c)) { svg += `<circle class="bead${off(tidOf(c))}${hit ? ' hit' : ''}" data-cid="${esc(c.id)}" cx="${cx}" cy="${cy}" r="${Math.min(MINI / 2, 2.2)}" style="fill:${stationColor(c, th)}"/>`; continue; }
+    if (isBead(c)) {
+      // A fork or merge keeps its own mark, smaller. Plain beads are thinned to one every 6px on a line: a dotted
+      // texture that says "work happened here", not one dot per record (the count is beside the stretch).
+      if (knot(c)) { svg += `<g data-cid="${esc(c.id)}" class="knot${off(tidOf(c))}"><title>${esc(c.title)}</title>${glyph(c.kind, stationColor(c, th), cx, cy, 3.5, {})}</g>`; beadY.set(tidOf(c), cy); continue; }
+      if (cy - (beadY.get(tidOf(c)) ?? -99) < 6 && !hit) continue;
+      beadY.set(tidOf(c), cy);
+      svg += `<circle class="bead${off(tidOf(c))}${hit ? ' hit' : ''}" data-cid="${esc(c.id)}" cx="${cx}" cy="${cy}" r="2" style="fill:${stationColor(c, th)}"><title>${esc(c.title)}</title></circle>`;
+      continue;
+    }
     svg += `<g data-cid="${esc(c.id)}" class="${off(tidOf(c))}">${hit ? `<circle class="g-hit" cx="${cx}" cy="${cy}" r="10" style="fill:${th.color}"/>` : ''}${glyph(c.kind, stationColor(c, th), cx, cy, 6, { done: c.done, dim: filtering() && !matches(c) })}${c.id === selC ? `<circle cx="${cx}" cy="${cy}" r="11" fill="none" style="stroke:var(--accent)" stroke-width="2"/>` : ''}</g>`;
   }
   const selS = S.sel && S.sel.type === 'live' ? S.sel.id : null;
@@ -3337,7 +3352,7 @@ ${machineTag(s.away && s.machine)}
   }).join('');
   const rows = tipRows + list.map((c, i) => {
     const th = getThread(tidOf(c));
-    if (isBead(c)) return runs.has(i) ? `<div class="g-row g-mini" style="height:${runs.get(i)}px"></div>` : ''; // one spacer for the whole run
+    if (isBead(c)) { const r = runs.get(i); return r ? `<div class="g-row g-mini" style="height:${r.h}px;padding-left:${gw + 6}px">${r.n >= 5 ? `<span class="g-more mono">+${r.n}</span>` : ''}</div>` : ''; } // one spacer for the whole stretch
     return `<div class="g-row k-${c.kind} ${c.done ? 'done' : ''} ${selT && tidOf(c) !== selT ? 'is-other' : ''} ${c.id === selC ? 'is-sel' : ''} ${filtering() && !matches(c) ? 'is-dim' : ''}" tabindex="0" data-kb data-cid="${esc(c.id)}" style="padding-left:${gw + 6}px">
       ${c.kind === 'fork' || c.kind === 'merge' ? '<span class="actor"></span>' : actorMark(c, th.color)}
       <span class="g-title">${starMark(c)}${esc(c.title)}</span>

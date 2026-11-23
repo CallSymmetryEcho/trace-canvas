@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **Pinch the Branches view to zoom.** Three levels: every record in full, decisions and starred (with forks and merges), starred only. The other records shrink to small beads on their lines, and a long run of them shares a short stretch, so every line, fork and merge stays in place. Pinch with two fingers or on the trackpad, or use the switch at the top left. The row under your fingers stays where it is and the graph scales about it.
+- **Pinch the Branches view to zoom.** Three levels: every record in full, decisions and starred (with forks and merges), starred only. The other records shrink to small beads on their lines, spaced like a transit map, not to scale: a fork or merge keeps a slot of its own so its curve has room to turn, a run of plain records shares a stretch that grows with the square root of its count, and a faint +N beside it says how many are there. Pinch with two fingers or on the trackpad, or use the switch at the top left. The row under your fingers stays where it is and the graph scales about it.
 - On the phone, a line's page starts with **Talk to this line's agent**: it opens the running session's chat in the Claude app (Remote Control). Sessions on another machine get the same link, and the phone no longer offers links only the computer can open.
 - A session resumed by a dispatch that an agent ran no longer moves onto that agent's line.
 - **Records written on a merged line after its merge move to the line it went into.** A session that had not followed yet, or another machine's older copy, could still leave records on the merged line, where the branch view drew them above the merge. They now go to the target line, and undoing the merge takes them back.

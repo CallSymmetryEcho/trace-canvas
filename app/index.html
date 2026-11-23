@@ -516,6 +516,11 @@ body.history-open .hist-btn span { display: inline; }
 .q-ask { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 13px; color: var(--muted); }
 .q-ask span { margin-right: 4px; }
 .kind-chip.is-sel { background: var(--accent-soft); border-color: var(--accent); }
+.g-level { flex: none; }
+.g-level button { padding: 3px 9px; font-size: 12px; }
+.g-count { flex: none; color: var(--faint); font-size: 11px; }
+.g-count:empty { display: none; }
+.g-none { margin: 24px 16px; color: var(--faint); }
 .git-body { position: relative; padding-left: max(4px, env(safe-area-inset-left, 0px)); }
 .git-svg { position: absolute; top: 0; overflow: visible; }
 .git-svg .lane { stroke-width: 3; stroke-linecap: round; fill: none; }
@@ -1348,7 +1353,7 @@ apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent 
     justNow: 'just now', minAgo: n => `${n} min ago`, hAgo: n => `${n} h ago`, yesterday: 'yesterday', daysAgo: n => `${n} days ago`,
     edgeRelated: 'related', edgeFork: 'fork', edgeMerge: 'merge', labelChips: ['depends on', 'references', 'derived from', 'blocks', 'conflicts', 'same goal'],
     connectFrom: n => `From <b>${n}</b>: now pick a second thread`, connectPick: 'Pick the thread to start from',
-    legend: 'Lines', legendKinds: 'Show', lanesAll: n => `All ${n}`, lanesLess: 'Collapse', tlCorner: 'Threads', tlNowLabel: 'now',
+    legend: 'Lines', legendKinds: 'Show', lanesAll: n => `All ${n}`, lanesLess: 'Collapse', gl0: 'All', gl1: 'Decisions', gl2: 'Starred', glTitle: 'How much to show: pinch in for less, out for more', glNone: 'Nothing here is starred yet. Pinch out, or pick another level above.', tlCorner: 'Threads', tlNowLabel: 'now',
     week: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
     months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
     dayLabel: d => `${I18N.en.week[d.getDay()]} ${d.getMonth() + 1}/${d.getDate()}`,
@@ -1531,7 +1536,7 @@ apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的
     justNow: '刚刚', minAgo: n => `${n} 分钟前`, hAgo: n => `${n} 小时前`, yesterday: '昨天', daysAgo: n => `${n} 天前`,
     edgeRelated: '相关', edgeFork: '分叉', edgeMerge: '合并', labelChips: ['依赖', '参考', '衍生', '阻塞', '冲突', '同一目标'],
     connectFrom: n => `从「<b>${n}</b>」出发，再点一条线程完成连线`, connectPick: '点一条线程作为起点',
-    legend: '线路', legendKinds: '只看', lanesAll: n => `全部 ${n}`, lanesLess: '收起', tlCorner: '线程', tlNowLabel: '现在',
+    legend: '线路', legendKinds: '只看', lanesAll: n => `全部 ${n}`, lanesLess: '收起', gl0: '全部', gl1: '决定', gl2: '星标', glTitle: '显示多少：捏合收起，张开展开', glNone: '这里还没有标星的记录。张开手指，或在上面换一档。', tlCorner: '线程', tlNowLabel: '现在',
     week: ['日', '一', '二', '三', '四', '五', '六'],
     dayLabel: d => `${d.getMonth() + 1}/${d.getDate()} 周${I18N.zh.week[d.getDay()]}`,
     monthLabel: d => `${d.getFullYear()} 年 ${d.getMonth() + 1} 月`,
@@ -1686,7 +1691,7 @@ const COLS = ['threads', 'commits', 'edges'];
 const S = {
   threads: new Map(), commits: new Map(), edges: new Map(),
   view: 'canvas', sel: null, ui: {}, q: '',
-  kinds: new Set(ls.get('tc.kinds', [])), lanesOpen: ls.get('tc.lanesOpen', false), // record kinds picked in the Branches legend; empty = all
+  kinds: new Set(ls.get('tc.kinds', [])), lanesOpen: ls.get('tc.lanesOpen', false), gitLevel: ls.get('tc.gitLevel', 0), // record kinds picked in the Branches legend; empty = all
   glDraft: {}, glEdit: null, // Goals page: half-typed to-dos per line; the to-do id (or goal:<line>) being edited
   hideDone: ls.get('tc.hideDone', false), showMerged: ls.get('tc.showMerged', false),
   cam: { x: 40, y: 40, z: 1 }, fitted: false,
@@ -3189,16 +3194,22 @@ function createThreadAndEdit() {
 /* ================= git graph ================= */
 // Another machine's name, next to what it wrote or runs (this machine is never named).
 const machineTag = m => (m && S.machine && m !== S.machine ? `<span class="agent-tag m-tag" title="${esc(t('onMachine', m))}">${esc(m)}</span>` : '');
+// Zoom levels of the Branches view: 0 every record, 1 decisions and starred (forks and merges stay, so the lines keep
+// their shape), 2 starred only. The record that is open stays at every level.
+const GIT_LEVELS = 3;
+const gitKeep = (c, lvl) => !lvl || !!c.starred || (lvl === 1 && (c.kind === 'decision' || c.kind === 'fork' || c.kind === 'merge')) || (S.sel && S.sel.type === 'commit' && S.sel.id === c.id);
 function renderGit() {
   const by = byThread();
   const visible = new Set(viewLines(th => !isFolded(th) && (!isHidden(th) || (th.status === 'merged' && !S.hideDone))).map(th => th.id));
   // The kind filter drops rows here (forks and merges stay so lines keep their shape); search only dims.
   const kindOk = c => !S.kinds.size || S.kinds.has(c.kind) || c.kind === 'fork' || c.kind === 'merge';
-  const list = [...S.commits.values()].filter(c => visible.has(tidOf(c)) && kindOk(c)).sort((a, b) => b.ts - a.ts);
+  const lvl = S.gitLevel, inView = [...S.commits.values()].filter(c => visible.has(tidOf(c)) && kindOk(c));
+  const list = inView.filter(c => gitKeep(c, lvl)).sort((a, b) => b.ts - a.ts);
+  const levelCtl = `<span class="seg g-level" title="${esc(t('glTitle'))}">${[0, 1, 2].map(n => `<button data-glevel="${n}" aria-pressed="${n === lvl}">${esc(t('gl' + n))}</button>`).join('')}</span>`;
   // Live tips: sessions working on a visible line right now take the top rows, above its newest record.
   const tips = S.live.filter(s => s.threadId && visible.has(s.threadId));
   const body = $('#git-body'), legend = $('#git-legend');
-  if (!list.length && !tips.length) { body.innerHTML = ''; legend.innerHTML = ''; return; }
+  if (!list.length && !tips.length) { body.innerHTML = lvl && inView.length ? `<p class="g-none">${esc(t('glNone'))}</p>` : ''; legend.innerHTML = lvl && inView.length ? levelCtl : ''; return; }
   const tipLines = new Set(tips.map(s => s.threadId));
   const laneOrder = [INBOX, ...orderedThreads().map(th => th.id)].filter(id => visible.has(id) && (by.has(id) || tipLines.has(id)));
   const row = new Map(list.map((c, i) => [c.id, i + tips.length]));
@@ -3245,7 +3256,7 @@ function renderGit() {
   const selC = S.sel && S.sel.type === 'commit' ? S.sel.id : null;
   legend.classList.toggle('open', !!S.lanesOpen);
   const chipIds = laneOrder.filter(id => !isHidden(getThread(id)));
-  legend.innerHTML = `<span class="legend-label">${esc(t('legend'))}</span><span class="lane-chips">` + chipIds.map(id => {
+  legend.innerHTML = levelCtl + `<span class="g-count mono">${lvl ? `${list.length}/${inView.length}` : ''}</span><span class="legend-label">${esc(t('legend'))}</span><span class="lane-chips">` + chipIds.map(id => {
     const th = getThread(id);
     return `<button class="lane-chip ${selT === id ? 'is-sel' : ''}" data-tid="${esc(id)}" style="--c:${th.color}"><i></i>${esc(th.name)}<span class="mono" style="color:var(--faint);font-size:11px">${(by.get(id) || []).length}</span></button>`;
   }).join('') + `</span><button class="lane-chip lane-more" data-lanes-toggle>${esc(S.lanesOpen ? t('lanesLess') : t('lanesAll', chipIds.length))}</button><span class="legend-label" style="margin-left:10px">${esc(t('legendKinds'))}</span>` + USER_KINDS.map(k => `<button class="lane-chip kind-chip ${S.kinds.has(k) ? 'is-sel' : ''}" data-kind="${k}" title="${esc(kindLabel(k))}" aria-label="${esc(kindLabel(k))}" aria-pressed="${S.kinds.has(k)}">${mini(k, 'var(--ink)', false)}<span>${esc(kindLabel(k))}</span></button>`).join('') + `<span class="legend-actors">${ACTOR_ICON.human ? `<span class="actor a-human">${ACTOR_ICON.human}</span>${esc(t('actorHuman'))}` : ''}<span class="actor a-agent" style="margin-left:8px">${ACTOR_ICON.agent}</span>${esc(t('actorAgent'))}</span>`;
@@ -3336,6 +3347,8 @@ $('#git-scroll').addEventListener('click', e => {
     if (best) { const tid = best.dataset.tid; select(S.sel && S.sel.type === 'thread' && S.sel.id === tid ? null : { type: 'thread', id: tid }); }
     return;
   }
+  const lv = e.target.closest('[data-glevel]');
+  if (lv) { gitZoom(+lv.dataset.glevel - S.gitLevel); return; }
   if (e.target.closest('[data-lanes-toggle]')) { S.lanesOpen = !S.lanesOpen; ls.set('tc.lanesOpen', S.lanesOpen); render(); return; }
   const kc = e.target.closest('[data-kind]');
   if (kc) { const k = kc.dataset.kind; S.kinds.has(k) ? S.kinds.delete(k) : S.kinds.add(k); ls.set('tc.kinds', [...S.kinds]); render(); return; }
@@ -3345,6 +3358,62 @@ $('#git-scroll').addEventListener('click', e => {
   const r = e.target.closest('[data-cid]');
   if (r) select({ type: 'commit', id: r.dataset.cid });
 });
+
+// Pinch in the Branches view: one step fewer or more records. The row nearest the fingers that is in both levels stays
+// where it is on the screen; the rows that stay glide to their new places on a strong ease-out, the ones that come
+// back slide out from under the row above them, and the lines are redrawn underneath with a short fade.
+const EASE_ZOOM = 'cubic-bezier(.16,1,.3,1)';
+function gitZoom(dir, cy) {
+  const to = clamp(S.gitLevel + dir, 0, GIT_LEVELS - 1), wrap = $('#git-scroll'), body = $('#git-body');
+  if (to === S.gitLevel || S.view !== 'git') return;
+  const box = wrap.getBoundingClientRect(), y0 = cy == null ? box.top + box.height / 2 : cy;
+  // Where each row is, from the top of the scroller (the body starts below the legend).
+  const top = () => { const b = body.getBoundingClientRect().top - box.top; return new Map([...body.querySelectorAll('.g-row[data-cid]')].map(r => [r.dataset.cid, b + r.offsetTop])); };
+  const was = top(), both = lvl => id => S.commits.has(id) && gitKeep(S.commits.get(id), lvl);
+  // The anchor: in both levels, nearest the fingers.
+  let anchor = null, ad = Infinity;
+  for (const [id, y] of was) { const d = Math.abs(y + box.top - y0); if (d < ad && both(to)(id)) { anchor = id; ad = d; } }
+  S.gitLevel = to; ls.set('tc.gitLevel', to);
+  renderGit(); // now, not on the next frame: the new places are measured below
+  let now = top();
+  if (anchor && now.has(anchor)) { wrap.scrollTop += now.get(anchor) - was.get(anchor); now = top(); }
+  if (CALM.matches) return;
+  const H = box.height, opts = { duration: 460, easing: EASE_ZOOM, fill: 'backwards' };
+  let dy = 0, n = 0; // dy: how far the last row that was there before has to travel; a row that comes back starts with it
+  for (const [id, y] of now) {
+    if (y > H + 60) break;
+    const old = was.has(id);
+    if (old) dy = clamp(was.get(id) - y, -H, H);
+    if (y < -60 || (old && !dy) || n++ > 80) continue;
+    const frames = old ? [{ transform: `translateY(${dy}px)` }, { transform: 'none' }] : [{ transform: `translateY(${dy}px)`, opacity: 0 }, { transform: 'none' }];
+    motion(() => rowOf(id), frames, opts);
+    motion(() => dotOf('git', id), frames, opts);
+  }
+  motion(() => body.querySelector('.git-svg'), [{ opacity: .15 }, { opacity: 1 }], { duration: 380, easing: 'ease-out', fill: 'backwards' });
+}
+{
+  const wrap = $('#git-scroll');
+  // Trackpad pinch (a wheel with ctrl): one step per gesture, however long the fingers keep moving.
+  let acc = 0, quiet = 0, stepped = false;
+  wrap.addEventListener('wheel', e => {
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    clearTimeout(quiet); quiet = setTimeout(() => { acc = 0; stepped = false; }, 220);
+    acc += e.deltaY;
+    if (!stepped && Math.abs(acc) > 30) { stepped = true; gitZoom(acc > 0 ? 1 : -1, e.clientY); }
+  }, { passive: false });
+  // Two fingers on a touch screen: each time they close or open by about a third, one step.
+  let d0 = 0;
+  const span = e => Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+  wrap.addEventListener('touchstart', e => { d0 = e.touches.length === 2 ? span(e) : 0; }, { passive: true });
+  wrap.addEventListener('touchmove', e => {
+    if (e.touches.length !== 2 || !d0) return;
+    e.preventDefault();
+    const d = span(e), k = d / d0;
+    if (k < 0.7 || k > 1.4) { d0 = d; gitZoom(k < 1 ? 1 : -1, (e.touches[0].clientY + e.touches[1].clientY) / 2); }
+  }, { passive: false });
+  wrap.addEventListener('gesturestart', e => e.preventDefault()); // Safari's own page zoom
+}
 
 /* ================= timeline ================= */
 const TLZ = { day: 56, week: 9, month: 2.4 };

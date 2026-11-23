@@ -2,7 +2,7 @@ import { HEADS } from './prompts.mjs';
 import fs from 'node:fs';
 // Operations shared by the MCP server and the command line:
 // putting a session on the canvas, merging threads, and merging data sets.
-import { INBOX, COLS, isTodo, RETURN_LIMIT, evolveConfig, absorb, addCommit, createThread, findThreadByName, goalOf, hashId, lastCommit, readConfig, threadById, threadIdOf } from './store.mjs';
+import { INBOX, COLS, isTodo, RETURN_LIMIT, evolveConfig, absorb, leadsTo, addCommit, createThread, findThreadByName, goalOf, hashId, lastCommit, readConfig, threadById, threadIdOf } from './store.mjs';
 import { headline, firstLine } from './git-events.mjs';
 import { AGENT, bindSession, gitRoot, logGitEvents, repoInfo, resumeLink, sessionThread, turnBody, rel } from './hook.mjs';
 import { listLive } from './live.mjs';
@@ -535,14 +535,22 @@ export function mergeThreads(d, { sources = [], target, newName, mode = 'merge' 
   if (missing.length) throw new Error(`No thread named ${missing.map(m => `"${m}"`).join(', ')}`);
   let tid = target ? resolveThreadRef(d, target) : null;
   if (tid === INBOX) throw new Error('The inbox cannot be a merge target');
+  const sids = srcIds.filter(id => id !== tid);
+  if (!sids.length) throw new Error('Pick at least one thread other than the target');
+  if (tid && mode !== 'combine' && d.threads[tid].status === 'merged') {
+    // A merged line is drawn inside the line it leads to: merged into, it would vanish with everything in it,
+    // and when it leads to one of the sources the two would point at each other.
+    const T = d.threads[tid], to = leadsTo(d, T);
+    throw new Error(sids.includes(to.id) || to === T ? `"${T.name}" is merged into "${d.threads[T.mergedInto]?.name}": merging that into it would make a circle` : `"${T.name}" is merged into "${to.name}": merge into that line instead`);
+  }
   if (!tid) {
     const nm = String(newName || target || srcIds.map(id => d.threads[id].name).join(' + ')).slice(0, 120);
     const first = d.threads[srcIds[0]];
-    tid = createThread(d, { name: nm }).id;
+    // Lines of one group stay in it: the new line takes the group they share.
+    const groups = new Set(srcIds.map(id => d.threads[id].group || ''));
+    tid = createThread(d, { name: nm, extra: { madeByMerge: true, ...(groups.size === 1 && !groups.has('') ? { group: [...groups][0] } : {}) } }).id;
     if (first) { d.threads[tid].x = (first.x || 0) + 300; d.threads[tid].y = first.y || 0; }
   }
-  const sids = srcIds.filter(id => id !== tid);
-  if (!sids.length) throw new Error('Pick at least one thread other than the target');
   const names = sids.map(id => d.threads[id].name);
 
   if (mode === 'combine') {
@@ -569,10 +577,35 @@ export function mergeThreads(d, { sources = [], target, newName, mode = 'merge' 
       const src = d.threads[id];
       const srcTip = lastCommit(d, id), tip = lastCommit(d, tid);
       addCommit(d, { thread: tid, kind: 'merge', title: tr(cfg.lang, 'merged', src.name), parents: [tip && tip.id, srcTip && srcTip.id].filter(Boolean), ts: Math.max(Date.now(), srcTip ? srcTip.ts + 1 : 0), extra: { mergeOf: id } });
+      // What undoing the merge puts back (unmergeThread): a merged line takes its target's group (settleMerged).
+      src.mergedPrev ||= { status: src.status === 'merged' ? 'active' : src.status || 'active', group: src.group || '' };
       src.status = 'merged'; src.mergedInto = tid;
     }
   }
   return { target: d.threads[tid], sources: names, mode };
+}
+
+/**
+ * Undoes a merge that kept the line: the line is as it was before (status, group, not merged into anything), its
+ * merge record is gone from the target, and a target the merge itself made goes too once nothing is left on it.
+ * Its sessions and open to-dos come back with the next write (settleMerged).
+ */
+export function unmergeThread(d, ref) {
+  const id = resolveThreadRef(d, ref), t = d.threads[id];
+  if (!t || !(t.mergedInto || t.status === 'merged')) throw new Error(`"${ref}" is not a merged line`);
+  const into = d.threads[t.mergedInto], prev = t.mergedPrev;
+  for (const c of Object.values(d.commits)) {
+    if (c.kind !== 'merge' || c.mergeOf !== id) continue;
+    for (const x of Object.values(d.commits)) if ((x.parents || []).includes(c.id)) x.parents = x.parents.flatMap(p => (p === c.id ? (c.parents || []).slice(0, 1) : [p]));
+    delete d.commits[c.id];
+  }
+  t.status = (prev && prev.status) || 'active'; t.mergedInto = null;
+  if (prev) { if (prev.group) t.group = prev.group; else delete t.group; }
+  delete t.mergedPrev;
+  // What followed a source onto the target (open to-dos, settleMerged) goes back with it, so it does not count as the target's own.
+  const stays = c => c.thread === into.id && !(d.threads[c.movedFrom] && leadsTo(d, d.threads[c.movedFrom]).id !== into.id);
+  if (into && into.madeByMerge && !Object.values(d.commits).some(stays) && !Object.values(d.threads).some(x => x.mergedInto === into.id || x.parent === into.id)) delete d.threads[into.id];
+  return { thread: t, from: into && d.threads[into.id] ? into : null };
 }
 
 /**

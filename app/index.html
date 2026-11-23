@@ -1322,7 +1322,7 @@ const I18N = {
     focusIntro: 'Every view then shows only the lines of the group you pick: the canvas, the branches, the timeline and the goals. It stays on, also after a reload, until you leave it.',
     focusNoGroups: 'No groups yet. Select lines on the canvas and press Group, or fill in a group in a line\'s panel.', groupUngroup: 'Ungroup',
     threadGroup: 'Group', threadGroupPh: 'None', multiGroup: 'Group', multiGroupPh: 'Group name', tGroupNeedName: 'Type a group name first',
-    tGrouped: (n, g) => `${n} line${n === 1 ? '' : 's'} in "${g}"`, tUngrouped: 'Group dissolved; the lines stay',
+    tGrouped: (n, g) => `${n} line${n === 1 ? '' : 's'} in "${g}"`, tUngrouped: 'Group dissolved; the lines stay', tGroupRenamed: (n, g) => `${n} line${n === 1 ? '' : 's'} now in “${g}”`, groupJoinQ: (g, n) => `There is a group “${g}” already. Put these ${n} line${n === 1 ? '' : 's'} into it?`, groupJoin: 'Join it',
     menuSync: 'Sync with other machines', menuAway: on => `Other machines' sessions: ${on ? 'shown' : 'off'}`, menuUpdate: n => `Update to the newest version (${n} new)`, tUpdating: 'Updating… the page reloads in a moment', tUpdateFail: e => `Not updated: ${e}`, tUpdateHere: 'Run trace-canvas update on the computer that runs the canvas', menuAwayGit: on => `Other machines' changes: ${on ? 'read over ssh' : 'off'}`, tAwayGit: on => on ? 'A commit made on another machine, with no clone here, is read from that machine over ssh' : 'Other machines\' changes are no longer read over ssh', tAway: on => on ? 'The live bar now shows sessions running on your other machines (read over ssh every 15 s)' : 'Other machines\' sessions are off', menuPhone: 'Open on your phone', phoneTitle: 'Open on your phone',
     phoneIntro: 'Scan this with the phone camera. The phone needs Tailscale, signed in to the same account as this computer. The address carries a key: keep it to yourself.',
     phoneAfter: 'On the phone you can read every line, add ideas and to-dos with the box at the bottom (pick a line, or start with #line name), and copy a prompt for an agent from a line\'s panel.',
@@ -1353,8 +1353,7 @@ apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent 
     multiClear: 'Clear', multiNeedMore: 'Pick at least two threads, or one thread and an existing target',
     multiPick: 'Click the lines to merge or group', multiPickMore: 'Click one more line, or choose another line to merge into', multiInGroup: 'Picked', multiOthers: 'Other lines',
     multiMakeTarget: 'Merge the others into this line', multiTargetMark: 'kept', multiDrop: 'Unselect',
-    tMergedMany: (n, name) => `Merged ${n} thread${n === 1 ? '' : 's'} into “${name}”`, tCombinedMany: (n, name) => `Combined ${n} thread${n === 1 ? '' : 's'} into “${name}”`,
-    combinedFrom: names => `Combined from ${names}`,
+    tMergedMany: (n, name) => `Merged ${n} thread${n === 1 ? '' : 's'} into “${name}”`,
     tlDay: 'Day', tlWeek: 'Week', tlMonth: 'Month', tlNow: 'Now', tlHint: 'One row per thread. The band shows when it was active; dashed curves are forks and merges.',
     detailAria: 'Details', capThreadAria: 'Thread to log to', kindsAria: 'Record type',
     capPh: 'Log an idea, a task or what an agent produced…  Enter to save. Start with #thread to file it. Paste JSON to import.',
@@ -1394,11 +1393,11 @@ apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent 
     captureHere: 'Log on this line', mergeTo: 'Merge into…', merge: 'Merge', delThreadQ: 'Delete thread? Its records move to the inbox', delThread: 'Delete thread',
     edgeHead: 'Link', edgeRel: 'Relationship', edgeRelPh: 'depends on, references…', flip: 'Reverse direction', delEdgeQ: 'Delete this link?',
     newThreadName: n => `New thread ${n}`, branchDefault: n => `${n} · branch`,
-    forkTitle: (p, ti) => `Forked from ${p}: ${ti}`, mergeTitle: n => `Merged ${n}`,
+    forkTitle: (p, ti) => `Forked from ${p}: ${ti}`,
     tReadOnly: 'You can only view this page', tReadOnlyNotSaved: 'You can only view this page, so that change wasn’t saved',
     tQuota: 'Storage is full: export a backup, then delete some old records', tSlow: 'Too many changes at once. Wait a few seconds and try again.',
     tSaveFail: 'Couldn’t save. Check the connection and try again.', tConnLost: 'Lost the data connection. Reload the page to reconnect.',
-    tForked: ti => `Forked a new thread from “${ti}”`, tMerged: (a, b) => `Merged “${a}” into “${b}”`, tCleared: n => `Cleared ${n} example item${n === 1 ? '' : 's'}`,
+    tForked: ti => `Forked a new thread from “${ti}”`, tMerged: (a, b) => `Merged “${a}” into “${b}”`, tUnmerged: n => `“${n}” is a line of its own again, as before the merge`, unmergeBtn: 'Undo the merge', unmergeTitle: 'The line is as it was before: its status, its group, its to-dos; the merge record goes', tCleared: n => `Cleared ${n} example item${n === 1 ? '' : 's'}`,
     tMoved: n => `Moved to “${n}”`, tLogged: n => `Logged to “${n}”`, tImported: n => `Imported ${n} record${n === 1 ? '' : 's'}`,
     tDeleted: 'Deleted', tCopied: 'Copied', tCopyFail: 'This page can’t write to the clipboard. The text below is selected: copy it from here.',
     tSaved: 'Saved', tCopiedAll: 'Copied all data', tSaveFallback: 'Saving didn’t work here, so the JSON is on your clipboard instead',
@@ -1505,7 +1504,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     focusIntro: '选一个分组后，画布、分支、时间线和目标都只显示这个组里的线。刷新后也保持，直到你退出。',
     focusNoGroups: '还没有分组。在画布上选中几条线点「编组」，或者在线面板里填写分组。', groupUngroup: '解散分组',
     threadGroup: '分组', threadGroupPh: '无', multiGroup: '编组', multiGroupPh: '分组名称', tGroupNeedName: '先填分组名称',
-    tGrouped: (n, g) => `${n} 条线已放进「${g}」`, tUngrouped: '分组已解散，线都还在',
+    tGrouped: (n, g) => `${n} 条线已放进「${g}」`, tUngrouped: '分组已解散，线都还在', tGroupRenamed: (n, g) => `${n} 条线现在在「${g}」`, groupJoinQ: (g, n) => `已经有「${g}」这个组。把这 ${n} 条线并进去？`, groupJoin: '并入',
     menuSync: '和其他电脑同步', menuAway: on => `其他电脑的会话：${on ? '显示中' : '已关闭'}`, menuUpdate: n => `更新到最新版（${n} 个新改动）`, tUpdating: '正在更新，页面一会儿会自己刷新', tUpdateFail: e => `没有更新：${e}`, tUpdateHere: '在运行画布的那台电脑上执行 trace-canvas update', menuAwayGit: on => `其他电脑的提交改动：${on ? '通过 ssh 读取' : '已关闭'}`, tAwayGit: on => on ? '这台电脑上没有克隆的提交，会通过 ssh 到它所在的电脑上读改动' : '不再通过 ssh 读其他电脑的提交改动', tAway: on => on ? '实时栏会显示其他电脑上正在跑的会话（每 15 秒通过 ssh 读一次）' : '已关闭其他电脑的会话', menuPhone: '在手机上打开', phoneTitle: '在手机上打开',
     phoneIntro: '用手机相机扫这个二维码。手机要装 Tailscale，并登录和这台电脑相同的账号。地址里带着密钥，不要发给别人。',
     phoneAfter: '在手机上可以看每条线，用底部的输入框加想法和待办（选一条线，或者以 #线名 开头），也可以在线的面板里复制一段给 agent 的提示。',
@@ -1536,8 +1535,7 @@ apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的
     multiClear: '取消', multiNeedMore: '至少选两条线程，或选一条并指定一条已有的目标线程',
     multiPick: '点卡片选中要合并或编组的线', multiPickMore: '再点一条线，或在「合并到」里选另一条线', multiInGroup: '已选', multiOthers: '其他线',
     multiMakeTarget: '把其余的线并进这条', multiTargetMark: '保留', multiDrop: '取消选中',
-    tMergedMany: (n, name) => `已把 ${n} 条线程合并到「${name}」`, tCombinedMany: (n, name) => `已把 ${n} 条线程并成「${name}」`,
-    combinedFrom: names => `由 ${names} 合并而来`,
+    tMergedMany: (n, name) => `已把 ${n} 条线程合并到「${name}」`,
     tlDay: '日', tlWeek: '周', tlMonth: '月', tlNow: '回到现在', tlHint: '每一行是一条线程，色带是它活跃的时段，虚线是分叉与合并',
     detailAria: '详情', capThreadAria: '记到哪条线程', kindsAria: '记录类型',
     capPh: '记下一个想法、任务或 agent 的产出…  回车留痕，#线程名 开头可直接归类，粘贴 JSON 可批量导入',
@@ -1576,11 +1574,11 @@ apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的
     captureHere: '在这条线上记录', mergeTo: '合并到…', merge: '合并', delThreadQ: '删除线程？记录会移回收件箱', delThread: '删除线程',
     edgeHead: '关联', edgeRel: '关系', edgeRelPh: '依赖、参考、衍生…', flip: '反转方向', delEdgeQ: '删除这条关联？',
     newThreadName: n => `新线程 ${n}`, branchDefault: n => `${n} · 分支`,
-    forkTitle: (p, ti) => `从「${p}」分叉：${ti}`, mergeTitle: n => `合并「${n}」`,
+    forkTitle: (p, ti) => `从「${p}」分叉：${ti}`,
     tReadOnly: '你对这页只有查看权限', tReadOnlyNotSaved: '你对这页只有查看权限，刚才的修改没有保存',
     tQuota: '存储已满：先导出备份，再删除一些旧记录', tSlow: '操作太快了，稍等几秒再试',
     tSaveFail: '保存失败，请检查网络后重试', tConnLost: '数据连接中断，刷新页面可恢复',
-    tForked: ti => `已从「${ti}」分出新线程`, tMerged: (a, b) => `「${a}」已合并到「${b}」`, tCleared: n => `已清除 ${n} 条示例数据`,
+    tForked: ti => `已从「${ti}」分出新线程`, tMerged: (a, b) => `「${a}」已合并到「${b}」`, tUnmerged: n => `「${n}」已恢复成合并前的样子`, unmergeBtn: '撤销合并', unmergeTitle: '这条线回到合并前：状态、分组、待办都还原，合并记录删掉', tCleared: n => `已清除 ${n} 条示例数据`,
     tMoved: n => `已移到「${n}」`, tLogged: n => `已记到「${n}」`, tImported: n => `已导入 ${n} 条记录`,
     tDeleted: '已删除', tCopied: '已复制', tCopyFail: '这个页面没法直接写入剪贴板。下面的文字已经选中，在这里复制即可。',
     tSaved: '已保存', tCopiedAll: '已复制全部数据', tSaveFallback: '这里不能直接保存文件，已把 JSON 复制到剪贴板',
@@ -2331,20 +2329,25 @@ function forkFrom(cid, name) {
   select({ type: 'thread', id: th.id });
   toast(t('tForked', c.title.slice(0, 18)));
 }
-function mergeThread(sid, tid) {
-  const s = S.threads.get(sid); if (!s || !tid || tid === sid) return;
-  const sTip = lastCommit(sid), tTip = lastCommit(tid);
-  addCommit({ thread: tid, kind: 'merge', title: t('mergeTitle', s.name), parents: [tTip && tTip.id, sTip && sTip.id].filter(Boolean), ts: Math.max(Date.now(), sTip ? sTip.ts + 1 : 0), extra: { mergeOf: sid } });
-  patchDoc('threads', sid, { status: 'merged', mergedInto: tid }, 0);
-  toast(t('tMerged', s.name, getThread(tid).name));
+// Merging and undoing a merge are done by the server alone (mergeThreads, unmergeThread in src/ops.mjs): one set of
+// checks for the page, MCP and the command line. Without a server the page does not offer them. Edits still on
+// their way are written first, so they do not land on top of what the server changed.
+async function serverMerge(url, body) {
+  for (const [key, tm] of [...timers]) { clearTimeout(tm); timers.delete(key); flush(...key.split('/')); }
+  await Promise.all([...chains.values()]);
+  const r = await postJSON(url, body);
+  if (r.error) { toast(r.error); return null; }
+  await loadServer();
+  return r.thread;
 }
-function deleteThread(id) {
+const mergeThread = (sid, tid) => serverMerge('/api/merge', { sources: [sid], target: tid }).then(th => { if (th) toast(t('tMerged', (S.threads.get(sid) || {}).name || '', th.name)); return th; });
+const unmerge = id => serverMerge('/api/unmerge', { thread: id }).then(th => { if (th) toast(t('tUnmerged', th.name)); return th; });
+async function deleteThread(id) {
+  // Lines merged into it are lines of their own again, as they were before the merge.
+  for (const th of mergedIn(id)) { if (SERVER) await serverMerge('/api/unmerge', { thread: th.id }); else patchDoc('threads', th.id, { mergedInto: null, status: 'active' }, 0); }
   for (const c of [...S.commits.values()]) if (c.thread === id) patchDoc('commits', c.id, { thread: INBOX }, 0);
   for (const e of [...S.edges.values()]) if (e.from === id || e.to === id) removeDoc('edges', e.id);
-  for (const th of [...S.threads.values()]) {
-    if (th.parent === id) patchDoc('threads', th.id, { parent: INBOX }, 0);
-    if (th.mergedInto === id) patchDoc('threads', th.id, { mergedInto: null, status: th.status === 'merged' ? 'done' : th.status }, 0);
-  }
+  for (const th of [...S.threads.values()]) if (th.parent === id) patchDoc('threads', th.id, { parent: INBOX }, 0);
   removeDoc('threads', id);
   if (S.captureThread === id) setCaptureThread(INBOX);
 }
@@ -2658,7 +2661,20 @@ function renderCanvas() {
 
 /* ---- several threads at once ---- */
 let multiSig = '';
+// The banner lies over the top of the canvas. When it opens or grows, the cards it would cover move down from
+// under it, and back when it closes; in between the canvas pans as usual.
+let mbBottom = 0, mbShift = 0;
 function renderMulti() {
+  drawMulti();
+  const mb = $('#multi-banner'), r = mb.hidden ? null : mb.getBoundingClientRect(), bottom = r ? Math.round(r.bottom) : 0;
+  if (bottom === mbBottom) return;
+  mbBottom = bottom;
+  const under = r ? [...cardsEl.children].map(el => el.getBoundingClientRect()).filter(c => c.top < r.bottom + 10 && c.bottom > r.top && c.left < r.right && c.right > r.left) : [];
+  const by = r ? (under.length ? r.bottom + 10 - Math.min(...under.map(c => c.top)) : 0) : -mbShift;
+  if (!by) return;
+  mbShift += by; S.cam.y += by; applyCam();
+}
+function drawMulti() {
   for (const id of [...S.multi]) if (!S.threads.has(id)) S.multi.delete(id);
   const mb = $('#multi-banner');
   const show = !S.connect && (S.multi.size > 0 || S.selectMode);
@@ -2668,7 +2684,8 @@ function renderMulti() {
   const others = orderedThreads().filter(th => !S.multi.has(th.id) && th.status !== 'merged' && inFocus(th));
   // The line the others go into: one of the picked lines (the first picked by default), another line, or a new one.
   if (!picked.length) { S.multiTarget = null; multiSig = ''; mb.innerHTML = `<span>${esc(t('multiPick'))}</span><button class="btn btn-quiet" data-multi="clear">${esc(t('multiClear'))}</button>`; return; }
-  if (S.multiTarget !== '__new' && !S.multi.has(S.multiTarget) && !others.some(th => th.id === S.multiTarget)) S.multiTarget = picked[0].id;
+  const open = picked.filter(th => th.status !== 'merged');
+  if (S.multiTarget !== '__new' && !open.concat(others).some(th => th.id === S.multiTarget)) S.multiTarget = open[0] ? open[0].id : '__new';
   const sig = LANG + [...S.multi].join(',') + '|' + S.multiTarget + '|' + [...picked, ...others].map(th => th.id + th.name).join(',');
   if (sig === multiSig && mb.contains(document.activeElement)) return;
   multiSig = sig;
@@ -2677,14 +2694,14 @@ function renderMulti() {
   const opt = th => `<option value="${esc(th.id)}" ${th.id === tgt ? 'selected' : ''}>${esc(th.name)}</option>`;
   const flow = !srcs.length ? esc(t('multiPickMore')) : `${srcs.map(th => esc(th.name)).join('、')} → ${tgt === '__new' ? esc(S.multiName.trim() || t('multiNew')) : esc(S.threads.get(tgt).name)}`;
   mb.innerHTML = `<div class="mb-chips">${picked.map(chip).join('')}</div>
-    <span>${esc(t('multiInto'))}</span>
-    <select id="multi-target"><optgroup label="${esc(t('multiInGroup'))}">${picked.map(opt).join('')}</optgroup><option value="__new" ${tgt === '__new' ? 'selected' : ''}>${esc(t('multiNew'))}</option>${others.length ? `<optgroup label="${esc(t('multiOthers'))}">${others.map(opt).join('')}</optgroup>` : ''}</select>
+    ${SERVER ? `<span>${esc(t('multiInto'))}</span>
+    <select id="multi-target"><optgroup label="${esc(t('multiInGroup'))}">${open.map(opt).join('')}</optgroup><option value="__new" ${tgt === '__new' ? 'selected' : ''}>${esc(t('multiNew'))}</option>${others.length ? `<optgroup label="${esc(t('multiOthers'))}">${others.map(opt).join('')}</optgroup>` : ''}</select>
     <input id="multi-name" placeholder="${esc(t('multiNamePh'))}" value="${esc(S.multiName)}" ${tgt === '__new' ? '' : 'hidden'}>
-    <button class="btn btn-primary" data-multi="merge" title="${esc(t('multiMergeTitle'))}">${esc(t('multiMerge'))}</button>
+    <button class="btn btn-primary" data-multi="merge" title="${esc(t('multiMergeTitle'))}">${esc(t('multiMerge'))}</button>` : ''}
     <input id="multi-group" list="group-list" placeholder="${esc(t('multiGroupPh'))}" value="${esc(S.multiGroup)}">
     <button class="btn" data-multi="group">${esc(t('multiGroup'))}</button>
     <button class="btn btn-quiet" data-multi="clear">${esc(t('multiClear'))}</button>
-    <div class="mb-flow">${flow}</div>`;
+    ${SERVER ? `<div class="mb-flow">${flow}</div>` : ''}`;
 }
 function toggleMulti(id) {
   if (id === INBOX) return;
@@ -2707,58 +2724,19 @@ $('#multi-banner').addEventListener('click', e => {
     setGroup(ids, name); S.multiGroup = ''; clearMulti(); toast(t('tGrouped', ids.length, name));
     return;
   }
-  mergeMany(b.dataset.multi, S.multiTarget);
+  mergeMany(S.multiTarget);
 });
 $('#select-btn').onclick = () => { S.selectMode = !S.selectMode; if (!S.selectMode && !S.multi.size) S.multiName = ''; S.connect = null; render(); };
 
-// Same rules as `trace-canvas merge`: merge keeps every line, combine folds them into one.
-function mergeMany(mode, targetVal) {
+async function mergeMany(targetVal) {
   const sources = [...S.multi].filter(id => S.threads.has(id) && id !== targetVal);
   const isNew = targetVal === '__new';
   if (sources.length < (isNew ? 2 : 1)) { toast(t('multiNeedMore')); return; }
-  const names = sources.map(id => S.threads.get(id).name);
-  let tid = targetVal;
-  if (isNew) {
-    const first = S.threads.get(sources[0]);
-    tid = newThread({ name: S.multiName.trim() || names.join(' + '), near: first }).id;
-  }
-  if (mode === 'combine') {
-    for (const c of [...S.commits.values()]) if (sources.includes(c.thread)) patchDoc('commits', c.id, { thread: tid }, 0);
-    for (const th of [...S.threads.values()]) {
-      const patch = {};
-      if (sources.includes(th.parent)) patch.parent = th.id === tid ? null : tid;
-      if (sources.includes(th.mergedInto)) patch.mergedInto = tid;
-      if (Object.keys(patch).length) patchDoc('threads', th.id, patch, 0);
-    }
-    const seen = new Set();
-    for (const e of [...S.edges.values()]) {
-      const from = sources.includes(e.from) ? tid : e.from, to = sources.includes(e.to) ? tid : e.to;
-      const k = `${from}>${to}:${e.label}`;
-      if (from === to || seen.has(k)) { removeDoc('edges', e.id); continue; }
-      seen.add(k);
-      if (from !== e.from || to !== e.to) patchDoc('edges', e.id, { from, to }, 0);
-    }
-    // Same as absorb() in src/store.mjs: the kept line takes a key if it had none, and the folded
-    // lines' ids and other keys become aliases, so their folders and bound sessions still land here.
-    const gone = sources.map(id => S.threads.get(id)), target = S.threads.get(tid);
-    const keys = gone.map(g => g.key).filter(Boolean), key = target.key || keys.shift();
-    const aliases = [...new Set([...(target.aliases || []), ...keys, ...gone.flatMap(g => [g.id, ...(g.aliases || [])])])];
-    for (const id of sources) removeDoc('threads', id);
-    const note = t('combinedFrom', names.join(', '));
-    patchDoc('threads', tid, { note: target.note ? `${target.note}\n${note}` : note, ...(key ? { key } : {}), aliases, ...(target.status === 'merged' ? { status: 'active', mergedInto: null } : {}) }, 0);
-    if (sources.includes(S.captureThread)) setCaptureThread(tid);
-  } else {
-    for (const sid of sources) {
-      const s = S.threads.get(sid);
-      const sTip = lastCommit(sid), tTip = lastCommit(tid);
-      addCommit({ thread: tid, kind: 'merge', title: t('mergeTitle', s.name), parents: [tTip && tTip.id, sTip && sTip.id].filter(Boolean), ts: Math.max(Date.now(), sTip ? sTip.ts + 1 : 0), extra: { mergeOf: sid } });
-      patchDoc('threads', sid, { status: 'merged', mergedInto: tid }, 0);
-    }
-  }
-  const targetName = S.threads.get(tid).name;
+  const th = await serverMerge('/api/merge', { sources, ...(isNew ? { newName: S.multiName.trim() || sources.map(id => S.threads.get(id).name).join(' + ') } : { target: targetVal }) });
+  if (!th) return;
   S.multi.clear(); S.multiTarget = null; S.selectMode = false; S.multiName = '';
-  select({ type: 'thread', id: tid });
-  toast(mode === 'combine' ? t('tCombinedMany', sources.length, targetName) : t('tMergedMany', sources.length, targetName));
+  select({ type: 'thread', id: th.id });
+  toast(t('tMergedMany', sources.length, th.name));
 }
 /* ---- groups ---- */
 // A group is a name on its lines (th.group); its frame wraps their cards as drawn, under them.
@@ -2894,6 +2872,15 @@ function detachThread(tid) {
   toast(t('tDetached', th.name));
 }
 function setGroup(ids, name) { for (const id of ids) patchDoc('threads', id, { group: name }, 0); }
+// A group is the name its lines carry, so a rename to another group's name joins the two: that is asked first
+// (S.ui.gJoin). A rename, a join and dissolving can be undone from the toast: each line gets its group back.
+function regroupLines(from, to) {
+  const before = [...S.threads.values()].filter(th => th.group === from).map(th => th.id);
+  setGroup(before, to);
+  S.ui = {}; S.sel = to ? { type: 'group', id: to } : null;
+  toast(to ? t('tGroupRenamed', before.length, to) : t('tUngrouped'), { label: t('tUndo'), run: () => { setGroup(before.filter(id => S.threads.has(id)), from); select({ type: 'group', id: from }); } });
+  render();
+}
 function groupDetail(name) {
   const ths = orderedThreads().filter(th => th.group === name);
   return `<div class="d-head">
@@ -2901,7 +2888,8 @@ function groupDetail(name) {
       <button class="icon-btn" data-act="close" aria-label="${esc(t('close'))}">×</button>
     </div>
     <div class="d-scroll">
-      <label class="fld"><span>${esc(t('groupName'))}</span><input id="g-name" class="big-input" value="${esc(name)}"></label>
+      <label class="fld"><span>${esc(t('groupName'))}</span><input id="g-name" class="big-input" value="${esc(S.ui.gJoin || name)}"></label>
+      ${S.ui.gJoin ? `<div class="inline-form"><span>${esc(t('groupJoinQ', S.ui.gJoin, ths.length))}</span><button class="btn btn-primary" data-act="g-join">${esc(t('groupJoin'))}</button><button class="btn" data-act="g-join-cancel">${esc(t('cancel'))}</button></div>` : ''}
       <div class="sec-label">${esc(t('groupLines'))}</div>
       <ul class="l-list">${ths.map(th => `<li data-act="goto-thread" data-tid="${esc(th.id)}"><span class="ldot" style="background:${th.color}"></span><span>${esc(th.name)}</span></li>`).join('')}</ul>
       <div class="d-actions">
@@ -3629,9 +3617,9 @@ window.addEventListener('popstate', () => {
   if (S.sel) { S.sel = null; S.ui = {}; render(); }
   try { history.replaceState(null, '', location.pathname + location.search + '#' + S.view); } catch {} // the entry gone back to may name an older view
 });
-function threadOptions(selected, { excludeId, onlyOpen } = {}) {
+function threadOptions(selected, { excludeId, onlyOpen, noInbox } = {}) {
   // In focus mode only the group's lines, and the one already chosen.
-  const opts = [...(S.focusGroup && selected !== INBOX ? [] : [{ id: INBOX, name: t('inbox') }]), ...orderedThreads().filter(th => th.id !== excludeId && (inFocus(th) || th.id === selected) && (!onlyOpen || th.status === 'active' || th.status === 'parked' || th.id === selected))];
+  const opts = [...(noInbox || (S.focusGroup && selected !== INBOX) ? [] : [{ id: INBOX, name: t('inbox') }]), ...orderedThreads().filter(th => th.id !== excludeId && (inFocus(th) || th.id === selected) && (!onlyOpen || th.status === 'active' || th.status === 'parked' || th.id === selected))];
   return opts.map(th => `<option value="${esc(th.id)}" ${th.id === selected ? 'selected' : ''}>${esc(th.name)}${th.status && th.status !== 'active' && th.id !== INBOX ? ` (${esc(statusLabel(th.status))})` : ''}</option>`).join('');
 }
 // A local report (a .md or .txt file a record links) gets 阅读, which shows it in the reader (a .txt as it is written).
@@ -4327,7 +4315,7 @@ function threadDetail(th) {
         <span>${esc(t('createdAt', fmtAbs(th.createdAt || Date.now())))}${cs[0] ? esc(t('lastUpdate', fmtRel(cs[0].ts))) : ''}</span>
         ${th.parent ? `<span>${esc(t('forkedFromThread'))} <button class="linkish" data-act="goto-thread" data-tid="${esc(th.parent)}">${esc(getThread(th.parent).name)}</button>${forkC ? ` ${esc(t('of'))} <button class="linkish" data-act="goto-commit" data-cid="${esc(forkC.id)}">${esc(forkC.title.slice(0, 40))}</button>` : ''} · <button class="linkish" data-act="detach" title="${esc(t('detachTitle'))}">${esc(t('detach'))}</button></span>` : ''}
         ${mergedIn(th.id).length ? `<span>${esc(t('mergedInLabel'))} ${mergedIn(th.id).map(x => `<button class="linkish" data-act="goto-thread" data-tid="${esc(x.id)}">${esc(x.name)}</button>`).join('、')}</span>` : ''}
-        ${th.mergedInto ? `<span>${esc(t('mergedInto'))} <button class="linkish" data-act="goto-thread" data-tid="${esc(th.mergedInto)}">${esc(getThread(th.mergedInto).name)}</button></span>` : ''}
+        ${th.mergedInto ? `<span>${esc(t('mergedInto'))} <button class="linkish" data-act="goto-thread" data-tid="${esc(th.mergedInto)}">${esc(getThread(th.mergedInto).name)}</button>${SERVER ? ` · <button class="linkish" data-act="unmerge" title="${esc(t('unmergeTitle'))}">${esc(t('unmergeBtn'))}</button>` : ''}</span>` : ''}
       </div>`}
       ${lineSessions(th.id)}
       <div class="sec-label">${esc(t('stations'))}</div>
@@ -4339,8 +4327,8 @@ function threadDetail(th) {
         ${!isInbox && !th.group && th.status !== 'merged' ? `<button class="btn" data-act="t-archive">${esc(t('archiveBtn'))}</button>` : ''}
         ${!isInbox ? `<button class="btn" data-act="agent-prompt" title="${esc(t('agentPromptTitle'))}">${esc(t('agentAsk'))}</button>` : ''}
         ${!isInbox && SERVER && !S.remote ? (S.ui.retro ? retroRangeForm(th.id) : `<button class="btn" data-act="retro" title="${esc(t('retroTitle'))}" ${S.retroBusy ? 'disabled' : ''}>${esc(S.retroBusy === th.id ? t('retroRunning') : t('retro'))}</button>`) : ''}
-        ${!isInbox && th.status !== 'merged' ? (S.ui.merge
-          ? `<div class="inline-form"><select id="t-merge">${threadOptions(th.parent && th.parent !== th.id ? th.parent : INBOX, { excludeId: th.id, onlyOpen: true })}</select><button class="btn btn-primary" data-act="merge">${esc(t('merge'))}</button><button class="btn" data-act="merge-cancel">${esc(t('cancel'))}</button></div>`
+        ${!isInbox && SERVER && th.status !== 'merged' ? (S.ui.merge
+          ? `<div class="inline-form"><select id="t-merge">${threadOptions(th.parent && th.parent !== th.id ? th.parent : '', { excludeId: th.id, onlyOpen: true, noInbox: true })}</select><button class="btn btn-primary" data-act="merge">${esc(t('merge'))}</button><button class="btn" data-act="merge-cancel">${esc(t('cancel'))}</button></div>`
           : `<button class="btn" data-act="merge-open">${esc(t('mergeTo'))}</button>`) : ''}
         ${!isInbox ? `<span class="spacer"></span>${S.ui.del ? delUI(t('delThreadQ')) : `<button class="btn btn-quiet-danger" data-act="del-open">${esc(t('delThread'))}</button>`}` : ''}
       </div>
@@ -4422,7 +4410,7 @@ detail.addEventListener('change', e => {
   if (s.type === 'live' && el.id === 'l-thread') { bindLive(s.id, el.value); el.blur(); return; }
   if (s.type === 'group' && el.id === 'g-name') { // rename: every line of the group gets the new name
     const name = el.value.trim();
-    if (name && name !== s.id) { setGroup(orderedThreads().filter(th => th.group === s.id).map(th => th.id), name); S.sel = { type: 'group', id: name }; render(); }
+    if (!name || name === s.id) { S.ui = {}; render(); } else if (groupNames().includes(name)) { S.ui = { gJoin: name }; render(); } else regroupLines(s.id, name);
     return;
   }
   if (s.type !== 'commit') return;
@@ -4444,7 +4432,7 @@ detail.addEventListener('click', e => {
   if (handClick(e)) return;
   const b = e.target.closest('[data-act]'); if (!b) return;
   const act = b.dataset.act, s = S.sel;
-  const writeActs = ['star', 'detach', 'fork-open', 'fork-create', 'del-open', 'del-confirm', 'status', 'color', 'merge-open', 'merge', 'label', 'flip', 'g-arrange', 'g-ungroup'];
+  const writeActs = ['star', 'detach', 'fork-open', 'fork-create', 'del-open', 'del-confirm', 'status', 'color', 'merge-open', 'merge', 'unmerge', 'label', 'flip', 'g-arrange', 'g-ungroup', 'g-join'];
   if (writeActs.includes(act) && !canWrite()) return;
   switch (act) {
     case 'close': select(null); break;
@@ -4487,7 +4475,9 @@ detail.addEventListener('click', e => {
     case 'g-fold': setFold(s.id, true); toast(t('tFolded', s.id)); break;
     case 'g-archive': S.archiveGroup = s.id; S.archiveLine = null; openSheet('archive'); break;
     case 't-archive': S.archiveGroup = getThread(s.id).name; S.archiveLine = s.id; openSheet('archive'); break;
-    case 'g-ungroup': setGroup(orderedThreads().filter(th => th.group === s.id).map(th => th.id), ''); select(null); toast(t('tUngrouped')); break;
+    case 'g-ungroup': regroupLines(s.id, ''); break;
+    case 'g-join': regroupLines(s.id, S.ui.gJoin); break;
+    case 'g-join-cancel': S.ui = {}; render(); break;
     case 'goto-live': select({ type: 'live', id: b.dataset.sid }); break;
     case 'copy-cmd': copyText(b.dataset.cmd); break;
     case 'focus-term': focusTerm(b.dataset.sid); break;
@@ -4527,11 +4517,13 @@ detail.addEventListener('click', e => {
       select(null); toast(t('tDeleted')); break;
     case 'status':
       if (b.dataset.status === 'done' && getThread(s.id).status !== 'done') { S.wrapLine = s.id; openSheet('wrap'); break; }
+      if (getThread(s.id).status === 'merged') { if (SERVER) unmerge(s.id).then(th => { if (th && b.dataset.status !== getThread(s.id).status) patchDoc('threads', s.id, { status: b.dataset.status }, 0); }); break; }
       patchDoc('threads', s.id, { status: b.dataset.status }, 0); break;
+    case 'unmerge': unmerge(s.id); break;
     case 'color': patchDoc('threads', s.id, { color: b.dataset.color }, 0); break;
     case 'capture-here': setCaptureThread(s.id); $('#cap-text').focus(); break;
     case 'merge-open': S.ui = { merge: true }; render(); break;
-    case 'merge': mergeThread(s.id, $('#t-merge').value); S.ui = {}; render(); break;
+    case 'merge': if ($('#t-merge').value) mergeThread(s.id, $('#t-merge').value); S.ui = {}; render(); break;
     case 'label': patchDoc('edges', s.id, { label: b.dataset.label }, 0); lastKey = ''; render(); break;
     case 'flip': { const ed = S.edges.get(s.id); if (ed) patchDoc('edges', s.id, { from: ed.to, to: ed.from }, 0); break; }
   }
@@ -5565,7 +5557,7 @@ function aiSuggestions(res) {
   const arr = k => (Array.isArray(res[k]) ? res[k] : []).filter(x => x && typeof x === 'object');
   const active = id => S.threads.has(id) && !['merged'].includes(S.threads.get(id).status);
   return [
-    ...arr('merge').filter(m => m.from !== m.into && active(m.from) && active(m.into)).map(m => ({ key: `m:${m.from}`, type: 'merge', from: m.from, into: m.into, why: m.why })),
+    ...arr('merge').filter(m => SERVER && m.from !== m.into && active(m.from) && active(m.into)).map(m => ({ key: `m:${m.from}`, type: 'merge', from: m.from, into: m.into, why: m.why })),
     ...arr('wrap').filter(w => ['done', 'parked'].includes(w.status) && active(w.thread) && S.threads.get(w.thread).status === 'active' && !liveOn(w.thread).length).map(w => ({ key: `w:${w.thread}`, type: 'wrap', thread: w.thread, status: w.status, why: w.why })),
     ...arr('todos').filter(x => S.commits.has(x.task) && isTodo(S.commits.get(x.task)) && !S.commits.get(x.task).done).map(x => ({ key: `t:${x.task}`, type: 'todo', task: x.task, why: x.why })),
   ];
@@ -5593,11 +5585,8 @@ function renderAI() {
 function aiDo(g) {
   if (!canWrite()) return;
   if (g.type === 'merge') {
-    const s = S.threads.get(g.from), prev = { status: s.status, mergedInto: s.mergedInto || null };
-    const sTip = lastCommit(g.from), tTip = lastCommit(g.into);
-    const m = addCommit({ thread: g.into, kind: 'merge', title: t('mergeTitle', s.name), parents: [tTip && tTip.id, sTip && sTip.id].filter(Boolean), ts: Math.max(Date.now(), sTip ? sTip.ts + 1 : 0), extra: { mergeOf: g.from } });
-    patchDoc('threads', g.from, { status: 'merged', mergedInto: g.into }, 0);
-    S.ai.undo.set(g.key, () => { removeDoc('commits', m.id); patchDoc('threads', g.from, prev, 0); });
+    mergeThread(g.from, g.into).then(th => { if (th) { S.ai.undo.set(g.key, () => unmerge(g.from)); if (S.sheet === 'ai') renderAI(); } });
+    return;
   } else if (g.type === 'wrap') {
     const prev = S.threads.get(g.thread).status;
     patchDoc('threads', g.thread, { status: g.status }, 0);

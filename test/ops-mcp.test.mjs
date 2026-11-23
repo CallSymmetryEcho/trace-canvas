@@ -6,8 +6,8 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseTranscript, encodeProjectDir, findTranscript } from '../src/transcript.mjs';
-import { captureSession, mergeThreads, mergeDataset, listThreads } from '../src/ops.mjs';
-import { emptyData, addCommit, createThread } from '../src/store.mjs';
+import { captureSession, mergeThreads, unmergeThread, mergeDataset, listThreads } from '../src/ops.mjs';
+import { emptyData, addCommit, createThread, settleMerged } from '../src/store.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const FIX_A = path.join(here, 'fixtures', 'session-a.jsonl');
@@ -222,4 +222,62 @@ test('a link logged as a path relative to the session folder is kept as the full
   fs.mkdirSync(path.join(dir, 'notes')); fs.writeFileSync(path.join(dir, 'notes', 'reading_list.md'), '# x');
   assert.deepEqual(fullLinks(['notes/reading_list.md', 'https://x.com/a', 'claude --resume abc', 'gone.md', '/abs/x.md'], dir),
     [path.join(dir, 'notes', 'reading_list.md'), 'https://x.com/a', 'claude --resume abc', 'gone.md', '/abs/x.md']);
+});
+
+// warden 2026-11-23 (groups-merge): the four merges that went wrong on the page, as rules of mergeThreads.
+test('a merge is refused when it would make a circle, or goes into the inbox or a merged line', () => {
+  const d = emptyData();
+  const [a, b, n, m] = ['A', 'B', 'N', 'M'].map(name => createThread(d, { name }));
+  mergeThreads(d, { sources: [a.id, b.id], target: n.id }, env);
+  const before = structuredClone(d);
+  assert.throws(() => mergeThreads(d, { sources: [n.id], target: a.id }, env), /circle/);
+  assert.throws(() => mergeThreads(d, { sources: [m.id], target: a.id }, env), /merge into that line instead/);
+  assert.throws(() => mergeThreads(d, { sources: [m.id], target: 'inbox' }, env), /inbox/i);
+  assert.deepEqual(d, before, 'a refused merge changes nothing');
+});
+
+test('lines of one group merged into a new line: the new line is in that group, and so are they', () => {
+  const d = emptyData();
+  const [a, b, c] = ['A', 'B', 'C'].map(name => createThread(d, { name, extra: { group: 'G1' } }));
+  c.group = 'G2';
+  const n = mergeThreads(d, { sources: [a.id, b.id], newName: 'N' }, env).target;
+  settleMerged(d);
+  assert.deepEqual([n.group, a.group, b.group], ['G1', 'G1', 'G1']);
+  const mixed = mergeThreads(d, { sources: [n.id, c.id], newName: 'Mixed' }, env).target;
+  assert.equal(mixed.group, undefined, 'lines of two groups: the new line is in none');
+});
+
+test('undoing a merge puts everything back: status, group, the link, the merge record, to-dos and sessions', () => {
+  const d = emptyData();
+  const src = createThread(d, { name: 'D', extra: { group: 'G2' } }), into = createThread(d, { name: 'E' });
+  src.status = 'parked';
+  addCommit(d, { thread: into.id, kind: 'note', title: 'on E' });
+  const todo = addCommit(d, { thread: src.id, kind: 'task', title: 'open on D' });
+  d.sessions = { s1: { id: 's1', thread: src.id } };
+  settleMerged(d);
+  const before = structuredClone(d);
+
+  mergeThreads(d, { sources: [src.id], target: into.id }, env);
+  settleMerged(d);
+  const later = addCommit(d, { thread: into.id, kind: 'note', title: 'after the merge' });
+  assert.deepEqual([src.status, src.mergedInto, src.group, todo.thread, d.sessions.s1.thread], ['merged', into.id, undefined, into.id, into.id]);
+
+  unmergeThread(d, src.id);
+  settleMerged(d);
+  assert.ok(!Object.values(d.commits).some(c => c.kind === 'merge'), 'no merge record is left on the target');
+  assert.ok(d.commits[later.parents[0]] && d.commits[later.parents[0]].title === 'on E', 'what was logged after it hangs on the record before it');
+  delete d.commits[later.id]; delete d.sessions.s1.mergedNote;
+  assert.deepEqual(d, before);
+
+  // A line the merge itself made goes with the undo of its last source.
+  const n = mergeThreads(d, { sources: [src.id, into.id], newName: 'N' }, env).target;
+  settleMerged(d);
+  assert.equal(todo.thread, n.id, 'the open to-do went along');
+  unmergeThread(d, src.id);
+  assert.ok(d.threads[n.id], 'one line is still merged into it');
+  unmergeThread(d, into.id);
+  settleMerged(d);
+  assert.equal(d.threads[n.id], undefined);
+  assert.equal(todo.thread, src.id, 'and is back on its line');
+  assert.throws(() => unmergeThread(d, into.id), /not a merged line/);
 });

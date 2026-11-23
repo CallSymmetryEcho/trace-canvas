@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Merging is done in one place, with checks, and can be undone.** The page had its own copy of the merge rules and it had drifted from the server's. The page now asks the server (`/api/merge`, `/api/unmerge`), as MCP and the command line do. A merge into the inbox or into a line that is itself merged is refused, so lines can no longer be merged into a circle and vanish. Lines of one group merged into a new line stay in that group, and so does the new line. A merged line's panel has **Undo the merge**: its status, its group and its to-dos are as before and the merge record is gone; a line the merge itself made goes once nothing is left on it. Clicking a status on a merged line does the same. The panel's "Merge into…" no longer offers the inbox. Deleting a line gives the lines merged into it back as they were, not as done. Without a server (the page on browser storage or an artifact database) merging is not offered any more.
+
+- **A group rename onto another group's name asks first, and can be undone.** It used to join the two groups without a word. Renaming, joining and dissolving a group each show Undo. The multi-select banner no longer lies over the first row of cards: the cards under it move down while it is open.
+
 - **Goals keeps up while you type.** The list used to hold still as long as a box had the cursor, so new to-dos waited until you clicked away. It now redraws under you and puts the box back as it was: its text, the focus and the caret. Only a word being composed with an input method holds it still.
 
 - **A terminal that fails to open is reported, and a sync failing for over an hour shows at the top.** On Linux a terminal counted as opened even when it ended at once with an error.

@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { COLS, addCommit, dataFile, home, mutate, readConfig, readData, regroup, toArrays, writeConfig } from './store.mjs';
 import { demoData } from './demo.mjs';
 import { liveDir, readLive, withCodexTerm } from './live.mjs';
-import { agentContext, lineAgent, awayCache, bindLiveSession, findThreadLoose, handTo, liveSessions, sessionList, startAutopilot, stopAutopilot, threadSessions } from './ops.mjs';
+import { agentContext, lineAgent, awayCache, bindLiveSession, findThreadLoose, handTo, liveSessions, mergeThreads, unmergeThread, sessionList, startAutopilot, stopAutopilot, threadSessions } from './ops.mjs';
 import { applyRetro, askAgent, retroRecord, runRetro } from './retro.mjs';
 import { AGENTS, deliverRow, focusTab, openTerminal, terminalCommand } from './agents.mjs';
 import { draftLessons, rememberLesson } from './lessons.mjs';
@@ -200,6 +200,17 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
           if (was && (was.group || '') !== (doc.group || '')) regroup(d, id, was.group || '', doc.group || '');
         });
         return send(res, 200, { ok: true });
+      }
+      // Merging and undoing a merge are done here only, so the page, MCP and the command line share one set of checks.
+      if (req.method === 'POST' && (p === '/api/merge' || p === '/api/unmerge')) {
+        const body = JSON.parse(await readBody(req));
+        try {
+          const r = mutate(d => (p === '/api/merge'
+            ? mergeThreads(d, { sources: (body.sources || []).map(String), target: body.target ? String(body.target) : undefined, newName: body.newName ? String(body.newName) : undefined, mode: 'merge' })
+            : unmergeThread(d, String(body.thread || ''))));
+          const th = r.target || r.thread;
+          return send(res, 200, { ok: true, thread: { id: th.id, name: th.name } });
+        } catch (e) { return send(res, 400, { error: String(e.message || e) }); }
       }
       // Open in Terminal: the command is built here from the to-do, never taken from the request.
       if (req.method === 'POST' && p === '/api/hand') {

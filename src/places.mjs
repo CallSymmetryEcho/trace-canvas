@@ -90,12 +90,16 @@ export function addPlace(d, { thread, root, machine = '', role, dir, on = '', ag
 
 // Paths a record names that are files of the project: its links that are paths and the files it changed. Conversations
 // (~/.claude, ~/.codex) and the canvas's own data are not project files.
-const NOT_PROJECT = /\/\.(claude|codex|gemini|trace-canvas)\//;
+const NOT_PROJECT = /\/\.(claude|codex|gemini|trace-canvas)\/|^\/(private\/)?tmp\/claude-\d+\//; // nor are an agent's scratch files (Claude Code's scratchpad under /tmp)
 function pathsOf(d, c) {
-  const s = (d.sessions || {})[c.session], base = c.root || (s && s.cwd) || '';
   const out = (c.links || []).map(l => String(l).trim()).filter(l => /^[/~]/.test(l) && !/\s/.test(l));
-  if (base) for (const f of c.files || []) out.push(path.isAbsolute(f) ? f : path.posix.join(base, f));
-  return [...new Set(out.map(home))].filter(p => !NOT_PROJECT.test(p));
+  // A changed file is listed from the root its record keeps. An older record kept none (its files were listed from the
+  // repository's root, which is not always the session's folder): those cannot be placed, so they are not judged.
+  for (const f of c.files || []) if (path.isAbsolute(f)) out.push(f); else if (c.root) out.push(path.posix.join(c.root, f));
+  // Under another person's or machine's home folder (/Users/ann on a Linux machine): written elsewhere, whatever the
+  // record says about its machine (older records say nothing).
+  const mine = p => { const h = (/^\/(?:Users|home)\/[^/]+/.exec(p) || [])[0]; return !h || h === os.homedir(); };
+  return [...new Set(out.map(home))].filter(p => !NOT_PROJECT.test(p) && mine(p));
 }
 
 /**

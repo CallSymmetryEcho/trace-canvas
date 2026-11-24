@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Merged lines stay on the canvas, a size smaller.** A line merged into another used to lose its card (0.3.0 folded it into the target's), which read as the line being gone. It is now shown where it was as a small dotted chip with its name and "Merged", its merge line running to the target; ▸ on the chip shows its stations. **More → Hide → Merged** still folds them into their targets' cards (the chips fade out, and grow back in). Shown is the default for a browser that never set it.
+
 - **Branches keeps merged lines when finished threads are hidden.** With **Hide finished threads** on, a merged line was taken out of Branches as well: the merge row stood alone and the line looked deleted. A merged line is now drawn whenever the line it went into is.
 
 - **Four findings from Codex's audit.** Undoing the last merge into a line the merge made no longer deletes that line when a goal or a note was written on it (the goal went with it, with no warning). A turn that writes files in two repositories lists both: the second repository's files keep their full path, and both open in the reader (only the last repository's files were kept). A canvas card with keyboard focus keeps it when a record from another tab or an agent redraws the canvas. Grouping lines picked on the canvas has Undo in its toast: each line goes back to the group it had, or to none.

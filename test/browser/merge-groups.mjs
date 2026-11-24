@@ -112,7 +112,7 @@ out.groupUndone = await groupsOf(); assert.deepEqual(out.groupUndone, was);
 await call('Page.reload'); await wait(2500);
 assert.deepEqual(await groupsOf(), was, 'and after a reload');
 
-// Branches draws a merged line whenever the line it went into is drawn, also with "Hide finished threads" on
+// Branches draws a merged line by More → Hide → Merged alone, also with "Hide finished threads" on
 // (2026-11-24: the merge row was left with no line leading to it, and the merged history could not be seen).
 await ev(`fetch('/api/docs/commits/kept1', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Trace-Canvas': '1' }, body: JSON.stringify({ id: 'kept1', thread: ${JSON.stringify(picks[0].id)}, kind: 'note', title: 'A note that stays on the merged line', body: '', ts: Date.now(), parents: [], links: [] }) }).then(r => r.status)`);
 await post('/api/merge', { sources: [picks[0].id], target: picks[1].id });
@@ -120,6 +120,13 @@ await ev(`localStorage.setItem('tc.hideDone', 'true')`); await call('Page.reload
 await ev(`document.querySelector('#tab-git').click()`); await wait(800);
 out.mergedInBranches = await ev(`!!document.querySelector('#git-body [data-cid="kept1"]')`);
 assert.equal(out.mergedInBranches, true, 'the merged line has its rows in Branches');
+// More → Hide → Merged is what takes it out of Branches; the canvas keeps "N merged in" on the target's card either way.
+await ev(`localStorage.setItem('tc.showMerged', 'false')`); await call('Page.reload'); await wait(2500);
+await ev(`document.querySelector('#tab-canvas').click()`); await wait(800);
+assert.equal(await ev(`!!document.querySelector('#cv-cards .card[data-tid="${picks[1].id}"] [data-merged-tog]')`), true, 'the card offers its merged lines');
+assert.equal(await ev(`!!document.querySelector('#cv-cards .card[data-tid="${picks[0].id}"]')`), false, 'a merged line has no card until they are opened');
+await ev(`document.querySelector('#tab-git').click()`); await wait(800);
+assert.equal(await ev(`!!document.querySelector('#git-body [data-cid="kept1"]')`), false, 'hidden with the switch');
 
 console.log(JSON.stringify(out, null, 1));
 if (shot) { const s = await call('Page.captureScreenshot'); (await import('node:fs')).writeFileSync(shot, Buffer.from(s.result.data, 'base64')); }

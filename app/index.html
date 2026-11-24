@@ -238,14 +238,16 @@ main { flex: 1 1 auto; position: relative; min-height: 0; }
 .card.is-shut { width: auto; max-width: 252px; border-style: dashed; opacity: .75; }
 .card.is-shut .strip, .card.is-shut .card-foot { display: none; }
 .card.is-shut .card-head { padding-bottom: 10px; }
-.card.is-shut.st-merged { font-size: 12px; opacity: .62; border-style: dotted; box-shadow: none; }
-.card.is-shut.st-merged .card-head { padding: 5px 8px 5px 10px; } .card.is-shut.st-merged:hover, .card.is-shut.st-merged.is-sel { opacity: 1; }
-.merged-in .card.st-merged { animation: merged-in .32s ease-out both; } .merged-out .card.st-merged { opacity: 0; transform: scale(.9); transition: opacity .18s, transform .18s; }
-@keyframes merged-in { from { opacity: 0; transform: scale(.85); } }
-@media (prefers-reduced-motion: reduce) { .merged-in .card.st-merged { animation: none; } }
 /* A folded line opened to look at floats over its neighbours until folded again. */
 .card.is-peek { z-index: 6; box-shadow: var(--shadow); }
-.card .mi-tog { font: inherit; color: inherit; text-decoration: underline dotted; text-underline-offset: 2px; }
+.card .mi-tog { font: inherit; color: var(--ink); margin-left: 4px; padding: 1px 8px; border: 1px solid var(--rule); border-radius: 999px; background: var(--surface-2); cursor: pointer; }
+.card-foot > span:last-child { white-space: nowrap; }
+.card .mi-tog:hover, .card .mi-tog[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
+.mi-list { display: grid; gap: 6px; margin: 6px 0 4px; }
+.mi-cell { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--rule); border-left: 4px solid var(--c); border-radius: 10px; background: var(--surface-2); }
+.mi-cell .mi-go { all: unset; cursor: pointer; min-width: 0; display: grid; gap: 2px; } .mi-cell .mi-go:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.mi-cell .mi-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .mi-cell .mi-go:hover .mi-name { text-decoration: underline; }
+.mi-cell .mi-sub { font-size: 12px; color: var(--muted); }
 /* A done line folds too, in the ok colour with a check, so it reads apart from a parked (dashed, grey) one. */
 .card.is-shut.st-done { border-style: solid; border-color: var(--ok); }
 .card.st-done .card-name::before { content: '✓ '; color: var(--ok); }
@@ -1341,7 +1343,7 @@ const I18N = {
     exChip: 'Example data', exClear: 'Clear', exChipTitle: 'Records added to show how the views work',
     searchPh: 'Search; # picks a field', sc_thread: 'line', sc_title: 'title', sc_body: 'body', sc_kind: 'type', sc_links: 'links', scHint_thread: 'line names, groups and folders only', scHint_title: 'record titles only', scHint_body: 'record details only', scHint_kind: 'by type: idea, to-do, decision…', scHint_links: 'linked files and addresses only', aiBtn: 'AI tidy-up', aiBtnTitle: 'Claude reads every line and suggests merges, lines to wrap up and to-dos already done; you click each one',
     langGroup: 'Language', more: 'More',
-    menuNewThread: 'New thread', menuHideDone: 'Hide finished threads', menuShowDone: 'Show finished threads', quietLabel: 'Gone quiet', quietDays: n => `${n}d`, quietDot: n => `${n} line${n === 1 ? ' has' : 's have'} gone quiet`, quietAsk: (n, u) => `Nothing for ${n} days, where it usually moves every ${u === 1 ? 'day' : `${u} days`}. Finished?`, quietAskOpen: (n, k) => `Nothing for ${n} days, with ${k} to-do${k === 1 ? '' : 's'} still open. Park it for now?`, quietStill: 'Still on it', menuShowMerged: 'Show merged threads', menuHideMerged: 'Fold merged threads', menuShow: 'Hide', chipDone: 'Finished', chipMerged: 'Merged', menuThemeL: 'Theme', menuMachines: 'Other computers', chipSync: 'Sync now', chipAway: 'Show their sessions', menuDetach: 'New agents', chipDetach: 'Run in the background (tmux)', tDetach: on => on ? 'Agents that dispatch and Autopilot start on this computer now run in a background tmux session: they start with nobody here and keep going when the window closes' : 'Agents that dispatch and Autopilot start on this computer open in a terminal tab (in the background only when no terminal can open)', chipAwayGit: 'Read their changes over ssh', menuHelpL: 'Help', chipHelp: 'Shortcuts and how-to', peekOpen: 'Show its stations (it stays finished)', peekOpenParked: 'Show its stations (it stays parked)', peekOpenMerged: 'Show its stations (it stays merged)', peekClose: 'Fold it again', mergedOpen: 'Show the lines merged into it', mergedClose: 'Fold them again', mergedInCount: n => ` · ${n} merged in`, mergedInLabel: 'Merged in',
+    menuNewThread: 'New thread', menuHideDone: 'Hide finished threads', menuShowDone: 'Show finished threads', quietLabel: 'Gone quiet', quietDays: n => `${n}d`, quietDot: n => `${n} line${n === 1 ? ' has' : 's have'} gone quiet`, quietAsk: (n, u) => `Nothing for ${n} days, where it usually moves every ${u === 1 ? 'day' : `${u} days`}. Finished?`, quietAskOpen: (n, k) => `Nothing for ${n} days, with ${k} to-do${k === 1 ? '' : 's'} still open. Park it for now?`, quietStill: 'Still on it', menuShowMerged: 'Show merged threads', menuHideMerged: 'Fold merged threads', menuShow: 'Hide', chipDone: 'Finished', chipMerged: 'Merged', menuThemeL: 'Theme', menuMachines: 'Other computers', chipSync: 'Sync now', chipAway: 'Show their sessions', menuDetach: 'New agents', chipDetach: 'Run in the background (tmux)', tDetach: on => on ? 'Agents that dispatch and Autopilot start on this computer now run in a background tmux session: they start with nobody here and keep going when the window closes' : 'Agents that dispatch and Autopilot start on this computer open in a terminal tab (in the background only when no terminal can open)', chipAwayGit: 'Read their changes over ssh', menuHelpL: 'Help', chipHelp: 'Shortcuts and how-to', peekOpen: 'Show its stations (it stays finished)', peekOpenParked: 'Show its stations (it stays parked)', peekClose: 'Fold it again', mergedOpen: 'Show the lines merged into it', mergedClose: 'Fold them again', mergedInCount: n => `${n} merged in`, mergedUnfold: 'show', mergedFold: 'fold', mergedAt: d => `merged ${d}`, mergedInLabel: 'Merged in',
     arrange: 'Arrange', arrangeTitle: 'Lay the lines out by group, forks next to the lines they came from', tArranged: 'Arranged', tUndo: 'Undo',
     groupLabel: 'Group', groupName: 'Name', groupLines: 'Lines in this group', groupCount: n => `${n} line${n === 1 ? '' : 's'}`, groupArrange: 'Arrange this group', groupFocus: 'Focus on this group', menuFocus: 'Focus and fold groups…', menuTheme: n => `Theme: ${n}`, theme_auto: 'match the system', theme_light: 'light', theme_dark: 'dark', theme_mist: 'mist', focusTitle: 'Focus on a group', focusLabel: 'Focus', focusPick: 'Change', focusExit: 'Leave focus', groupFold: 'Fold this group', foldedLabel: 'Folded', foldOpenAll: 'Unfold all', foldOpen: 'Unfold', foldedChip: n => `${n} line${n === 1 ? '' : 's'} · folded`, fromMachines: ms => `from ${ms.join(', ')}`, fromTitle: (m, n) => `${n} record${n === 1 ? '' : 's'} written on ${m}`, foldTitle: 'Fold groups', foldIntro: 'Folded groups stay out of every view (the canvas keeps a small chip for each) until you unfold them. Focus still works on any group.', foldShown: 'Shown', tFolded: g => `Folded "${g}"`, unpark: 'Unfold: make it active again', histBtn: 'History', histBack: '← Back to the workspace', histTitle: 'Finished projects, archived', histSub: 'Projects you finished, one plaque each.', histProjects: 'projects', histLines: 'lines', histOpenLine: 'Open this line', histStations: 'stations', histDecisions: 'decisions', histSessions: 'sessions', histDays: n => `${n} day${n === 1 ? '' : 's'}`, histArchived: 'Archived', histArchivedOn: d => `Archived ${d}`, histRestore: 'Restore', histReplay: 'Replay', histLessons: 'Draw lessons', histLessonsMore: 'More lessons', histLessonsN: n => `${n} lesson${n === 1 ? '' : 's'} remembered`, lsHead: g => `Lessons from "${g}"`, lsWait: 'Your local claude is reading the decisions and wrap-ups of the project\'s finished lines… (a minute or two)', lsNone: 'Nothing worth keeping came out of it.', lsP: 'Tick the ones worth keeping: they go to long-term memory (Theatrum), and a new line that fits gets them when it starts. Unticked ones are dropped.', lsSave: 'Remember the ticked ones', lsPickOne: 'Tick at least one', lsSaved: n => `${n} lesson${n === 1 ? '' : 's'} remembered`, lsSomeFailed: (n, e) => `${n} remembered; the rest failed: ${e}`, histPlay: 'Play', histPause: 'Pause', histAgain: 'Play again', histEmptyHead: 'Nothing on the wall yet', histEmpty: 'A line you mark done comes here, under its group (a line in no group as a project of its own). When a whole project is finished, open its group and press Archive this project.', archiveBtn: 'Archive this project', archiveHead: g => `Archive "${g}"`, archiveP: 'Its lines leave every view, the live bar and dispatch, and the project gets a plaque on the History wall. Restore brings it back.', archiveOpen: n => `${n} to-do${n === 1 ? '' : 's'} still open`, archiveLive: n => `${n} session${n === 1 ? '' : 's'} still running`, archiveClean: 'Nothing open or running: ready for the wall.', archiveGo: 'Archive', tArchived: g => `"${g}" is on the History wall`, tRestored: g => `"${g}" is back in the workspace`, apTick: x => `Autopilot · working on: ${x}`, apTickIdle: 'Autopilot · stopped to ask: answer it in its session', reopen: 'Unfold: reopen it', wrapHead: 'Wrap up this line', wrapP: 'A done line leaves the workspace for History. This wrap-up becomes its last station; edit it first.', wrapSave: 'Save and mark done', wrapSkip: 'Done, no wrap-up', wrapSolo: 'This line is in no group, so it also goes on the History wall as a project of its own.', wrapGroup: g => `It also goes into History, under its group "${g}"; the group's other lines stay in the workspace.`, tLineArchived: (n, g) => `"${n}" is in History, under "${g}"`, histOngoing: 'In progress', wrapRec: n => `Wrap-up: ${n}`, wrapGoal: 'Goal: ', wrapSpan: (a, b, n, s) => `${a} – ${b} · ${n} records · ${s} sessions`, wrapDec: 'Key decisions:', wrapTodos: (d, n) => `To-dos done: ${d}/${n}`, wrapOpen: 'Left open:', wrapOut: 'Outputs and where they are kept:\n- ', tUnparked: n => `"${n}" is active again`,
     focusIntro: 'Every view then shows only the lines of the group you pick: the canvas, the branches, the timeline and the goals. It stays on, also after a reload, until you leave it.',
@@ -1523,7 +1525,7 @@ kind can be agent, idea, task, decision or note. Use a short thread name and kee
     exChip: '示例数据', exClear: '清除', exChipTitle: '这些是演示各个视图用的示例数据',
     searchPh: '搜索；输入 # 选范围', sc_thread: '线路', sc_title: '标题', sc_body: '正文', sc_kind: '类型', sc_links: '链接', scHint_thread: '只搜线路名、分组和文件夹', scHint_title: '只搜记录标题', scHint_body: '只搜记录详情', scHint_kind: '按类型：想法、待办、决策…', scHint_links: '只搜链接的文件和网址', aiBtn: 'AI 梳理', aiBtnTitle: 'Claude 通看所有线路，建议合并、收尾和勾掉已做完的待办，每条由你点了才做',
     langGroup: '语言', more: '更多',
-    menuNewThread: '新建线程', menuHideDone: '隐藏已完成的线程', menuShowDone: '显示已完成的线程', quietLabel: '安静了', quietDays: n => `${n} 天`, quietDot: n => `${n} 条线安静了`, quietAsk: (n, u) => `${n} 天没动静，平时${u === 1 ? '每天' : ` ${u} 天`}一更。做完了吗？`, quietAskOpen: (n, k) => `${n} 天没动静，还有 ${k} 项待办。先搁置？`, quietStill: '还在做', menuShowMerged: '显示已合并的线程', menuHideMerged: '收起已合并的线程', menuShow: '隐藏', chipDone: '已完成', chipMerged: '已合并', menuThemeL: '主题', menuMachines: '其他电脑', chipSync: '立即同步', chipAway: '显示它们的会话', menuDetach: '新开的 agent', chipDetach: '在后台运行（tmux）', tDetach: on => on ? '分派和 Autopilot 在这台电脑上开的 agent 改在后台 tmux 会话里运行：没人在也能启动，关掉窗口照常跑' : '分派和 Autopilot 在这台电脑上开的 agent 在终端标签里打开（开不了终端时才进后台）', chipAwayGit: '通过 ssh 读它们的改动', menuHelpL: '帮助', chipHelp: '快捷键与用法', peekOpen: '展开看看（仍是已完成）', peekOpenParked: '展开看看（仍是搁置）', peekOpenMerged: '展开看看（仍是已合并）', peekClose: '收起', mergedOpen: '展开并入这条线的线程', mergedClose: '收起', mergedInCount: n => ` · 已并入 ${n} 条`, mergedInLabel: '已并入',
+    menuNewThread: '新建线程', menuHideDone: '隐藏已完成的线程', menuShowDone: '显示已完成的线程', quietLabel: '安静了', quietDays: n => `${n} 天`, quietDot: n => `${n} 条线安静了`, quietAsk: (n, u) => `${n} 天没动静，平时${u === 1 ? '每天' : ` ${u} 天`}一更。做完了吗？`, quietAskOpen: (n, k) => `${n} 天没动静，还有 ${k} 项待办。先搁置？`, quietStill: '还在做', menuShowMerged: '显示已合并的线程', menuHideMerged: '收起已合并的线程', menuShow: '隐藏', chipDone: '已完成', chipMerged: '已合并', menuThemeL: '主题', menuMachines: '其他电脑', chipSync: '立即同步', chipAway: '显示它们的会话', menuDetach: '新开的 agent', chipDetach: '在后台运行（tmux）', tDetach: on => on ? '分派和 Autopilot 在这台电脑上开的 agent 改在后台 tmux 会话里运行：没人在也能启动，关掉窗口照常跑' : '分派和 Autopilot 在这台电脑上开的 agent 在终端标签里打开（开不了终端时才进后台）', chipAwayGit: '通过 ssh 读它们的改动', menuHelpL: '帮助', chipHelp: '快捷键与用法', peekOpen: '展开看看（仍是已完成）', peekOpenParked: '展开看看（仍是搁置）', peekClose: '收起', mergedOpen: '展开并入这条线的线程', mergedClose: '收起', mergedInCount: n => `已并入 ${n} 条`, mergedUnfold: '展开', mergedFold: '收起', mergedAt: d => `${d} 并入`, mergedInLabel: '已并入',
     arrange: '整理', arrangeTitle: '按分组排好线程，分叉排在原线旁边', tArranged: '已整理', tUndo: '撤销',
     groupLabel: '分组', groupName: '名称', groupLines: '组里的线', groupCount: n => `${n} 条线`, groupArrange: '整理这一组', groupFocus: '专注这一组', menuFocus: '专注与折叠分组…', menuTheme: n => `主题：${n}`, theme_auto: '跟随系统', theme_light: '浅色', theme_dark: '深色', theme_mist: '雾蓝', focusTitle: '专注模式', focusLabel: '专注', focusPick: '换一个', focusExit: '退出专注', groupFold: '折叠这一组', foldedLabel: '已折叠', foldOpenAll: '全部展开', foldOpen: '展开', foldedChip: n => `${n} 条线 · 已折叠`, fromMachines: ms => `来自 ${ms.join('、')}`, fromTitle: (m, n) => `${n} 条记录写在 ${m} 上`, foldTitle: '折叠分组', foldIntro: '折叠的分组不会出现在任何视图里（画布上只留一个小条），直到你展开。专注仍然可以选任何分组。', foldShown: '显示中', tFolded: g => `已折叠「${g}」`, unpark: '展开：恢复为进行中', histBtn: '历史', histBack: '← 回到工作区', histTitle: '做完并归档的项目', histSub: '做完的项目，一个项目一块牌子。', histProjects: '个项目', histLines: '条线', histOpenLine: '打开这条线', histStations: '站', histDecisions: '个决定', histSessions: '个会话', histDays: n => `${n} 天`, histArchived: '已归档', histArchivedOn: d => `归档于 ${d}`, histRestore: '恢复', histReplay: '回放', histLessons: '提炼经验', histLessonsMore: '再提炼', histLessonsN: n => `${n} 条经验已记住`, lsHead: g => `从「${g}」学到的`, lsWait: '本机的 claude 正在读这个项目里已完成的线的决定和收尾总结……（一两分钟）', lsNone: '没提炼出值得留下的经验。', lsP: '勾选值得留下的：它们会写进长期记忆（Theatrum），相关的新线开工时会带上。没勾的直接丢掉。', lsSave: '记住勾选的', lsPickOne: '至少勾一条', lsSaved: n => `记住了 ${n} 条经验`, lsSomeFailed: (n, e) => `记住了 ${n} 条，其余失败：${e}`, histPlay: '播放', histPause: '暂停', histAgain: '再放一遍', histEmptyHead: '墙上还空着', histEmpty: '标记完成的线会来到这里，归在它的分组下（没归组的线自成一个项目）。整个项目做完后，打开它的分组，点「归档这个项目」。', archiveBtn: '归档这个项目', archiveHead: g => `归档「${g}」`, archiveP: '它的线会从所有视图、实时栏和分派里移走，项目在历史墙上得到一块牌子。随时可以恢复。', archiveOpen: n => `还有 ${n} 项待办没做完`, archiveLive: n => `还有 ${n} 个会话在跑`, archiveClean: '没有没做完的待办，也没有在跑的会话，可以上墙了。', archiveGo: '归档', tArchived: g => `「${g}」已经挂上历史墙`, tRestored: g => `「${g}」已回到工作区`, apTick: x => `Autopilot · 正在做：${x}`, apTickIdle: 'Autopilot · 停下来问你了：在它的会话里回答', reopen: '展开：重新打开', wrapHead: '收尾这条线', wrapP: '完成的线会离开工作区，放进历史。下面的收尾总结会成为它的最后一站，先改好再保存。', wrapSave: '保存并完成', wrapSkip: '直接完成，不写总结', wrapSolo: '这条线没有归组，完成后会作为一个单独的项目挂上历史墙。', wrapGroup: g => `完成后它会放进历史，归在「${g}」这一组下面；组里其他的线照常留在工作区。`, tLineArchived: (n, g) => `「${n}」已放进历史，归在「${g}」下`, histOngoing: '进行中', wrapRec: n => `收尾总结：${n}`, wrapGoal: '目标：', wrapSpan: (a, b, n, s) => `${a} – ${b} · ${n} 条记录 · ${s} 个会话`, wrapDec: '关键决定：', wrapTodos: (d, n) => `完成的待办：${d}/${n}`, wrapOpen: '没做完的：', wrapOut: '产出和存放位置：\n- ', tUnparked: n => `「${n}」恢复为进行中`,
     focusIntro: '选一个分组后，画布、分支、时间线和目标都只显示这个组里的线。刷新后也保持，直到你退出。',
@@ -1814,7 +1816,20 @@ function byThread() {
 }
 function orderedThreads() { return [...S.threads.values()].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)); }
 // A merged line folds into the line it merged into: hidden unless More → Show merged lines; its records stay where they are.
-function isHidden(th) { if (th.archived) return true; return th.status === 'merged' ? !(S.showMerged || S.mergedOpen.has(th.mergedInto)) || S.hideDone : S.hideDone && th.status === 'done'; }
+// A merged line has no card of its own: the canvas shows it only while the line it went into has "N merged in" opened.
+// Branches and the Timeline, the views of history, draw it or not by More → Hide → Merged (mergedShown), nothing else.
+// The lines merged into a line, in its panel: one cell each (its colour, name, how much is on it and when it came in),
+// which opens that line; the merge can be undone from the cell.
+function mergedCells(id) {
+  const ins = mergedIn(id); if (!ins.length) return '';
+  const cells = ins.map(x => {
+    const n = [...S.commits.values()].filter(c => tidOf(c) === x.id).length, m = [...S.commits.values()].find(c => c.kind === 'merge' && c.mergeOf === x.id);
+    return `<div class="mi-cell" style="--c:${x.color}"><button class="mi-go" data-act="goto-thread" data-tid="${esc(x.id)}"><span class="mi-name" title="${esc(x.name)}">${esc(x.name)}</span><span class="mi-sub">${esc(t('countRecords', n))}${m ? ' · ' + esc(t('mergedAt', fmtRel(m.ts))) : ''}</span></button>${SERVER && !S.readOnly ? `<button class="linkish" data-act="unmerge-one" data-tid="${esc(x.id)}" title="${esc(t('unmergeTitle'))}">${esc(t('unmergeBtn'))}</button>` : ''}</div>`;
+  }).join('');
+  return `<div class="sec-label">${esc(t('mergedInLabel'))} · ${ins.length}</div><div class="mi-list">${cells}</div>`;
+}
+function isHidden(th) { if (th.archived) return true; return th.status === 'merged' ? !S.mergedOpen.has(th.mergedInto) : S.hideDone && th.status === 'done'; }
+const mergedShown = (th, n = 0) => (th.status === 'merged' ? S.showMerged && S.threads.has(th.mergedInto) && n < 20 && mergedShown(getThread(th.mergedInto), n + 1) : !isHidden(th));
 const mergedIn = id => orderedThreads().filter(x => x.status === 'merged' && x.mergedInto === id);
 // Focus mode: every view shows only one group's lines (More → Focus on a group, or the group's panel). Kept per device.
 // What every view shows: in focus mode one group's lines; otherwise every line but those of folded groups.
@@ -1822,8 +1837,6 @@ function inFocus(th) { if (th.archived) return false; return S.focusGroup ? th.g
 // The lines a view shows: the inbox and every line in view, or in focus mode the group's lines only.
 // A parked or done line is folded, like a folded group: a chip on the canvas, out of the branch view and the timeline.
 const isFolded = th => th.status === 'parked' || th.status === 'done';
-// On the canvas a merged line that is shown is a chip too, a size smaller: its history is on the map without a card's room.
-const isChip = th => isFolded(th) || th.status === 'merged';
 function viewLines(keep = th => !isHidden(th)) { return [...(S.focusGroup ? [] : [inboxThread()]), ...orderedThreads().filter(th => inFocus(th) && keep(th))]; }
 // Folding keeps groups you rarely use out of the way, in every view, until you unfold them (per browser, like focus).
 function setFold(g, on) {
@@ -2968,7 +2981,7 @@ function cardHTML(th, cs, selT) {
   const last = cs[cs.length - 1];
   const anyHit = !filtering() || cs.some(matches) || (!S.kinds.size && lineHit(th));
   const selC = S.sel && S.sel.type === 'commit' ? S.sel.id : null;
-  const peeking = isChip(th) && S.peek.has(th.id), shut = isChip(th) && !peeking;
+  const peeking = isFolded(th) && S.peek.has(th.id), shut = isFolded(th) && !peeking;
   apSeen(th);
   const cls = ['card', isInbox ? 'is-inbox' : `st-${th.status || 'active'}`, shut ? 'is-shut' : '', peeking ? 'is-peek' : '', apRun(th) ? 'ap-on' : '', apEvo(th) ? 'ap-evo' : '', selT === th.id ? 'is-sel' : '', filtering() && !anyHit ? 'is-dim' : '', S.connect && S.connect.from === th.id ? 'is-from' : '', S.multi.has(th.id) ? 'is-multi' : '', S.multi.has(th.id) && th.id === S.multiTarget ? 'is-multi-target' : '', liveOn(th.id).some(s => s.status === 'working') ? 'is-running' : ''].filter(Boolean).join(' ');
   const items = recent.length
@@ -2978,10 +2991,10 @@ function cardHTML(th, cs, selT) {
   const chip = apChip(th) + (isInbox ? `<span class="chip">${esc(t('unsorted'))}</span>` : `<span class="chip chip-${th.status || 'active'}">${esc(statusLabel(th.status))}</span>`);
   const agents = cs.filter(c => c.kind === 'agent').length;
   return `<div class="${cls}${apD(th.id) != null ? ' ap-burst' : ''}" data-tid="${esc(th.id)}" tabindex="0" data-kb aria-label="${esc(th.name)}" style="left:${th.x || 0}px;top:${th.y || 0}px;--c:${th.color}${apD(th.id) != null ? `;--apd:${apD(th.id)}ms` : ''}">
-    <div class="card-head">${apRun(th) ? AP_RING : ''}${isChip(th) ? `<span class="grp-tog" data-park-tog="1" title="${esc(t(peeking ? 'peekClose' : th.status === 'done' ? 'peekOpen' : th.status === 'merged' ? 'peekOpenMerged' : 'peekOpenParked'))}">${peeking ? '▾' : '▸'}</span>` : ''}<span class="roundel"></span><span class="card-name">${esc(th.name)}</span>${liveBadge(th.id)}${chip}</div>
+    <div class="card-head">${apRun(th) ? AP_RING : ''}${isFolded(th) ? `<span class="grp-tog" data-park-tog="1" title="${esc(t(peeking ? 'peekClose' : th.status === 'done' ? 'peekOpen' : 'peekOpenParked'))}">${peeking ? '▾' : '▸'}</span>` : ''}<span class="roundel"></span><span class="card-name">${esc(th.name)}</span>${liveBadge(th.id)}${chip}</div>
     ${shut ? '' : apTickHTML(th, cs)}${apRun(th) ? AP_RING : ''}
     <ol class="strip" style="--ph:${phase(2800)}">${items}</ol>
-    <div class="card-foot"><span>${esc(t('countRecords', cs.length))}${agents ? esc(t('countAgent', agents)) : ''}${mergedIn(th.id).length && !S.showMerged ? `<button class="linkish mi-tog" data-merged-tog="1" title="${esc(t(S.mergedOpen.has(th.id) ? 'mergedClose' : 'mergedOpen'))}">${esc(t('mergedInCount', mergedIn(th.id).length))} ${S.mergedOpen.has(th.id) ? '▾' : '▸'}</button>` : ''}</span><span>${last ? esc(t('updated', fmtRel(last.ts))) : ''}</span></div>
+    <div class="card-foot"><span>${esc(t('countRecords', cs.length))}${agents ? esc(t('countAgent', agents)) : ''}${mergedIn(th.id).length ? ` <button class="mi-tog" data-merged-tog="1" aria-expanded="${S.mergedOpen.has(th.id)}" title="${esc(t(S.mergedOpen.has(th.id) ? 'mergedClose' : 'mergedOpen'))}">${esc(t('mergedInCount', mergedIn(th.id).length))} · ${esc(t(S.mergedOpen.has(th.id) ? 'mergedFold' : 'mergedUnfold'))} ${S.mergedOpen.has(th.id) ? '▾' : '▸'}</button>` : ''}</span><span>${last ? esc(t('updated', fmtRel(last.ts))) : ''}</span></div>
   </div>`;
 }
 function border(R, c, toward, gap) {
@@ -3263,10 +3276,7 @@ const gitSub = (c, lvl) => lvl === 1 && isTodo(c) && !!c.done && !c.starred && !
 const gitKeep = (c, lvl) => !lvl || !!c.starred || (lvl === 1 && (c.kind === 'decision' || c.kind === 'fork' || c.kind === 'merge' || (isTodo(c) && !!c.done))) || (S.sel && S.sel.type === 'commit' && S.sel.id === c.id);
 function renderGit() {
   const by = byThread();
-  // A merged line is part of the history of the line it went into: it is drawn whenever that line is, also with
-  // "Hide finished threads" on (which used to take it out, and the merge row was left with nothing leading to it).
-  const shown = (th, n = 0) => (th.status === 'merged' && S.threads.has(th.mergedInto) && n < 20 ? shown(getThread(th.mergedInto), n + 1) : !isHidden(th));
-  const visible = new Set(viewLines(th => !isFolded(th) && shown(th)).map(th => th.id));
+  const visible = new Set(viewLines(th => !isFolded(th) && mergedShown(th)).map(th => th.id));
   // The kind filter drops rows here (forks and merges stay so lines keep their shape); search only dims.
   const kindOk = c => !S.kinds.size || S.kinds.has(c.kind) || c.kind === 'fork' || c.kind === 'merge';
   const lvl = S.gitLevel, inView = [...S.commits.values()].filter(c => visible.has(tidOf(c)) && kindOk(c));
@@ -3337,7 +3347,7 @@ function renderGit() {
   const selT = selThreadId();
   const selC = S.sel && S.sel.type === 'commit' ? S.sel.id : null;
   legend.classList.toggle('open', !!S.lanesOpen);
-  const chipIds = laneOrder.filter(id => !isHidden(getThread(id)));
+  const chipIds = laneOrder.filter(id => getThread(id).status !== 'merged' && !isHidden(getThread(id)));
   legend.innerHTML = `<span class="legend-label">${esc(t('legend'))}</span><span class="lane-chips">` + chipIds.map(id => {
     const th = getThread(id);
     return `<button class="lane-chip ${selT === id ? 'is-sel' : ''}" data-tid="${esc(id)}" style="--c:${th.color}"><i></i>${esc(th.name)}<span class="mono" style="color:var(--faint);font-size:11px">${(by.get(id) || []).length}</span></button>`;
@@ -3542,7 +3552,7 @@ function renderTimeline() {
   const wrap = $('#tl-scroll'), inner = $('#tl-inner');
   $$('#tl-zoom button').forEach(b => b.setAttribute('aria-pressed', b.dataset.z === S.tlZoom ? 'true' : 'false'));
   const by = byThread();
-  const ids = viewLines(th => !isHidden(th) && !isFolded(th)).map(th => th.id).filter(id => by.has(id));
+  const ids = viewLines(th => mergedShown(th) && !isFolded(th)).map(th => th.id).filter(id => by.has(id));
   if (!ids.length) { inner.innerHTML = ''; return; }
   const H = 3600e3, pph = TLZ[S.tlZoom] || 9, now = Date.now();
   let min = Infinity, max = -Infinity;
@@ -4384,9 +4394,9 @@ function threadDetail(th) {
         ${th.archived ? `<span>${esc(t('lineArchived', fmtAbs(th.archived)))} · <button class="linkish" data-act="t-restore">${esc(t('lineRestore'))}</button></span>` : ''}
         <span>${esc(t('createdAt', fmtAbs(th.createdAt || Date.now())))}${cs[0] ? esc(t('lastUpdate', fmtRel(cs[0].ts))) : ''}</span>
         ${th.parent ? `<span>${esc(t('forkedFromThread'))} <button class="linkish" data-act="goto-thread" data-tid="${esc(th.parent)}">${esc(getThread(th.parent).name)}</button>${forkC ? ` ${esc(t('of'))} <button class="linkish" data-act="goto-commit" data-cid="${esc(forkC.id)}">${esc(forkC.title.slice(0, 40))}</button>` : ''} · <button class="linkish" data-act="detach" title="${esc(t('detachTitle'))}">${esc(t('detach'))}</button></span>` : ''}
-        ${mergedIn(th.id).length ? `<span>${esc(t('mergedInLabel'))} ${mergedIn(th.id).map(x => `<button class="linkish" data-act="goto-thread" data-tid="${esc(x.id)}">${esc(x.name)}</button>`).join('、')}</span>` : ''}
         ${th.mergedInto ? `<span>${esc(t('mergedInto'))} <button class="linkish" data-act="goto-thread" data-tid="${esc(th.mergedInto)}">${esc(getThread(th.mergedInto).name)}</button>${SERVER ? ` · <button class="linkish" data-act="unmerge" title="${esc(t('unmergeTitle'))}">${esc(t('unmergeBtn'))}</button>` : ''}</span>` : ''}
       </div>`}
+      ${mergedCells(th.id)}
       ${lineSessions(th.id)}
       <div class="sec-label">${esc(t('stations'))}</div>
       ${items ? `<ol class="d-strip" style="--c:${th.color}">${items}</ol>` : `<p style="margin:0;color:var(--faint)">${esc(t('noRecordsYet'))}</p>`}
@@ -4504,7 +4514,7 @@ detail.addEventListener('click', e => {
   if (handClick(e)) return;
   const b = e.target.closest('[data-act]'); if (!b) return;
   const act = b.dataset.act, s = S.sel;
-  const writeActs = ['star', 'detach', 'fork-open', 'fork-create', 'del-open', 'del-confirm', 'status', 'color', 'merge-open', 'merge', 'unmerge', 't-restore', 'label', 'flip', 'g-arrange', 'g-ungroup', 'g-join'];
+  const writeActs = ['star', 'detach', 'fork-open', 'fork-create', 'del-open', 'del-confirm', 'status', 'color', 'merge-open', 'merge', 'unmerge', 'unmerge-one', 't-restore', 'label', 'flip', 'g-arrange', 'g-ungroup', 'g-join'];
   if (writeActs.includes(act) && !canWrite()) return;
   switch (act) {
     case 'close': if (PHONE.matches && trail.some(selAlive)) selectBack(); else select(null); break;
@@ -4595,6 +4605,7 @@ detail.addEventListener('click', e => {
       patchDoc('threads', s.id, { status: b.dataset.status }, 0); break;
     case 't-restore': patchDoc('threads', s.id, unarchive(getThread(s.id)), 0); toast(t('tLineBack', getThread(s.id).name)); requestAnimationFrame(() => reveal(s.id)); break;
     case 'unmerge': unmerge(s.id); break;
+    case 'unmerge-one': unmerge(b.dataset.tid); break;
     case 'color': patchDoc('threads', s.id, { color: b.dataset.color }, 0); break;
     case 'capture-here': setCaptureThread(s.id); $('#cap-text').focus(); break;
     case 'merge-open': S.ui = { merge: true }; render(); break;
@@ -4810,10 +4821,7 @@ menu.addEventListener('click', e => {
   if (k === 'lang') { setLang(b.dataset.lang); menuState(); return; }
   if (k === 'theme') { ls.set('tc.theme', b.dataset.theme); applyTheme(); render(); return; }
   if (k === 'toggle-done') { S.hideDone = !S.hideDone; ls.set('tc.hideDone', S.hideDone); render(); return; }
-  if (k === 'toggle-merged') { // the chips fade out before they go, and grow in when they come
-    const flip = () => { S.showMerged = !S.showMerged; ls.set('tc.showMerged', S.showMerged); cardsEl.classList.remove('merged-out'); cardsEl.classList.toggle('merged-in', S.showMerged); render(); menuState(); if (S.showMerged) setTimeout(() => cardsEl.classList.remove('merged-in'), 400); };
-    if (S.showMerged && S.view === 'canvas') { cardsEl.classList.add('merged-out'); setTimeout(flip, 190); } else flip();
-    return; }
+  if (k === 'toggle-merged') { S.showMerged = !S.showMerged; ls.set('tc.showMerged', S.showMerged); render(); return; }
   closeMenu();
   if (k === 'ai') { openSheet('ai'); return; }
   else if (k === 'clear-examples') { if (canWrite()) clearExamples(); }

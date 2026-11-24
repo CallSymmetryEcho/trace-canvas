@@ -3375,9 +3375,11 @@ function renderGit() {
     if (!th.forkOf || !lane.has(th.id)) continue;
     const fc = S.commits.get(th.forkOf);
     if (!fc || !row.has(fc.id) || !lane.has(tidOf(fc))) continue;
-    const child = by.get(th.id).find(x => row.has(x.id));
-    if (!child) continue;
-    const x1 = lx(lane.get(tidOf(fc))), y1 = ry(row.get(fc.id)), x2 = lx(lane.get(th.id)), y2 = ry(row.get(child.id));
+    // The curve reaches the line at its first record after the fork. Records older than the fork (to-dos moved onto a
+    // line forked later) are not where it began: the curve then joins the line one row up, where it already runs.
+    const child = by.get(th.id).find(x => row.has(x.id) && x.ts >= fc.ts);
+    if (!child && !by.get(th.id).some(x => row.has(x.id))) continue;
+    const x1 = lx(lane.get(tidOf(fc))), y1 = ry(row.get(fc.id)), x2 = lx(lane.get(th.id)), y2 = child ? ry(row.get(child.id)) : y1 - ROW;
     if (x1 === x2) continue;
     if (y2 >= y1) { svg += `<line class="link${off2(th.id, tidOf(fc))}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="stroke:${th.color}"/>`; continue; }
     const bend = Math.max(y2, y1 - ROW);

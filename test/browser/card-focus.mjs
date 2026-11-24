@@ -20,5 +20,10 @@ await wait(3000);
 const after = await ev(`({ redrawn: ${card} !== window.__old, focused: document.activeElement === ${card}, tag: document.activeElement.tagName })`);
 console.log(JSON.stringify(after));
 assert.equal(after.redrawn, true, 'the canvas was redrawn'); assert.equal(after.focused, true, 'focus is on the same line\'s new card');
+// Branches: the fork of a line whose records are older than the fork is a curve beside the fork, not a long straight line.
+await ev(`document.querySelector('#tab-git').click()`); await wait(800);
+const links = await ev(`[...document.querySelectorAll('#git-body svg .link')].map(p => [p.tagName, Math.round(p.getBBox().height)])`);
+console.log(JSON.stringify(links));
+assert.ok(links.length >= 1 && links.every(([tag, h]) => tag === 'path' && h < 80), 'the fork is drawn as a short curve');
 await fetch('http://127.0.0.1:' + CDP + '/json/close/' + v.id);
 console.log('PASSED'); process.exit(0);

@@ -403,6 +403,9 @@ Setup (--user for every project, --project DIR for one)
   trace-canvas lang <en|zh>     Language of records the hooks write
   trace-canvas terminal [iterm|terminal]   macOS: open agents in iTerm2 tabs or Terminal windows (default: iTerm2 when installed)
   trace-canvas autopilot <line> [--stop]   Autopilot (beta): the line's to-dos by your decision profile, until you stop it
+  trace-canvas backup-fix [line…]  List the files your records name that are missing here, and where a copy is;
+                                --moved <dir> / --backup <dir> note where a project went or is backed up;
+                                --restore copies missing files back from a backup, after you say yes
   trace-canvas doctor           Check the setup and say how to fix each problem (also More → Check setup)
   trace-canvas where            Show where the data is stored
   trace-canvas phone            Open the canvas on your phone (Tailscale and a QR code; see docs/phone.md)

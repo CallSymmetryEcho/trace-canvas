@@ -8,6 +8,7 @@ import path from 'node:path';
 import { q } from './agents.mjs';
 import { ARGS, otherMachines } from './remote.mjs';
 import { home as dataHome, readConfig } from './store.mjs';
+import { findCopy } from './places.mjs';
 
 const SHA = /^[0-9a-f]{7,40}$/;
 const CAP = 200 * 1024; // one diff
@@ -249,6 +250,9 @@ function place(d, p, rec, env) {
     const full = (String(c.body || '').match(/(?:~|\/)[^\s`'"<>()，。；、：]*/g) || []).find(x => x.endsWith('/' + p));
     if (full) { p = full; abs = true; if (isFile(home(p))) return { file: home(p) }; }
   }
+  // Not where the record says: where its project went, or a backup of it (src/places.mjs), on this machine.
+  const full0 = abs ? p : path.isAbsolute(cwd) ? path.posix.join(cwd, p) : '', alt = full0 && findCopy(d, full0, machine || me, env);
+  if (alt) return { file: alt.file, via: { role: alt.role, path: alt.path } };
   // Written here but not here: an agent on this machine can write a file on another one over ssh and link its path there.
   if (here && abs && me) { machine = elsewhere(d, c, p, me); here = !machine; }
   if (here || !MACHINE.test(machine) || !(abs || cwd)) return { error: 'missing' };
@@ -302,7 +306,7 @@ export function readLinkedMd(d, want, rec, env = process.env) {
   if (at.error) return { error: at.error, ...(at.machine ? { machine: at.machine } : {}) };
   try {
     if (fs.statSync(at.file).size > 2 << 20) return { error: 'big' };
-    return { text: fs.readFileSync(at.file, 'utf8'), ...(at.from ? { from: at.from, at: at.at } : {}) };
+    return { text: fs.readFileSync(at.file, 'utf8'), ...(at.from ? { from: at.from, at: at.at } : {}), ...(at.via ? { via: at.via, file: at.file } : {}) };
   } catch { return { error: 'missing' }; }
 }
 

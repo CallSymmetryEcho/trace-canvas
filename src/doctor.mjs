@@ -5,7 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { home, readConfig } from './store.mjs';
+import { home, readConfig, readData } from './store.mjs';
+import { unbackedProjects } from './places.mjs';
 import { systemdUnit } from './live.mjs';
 import { syncStatus } from './sync.mjs';
 
@@ -63,6 +64,13 @@ export function doctor(env = process.env, homeDir = os.homedir()) {
   let log = ''; try { log = fs.readFileSync(path.join(home(env), 'hook-errors.log'), 'utf8'); } catch { /* no hook has failed */ }
   const errs = log.split('\n').slice(-200).map(l => { try { return JSON.parse(l); } catch { return null; /* a cut or empty line */ } }).filter(e => e && Date.now() - e.at < 864e5);
   if (errs.length) { const e = errs[errs.length - 1]; add('hook-errors', 'warn', `A hook failed ${errs.length} time${errs.length === 1 ? '' : 's'} in the last day; the latest (${e.what}, ${new Date(e.at).toLocaleString()}): ${String(e.error).split('\n')[0]}`, 'Records of those moments may be missing. The details are in hook-errors.log in the data folder'); }
+
+  // Backups: projects of open lines with no backup on record (trace-canvas backup-fix --backup). Reads records only.
+  try {
+    const none = unbackedProjects(readData(env), env);
+    if (none.length) add('backups', 'warn', `${none.length} project${none.length === 1 ? ' has' : 's have'} no backup on record: ${none.slice(0, 4).map(p => path.basename(p.root)).join(', ')}${none.length > 4 ? ', …' : ''}`, 'After backing one up: trace-canvas backup-fix --project <its folder> --backup <the backup folder>');
+    else add('backups', true, 'Every open line\'s project has a backup on record');
+  } catch (e) { add('backups', 'warn', `Backups could not be checked: ${e.message}`); }
 
   // Version: commits waiting upstream (as of the last fetch; the page and update fetch).
   const behind = Number(run('git', ['-C', ROOT, 'rev-list', '--count', 'HEAD..@{u}']));

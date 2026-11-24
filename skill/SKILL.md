@@ -10,7 +10,7 @@ Trace Canvas shows work as a transit map. A **thread** is one piece of work in p
 
 In Claude Code, invoke `/trace-canvas` (arguments: `$ARGUMENTS`). In Codex, invoke `$trace-canvas` and read the action from the user's request.
 
-Actions: `capture`, `all`, `sessions`, `tasks`, `pick`, `dispatch [lines or to-dos…]`, `retro <thread>`, `sync`, `live`, `bind <thread>`, `fork <thread>`, `detach <thread>`, `merge <threads…>`, `open`, `log <text>`.
+Actions: `capture`, `all`, `sessions`, `tasks`, `pick`, `dispatch [lines or to-dos…]`, `retro <thread>`, `sync`, `live`, `bind <thread>`, `fork <thread>`, `detach <thread>`, `merge <threads…>`, `backup-fix [lines…]`, `open`, `log <text>`.
 
 Pick the matching action below. With no arguments, capture the current session.
 
@@ -105,6 +105,23 @@ Call `trace_live` and show a short table: status (working, needs you, idle), tit
 ## bind <thread>: put this session on a thread
 
 Call `trace_bind` with the thread the user named (a new name creates the thread). Leave `session_id` empty for the current session. `unbind: true` goes back to the repository/branch line. Report the thread in one line.
+
+## backup-fix [lines…]: a project moved, was backed up, or lost files
+
+A record names its files by their path on the machine that wrote it. When a project moves or a file is lost, the canvas finds it again only through **places** noted on the line: where the project went, and where copies of it are kept.
+
+When you back a project up, or move it (to a NAS, another disk, a cloud folder):
+
+1. **Keep the layout.** A file's path inside the project is its path inside the copy: `<backup folder>/<path inside the project>`. Do not rename, flatten or pack it into one archive.
+2. **Note it right away.** Run `node <this skill's folder>/../bin/trace-canvas.mjs backup-fix "<line>" --backup <folder>` (`--project <the project's folder>` in place of the line when no line keeps that folder). A backup the canvas was not told about is one it cannot find.
+3. **A move is `--moved <new folder>`**, not `--backup`: the project is there now, and files open from there.
+4. **Never delete the original** as part of a backup or a move. Deleting is the person's call.
+
+When a file a record names cannot be opened here, or the person says something is gone:
+
+1. Run `… backup-fix "<line>"` (no line: every line). It lists the files this machine's records name that are missing, and for each where a copy is. A place it calls **out of reach** (a share that is not mounted) was not checked: say so; it does not mean the files are lost.
+2. If the person tells you where the project went or where a backup is, note it with `--moved` or `--backup` and run the check again.
+3. To copy files back from a backup: run `… backup-fix "<line>" --restore`, show the person the list it prints, and only after they agree run it again with `--yes`. Never pass `--yes` on your own. It copies only; it never overwrites a file that is there, and it leaves the backup as it is.
 
 ## open
 

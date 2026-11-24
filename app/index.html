@@ -765,6 +765,7 @@ body.read-page .sheet { width: min(860px, 100%); }
 .links { display: grid; gap: 4px; }
 .links a, .links code { font-size: 13px; overflow-wrap: anywhere; }
 .links a { color: var(--accent); }
+.links .link-was { margin-top: 2px; font-size: 12px; color: var(--faint); } .links .link-was code { font-size: 12px; background: none; padding: 0; color: var(--faint); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--faint) 50%, transparent); }
 .links code { font-family: var(--f-mono); background: var(--surface-2); padding: 2px 6px; border-radius: 4px; }
 .d-strip { list-style: none; margin: 0; padding: 0 0 0 2px; position: relative; display: grid; }
 .d-strip::before { content: ""; position: absolute; left: 12.5px; top: 12px; bottom: 12px; width: 3px; border-radius: 2px; background: var(--c); }
@@ -1488,7 +1489,7 @@ apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent 
     gxChanges: 'Changes', gxLoading: 'Reading from git…', gxNoRepo: 'This repository is not on this computer.', gxNoRepoOn: m => `This repository is on ${m}, not on this computer.`, gxNoCommit: 'This commit is no longer in its repository (rewritten or cleaned up).',
     gxLine: n => `line ${n}`, gxOnly: 'Changed lines only', gxExplain: 'Have your local Claude explain each file in a sentence', gxExplaining: 'Your local Claude is reading this commit… (about a minute)', gxPrev: 'Previous file', gxNext: 'Next file', gxRole_test: 'test', gxRole_doc: 'docs', gxRole_gen: 'generated', gxFiles: n => `${n} file${n === 1 ? '' : 's'}`, gxMore: n => `${n} more`, gxQuiet: n => `${n} binary or generated`, gxBinary: 'binary',
     gxCompare: 'Compare with', gxThisOnly: 'this commit only', gxOtherRepo: 'That station is in another repository.', gxTruncated: 'Cut at 200 KB.',
-    gxLater: 'Committed later in', gxUncommitted: 'Not committed yet.', fileAway: m => `This file is on ${m}; this computer has no copy yet.`, filePull: m => `Pull it from ${m}`, filePulling: 'Pulling…', fileFrom: (m, when) => `A copy from ${m}, pulled ${when}`, fileRepull: 'Pull again', mdErr_pull: 'Could not pull it: the other computer is off or cannot be reached.', mdErr_gone: 'The file is not on the other computer any more.', copyResume: 'Copy resume command', copyFresh: 'Copy the command', startFresh: 'New session here', convGone: 'its conversation is no longer on this machine, so it cannot be resumed', resumeHere: () => 'Resume in a terminal', resumeThere: m => `Resume on ${m} (ssh · tmux)`, lineSessionsHint: 'Resume one to keep working on this line instead of starting a new session.', liveBadge: (n, w) => `${n} running${w ? `, ${w} need${w === 1 ? 's' : ''} you` : ''}`,
+    gxLater: 'Committed later in', gxUncommitted: 'Not committed yet.', fileAway: m => `This file is on ${m}; this computer has no copy yet.`, filePull: m => `Pull it from ${m}`, filePulling: 'Pulling…', fileFrom: (m, when) => `A copy from ${m}, pulled ${when}`, fileRepull: 'Pull again', mdErr_pull: 'Could not pull it: the other computer is off or cannot be reached.', mdErr_gone: 'The file is not on the other computer any more.', linkWas: 'was', linkWasTitle: 'Where this file was before its project moved', mdVia: (role, p) => (role === 'moved' ? `Opened from where the project is now: ${p}` : `The original is not here: opened from the backup at ${p}`), copyResume: 'Copy resume command', copyFresh: 'Copy the command', startFresh: 'New session here', convGone: 'its conversation is no longer on this machine, so it cannot be resumed', resumeHere: () => 'Resume in a terminal', resumeThere: m => `Resume on ${m} (ssh · tmux)`, lineSessionsHint: 'Resume one to keep working on this line instead of starting a new session.', liveBadge: (n, w) => `${n} running${w ? `, ${w} need${w === 1 ? 's' : ''} you` : ''}`,
     tBound: n => `Bound to “${n}”`, tUnbound: 'Back to the repository and branch line',
     actorHuman: 'You', actorAgent: 'Agent', liveTipTime: 'now',
     goalsBtn: 'Goals', goalsBtnTitle: 'Goals and to-dos of every line', goalsTitle: 'Goals and to-dos',
@@ -1669,7 +1670,7 @@ apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的
     gxChanges: '改动', gxLoading: '正在从 git 读取…', gxNoRepo: '这台电脑上没有这个仓库。', gxNoRepoOn: m => `这个仓库在 ${m} 上，这台电脑上没有。`, gxNoCommit: '仓库里已经没有这个提交，可能被改写或清理了。',
     gxLine: n => `第 ${n} 行`, gxOnly: '只看改动的行', gxExplain: '让本机的 Claude 给每个文件写一句说明', gxExplaining: '本机的 Claude 正在读这次提交…（一分钟左右）', gxPrev: '上一个文件', gxNext: '下一个文件', gxRole_test: '测试', gxRole_doc: '文档', gxRole_gen: '生成', gxFiles: n => `${n} 个文件`, gxMore: n => `还有 ${n} 个`, gxQuiet: n => `${n} 个二进制或生成文件`, gxBinary: '二进制',
     gxCompare: '对比', gxThisOnly: '只看这次提交', gxOtherRepo: '那个站点不在同一个仓库。', gxTruncated: '超过 200 KB，已截断。',
-    gxLater: '之后提交于', gxUncommitted: '尚未提交。', fileAway: m => `这个文件在 ${m} 上，这台电脑还没有副本。`, filePull: m => `从 ${m} 拉取`, filePulling: '正在拉取…', fileFrom: (m, when) => `来自 ${m} 的副本，拉取于 ${when}`, fileRepull: '重新拉取', mdErr_pull: '没拉到：另一台电脑没开机或连不上。', mdErr_gone: '另一台电脑上已经没有这个文件了。', copyResume: '复制恢复命令', copyFresh: '复制命令', startFresh: '在这里开新会话', convGone: '对话记录已不在这台机器上，无法恢复', resumeHere: () => '在终端里恢复', resumeThere: m => `在 ${m} 上恢复（ssh · tmux）`, lineSessionsHint: '恢复其中一个就能接着在这条线上做，不用新开会话。', liveBadge: (n, w) => `${n} 个运行中${w ? `，${w} 个等你` : ''}`,
+    gxLater: '之后提交于', gxUncommitted: '尚未提交。', fileAway: m => `这个文件在 ${m} 上，这台电脑还没有副本。`, filePull: m => `从 ${m} 拉取`, filePulling: '正在拉取…', fileFrom: (m, when) => `来自 ${m} 的副本，拉取于 ${when}`, fileRepull: '重新拉取', mdErr_pull: '没拉到：另一台电脑没开机或连不上。', mdErr_gone: '另一台电脑上已经没有这个文件了。', linkWas: '原位置', linkWasTitle: '项目迁移前这个文件所在的位置', mdVia: (role, p) => (role === 'moved' ? `从项目现在的位置打开：${p}` : `原件不在本机：从备份打开（${p}）`), copyResume: '复制恢复命令', copyFresh: '复制命令', startFresh: '在这里开新会话', convGone: '对话记录已不在这台机器上，无法恢复', resumeHere: () => '在终端里恢复', resumeThere: m => `在 ${m} 上恢复（ssh · tmux）`, lineSessionsHint: '恢复其中一个就能接着在这条线上做，不用新开会话。', liveBadge: (n, w) => `${n} 个运行中${w ? `，${w} 个等你` : ''}`,
     tBound: n => `已绑定到「${n}」`, tUnbound: '已改回按仓库和分支自动归线',
     actorHuman: '你', actorAgent: 'Agent', liveTipTime: '此刻',
     goalsBtn: '目标', goalsBtnTitle: '每条线的目标和待办', goalsTitle: '目标和待办',
@@ -3706,12 +3707,22 @@ function threadOptions(selected, { excludeId, onlyOpen, noInbox } = {}) {
 const isMdPath = l => !/^https?:\/\//i.test(l) && /\.(md|markdown|txt|csv|tsv|json|py|r)$/i.test(l.trim());
 // A local image a record links gets 查看, which opens it in the reader (loaded on the click, not before).
 const isImgPath = l => !/^https?:\/\//i.test(l) && /\.(png|jpe?g|gif|webp|svg)$/i.test(l.trim());
+// Where a path is now when its project moved (a place record: src/places.mjs, trace-canvas backup-fix --moved): the
+// newest one valid on this machine. The page shows that path first and the old one below it, dimmed; the read and
+// view buttons still send the path the record has, which the server finds at the new place.
+function movedTo(l) {
+  const pl = [...S.commits.values()].filter(c => c.place && c.place.role === 'moved' && (!c.place.on || !S.machine || c.place.on === S.machine) && (l === c.place.root || l.startsWith(c.place.root.replace(/\/+$/, '') + '/'))).sort((a, b) => b.ts - a.ts)[0];
+  return pl ? pl.place.path.replace(/\/+$/, '') + l.slice(pl.place.root.replace(/\/+$/, '').length) : '';
+}
 function linksView(links) {
   if (!links || !links.length) return '';
-  return `<div class="links">${links.map(l => /^https?:\/\//i.test(l)
-    ? `<a href="${esc(l)}" target="_blank" rel="noopener noreferrer">${esc(l)}</a>`
-    : isMdPath(l) && SERVER ? `<div><code>${esc(l)}</code><button class="linkish" data-act="read-file" data-path="${esc(l)}">${esc(t('mdRead'))}</button></div>`
-    : isImgPath(l) && SERVER ? `<div><code>${esc(l)}</code><button class="linkish" data-act="view-img" data-path="${esc(l)}">${esc(t('mdView'))}</button></div>` : `<code>${esc(l)}</code>`).join('')}</div>`;
+  const row = l => {
+    const now = /^\//.test(l) ? movedTo(l) : '', btn = isMdPath(l) && SERVER ? `<button class="linkish" data-act="read-file" data-path="${esc(l)}">${esc(t('mdRead'))}</button>`
+      : isImgPath(l) && SERVER ? `<button class="linkish" data-act="view-img" data-path="${esc(l)}">${esc(t('mdView'))}</button>` : '';
+    if (now) return `<div><code>${esc(now)}</code>${btn}<div class="link-was" title="${esc(t('linkWasTitle'))}">${esc(t('linkWas'))} <code>${esc(l)}</code></div></div>`;
+    return btn ? `<div><code>${esc(l)}</code>${btn}</div>` : `<code>${esc(l)}</code>`;
+  };
+  return `<div class="links">${links.map(l => (/^https?:\/\//i.test(l) ? `<a href="${esc(l)}" target="_blank" rel="noopener noreferrer">${esc(l)}</a>` : row(l))).join('')}</div>`;
 }
 // <md>
 // TeX math ($…$, $$…$$) to MathML, which the browser draws itself: no library, works offline.
@@ -3919,7 +3930,7 @@ async function imgBlob(path, from, rec) {
 // A file only another machine has: the reader says where it is and offers to pull it; a pulled copy says where it came from.
 const pullBtn = (label, path, rec, img) => `<button class="${label === t('fileRepull') ? 'linkish' : 'btn'}" data-act="pull-file" data-path="${esc(path)}" data-rec="${esc(rec || '')}" ${img ? 'data-img="1"' : ''}>${esc(label)}</button>`;
 const awayHTML = (r, path, rec, img) => `<blockquote><p>${esc(r.error === 'away' ? t('fileAway', r.machine) : mdErr(r.error))}</p></blockquote>${r.machine ? `<p>${pullBtn(t('filePull', r.machine), path, rec, img)}</p>` : ''}`;
-const fromNote = (r, path, rec, img) => (r.from ? `<div class="md-src">${esc(t('fileFrom', r.from, fmtAbs(r.at)))} ${pullBtn(t('fileRepull'), path, rec, img)}</div>` : '');
+const fromNote = (r, path, rec, img) => (r.from ? `<div class="md-src">${esc(t('fileFrom', r.from, fmtAbs(r.at)))} ${pullBtn(t('fileRepull'), path, rec, img)}</div>` : r.via ? `<div class="md-src">${esc(t('mdVia', r.via.role, r.via.path))}</div>` : '');
 async function viewImage(path, rec) {
   const name = path.split('/').pop();
   openReader(name, null, path);

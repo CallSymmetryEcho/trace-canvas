@@ -135,6 +135,9 @@ Setup (pass --user for every project, or --project dir for one)
   trace-canvas sync             Sync the canvas with your other machines through the location map
                 [--allow-deletes]      (more than 50 deletions in one sync are refused without it)
                 [--adopt]              (this data folder takes over a sync file another folder wrote under the same machine name)
+  trace-canvas backup-fix [line…]  Files this machine's records name that are missing, and where a copy is
+                                --moved <dir> / --backup <dir> [--project <dir>]: note where the project went / is backed up
+                                --restore: copy the missing files back from a backup (asks first; --yes once the person agreed)
   trace-canvas doctor           Check the setup: Node, hooks, page server, start with the computer, version, sync, phone
   trace-canvas update [--check] Get the newest version (git pull in this clone) and restart the page server;
                                --check only says whether there is one (the page also offers it under More)
@@ -771,6 +774,54 @@ async function main() {
       if (r.busy) { console.log('Another sync is running.'); break; }
       console.log(`${r.machine}: ${r.imported} change${r.imported === 1 ? '' : 's'} from other machines, ${r.changed} here${r.moved ? `; ${r.moved} lines got stable ids` : ''}. ${r.offline ? 'Offline: pushes next time.' : r.unpushed ? `${r.unpushed} commit${r.unpushed === 1 ? '' : 's'} not pushed yet: the other machines do not have them.` : r.pushed ? 'Pushed.' : r.committed ? 'Committed.' : 'Up to date.'}`);
       if (r.offline || r.unpushed) process.exitCode = 1;
+      break;
+    }
+    case 'backup-fix': {
+      // trace-canvas backup-fix [line …]                      which files this machine's records name are missing, and where a copy is
+      //   --moved <dir> | --backup <dir> [--project <dir>]     note on the line where the project went, or where a copy of it is kept
+      //   --restore [--yes]                                    copy the missing files back from their backups, after a yes
+      const { addPlace, checkFiles, projectRoot, restoreFiles } = await import('../src/places.mjs');
+      const { findThreadLoose } = await import('../src/ops.mjs');
+      const cfg = readConfig(), me = cfg.machine || '', zh = cfg.lang === 'zh';
+      const moved = str(flag('moved')), backup = str(flag('backup')), project = str(flag('project')), origin = str(flag('machine')), on = str(flag('on'));
+      const restore = flag('restore', false), yes = flag('yes', false), agent = str(flag('agent'));
+      const abs = p => path.resolve(p.replace(/^~(?=\/|$)/, os.homedir()));
+      let d = readData();
+      const tids = argv.map(ref => { const id = findThreadLoose(d, ref); if (!id || id === INBOX) throw new Error(`No line named "${ref}"`); return id; });
+      if (moved && backup) throw new Error('One at a time: --moved or --backup');
+      if (moved || backup) {
+        const root = project ? abs(project) : tids.length ? projectRoot(d, d.threads[tids[0]]) : '';
+        if (!root) throw new Error('Which project? Name a line that has a folder, or give --project <its folder>');
+        // The line it is noted on: the one named, else the line that keeps this folder, else the inbox.
+        const tid = tids[0] || (Object.values(d.threads).find(t => projectRoot(d, t) === root) || {}).id || INBOX;
+        const rec = mutate(x => addPlace(x, { thread: tid, root, machine: origin || me, role: moved ? 'moved' : 'backup', dir: abs(moved || backup), on: on || me, agent, lang: cfg.lang }));
+        console.log(`${rec.title}\n  ${zh ? '记在' : 'Noted on'} "${tid === INBOX ? 'Inbox' : d.threads[tid].name}" (${rec.id}).`);
+        d = readData();
+      }
+      const r = checkFiles(d, tids.length ? tids : null);
+      for (const u of r.unreachable) console.log(`! ${u}: ${zh ? '现在够不着（没挂载或没响应），没查' : 'out of reach now (not mounted, or no answer); not checked'}`);
+      console.log(zh ? `查了 ${r.total} 个文件，${r.missing} 个不在本机。` : `${r.total} file${r.total === 1 ? '' : 's'} checked, ${r.missing} not on this machine.`);
+      const size = f => { try { const n = fs.statSync(f).size; return n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`; } catch { return '?'; } };
+      for (const it of r.items) console.log(it.copy ? `  ${it.file}\n      ← ${it.copy.file} (${size(it.copy.file)})` : `  ${it.file}\n      ${zh ? '登记过的位置里都没有' : 'in no place on record'}`);
+      const can = r.items.filter(it => it.copy && it.copy.role === 'backup');
+      if (!restore) { if (can.length) console.log(zh ? `\n${can.length} 个可以从备份恢复：trace-canvas backup-fix --restore` : `\n${can.length} can be restored from a backup: trace-canvas backup-fix --restore`); break; }
+      if (!can.length) { console.log(zh ? '没有可以恢复的文件。' : 'Nothing to restore.'); break; }
+      // Copying files back is the person's call. An agent has no terminal to answer in: it stops here and asks them.
+      if (!yes) {
+        if (!process.stdin.isTTY) { console.log(zh ? `\n没有恢复。把上面的清单给人看，对方同意后再运行：trace-canvas backup-fix ${argv.join(' ')} --restore --yes` : `\nNothing was restored. Show the person the list above; once they agree: trace-canvas backup-fix ${argv.join(' ')} --restore --yes`); break; }
+        const rl = (await import('node:readline/promises')).createInterface({ input: process.stdin, output: process.stdout });
+        const ans = await rl.question(zh ? `把这 ${can.length} 个文件从备份复制回原位置？已有的文件不会被覆盖。[y/N] ` : `Copy these ${can.length} file${can.length === 1 ? '' : 's'} back from the backup? Files that are there are not overwritten. [y/N] `);
+        rl.close();
+        if (!/^y(es)?$/i.test(ans.trim())) { console.log(zh ? '没有恢复。' : 'Nothing was restored.'); break; }
+      }
+      const out = restoreFiles(can);
+      console.log(zh ? `恢复了 ${out.restored.length} 个${out.skipped.length ? `，${out.skipped.length} 个已在原位置所以跳过` : ''}${out.failed.length ? `，${out.failed.length} 个失败` : ''}。` : `Restored ${out.restored.length}${out.skipped.length ? `, skipped ${out.skipped.length} already there` : ''}${out.failed.length ? `, ${out.failed.length} failed` : ''}.`);
+      for (const f of out.failed) console.log(`  ✗ ${f.file}: ${f.error}`);
+      if (out.restored.length) {
+        const byLine = new Map(); for (const it of can) if (out.restored.includes(it.file)) byLine.set(it.thread, [...(byLine.get(it.thread) || []), it]);
+        mutate(x => { for (const [tid, its] of byLine) addCommit(x, { thread: tid, kind: 'agent', agent, title: zh ? `从备份恢复了 ${its.length} 个文件` : `Restored ${its.length} file${its.length === 1 ? '' : 's'} from a backup`, body: its.slice(0, 40).map(it => `- ${it.file}\n  ← ${it.copy.file}`).join('\n'), links: its.slice(0, 20).map(it => it.file) }); });
+      }
+      if (out.failed.length) process.exitCode = 1;
       break;
     }
     case 'doctor': {

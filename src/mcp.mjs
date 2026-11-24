@@ -203,11 +203,6 @@ async function ensureServer() {
   for (let i = 0; i < 40; i++) { await sleep(150); if (await healthy(url)) return { url, started: true }; }
   throw new Error(`The page did not start on port ${port()}. Run: node "${CLI}" serve`);
 }
-function openBrowser(url) {
-  const cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'cmd' : 'xdg-open';
-  const args = process.platform === 'win32' ? ['/c', 'start', '', url] : [url];
-  try { spawn(cmd, args, { stdio: 'ignore', detached: true }).on('error', () => {}).unref(); } catch {}
-}
 const pageUrl = async () => { const url = `http://localhost:${port()}/`; return (await healthy(url)) ? url : null; };
 
 const MCP_HEAD = repoHead(); // the commit this MCP server's code was loaded from
@@ -268,7 +263,7 @@ async function callTool(name, a = {}) {
         return { text: `Closed the Quest "${c.title}".`, data: { id: c.id } };
       }
       if (!String(a.question || '').trim()) throw new Error('question is required to open a Quest');
-      let from = null; try { from = currentSessionId({ projectDir: projectDir() }); } catch {}
+      let from = null; try { from = currentSessionId({ projectDir: projectDir() }); } catch {} // no session id (not called from an agent session): logged without one
       const c = mutate(d => {
         const q = createCard(d, { question: a.question, thread: a.thread ? ensureThread(d, a.thread) : INBOX, inputs: Array.isArray(a.inputs) ? a.inputs : [], agent: a.agent || agentOf(agentKey()).name });
         if (from) q.fromSession = from;
@@ -283,7 +278,7 @@ async function callTool(name, a = {}) {
       let dup = false, from = null;
       // The session that logs it, so anyone can find the conversation behind a to-do (not `session`:
       // a task record with a session is a prompt the hooks logged).
-      try { from = currentSessionId({ projectDir: projectDir() }); } catch {}
+      try { from = currentSessionId({ projectDir: projectDir() }); } catch {} // no session id (not called from an agent session): logged without one
       const to = a.to ? replyTo(String(a.to)) : '';
       const c = mutate(d => {
         const q = a.quest ? d.commits[String(a.quest)] : null;
@@ -302,7 +297,7 @@ async function callTool(name, a = {}) {
         try {
           const t = liveSessions(readData()).sessions.find(x => x.id.startsWith(to) && x.id !== from && x.status === 'idle' && x.pane && x.tty);
           if (t) woke = await (await import('./agents.mjs')).typeInto({ socket: t.tmux || '', pane: t.pane, tty: t.tty }, `${(await import('./prompts.mjs')).HEADS.reply}: ${String(a.title).replace(/\s+/g, ' ').slice(0, 160)} [${c.id}]`);
-        } catch {}
+        } catch {} // could not type into its pane: woke stays false and the reply waits for its next turn
       }
       // on: the to-do is dispatched now, as `trace-canvas dispatch <id> --on <machine>` would (it used to be only stored,
       // so nothing started until someone ran dispatch by hand). A failed dispatch never loses the record.
@@ -330,7 +325,7 @@ async function callTool(name, a = {}) {
       const text = a.path ? fs.readFileSync(a.path, 'utf8') : String(a.json || '');
       if (!text.trim()) throw new Error('Pass path or json');
       let parsed = null;
-      try { parsed = JSON.parse(text); } catch {}
+      try { parsed = JSON.parse(text); } catch {} // not JSON: taken as a list of records below, or refused there
       if (parsed && !Array.isArray(parsed) && (parsed.threads || parsed.commits)) {
         const r = mutate(d => mergeDataset(d, parsed));
         return { text: `Merged ${r.commits} record${r.commits === 1 ? '' : 's'}, ${r.threads} new thread${r.threads === 1 ? '' : 's'} and ${r.edges} link${r.edges === 1 ? '' : 's'}; ${r.unified} thread${r.unified === 1 ? '' : 's'} joined an existing line.`, data: r };
@@ -364,7 +359,7 @@ async function callTool(name, a = {}) {
       let thread = a.thread || (handed && threadById(d, handed) ? handed : undefined);
       // Without a thread: the line this session works on, so the answer stays small as the canvas grows; every line
       // with all: true, for mine or an assignee, or when the session's line is not known.
-      if (!thread && !a.all && !a.mine && !a.assignee) try { const sid = currentSessionId({ sessionId: a.session_id, projectDir: projectDir() }); thread = (sid && sessionThread(d, { id: sid }).threadId) || undefined; } catch {}
+      if (!thread && !a.all && !a.mine && !a.assignee) try { const sid = currentSessionId({ sessionId: a.session_id, projectDir: projectDir() }); thread = (sid && sessionThread(d, { id: sid }).threadId) || undefined; } catch {} // no session: every line is listed
       const rows = listTasks(d, { thread, includeDone: !!a.include_done, assignee: a.mine ? agentKey() : a.assignee });
       const open = rows.reduce((n, r) => n + (r.total - r.done), 0);
       // This MCP server lives as long as its session and does not restart when the clone is updated: said here, where every agent looks.
@@ -409,8 +404,8 @@ async function callTool(name, a = {}) {
     case 'trace_open': {
       const { url, started } = await ensureServer();
       const full = url + (a.view && a.view !== 'canvas' ? `#${a.view}` : '');
-      if (a.open_browser) openBrowser(full);
-      return { text: `${started ? 'Started' : 'Running'} at ${full}${a.open_browser ? ' (opened in the browser)' : ''}.`, data: { url: full, dataFile: dataFile() } };
+      const noBrowser = a.open_browser ? await (await import('./agents.mjs')).openBrowser(full) : '';
+      return { text: `${started ? 'Started' : 'Running'} at ${full}${!a.open_browser ? '' : noBrowser ? ` (no browser could be opened here: ${noBrowser}; open the address yourself)` : ' (opened in the browser)'}.`, data: { url: full, dataFile: dataFile() } };
     }
     default: throw Object.assign(new Error(`Unknown tool ${name}`), { rpc: -32602 });
   }

@@ -3,6 +3,18 @@
 // a PermissionRequest is what "needs you" looks like); Gemini CLI names its events differently.
 // Tools are recognised by the shape of their input, since each CLI names them its own way.
 import { execFile, spawn } from 'node:child_process';
+
+// Opens an address in the person's browser. Resolves to '' once the opener has started, else to why it did not
+// (no xdg-open on a server, say), so the caller can say so instead of "opened".
+export function openBrowser(url, platform = process.platform, run = spawn) {
+  const cmd = platform === 'darwin' ? 'open' : platform === 'win32' ? 'cmd' : 'xdg-open';
+  return new Promise(done => {
+    try {
+      const c = run(cmd, platform === 'win32' ? ['/c', 'start', '', url] : [url], { stdio: 'ignore', detached: true });
+      c.once('error', e => done(`${cmd}: ${e.code || e.message}`)); c.once('spawn', () => { c.unref(); done(''); });
+    } catch (e) { done(`${cmd}: ${e.message}`); }
+  });
+}
 import fs from 'node:fs';
 import os from 'node:os';
 import crypto from 'node:crypto';
@@ -63,7 +75,7 @@ function desktopEnv(env) {
       if (fs.statSync(`/proc/${pid}`).uid !== process.getuid() || !/^(plasmashell|gnome-shell|kwin_x11|kwin_wayland|xfce4-session|cinnamon|mate-session|sway|Hyprland)$/.test(fs.readFileSync(`/proc/${pid}/comm`, 'utf8').trim())) continue;
       const vars = Object.fromEntries(fs.readFileSync(`/proc/${pid}/environ`, 'utf8').split('\0').filter(Boolean).map(l => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]));
       if (vars.DISPLAY || vars.WAYLAND_DISPLAY) return { ...env, ...Object.fromEntries(KEEP.filter(k => vars[k]).map(k => [k, vars[k]])) };
-    } catch {}
+    } catch {} // a process that ended meanwhile or is not ours to read: the next one
   }
   return null;
 }
@@ -90,7 +102,7 @@ export function typeable(cmd, dir = os.tmpdir()) {
 export function agentScreen(env = process.env) {
   const alive = pid => { try { return !!pid && process.kill(pid, 0); } catch { return false; } };
   let live = [];
-  try { live = listLive(env); } catch {}
+  try { live = listLive(env); } catch {} // live sessions unreadable: the terminal is chosen without them
   const s = live.filter(s => s.term === 'gnome-terminal' && /^\/org\/gnome\/Terminal\/screen\//.test(s.tab || '') && alive(s.pid)).sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0))[0];
   return s ? s.tab : '';
 }
@@ -105,7 +117,7 @@ export function terminalCommand(cmd, env = process.env, platform = env.TRACE_CAN
   // x-terminal-emulator is a symlink (Debian/Ubuntu: gnome-terminal.wrapper, which turns -e into --wait, a new window
   // each time): go by what it points to, and run that terminal itself so its new-tab flag applies.
   let real = term[0];
-  try { real = path.basename(fs.realpathSync(term[1])).replace(/\.(wrapper|real)$/, ''); } catch {}
+  try { real = path.basename(fs.realpathSync(term[1])).replace(/\.(wrapper|real)$/, ''); } catch {} // not a link: the name as given
   if (real !== term[0] && which(real, env)) term[0] = real, term[1] = which(real, env);
   if (term[0] === 'gnome-terminal') { const sc = screen ?? agentScreen(env); if (sc) shown.GNOME_TERMINAL_SCREEN = sc; }
   const sh = env.SHELL || '/bin/sh', run = [sh, '-lc', `${cmd}; exec ${q(sh)} -l`];
@@ -138,7 +150,7 @@ export function openTerminal(cmd, env = process.env) {
 export function startProbe(file, args, opts = {}, { wait = 1000, stay = false } = {}) {
   return new Promise(done => {
     let err = '', over = false;
-    const end = r => { if (over) return; over = true; clearTimeout(timer); try { c.stderr.destroy(); c.unref(); } catch {} done(r); };
+    const end = r => { if (over) return; over = true; clearTimeout(timer); try { c.stderr.destroy(); c.unref(); } catch {} done(r); }; // already closed
     const c = spawn(file, args, { ...opts, stdio: ['ignore', 'ignore', 'pipe'], detached: true });
     const timer = setTimeout(() => end({ started: true, why: '', pid: c.pid }), wait);
     c.stderr.on('data', b => { err = (err + b).slice(-2000); });
@@ -222,7 +234,7 @@ export async function deliverRow(r, { type = typeInto, ...deps } = {}) {
 // tmux is often not on the page server's PATH (a login item, a systemd service).
 // A process's environment: /proc on Linux, ps -E on a Mac (values cut at the first space, enough for these keys).
 async function envOf(pid) {
-  try { return Object.fromEntries(fs.readFileSync(`/proc/${pid}/environ`, 'utf8').split('\0').map(l => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)])); } catch {}
+  try { return Object.fromEntries(fs.readFileSync(`/proc/${pid}/environ`, 'utf8').split('\0').map(l => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)])); } catch {} // not Linux, or the process is gone: undefined, and the caller copes
   if (process.platform !== 'darwin') return {}; // ps -E is macOS's; elsewhere /proc was the way
   return Object.fromEntries(((await run('ps', ['-E', '-ww', '-o', 'command=', '-p', String(pid)])) || '').split(/\s+/).filter(w => /^[A-Z_][A-Z0-9_]*=/.test(w)).map(w => [w.slice(0, w.indexOf('=')), w.slice(w.indexOf('=') + 1)]));
 }
@@ -308,7 +320,7 @@ function agyReply(file) {
       if (!line.includes('"PLANNER_RESPONSE"')) continue;
       try { const e = JSON.parse(line); if (e.source === 'MODEL' && e.content) return String(e.content); } catch {} // the first line may be cut
     }
-  } catch {}
+  } catch {} // no transcript: no last reply
   return '';
 }
 function fromAgy(out) {

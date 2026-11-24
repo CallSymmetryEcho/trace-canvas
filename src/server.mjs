@@ -89,7 +89,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
   });
   fs.mkdirSync(liveDir(), { recursive: true });
   // ponytail: fs.watch on the folder; poll its files if a platform ever drops these events.
-  try { fs.watch(liveDir(), () => broadcast('live')).unref(); } catch {}
+  try { fs.watch(liveDir(), () => broadcast('live')).unref(); } catch {} // no watch on this platform: the page still gets live changes from the hooks' own broadcasts
   setInterval(() => { for (const res of clients) res.write(': ping\n\n'); }, 25000).unref();
   // A newer version on this clone's remote, looked up at start and twice a day; the page offers it under More.
   const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..'), CLI = path.join(ROOT, 'bin', 'trace-canvas.mjs');
@@ -232,7 +232,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
           // Other machines are read over ssh in a dry run first, never under the data lock (awayCache in src/ops.mjs).
           const awayLive = awayCache();
           const evolve = body.evolve || null;
-          try { startAutopilot(readData(), { thread, awayLive, evolve }); } catch {}
+          try { startAutopilot(readData(), { thread, awayLive, evolve }); } catch {} // a dry run that only reads other machines; the real start below reports any error
           const rows = mutate(d => startAutopilot(d, { thread, awayLive, evolve }));
           for (const r of rows) Object.assign(r, await deliverRow(r));
           broadcast('change');
@@ -319,7 +319,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
       if (req.method === 'POST' && p === '/api/update') {
         const log = path.join(home(), 'update.log'), fd = fs.openSync(log, 'w');
         const ch = spawn(process.execPath, [CLI, 'update'], { detached: true, stdio: ['ignore', fd, fd] }); fs.closeSync(fd); ch.unref();
-        ch.on('exit', code => { if (res.writableEnded) return; if (!code) return send(res, 200, { ok: true }); let why = ''; try { why = fs.readFileSync(log, 'utf8').trim().split('\n').pop(); } catch {} send(res, 500, { error: why.replace(/^Could not update: /, ''), failed: true }); });
+        ch.on('exit', code => { if (res.writableEnded) return; if (!code) return send(res, 200, { ok: true }); let why = ''; try { why = fs.readFileSync(log, 'utf8').trim().split('\n').pop(); } catch {} send(res, 500, { error: why.replace(/^Could not update: /, ''), failed: true }); }); // no log: the reason stays empty
         return;
       }
       if (req.method === 'GET' && p === '/api/doctor') return send(res, 200, { checks: remote ? [] : doctor() });
@@ -409,7 +409,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
     server.listen(port, host, () => {
       port = server.address().port;
       // Where it runs, so trace-canvas update can restart it on the same port.
-      try { fs.writeFileSync(path.join(home(), 'server.json'), JSON.stringify({ pid: process.pid, port, head: HEAD0 })); } catch {}
+      try { fs.writeFileSync(path.join(home(), 'server.json'), JSON.stringify({ pid: process.pid, port, head: HEAD0 })); } catch (e) { console.error(`Could not write server.json (${e.message}): trace-canvas update will not find this server to restart it.`); }
       // With phone access on, a second listener on the Tailscale address (never 0.0.0.0 unless set).
       const phone = readConfig().phone;
       if (!phone || !phone.bind) return resolve({ server, url: `http://localhost:${port}/`, ai });

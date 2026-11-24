@@ -115,7 +115,7 @@ export function allowSafeTools(file) {
 // MCP server. User scope goes through `claude mcp add`; a project gets an entry in its .mcp.json.
 export function installMcp({ user, project }, cli) {
   if (user) {
-    try { execFileSync('claude', ['mcp', 'remove', '--scope', 'user', 'trace-canvas'], { stdio: 'ignore' }); } catch {}
+    try { execFileSync('claude', ['mcp', 'remove', '--scope', 'user', 'trace-canvas'], { stdio: 'ignore' }); } catch {} // not registered before: nothing to remove
     try {
       execFileSync('claude', ['mcp', 'add', '--scope', 'user', 'trace-canvas', '--', NODE, cli, 'mcp'], { stdio: 'pipe' });
       return { ok: true, where: 'user scope (claude mcp add)' };
@@ -134,7 +134,7 @@ export function installMcp({ user, project }, cli) {
 // MCP for Codex and Gemini, with TRACE_CANVAS_AGENT so the server knows who is calling.
 export function installAgentMcp(agent, cli, home = os.homedir()) {
   if (agent === 'codex') {
-    try { execFileSync('codex', ['mcp', 'remove', 'trace-canvas'], { stdio: 'ignore' }); } catch {}
+    try { execFileSync('codex', ['mcp', 'remove', 'trace-canvas'], { stdio: 'ignore' }); } catch {} // not registered before: nothing to remove
     try { execFileSync('codex', ['mcp', 'add', 'trace-canvas', '--env', 'TRACE_CANVAS_AGENT=codex', '--', NODE, cli, 'mcp'], { stdio: 'pipe' }); return { ok: true }; }
     catch (e) { return { ok: false, hint: `codex mcp add trace-canvas --env TRACE_CANVAS_AGENT=codex -- "${NODE}" "${cli}" mcp` }; }
   }
@@ -191,7 +191,7 @@ export function linkCommand(cli, env = process.env, homeDir = os.homedir(), node
     if (!onIt.includes(dir)) continue;
     try { fs.accessSync(dir, fs.constants.W_OK); } catch { continue; }
     const dest = path.join(dir, 'trace-canvas');
-    let st = null; try { st = fs.lstatSync(dest); } catch {}
+    let st = null; try { st = fs.lstatSync(dest); } catch {} // not there yet
     if (st && !st.isSymbolicLink() && !fs.readFileSync(dest, 'utf8').includes(CMD_MARK)) continue; // not ours: leave it
     if (st) fs.unlinkSync(dest);
     fs.writeFileSync(dest, `#!/bin/sh\n${CMD_MARK}\nexec "${node}" "${cli}" "$@"\n`, { mode: 0o755 });
@@ -210,7 +210,7 @@ export function installSkill({ user, project }, skillDir, agent = 'claude') {
     const st = fs.lstatSync(dest);
     if (st.isSymbolicLink()) fs.unlinkSync(dest);
     else fs.renameSync(dest, `${dest}.bak-${Date.now()}`);
-  } catch {}
+  } catch {} // nothing there yet; if it could not be moved aside, the install below fails with the reason
   try { fs.symlinkSync(skillDir, dest, 'dir'); }
   catch { fs.mkdirSync(dest, { recursive: true }); fs.copyFileSync(path.join(skillDir, 'SKILL.md'), path.join(dest, 'SKILL.md')); }
   return dest;

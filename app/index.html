@@ -1299,7 +1299,7 @@ const uid = p => p + Date.now().toString(36) + Math.random().toString(36).slice(
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const ls = {
   get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
-  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }, // storage blocked or full: the choice lasts for this visit only
 };
 const pad2 = n => String(n).padStart(2, '0');
 // Theme: auto follows the system's light or dark; the rest are fixed (More → Theme, kept in this browser).
@@ -1679,13 +1679,13 @@ kind 可选 agent / idea / task / decision / note；thread 用简短的中文名
 };
 function initLang() {
   let l = null;
-  try { l = new URLSearchParams(location.search).get('lang'); } catch {}
+  try { l = new URLSearchParams(location.search).get('lang'); } catch {} // no readable address: the browser's language
   l = l || ls.get('tc.lang', null) || (SERVER && SERVER.langSet && SERVER.lang) || ((navigator.languages || [navigator.language]).find(x => /^(zh|en)/i.test(x || '')) || 'en').slice(0, 2).toLowerCase();
   return l === 'zh' ? 'zh' : 'en';
 }
 let LANG = initLang();
 // Nobody has chosen yet: keep what the browser said, so the records the hooks write use the same language.
-if (SERVER && !SERVER.langSet && !ls.get('tc.lang', null)) fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Trace-Canvas': '1' }, body: JSON.stringify({ lang: LANG }) }).catch(() => {});
+if (SERVER && !SERVER.langSet && !ls.get('tc.lang', null)) fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Trace-Canvas': '1' }, body: JSON.stringify({ lang: LANG }) }).catch(() => {}); // the language is kept in this browser anyway
 function t(key, ...args) {
   const v = I18N[LANG][key] !== undefined ? I18N[LANG][key] : I18N.en[key];
   return typeof v === 'function' ? v(...args) : (v === undefined ? key : v);
@@ -1698,12 +1698,12 @@ function applyStatic() {
   $$('[data-i18n-ph]').forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
   $$('[data-i18n-title]').forEach(el => { el.title = t(el.dataset.i18nTitle); });
   $$('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', t(el.dataset.i18nAria)); });
-  if (typeof menuState === 'function' && $('#theme-seg')) try { menuState(); } catch {}
+  if (typeof menuState === 'function' && $('#theme-seg')) try { menuState(); } catch {} // the menu is not built yet: it reads the theme when it is
 }
 function setLang(l) {
   LANG = l === 'zh' ? 'zh' : 'en';
   ls.set('tc.lang', LANG);
-  if (SERVER) fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Trace-Canvas': '1' }, body: JSON.stringify({ lang: LANG }) }).catch(() => {});
+  if (SERVER) fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Trace-Canvas': '1' }, body: JSON.stringify({ lang: LANG }) }).catch(() => {}); // the language is kept in this browser anyway
   applyStatic(); renderKinds(); capSig = ''; lastKey = ''; if (S.history) { $('#hist-label').textContent = t('histBack'); renderHistory(); }
   if (S.sheet && S.sheet !== 'ai') openSheet(S.sheet);
   render();
@@ -1900,7 +1900,7 @@ async function writeDoc(col, id, retried) {
       method: doc ? 'PUT' : 'DELETE',
       headers: { 'Content-Type': 'application/json', 'X-Trace-Canvas': '1' },
       body: doc ? JSON.stringify(doc) : undefined,
-    }).catch(() => null);
+    }).catch(() => null); // not reached: reported as a failed write on the next line
     if (!r || !r.ok) throw { code: 'server' };
     return;
   }
@@ -2267,7 +2267,7 @@ async function initStore() {
     S.mode = 'server';
     $('#sync-item').hidden = false; $('#doctor-item').hidden = false;
     // Phone access (trace-canvas phone): the server tells only this computer the address with its token.
-    fetch('/api/health', { cache: 'no-store' }).then(r => r.json()).then(j => { if (j.phone) { S.phoneUrl = j.phone; $('#phone-item').hidden = false; } }).catch(() => {});
+    fetch('/api/health', { cache: 'no-store' }).then(r => r.json()).then(j => { if (j.phone) { S.phoneUrl = j.phone; $('#phone-item').hidden = false; } }).catch(() => {}); // no phone address: the menu item stays hidden
     await loadServer();
     loadLive();
     const es = new EventSource('/api/events');
@@ -2287,7 +2287,7 @@ async function initStore() {
     try {
       const user = await window.claude.use('user');
       if (user) { const can = await user.can('data.write'); if (can === false) S.readOnly = true; }
-    } catch {}
+    } catch {} // no user capability: writing stays on
   } else {
     S.mode = 'local';
     const data = ls.get('tc.data', null);
@@ -3089,7 +3089,7 @@ vp.addEventListener('pointerdown', e => {
   if (e.pointerType === 'mouse' && e.button !== 0) return;
   stopCam();
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
-  try { vp.setPointerCapture(e.pointerId); } catch {}
+  try { vp.setPointerCapture(e.pointerId); } catch {} // the pointer is already gone: the drag ends on its own
   if (ptrs.size === 2) {
     const [a, b] = [...ptrs.values()];
     gesture = { type: 'pinch', d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, z0: S.cam.z, mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } };
@@ -4658,7 +4658,7 @@ function doCapture() {
   if (!canWrite()) return;
   let text = capText.value.trim(); if (!text) { capText.focus(); return; }
   if (/^[\[{]/.test(text)) {
-    try { const n = importText(text); capText.value = ''; autosize(); toast(t('tImported', n)); return; } catch {}
+    try { const n = importText(text); capText.value = ''; autosize(); toast(t('tImported', n)); return; } catch {} // not import JSON: kept as an ordinary record below
   }
   let tid = S.captureThread;
   const m = text.match(/^#([^\s#]+)\s+([\s\S]+)$/);
@@ -4688,7 +4688,7 @@ function setView(v) {
   $('#view-agents').hidden = v !== 'agents';
   if (v === 'timeline') S.tlScroll = true;
   if (v !== 'canvas') S.connect = null;
-  try { history.replaceState(history.state, '', location.pathname + location.search + '#' + v); } catch {}
+  try { history.replaceState(history.state, '', location.pathname + location.search + '#' + v); } catch {} // a sandboxed frame may refuse: the address just keeps the old view
   render();
 }
 $$('.tab[data-view]').forEach(el => el.addEventListener('click', () => { if (PHONE.matches) { if (S.sheet) closeSheet(); if (S.sel) select(null); } setView(el.dataset.view); }));
@@ -4848,7 +4848,7 @@ function codebox(text, id) { return `<div class="codebox"><pre id="${id}">${esc(
 // tailnet, so copying falls back to execCommand, and failing that shows the text selected, to copy by hand.
 async function copyText(text, okMsg) {
   let ok = false;
-  if (window.isSecureContext && navigator.clipboard) { try { await navigator.clipboard.writeText(text); ok = true; } catch {} }
+  if (window.isSecureContext && navigator.clipboard) { try { await navigator.clipboard.writeText(text); ok = true; } catch {} } // refused: the legacy copy below is tried, then the text is shown to copy by hand
   if (!ok) ok = copyLegacy(text);
   if (ok) { toast(okMsg || t('tCopied')); return; }
   S.sheet = 'copy'; document.body.classList.add('sheet-open');
@@ -4862,7 +4862,7 @@ function copyLegacy(text) {
   document.body.appendChild(box);
   box.focus(); box.setSelectionRange(0, text.length);
   let ok = false;
-  try { ok = document.execCommand('copy'); } catch {}
+  try { ok = document.execCommand('copy'); } catch {} // refused: the caller shows the text to copy by hand
   box.remove();
   return ok;
 }
@@ -5008,7 +5008,7 @@ async function saveExport() {
     return;
   }
   let dl = null;
-  try { dl = await window.claude.use('downloads'); } catch {}
+  try { dl = await window.claude.use('downloads'); } catch {} // no downloads capability: the export falls back to a link
   if (!dl) { copyText(exportJSON(), t('tSaveFallback')); return; }
   try { await dl.save({ filename, data: exportJSON() }); toast(t('tSaved')); }
   catch (e) { if (!e || e.code !== 'declined') copyText(exportJSON(), t('tSaveFallback')); }
@@ -5230,7 +5230,7 @@ function renderGoals() {
   S.glOrder = groups.map(g => g.th.id);
   const others = orderedThreads().filter(th => inFocus(th) && !['done', 'merged'].includes(th.status)).length - groups.filter(g => g.th.id !== INBOX).length;
   let tipHidden = false;
-  try { tipHidden = localStorage.getItem('tc.goalsTipHidden') === '1'; } catch {}
+  try { tipHidden = localStorage.getItem('tc.goalsTipHidden') === '1'; } catch {} // storage blocked: the tip shows
   const totalOpen = groups.reduce((n, g) => n + g.open.length, 0), totalReview = groups.reduce((n, g) => n + g.review.length, 0);
   const agentBy = c => `<span class="gl-by"><span class="actor a-agent">${ACTOR_ICON.agent}</span>${esc(t('goalsBy', c.doneBy))}</span>`;
   const row = c => {
@@ -5280,7 +5280,7 @@ function renderGoals() {
     ? { sel: act.tagName + [...act.classList].map(c => '.' + CSS.escape(c)).join('') + [...act.attributes].filter(x => x.name.startsWith('data-')).map(x => `[${x.name}="${CSS.escape(x.value)}"]`).join(''), v: act.value, a: act.selectionStart, b: act.selectionEnd } : null;
   setSheet(t('goalsTitle'), body);
   const again = typing && sb.querySelector(typing.sel);
-  if (again) { again.value = typing.v; again.focus({ preventScroll: true }); try { again.setSelectionRange(typing.a, typing.b); } catch {} }
+  if (again) { again.value = typing.v; again.focus({ preventScroll: true }); try { again.setSelectionRange(typing.a, typing.b); } catch {} } // not a text box with a caret
   const hit = marks.map(([k, off]) => [sb.querySelector(`[data-k="${CSS.escape(k)}"]`), off]).find(([el]) => el);
   sb.scrollTop = hit ? sb.scrollTop + offOf(hit[0]) - hit[1] : keep;
 }
@@ -5475,7 +5475,7 @@ sheetBody.addEventListener('click', e => {
   if (ret) { S.glReturn = S.glReturn === ret.dataset.return ? null : ret.dataset.return; renderGoals(); const box = $('.gl-ret', sheetBody); if (box) box.focus(); return; }
   if (retGo) { returnTodo(retGo.dataset.retGo); return; }
   if (e.target.closest('[data-gl-fold]')) { S.glFoldOpen = !S.glFoldOpen; renderGoals(); return; }
-  if (e.target.id === 'gl-tip-hide') { try { localStorage.setItem('tc.goalsTipHidden', '1'); } catch {} renderGoals(); return; }
+  if (e.target.id === 'gl-tip-hide') { try { localStorage.setItem('tc.goalsTipHidden', '1'); } catch {} renderGoals(); return; } // storage blocked: the tip is back on the next visit
   if (handClick(e)) return;
   const add = e.target.closest('[data-add]'), edit = e.target.closest('[data-edit], [data-goal-edit]');
   if (add) { addTodo(add.dataset.add); return; }
@@ -5559,11 +5559,11 @@ function startOn(ref) {
 }
 function parseLooseJSON(text) {
   const s = String(text || '').trim();
-  try { return JSON.parse(s); } catch {}
+  try { return JSON.parse(s); } catch {} // not plain JSON: a fenced block is tried next
   const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fence) { try { return JSON.parse(fence[1]); } catch {} }
+  if (fence) { try { return JSON.parse(fence[1]); } catch {} } // not JSON in the fence: the outermost braces are tried next
   const a = s.indexOf('{'), b = s.lastIndexOf('}');
-  if (a !== -1 && b > a) { try { return JSON.parse(s.slice(a, b + 1)); } catch {} }
+  if (a !== -1 && b > a) { try { return JSON.parse(s.slice(a, b + 1)); } catch {} } // no JSON at all: null, and the caller says the answer could not be read
   throw { code: 'invalid_json' };
 }
 async function askAI(prompt, signal) {

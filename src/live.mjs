@@ -31,7 +31,7 @@ const isLive = (s, now) => (s.pid ? (s.lastSeen || 0) > bootedAt() && running(s.
 export function claudeSessions(env = process.env) {
   const dir = path.join(env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude'), 'sessions'), out = new Map();
   let names = [];
-  try { names = fs.readdirSync(dir).filter(n => /^\d+\.json$/.test(n)); } catch {}
+  try { names = fs.readdirSync(dir).filter(n => /^\d+\.json$/.test(n)); } catch {} // no live folder yet: nothing is running
   for (const n of names) { const r = readJson(path.join(dir, n)); if (r && r.sessionId && r.pid) out.set(r.sessionId, r); }
   return out;
 }
@@ -43,7 +43,7 @@ function notePid(pid, sid, env) {
     m[pid] = sid;
     const keys = Object.keys(m); // ponytail: the 500 highest pids (number keys sort by value), plenty for replies within a day
     fs.writeFileSync(pidsFile(env), JSON.stringify(Object.fromEntries(keys.slice(-500).map(k => [k, m[k]]))));
-  } catch {}
+  } catch {} // bookkeeping: without it a reply sent by pid waits for that session's next turn
 }
 /** The session a Claude Code process is or was: its sessions/<pid>.json while it runs, else the pids the hooks noted. */
 export function sessionOfPid(pid, env = process.env) {
@@ -65,8 +65,8 @@ const readJson = f => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } c
 export function dropLive(sid, env) {
   const pre = `${safe(sid)}.agent-`;
   let names = [];
-  try { names = fs.readdirSync(liveDir(env)); } catch {}
-  for (const n of names) if (n === `${safe(sid)}.json` || n.startsWith(pre)) { try { fs.unlinkSync(path.join(liveDir(env), n)); } catch {} }
+  try { names = fs.readdirSync(liveDir(env)); } catch {} // no live folder: nothing to drop
+  for (const n of names) if (n === `${safe(sid)}.json` || n.startsWith(pre)) { try { fs.unlinkSync(path.join(liveDir(env), n)); } catch {} } // already gone
 }
 
 // Codex sometimes ends a turn without running the Stop hook, which left sessions "working" for hours. Its rollout
@@ -102,7 +102,7 @@ export function codexTerminals(run = execFileSync, platform = process.platform, 
       r.splice(1, 1); // [line, tty, id] as before
       if (r && !m.has(r[2])) m.set(r[2], { tty: '/dev/' + r[1], term: v('TERM_PROGRAM'), ...tmuxOf({ TMUX: v('TMUX'), TMUX_PANE: v('TMUX_PANE') }, '/dev/' + r[1], paneTty) });
     }
-  } catch {}
+  } catch {} // ps or /proc unreadable: sessions show without their terminal
   return m;
 }
 export function withCodexTerm(scan = codexTerminals) {
@@ -124,13 +124,13 @@ const paneTtyOf = (socket, pane) => execFileSync(tmuxBin(), ['-S', socket, 'disp
 export function tmuxOf(env, tty, paneTty = paneTtyOf) {
   if (!env.TMUX || !/^%\d+$/.test(env.TMUX_PANE || '')) return { tmux: '', pane: '' };
   const socket = String(env.TMUX).split(',')[0];
-  let own = ''; try { own = paneTty(socket, env.TMUX_PANE); } catch {}
+  let own = ''; try { own = paneTty(socket, env.TMUX_PANE); } catch {} // not in tmux, or tmux is gone: no own pane to leave out
   return tty && own === tty ? { tmux: socket, pane: env.TMUX_PANE } : { tmux: '', pane: '' };
 }
 // Running sessions, the ones that need you first, then the busiest. Each carries its subagents.
 export function listLive(env, now = Date.now()) {
   let names = [];
-  try { names = fs.readdirSync(liveDir(env)).filter(n => n.endsWith('.json')); } catch {}
+  try { names = fs.readdirSync(liveDir(env)).filter(n => n.endsWith('.json')); } catch {} // no live folder yet: nothing is running
   const agents = new Map();
   for (const n of names.filter(n => n.includes('.agent-'))) {
     const a = readJson(path.join(liveDir(env), n));
@@ -170,7 +170,7 @@ export function lastWords(file) {
         if (b.type === 'tool_use' && b.name === 'SubagentHandback' && b.input && b.input.message) return String(b.input.message);
       }
     }
-  } catch {} finally { if (fd !== undefined) try { fs.closeSync(fd); } catch {} }
+  } catch {} finally { if (fd !== undefined) try { fs.closeSync(fd); } catch {} } // transcript unreadable: no last reply is shown; the close fails only on a descriptor already closed
   return '';
 }
 
@@ -215,7 +215,7 @@ export function terminalOf(env = process.env, pid = process.pid, paneTty = paneT
       const [p, pp, t, ...c] = l.trim().split(/\s+/);
       if (p) procs.set(+p, { ppid: +pp, tty: t, comm: c.join(' ') });
     }
-  } catch {}
+  } catch {} // ps failed: the terminal stays unknown and the caller falls back
   let tty = '', agent = +env.CLAUDE_PID || 0; // Claude Code names its own process; others are found by name
   for (let p = pid, n = 0; procs.has(p) && p > 1 && n < 8 && !(tty && agent); p = procs.get(p).ppid, n++) {
     const { tty: t, comm } = procs.get(p);

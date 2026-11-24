@@ -23,7 +23,7 @@ export function tailscaleSelf() {
       const s = JSON.parse(execFileSync(bin, ['status', '--json'], { encoding: 'utf8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'] }));
       const self = s.Self || {}, ip = (self.TailscaleIPs || []).find(a => a.includes('.'));
       return s.BackendState === 'Running' && self.DNSName && ip ? { dns: self.DNSName.replace(/\.$/, ''), ip } : null;
-    } catch {}
+    } catch {} // no tailscale at this path, or not running: the next path is tried, then none is reported
   }
   return null;
 }
@@ -58,6 +58,11 @@ export function doctor(env = process.env, homeDir = os.homedir()) {
   const agent = process.platform === 'darwin' && (() => { try { return fs.readdirSync(path.join(homeDir, 'Library', 'LaunchAgents')).some(f => /trace-canvas/i.test(f)); } catch { return false; } })();
   if (unit || agent) add('autostart', true, unit ? `Starts with the computer (systemd ${unit.name})` : 'Starts with the computer (launchd)');
   else add('autostart', 'warn', 'Does not start with the computer: after a restart the page is down until you run it', process.platform === 'linux' ? 'A systemd user service (see the FAQ)' : process.platform === 'darwin' ? 'A launchd agent (see the FAQ)' : 'Start it with trace-canvas serve after a restart');
+
+  // Hooks never fail an agent's turn; what went wrong in one is kept in hook-errors.log (bin/trace-canvas.mjs).
+  let log = ''; try { log = fs.readFileSync(path.join(home(env), 'hook-errors.log'), 'utf8'); } catch { /* no hook has failed */ }
+  const errs = log.split('\n').slice(-200).map(l => { try { return JSON.parse(l); } catch { return null; /* a cut or empty line */ } }).filter(e => e && Date.now() - e.at < 864e5);
+  if (errs.length) { const e = errs[errs.length - 1]; add('hook-errors', 'warn', `A hook failed ${errs.length} time${errs.length === 1 ? '' : 's'} in the last day; the latest (${e.what}, ${new Date(e.at).toLocaleString()}): ${String(e.error).split('\n')[0]}`, 'Records of those moments may be missing. The details are in hook-errors.log in the data folder'); }
 
   // Version: commits waiting upstream (as of the last fetch; the page and update fetch).
   const behind = Number(run('git', ['-C', ROOT, 'rev-list', '--count', 'HEAD..@{u}']));

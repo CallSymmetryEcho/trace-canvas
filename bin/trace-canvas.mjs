@@ -49,10 +49,15 @@ function flag(name, fallback) {
   return v && !v.startsWith('--') ? v : true;
 }
 const str = v => (v === true || v == null ? '' : String(v));
-function openBrowser(url) {
-  const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'cmd' : 'xdg-open';
-  const args = process.platform === 'win32' ? ['/c', 'start', '', url] : [url];
-  try { spawn(opener, args, { stdio: 'ignore', detached: true }).on('error', () => {}).unref(); } catch {}
+// Says so when no browser could be opened (a server without a desktop), instead of leaving the person waiting for a window.
+async function openBrowser(url) {
+  const why = await (await import('../src/agents.mjs')).openBrowser(url);
+  if (why) console.error(`No browser could be opened here (${why}). Open ${url} yourself.`);
+}
+// A hook never fails the agent's turn, so what went wrong in it is kept in the data folder; trace-canvas doctor shows the
+// latest. ponytail: the file only grows (one line per failure); cap it if hooks ever fail often.
+function noteHookError(what, e) {
+  try { fs.mkdirSync(path.dirname(dataFile()), { recursive: true }); fs.appendFileSync(path.join(path.dirname(dataFile()), 'hook-errors.log'), JSON.stringify({ at: Date.now(), what, error: String(e && e.stack || e).slice(0, 2000) }) + '\n'); } catch { /* nowhere to write it: the hook still must not fail the turn */ }
 }
 function scope() {
   const user = flag('user', false), project = flag('project', null);
@@ -172,11 +177,11 @@ async function main() {
         console.log(`Data: ${dataFile()}`);
         console.log(ai ? 'AI tidy-up: on (uses your local `claude` CLI)' : 'AI tidy-up: off (install Claude Code to enable it)');
         console.log('Press Ctrl+C to stop.');
-        if (!noOpen) openBrowser(url);
+        if (!noOpen) await openBrowser(url);
       } catch (e) {
         if (e.code === 'EADDRINUSE') {
           console.log(`Port ${port} is in use; Trace Canvas may already be running at http://localhost:${port}/`);
-          if (!noOpen) openBrowser(`http://localhost:${port}/`);
+          if (!noOpen) await openBrowser(`http://localhost:${port}/`);
           process.exit(1); // nothing to serve: never sit idle holding a service manager's slot
         } else throw e;
       }
@@ -188,7 +193,7 @@ async function main() {
         try {
           const why = process.env.TRACE_CANVAS_DISABLE === '1' ? '' : (await import('../src/hook.mjs')).autopilotGate(JSON.parse(await readStdin()));
           if (why) process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: why } }));
-        } catch {}
+        } catch (e) { noteHookError('gate', e); }
         process.exit(0);
       }
       // Never break the Claude Code session: swallow everything, print nothing.
@@ -217,7 +222,7 @@ async function main() {
             else if (input.hook_event_name === 'UserPromptSubmit') context = promptContext(input);
           }
         }
-      } catch (e) { outcome = { error: String(e && e.stack || e) }; }
+      } catch (e) { outcome = { error: String(e && e.stack || e) }; noteHookError(event || 'hook', e); }
       // Antigravity takes context as a system message step; any other output from its tool hook would decide the tool.
       if (context) process.stdout.write(JSON.stringify(agent === 'agy' ? { injectSteps: [{ systemMessage: { systemMessage: context } }] } : { hookSpecificOutput: { hookEventName: event, additionalContext: context } }));
       // Autopilot: an agent that stops while it could go on is handed its next to-do (src/hook.mjs). Claude Code's and
@@ -232,9 +237,9 @@ async function main() {
           const gate = agent !== 'claude' && (event === 'PreToolUse' || event === 'BeforeTool') && autopilotGate(p);
           if (gate) process.stdout.write(JSON.stringify(agent === 'gemini' || agent === 'agy' ? { decision: 'deny', reason: gate } : { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: gate } }));
         }
-      } catch {}
+      } catch (e) { if (!(outcome && outcome.error)) noteHookError(`${event || 'hook'} (autopilot)`, e); } // the same failure is noted once
       if (process.env.TRACE_CANVAS_DEBUG) {
-        try { fs.appendFileSync(path.join(path.dirname(dataFile()), 'debug.log'), `${new Date().toISOString()} ${raw.slice(0, 4000)}\n  -> ${JSON.stringify(outcome ?? 'logged')}\n`); } catch {}
+        try { fs.appendFileSync(path.join(path.dirname(dataFile()), 'debug.log'), `${new Date().toISOString()} ${raw.slice(0, 4000)}\n  -> ${JSON.stringify(outcome ?? 'logged')}\n`); } catch {} // the debug log is optional
       }
       process.exit(0);
     }
@@ -307,7 +312,7 @@ async function main() {
       if (!src) { console.error('Usage: trace-canvas import <file|->'); process.exit(1); }
       const text = src === '-' ? await readStdin() : fs.readFileSync(src, 'utf8');
       let parsed = null;
-      try { parsed = JSON.parse(text); } catch {}
+      try { parsed = JSON.parse(text); } catch {} // not JSON: taken as a list of records below, or refused there
       if (parsed && !Array.isArray(parsed) && (parsed.threads || parsed.commits)) {
         const { mergeDataset } = await import('../src/ops.mjs');
         const r = mutate(d => mergeDataset(d, parsed));
@@ -350,7 +355,7 @@ async function main() {
       let rows = [];
       // Other machines are read over ssh in a dry run on a copy, never under the data lock (awayCache in src/ops.mjs).
       const ask = { refs: argv.filter(Boolean), all, on, self: process.env.CLAUDE_CODE_SESSION_ID || null, awayLive: awayCache() };
-      try { dispatch(readData(), ask); } catch {}
+      try { dispatch(readData(), ask); } catch {} // a dry run that only reads other machines; the real one below reports any error
       mutate(d => { rows = dispatch(d, ask); return print ? false : rows; });
       await runRows(rows, { run, json });
       break;
@@ -366,7 +371,7 @@ async function main() {
       if (stop) { const th = mutate(d => stopAutopilot(d, { thread: ref })); console.log(`Autopilot is off on "${th.name}"; its agent stops before the next to-do.`); break; }
       let rows = [];
       const ask = { thread: ref, self: process.env.CLAUDE_CODE_SESSION_ID || null, awayLive: awayCache() };
-      try { startAutopilot(readData(), ask); } catch {}
+      try { startAutopilot(readData(), ask); } catch {} // a dry run that only reads other machines; the real one below reports any error
       mutate(d => { rows = startAutopilot(d, ask); return print ? false : rows; });
       await runRows(rows, { run: !print && !!terminalCommand(''), json });
       if (!json && !print) console.log('\nAutopilot is asked: it turns on when a session takes the prompt (its hook says so) and stays on: the agent stops to ask what it cannot decide and goes on after your answer, until you stop it with trace-canvas autopilot <line> --stop.');
@@ -558,7 +563,8 @@ async function main() {
           }
           console.log(`Updated ${before} → ${git('rev-parse', '--short', 'HEAD')}:\n${news}`);
           for (const d of [path.join(os.homedir(), '.claude', 'skills', 'trace-canvas'), path.join(os.homedir(), '.agents', 'skills', 'trace-canvas')]) {
-            try { if (!fs.lstatSync(d).isSymbolicLink()) fs.copyFileSync(path.join(root, 'skill', 'SKILL.md'), path.join(d, 'SKILL.md')); } catch {}
+            // Not installed there (ENOENT) is fine; anything else leaves an old skill behind, so it is said.
+            try { if (!fs.lstatSync(d).isSymbolicLink()) fs.copyFileSync(path.join(root, 'skill', 'SKILL.md'), path.join(d, 'SKILL.md')); } catch (e) { if (e.code !== 'ENOENT') console.error(`The skill in ${d} was not updated: ${e.message}`); }
           }
         }
         if (check) break;
@@ -677,7 +683,7 @@ async function main() {
       {
         const { machineOwner } = await import('../src/sync.mjs');
         let saved = '';
-        try { saved = JSON.parse(fs.readFileSync(path.join(home(), 'config.json'), 'utf8')).machine || ''; } catch {}
+        try { saved = JSON.parse(fs.readFileSync(path.join(home(), 'config.json'), 'utf8')).machine || ''; } catch {} // no config yet
         const mapArg = str(flag('map', '')); // flag() takes the option out of argv, so read it once
         if (mapArg) writeConfig({ map: path.resolve(mapArg) });
         const cfg = readConfig(), machine = str(flag('machine', '')) || saved || whoami(cfg.map) || cfg.machine;

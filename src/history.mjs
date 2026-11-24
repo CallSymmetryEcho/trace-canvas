@@ -115,7 +115,7 @@ function claudeSessions(root, sub, known, env) {
 }
 function codexSessions(root, sub, known, env) {
   const base = env.CODEX_HOME || path.join(os.homedir(), '.codex'), out = [];
-  const walk = dir => { let es = []; try { es = fs.readdirSync(dir, { withFileTypes: true }); } catch {} return es.flatMap(e => e.isDirectory() ? walk(path.join(dir, e.name)) : /^rollout-.*\.jsonl$/.test(e.name) ? [path.join(dir, e.name)] : []); };
+  const walk = dir => { let es = []; try { es = fs.readdirSync(dir, { withFileTypes: true }); } catch {} return es.flatMap(e => e.isDirectory() ? walk(path.join(dir, e.name)) : /^rollout-.*\.jsonl$/.test(e.name) ? [path.join(dir, e.name)] : []); }; // no such folder: no Codex sessions there
   for (const file of [...walk(path.join(base, 'sessions')), ...walk(path.join(base, 'archived_sessions'))]) {
     const id = (file.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/) || [])[1];
     if (!id || known.has(id)) continue;

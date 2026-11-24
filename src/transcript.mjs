@@ -35,7 +35,7 @@ export function findTranscripts(projectDir, env = process.env) {
     // Fall back to matching the cwd recorded inside each project's newest transcript.
     const want = path.resolve(projectDir);
     let dirs = [];
-    try { dirs = fs.readdirSync(root); } catch {}
+    try { dirs = fs.readdirSync(root); } catch {} // no such folder: no sessions there
     for (const d of dirs) {
       const fs2 = list(path.join(root, d)).sort((a, b) => b.mtime - a.mtime);
       if (!fs2.length) continue;
@@ -75,7 +75,7 @@ export function findTranscript({ sessionId, projectDir, transcriptPath }, env = 
     if (local) return local.path;
     const root = projectsRoot(env);
     let dirs = [];
-    try { dirs = fs.readdirSync(root); } catch {}
+    try { dirs = fs.readdirSync(root); } catch {} // no such folder: no sessions there
     for (const d of dirs) { const p = path.join(root, d, sessionId + '.jsonl'); if (fs.existsSync(p)) return p; }
     return null;
   }
@@ -200,7 +200,7 @@ export function sessionTokens(file, since = 0) {
     return r;
   };
   const dir = path.join(file.replace(/\.jsonl$/, ''), 'subagents');
-  let subs = []; try { subs = fs.readdirSync(dir).filter(f => f.endsWith('.jsonl')).map(f => sum(path.join(dir, f))).filter(r => r.calls); } catch {}
+  let subs = []; try { subs = fs.readdirSync(dir).filter(f => f.endsWith('.jsonl')).map(f => sum(path.join(dir, f))).filter(r => r.calls); } catch {} // no subagent folder
   return { main: sum(file), subagents: subs };
 }
 

@@ -64,14 +64,14 @@ export function gitRoot(dir) {
 
 const stateFile = (sid, env) => path.join(home(env), 'sessions', String(sid).replace(/[^\w.-]/g, '_') + '.json');
 function loadState(sid, env) {
-  try { return JSON.parse(fs.readFileSync(stateFile(sid, env), 'utf8')); } catch {}
+  try { return JSON.parse(fs.readFileSync(stateFile(sid, env), 'utf8')); } catch {} // no state yet: a new session
   return { startedAt: Date.now(), prompts: 0, files: [], turnFiles: [], turnTodos: [], turnActions: 0, doneTodos: [], commits: [], seen: [] };
 }
 function saveState(sid, state, env) {
   fs.mkdirSync(path.dirname(stateFile(sid, env)), { recursive: true });
   fs.writeFileSync(stateFile(sid, env), JSON.stringify(state));
 }
-function dropState(sid, env) { try { fs.unlinkSync(stateFile(sid, env)); } catch {} }
+function dropState(sid, env) { try { fs.unlinkSync(stateFile(sid, env)); } catch {} } // already gone
 
 // git reports the real path, while cwd and tool paths may go through a link (on macOS /var and
 // /tmp point into /private), so compare real paths. f itself may not exist yet; its folder does.
@@ -174,10 +174,10 @@ export function handleHook(input, env = process.env) {
   const sid = input.session_id || 'unknown';
   if (ev === 'UserPromptSubmit' && APP_PROMPT.test(String(input.prompt || ''))) {
     saveState(sid, { ...loadState(sid, env), ignored: true }, env);
-    try { dropLive(sid, env); } catch {}
+    try { dropLive(sid, env); } catch {} // a live file left behind is dropped once its process is gone
     return { skipped: 'app-generated' };
   }
-  if (loadState(sid, env).ignored) { if (ev === 'SessionEnd') dropState(sid, env); else try { dropLive(sid, env); } catch {} return { skipped: 'app-generated' }; }
+  if (loadState(sid, env).ignored) { if (ev === 'SessionEnd') dropState(sid, env); else try { dropLive(sid, env); } catch {} return { skipped: 'app-generated' }; } // a live file left behind is dropped once its process is gone
   const cfg = readConfig(env);
   const cwd = input.cwd || process.cwd();
   const ag = agentOf(input._agent); // normalize() sets it for Codex and Gemini; plain input is Claude Code
@@ -198,7 +198,7 @@ export function handleHook(input, env = process.env) {
   // `git commit -q` (or output cut by `| tail`) prints no sha: then the commit is HEAD, if it was made just now.
   const head = commitRepo ? git(commitRepo, ['log', '-1', '--format=%H%x09%ct%x09%s']).split('\t') : [];
   const headNow = head.length === 3 && Date.now() - Number(head[1]) * 1000 < 120e3 ? { sha: head[0], subject: head[2] } : null;
-  try { updateLive(input, { info, key: info ? threadKey(info, cfg, sid) : null, env, agent: ag.name, agentKey: input._agent || 'claude', resume: ag.resume(sid), machine: cfg.machine, terminal }); } catch {}
+  try { updateLive(input, { info, key: info ? threadKey(info, cfg, sid) : null, env, agent: ag.name, agentKey: input._agent || 'claude', resume: ag.resume(sid), machine: cfg.machine, terminal }); } catch {} // the live bar is bookkeeping: the record itself is written below
   if (!LOG_EVENTS.includes(ev)) return { live: ev };
 
   let due = null;
@@ -303,7 +303,7 @@ export function handleHook(input, env = process.env) {
         task.result = msg.length > 1500 ? msg.slice(0, 1500) + '…' : msg;
         if (msg.length > 1500) {
           const file = path.join(home(env), 'replies', `${task.id}.md`);
-          try { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, msg + '\n'); task.links = [...(task.links || []), file]; } catch {}
+          try { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, msg + '\n'); task.links = [...(task.links || []), file]; } catch (e) { task.result += `\n(The full reply could not be saved: ${e.code || e.message})`; }
         }
         Object.assign(task, { done: true, doneBy: ag.name, doneAt: Date.now(), toReview: true });
         changed = true;
@@ -341,10 +341,10 @@ export function handleHook(input, env = process.env) {
 export function historyDue(tid, env = process.env, every = 10 * 60e3) {
   const f = path.join(home(env), 'history-at.json');
   let at = {};
-  try { at = JSON.parse(fs.readFileSync(f, 'utf8')); } catch {}
+  try { at = JSON.parse(fs.readFileSync(f, 'utf8')); } catch {} // no file yet
   if (Date.now() - (at[tid] || 0) < every) return false;
   at[tid] = Date.now();
-  try { fs.writeFileSync(f, JSON.stringify(at)); } catch {}
+  try { fs.writeFileSync(f, JSON.stringify(at)); } catch {} // at worst the reminder comes once more
   return true;
 }
 
@@ -419,7 +419,7 @@ function underSharedDaemon(pid = process.ppid) {
       if (/codex\S*\s+app-server/.test(cmd)) return true;
       pid = Number(ppid);
     }
-  } catch {}
+  } catch {} // ps failed: taken as a session of the person's own
   return false;
 }
 /** The line this process was handed with TRACE_CANVAS_THREAD (`hand`), '' when the variable is a shared daemon's. */

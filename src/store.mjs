@@ -57,12 +57,12 @@ export function withLock(fn, env) {
     try { fs.mkdirSync(dir); break; } catch (e) {
       if (e.code !== 'EEXIST') throw e;
       let stale = false;
-      try { stale = Date.now() - fs.statSync(dir).mtimeMs > 5000; } catch {}
-      if (stale || Date.now() - start > 4000) { try { fs.rmdirSync(dir); } catch {} continue; }
+      try { stale = Date.now() - fs.statSync(dir).mtimeMs > 5000; } catch {} // the lock went away meanwhile: the loop tries again
+      if (stale || Date.now() - start > 4000) { try { fs.rmdirSync(dir); } catch {} continue; } // another process removed it first
       sleepSync(10);
     }
   }
-  try { return fn(); } finally { try { fs.rmdirSync(dir); } catch {} }
+  try { return fn(); } finally { try { fs.rmdirSync(dir); } catch {} } // already removed
 }
 
 // Runs fn(data) under the lock. fn returns false to skip the write. While it runs, new records and
@@ -82,7 +82,7 @@ export function mutate(fn, env) {
 
 export function readConfig(env = process.env) {
   let file = {};
-  try { file = JSON.parse(fs.readFileSync(configFile(env), 'utf8')); } catch {}
+  try { file = JSON.parse(fs.readFileSync(configFile(env), 'utf8')); } catch {} // no config file yet: the defaults
   return {
     lang: env.TRACE_CANVAS_LANG || file.lang || 'en',
     langSet: !!(env.TRACE_CANVAS_LANG || file.lang), // chosen, not the default
@@ -123,7 +123,7 @@ export const insidePlace = (p, dir) => { if (!p || !dir) return false; const a =
 export function writeConfig(patch, env) {
   fs.mkdirSync(home(env), { recursive: true });
   let file = {};
-  try { file = JSON.parse(fs.readFileSync(configFile(env), 'utf8')); } catch {}
+  try { file = JSON.parse(fs.readFileSync(configFile(env), 'utf8')); } catch {} // no config file yet: the defaults
   fs.writeFileSync(configFile(env), JSON.stringify({ ...file, ...patch }, null, 2));
 }
 
@@ -308,7 +308,7 @@ export function parseTs(v) {
 export function importText(d, text, { defaultThread = INBOX } = {}) {
   text = String(text || '').trim();
   let data = null;
-  try { data = JSON.parse(text); } catch {}
+  try { data = JSON.parse(text); } catch {} // not JSON: read below as text, or refused there
   const validId = id => typeof id === 'string' && /^[\w\-.~:@+]{1,180}$/.test(id);
   if (data && !Array.isArray(data) && typeof data === 'object' && (Array.isArray(data.threads) || Array.isArray(data.commits))) {
     let n = 0;

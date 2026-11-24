@@ -166,7 +166,7 @@ export function syncSoon(cli, env = process.env, { now = false, spawnIt = spawn 
   const cfg = readConfig(env);
   if (!cfg.map || !fs.existsSync(path.join(cfg.map, 'canvas', `${cfg.machine}.jsonl`))) return false;
   let last = 0;
-  try { last = Number(fs.readFileSync(path.join(home(env), '.sync-last'), 'utf8')) || 0; } catch {}
+  try { last = Number(fs.readFileSync(path.join(home(env), '.sync-last'), 'utf8')) || 0; } catch {} // never synced
   if (!now && Date.now() - last < 120000) return false;
   spawnIt(process.execPath, [cli, 'sync', '--quiet', ...(now ? ['--nudge'] : [])], { detached: true, stdio: 'ignore', env }).unref();
   return true;
@@ -179,7 +179,7 @@ const statusFile = env => path.join(home(env), '.sync-status.json');
 export function syncStatus(env = process.env) { try { return JSON.parse(fs.readFileSync(statusFile(env), 'utf8')); } catch { return null; } }
 function noteStatus(env, failed, others) {
   const old = syncStatus(env) || {}, at = Date.now();
-  try { fs.writeFileSync(statusFile(env), JSON.stringify({ at, failed: failed || null, failedSince: failed ? old.failedSince || at : null, lastOk: failed ? old.lastOk || null : at, others: others || old.others || {} })); } catch {}
+  try { fs.writeFileSync(statusFile(env), JSON.stringify({ at, failed: failed || null, failedSince: failed ? old.failedSince || at : null, lastOk: failed ? old.lastOk || null : at, others: others || old.others || {} })); } catch {} // it feeds the page's notice only: this sync's own result still goes back to the caller
 }
 const firstErr = out => String(out || '').split('\n').map(l => l.trim()).filter(Boolean).pop() || 'unknown error';
 
@@ -188,7 +188,7 @@ export function runSync(env = process.env, { allowDeletes = env.TRACE_CANVAS_ALL
   if (!mapDir || !fs.existsSync(path.join(mapDir, '.git'))) return { error: 'No location map repository (setup --map, or clone it to ~/agent-map)' };
   const lock = path.join(home(env), '.sync-lock');
   try { fs.mkdirSync(lock); } catch {
-    try { if (Date.now() - fs.statSync(lock).mtimeMs < 120000) return { busy: true }; } catch {}
+    try { if (Date.now() - fs.statSync(lock).mtimeMs < 120000) return { busy: true }; } catch {} // the lock went away meanwhile
   }
   try {
     const dir = path.join(mapDir, 'canvas'), file = path.join(dir, `${machine}.jsonl`);
@@ -249,6 +249,6 @@ export function runSync(env = process.env, { allowDeletes = env.TRACE_CANVAS_ALL
     noteStatus(env, String(e && e.message || e));
     return { error: String(e && e.message || e) };
   } finally {
-    try { fs.rmdirSync(lock); } catch {}
+    try { fs.rmdirSync(lock); } catch {} // already removed; one left behind is taken as stale after 2 minutes
   }
 }

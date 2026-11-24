@@ -24,7 +24,7 @@ export const LAYERS = ['project', 'line', 'memory'];
 function codexFile(id, env) {
   const root = env.CODEX_HOME || path.join(os.homedir(), '.codex'), want = `-${id}.jsonl`;
   const walk = dir => {
-    let ents = []; try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch {}
+    let ents = []; try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch {} // no such folder: no transcripts there
     for (const e of ents) {
       const p = path.join(dir, e.name);
       const hit = e.isDirectory() ? walk(p) : e.name.endsWith(want) ? p : null;

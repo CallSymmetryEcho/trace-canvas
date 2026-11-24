@@ -44,7 +44,7 @@ export function desktopSessions(env = process.env) {
       try {
         const d = JSON.parse(fs.readFileSync(f, 'utf8'));
         if (d.sessionId && d.cliSessionId) rec = { desktopId: d.sessionId, cli: d.cliSessionId, title: String(d.title || ''), parentDesktop: d.spawnedFrom && d.spawnedFrom.sessionId || null, archived: !!d.isArchived };
-      } catch {}
+      } catch {} // half-written or not JSON: read again when the file changes
       hit = { mtime, rec };
       cache.set(f, hit);
     }

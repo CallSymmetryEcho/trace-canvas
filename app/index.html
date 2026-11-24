@@ -4354,7 +4354,10 @@ function lineSessions(tid) {
   const live = liveOn(tid), byId = new Map(live.map(s => [s.id, s]));
   const known = new Set(S.sessions.map(s => s.id));
   const rows = [...S.sessions.filter(s => s.thread === tid || byId.has(s.id)), ...live.filter(l => !known.has(l.id)).map(l => ({ id: l.id, agent: l.agent, last: l.lastSeen }))]
-    .sort((a, b) => byId.has(b.id) - byId.has(a.id) || (b.last || 0) - (a.last || 0));
+    .sort((a, b) => byId.has(b.id) - byId.has(a.id) || (b.last || 0) - (a.last || 0))
+    // A session whose conversation is gone has nothing left to open once the line has a later session (the new one
+    // started in its place): it is left out of the list. Its records stay on the line.
+    .filter((s, _, all) => !(s.gone && !byId.has(s.id) && all.some(o => o !== s && !o.gone && (byId.has(o.id) || (o.last || 0) > (s.last || 0)))));
   if (!rows.length) return '';
   // Each machine's latest session (where dispatch looks for that machine), marked and shown even past the first eight.
   const latest = new Map();

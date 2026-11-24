@@ -315,3 +315,25 @@ test('undoing a merge puts everything back: status, group, the link, the merge r
     delete d.threads[g.id];
   }
 });
+
+// 2026-11-24: the canvas offered `claude --resume <id>` for a session whose conversation file was gone from the Mac
+// ("No conversation found"). The project's folder was there; the session's file was not.
+test('a session whose conversation file is gone gets a new session in its folder, and dispatch passes it over', async () => {
+  const { threadSessions, conversationGone, lineAgent, agentContext } = await import('../src/ops.mjs');
+  const top = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'tc-gone-'))), cwd = path.join(top, 'proj');
+  const env2 = { ...process.env, TRACE_CANVAS_HOME: path.join(top, 'tc'), TRACE_CANVAS_MACHINE: 'here', CLAUDE_PROJECTS_DIR: path.join(top, 'projects') };
+  const proj = path.join(env2.CLAUDE_PROJECTS_DIR, cwd.replace(/[^a-zA-Z0-9]/g, '-'));
+  fs.mkdirSync(proj, { recursive: true }); fs.mkdirSync(cwd); fs.writeFileSync(path.join(proj, 'kept.jsonl'), '{}\n');
+  const d = { threads: {}, commits: {}, edges: {}, sessions: {} }, t = createThread(d, { name: 'Paper' });
+  for (const [id, ts] of [['kept', 1000], ['lost', 2000]]) {
+    d.sessions[id] = { id, thread: t.id, agent: 'Claude Code', cwd, machine: 'here', resume: `claude --resume ${id}`, last: ts };
+    addCommit(d, { thread: t.id, kind: 'agent', title: id + ' worked', ts, extra: { session: id, machine: 'here' } });
+  }
+  const by = Object.fromEntries(threadSessions(d, t.id, env2).map(s => [s.id, s]));
+  assert.deepEqual([!!by.kept.gone, by.kept.command], [false, `cd '${cwd}' && claude --resume kept`]);
+  assert.deepEqual([by.lost.gone, by.lost.command], [true, `cd '${cwd}' && TRACE_CANVAS_THREAD=${t.id} claude`]);
+  assert.equal(lineAgent(d, t.id, {}, agentContext(d, env2, () => [])), 'kept', 'the latest session is gone: the one before it');
+  // Not judged: another machine's session, and a project folder that is not there at all.
+  assert.equal(conversationGone({ ...d.sessions.lost, machine: 'mac' }, env2), false);
+  assert.equal(conversationGone({ ...d.sessions.lost, cwd: path.join(top, 'elsewhere') }, env2), false);
+});

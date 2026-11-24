@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { COLS, addCommit, dataFile, home, mutate, readConfig, readData, regroup, toArrays, writeConfig } from './store.mjs';
 import { demoData } from './demo.mjs';
 import { liveDir, readLive, withCodexTerm } from './live.mjs';
-import { agentContext, lineAgent, awayCache, bindLiveSession, findThreadLoose, handTo, liveSessions, mergeThreads, unmergeThread, sessionList, startAutopilot, stopAutopilot, threadSessions } from './ops.mjs';
+import { conversationGone, agentContext, lineAgent, awayCache, bindLiveSession, findThreadLoose, handTo, liveSessions, mergeThreads, unmergeThread, sessionList, startAutopilot, stopAutopilot, threadSessions } from './ops.mjs';
 import { applyRetro, askAgent, retroRecord, runRetro } from './retro.mjs';
 import { AGENTS, deliverRow, focusTab, openTerminal, terminalCommand } from './agents.mjs';
 import { draftLessons, rememberLesson } from './lessons.mjs';
@@ -146,7 +146,7 @@ export function startServer({ port = 4777, host = '127.0.0.1' } = {}) {
       if (req.method === 'GET' && p === '/api/data') {
         // desktopId: the Claude desktop app's id of a session, so the page can open its chat (claude://…).
         const d = readData(), desk = desktopSessions();
-        return send(res, 200, { ...toArrays(d), sessions: sessionList(d).map(s => ({ ...s, desktopId: (desk.get(s.id) || {}).desktopId || null })), machine: readConfig().machine, platform: process.platform, remote, update, start: canStart(remote), awayLive: readConfig().awayLive, detach: readConfig().detach, awayGit: readConfig().awayGit, sync: syncStatus(), machines: otherMachines(d) });
+        return send(res, 200, { ...toArrays(d), sessions: sessionList(d).map(s => ({ ...s, desktopId: (desk.get(s.id) || {}).desktopId || null, ...(conversationGone(s) ? { gone: true } : {}) })), machine: readConfig().machine, platform: process.platform, remote, update, start: canStart(remote), awayLive: readConfig().awayLive, detach: readConfig().detach, awayGit: readConfig().awayGit, sync: syncStatus(), machines: otherMachines(d) });
       }
       if (req.method === 'GET' && p === '/api/live') {
         // Where several sessions run on one line, the page asks who its agent is; the answer is lineAgent's (src/ops.mjs), not the page's own.

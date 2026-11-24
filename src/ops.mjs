@@ -1,5 +1,6 @@
 import { HEADS } from './prompts.mjs';
 import fs from 'node:fs';
+import path from 'node:path';
 // Operations shared by the MCP server and the command line:
 // putting a session on the canvas, merging threads, and merging data sets.
 import { INBOX, COLS, isTodo, RETURN_LIMIT, evolveConfig, absorb, leadsTo, addCommit, createThread, findThreadByName, goalOf, hashId, lastCommit, readConfig, threadById, threadIdOf } from './store.mjs';
@@ -10,6 +11,7 @@ import { AGENTS, q, remote, resumeThere } from './agents.mjs';
 import { desktopSessions } from './desktop.mjs';
 import { remoteLiveSync } from './remote.mjs';
 import { tr } from './i18n.mjs';
+import { findTranscript, projectsRoot } from './transcript.mjs';
 
 const norm = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
@@ -166,7 +168,7 @@ export function lineAgent(d, tid, { machine = '', agent = '' } = {}, ctx = agent
   // here from its own line, when none has worked here); of those a running one, this machine's before another's (whose
   // messages do not reach it yet); then this machine's latest; then the latest anywhere. A to-do assigned to an agent
   // goes only to that agent's sessions (or a new one of it).
-  const pool = ctx.ranked.get(tid).filter(id => (!machine || machineOf(id) === machine) && (!agent || known.get(id).agent === AGENTS[agent].name)), own = pool.filter(onLine), c = own.length ? own : pool;
+  const pool = ctx.ranked.get(tid).filter(id => (!machine || machineOf(id) === machine) && (!agent || known.get(id).agent === AGENTS[agent].name) && !known.get(id).gone), own = pool.filter(onLine), c = own.length ? own : pool;
   return c.find(id => machineOf(id) === me && runOf(id)) || c.find(id => runOf(id)) || c.find(id => machineOf(id) === me) || c[0];
 }
 /**
@@ -697,11 +699,27 @@ export { remote };
 const hereRun = (cmd, id) => ({ command: cmd, tmux: { machine: '', name: `tc-${id}`, cmd, attach: `tmux attach -t tc-${id}` } });
 const awayRun = (machine, cmd, id) => ({ command: remote(machine, cmd), tmux: { machine, name: `tc-${id}`, cmd, attach: remote(machine, `tmux attach -t tc-${id}`) } });
 // A line's sessions with their live status ('off' when not running).
+/**
+ * True when a Claude Code session of this machine can no longer be resumed: its project's folder of conversations is
+ * there and its own file is not, there or under any other project (`claude --resume` answers "No conversation found").
+ * ponytail: Claude Code only, and only while the project's folder exists; a Codex session or a vanished folder is
+ * not judged (then the resume command is offered as before). Add them when one is met.
+ */
+export function conversationGone(s, env = process.env) {
+  if (!s || !s.cwd || !/^claude --resume /.test(s.resume || '') || (s.machine && s.machine !== readConfig(env).machine)) return false;
+  const dir = path.join(projectsRoot(env), s.cwd.replace(/[^a-zA-Z0-9]/g, '-'));
+  if (!fs.existsSync(dir) || fs.existsSync(path.join(dir, s.id + '.jsonl'))) return false;
+  return !findTranscript({ sessionId: s.id }, env);
+}
 export function threadSessions(d, tid, env = process.env) {
   const live = new Map(listLive(env).map(s => [s.id, s])), me = readConfig(env).machine;
   return sessionList(d, tid).map(s => {
     const l = live.get(s.id), cwd = s.cwd || (l && l.cwd) || '', here = `${cwd ? `cd ${q(cwd)} && ` : ''}${s.resume}`;
     // Another machine's session resumes there, over ssh and in tmux (machine names are the ssh aliases).
+    // Its conversation is gone: a new session in its folder, on its line, in place of a resume that cannot work.
+    const gone = !l && conversationGone({ ...s, cwd }, env);
+    const bind = s.thread && s.thread !== INBOX ? `TRACE_CANVAS_THREAD=${s.thread} ` : '';
+    if (gone) return { ...s, status: 'off', cwd, away: false, gone: true, command: `cd ${q(cwd)} && ${bind}claude` };
     return { ...s, status: l ? l.status : 'off', cwd, away: !!(s.machine && s.machine !== me), command: s.machine && s.machine !== me ? resumeThere(s.machine, here, s.id) : here };
   });
 }

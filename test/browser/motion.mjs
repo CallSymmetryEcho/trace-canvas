@@ -16,8 +16,8 @@ if (await ev(`matchMedia('(hover: none)').matches`)) { console.log('This browser
 const loops = `document.getAnimations().filter(a => a.effect.getComputedTiming().iterations === Infinity)`;
 const props = await ev(`[...new Set(${loops}.flatMap(a => a.effect.getKeyframes().flatMap(k => Object.keys(k))).filter(k => !['offset', 'easing', 'composite', 'computedOffset'].includes(k)))].sort()`);
 assert.deepEqual(props, ['opacity', 'transform'], 'the loops animate transform and opacity only');
-// Where each loop is on the document's clock, in 50 ms steps: the same after a redraw.
-const phase = `${loops}.map(a => { const g = a.effect.getComputedTiming(), d = g.duration; return a.animationName + ':' + Math.round(((((a.currentTime - g.delay - document.timeline.currentTime) % d) + d) % d) / 50); }).sort().join(' ')`;
+// Where each loop is on the document's clock, in 50 ms steps (a hair before the loop's end counts as its start): the same after a redraw.
+const phase = `${loops}.map(a => { const g = a.effect.getComputedTiming(), d = g.duration; return a.animationName + ':' + Math.round(((((a.currentTime - g.delay - document.timeline.currentTime) % d) + d) % d) / 50) % Math.round(d / 50); }).sort().join(' ')`;
 const before = await ev(phase);
 assert.ok(before.split(' ').length >= 5, 'two rings, two tickers and a glow run: ' + before);
 await ev(`window.__card = document.querySelector('.card.ap-on')`);

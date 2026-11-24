@@ -95,6 +95,23 @@ L = await data(); assert.equal(L.count('G1'), 0);
 await ev(`document.querySelector('#toast .toast-act').click()`); await wait(1000);
 L = await data(); out.dissolveUndone = [L.count('G1'), L.count('G2')]; assert.deepEqual(out.dissolveUndone, g0);
 
+// Grouping lines picked on the canvas can be undone from the toast: each goes back to the group it had, or to none.
+await ev(`document.querySelector('.detail [data-act="close"], #detail-close')?.click()`); await wait(300);
+const shown = new Set(await ev(`[...document.querySelectorAll('#cv-cards .card')].map(c => c.dataset.tid)`));
+const picks = ['G1', 'G2', ''].map(g => L.d.threads.find(t => shown.has(t.id) && t.status !== 'merged' && (t.group || '') === g)).filter(Boolean);
+assert.ok(picks.length >= 2, 'lines of two groups are on the canvas');
+const groupsOf = async () => { L = await data(); return picks.map(t => L.line[t.name].group || ''); }, was = await groupsOf();
+if (await ev(`document.querySelector('#select-btn').getAttribute('aria-pressed')`) !== 'true') { await ev(`document.querySelector('#select-btn').click()`); await wait(300); }
+for (const t of picks) await click(`.card[data-tid="${t.id}"]`, 0.8);
+await setVal('#multi-group', 'Transit', 'input');
+await ev(`document.querySelector('[data-multi="group"]').click()`); await wait(1000);
+assert.deepEqual(await groupsOf(), picks.map(() => 'Transit'));
+out.groupToast = await toast(); assert.ok(await ev(`!!document.querySelector('#toast .toast-act')`), 'the toast offers Undo');
+await ev(`document.querySelector('#toast .toast-act').click()`); await wait(1000);
+out.groupUndone = await groupsOf(); assert.deepEqual(out.groupUndone, was);
+await call('Page.reload'); await wait(2500);
+assert.deepEqual(await groupsOf(), was, 'and after a reload');
+
 console.log(JSON.stringify(out, null, 1));
 if (shot) { const s = await call('Page.captureScreenshot'); (await import('node:fs')).writeFileSync(shot, Buffer.from(s.result.data, 'base64')); }
 await fetch('http://127.0.0.1:' + CDP + '/json/close/' + v.id);

@@ -305,4 +305,13 @@ test('undoing a merge puts everything back: status, group, the link, the merge r
   assert.equal(d.threads[n.id], undefined);
   assert.equal(todo.thread, src.id, 'and is back on its line');
   assert.throws(() => unmergeThread(d, into.id), /not a merged line/);
+
+  // But not when the person wrote a goal (or a note) on it: the line stays, with their words.
+  for (const field of ['goal', 'note']) {
+    const g = mergeThreads(d, { sources: [src.id, into.id], newName: 'G ' + field }, env).target;
+    g[field] = 'Ship the map';
+    unmergeThread(d, src.id); unmergeThread(d, into.id); settleMerged(d);
+    assert.equal(d.threads[g.id] && d.threads[g.id][field], 'Ship the map', field + ' kept');
+    delete d.threads[g.id];
+  }
 });

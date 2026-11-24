@@ -76,6 +76,13 @@ function dropState(sid, env) { try { fs.unlinkSync(stateFile(sid, env)); } catch
 // git reports the real path, while cwd and tool paths may go through a link (on macOS /var and
 // /tmp point into /private), so compare real paths. f itself may not exist yet; its folder does.
 const real = p => { try { return fs.realpathSync(p); } catch { return p; } };
+// A session's files are listed from the first root it wrote under. One written under another root later (a second
+// repository in the same turn) keeps its full path, so both are on the record and both open.
+function noteFile(state, root, r) {
+  if (!state.fileRoot) state.fileRoot = root;
+  const f = samePlace(root, state.fileRoot) ? r : path.join(root, r);
+  pushUnique(state.turnFiles, f); pushUnique(state.files, f);
+}
 export const rel = (root, f) => { try { const r = path.relative(real(root), path.join(real(path.dirname(f)), path.basename(f))); return r && !r.startsWith('..') ? r : f; } catch { return f; } };
 const pushUnique = (arr, v) => { if (v && !arr.includes(v)) arr.push(v); };
 export const resumeLink = sid => `claude --resume ${sid}`;
@@ -267,7 +274,7 @@ export function handleHook(input, env = process.env) {
         for (const f of ti.files || [ti.file_path || ti.notebook_path || out.filePath].filter(Boolean)) {
           const r = rel(info ? info.root : cwd, path.resolve(cwd, f));
           if (path.isAbsolute(r)) continue; // outside the project (/tmp, a scratchpad, elsewhere): not its output
-          state.fileRoot = info ? info.root : cwd; pushUnique(state.turnFiles, r); pushUnique(state.files, r);
+          noteFile(state, info ? info.root : cwd, r);
         }
       } else if (tool === 'TodoWrite' && Array.isArray(ti.todos)) {
         for (const td of ti.todos) {
@@ -278,7 +285,7 @@ export function handleHook(input, env = process.env) {
         const cmd = String(ti.command || '');
         const root = info ? info.root : cwd;
         const targets = redirectTargets(cmd, cwd).map(f => rel(root, f)).filter(f => !path.isAbsolute(f));
-        for (const f of targets) { state.fileRoot = root; pushUnique(state.turnFiles, f); pushUnique(state.files, f); }
+        for (const f of targets) noteFile(state, root, f);
         if (targets.length || BASH_WRITES.test(cmd)) state.turnActions = (state.turnActions || 0) + 1;
         const g = { ...gitEvents(cmd, out.stdout, out.stderr, out.gitOperation), repo: commitRepo };
         // Only when the commit did not fail, HEAD carries the message the command gave, and it is not on the canvas yet.
@@ -607,13 +614,18 @@ export function namedReports(msg, root = '') {
  * reply names come first. Files outside the project never get here.
  */
 export function outputs(files, root, msg = '') {
-  const here = (files || []).filter(f => { try { return fs.statSync(path.join(root, f)).isFile(); } catch { return false; } });
+  const isFile = f => { try { return fs.statSync(f).isFile(); } catch { return false; } };
+  const ignoredThere = f => { try { execFileSync('git', ['-C', path.dirname(f), 'check-ignore', '-q', f], { stdio: 'ignore', timeout: 5000 }); return true; } catch { return false; } }; // exits 1 (not ignored) or 128 (no repository)
+  // Full paths are files under another root than the list's (see noteFile): each is checked in its own repository.
+  const far = (files || []).filter(f => path.isAbsolute(f) && isFile(f) && !ignoredThere(f));
+  const here = (files || []).filter(f => !path.isAbsolute(f) && isFile(path.join(root, f)));
   let ignored = '';
   // check-ignore prints the ignored ones; it exits 1 when none is, 128 outside a git repository (then nothing is ignored).
   if (here.length) try { ignored = execFileSync('git', ['-C', root, 'check-ignore', '--stdin'], { input: here.join('\n'), encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'], timeout: 5000 }); } catch (e) { ignored = String(e.stdout || ''); }
   const skip = new Set(ignored.split('\n').filter(Boolean)), kept = here.filter(f => !skip.has(f));
   const named = f => msg.includes(f) || msg.includes(path.basename(f));
-  return [...kept.filter(named), ...kept.filter(f => !named(f))];
+  const all = (files || []).filter(f => kept.includes(f) || far.includes(f)); // in the order they were written
+  return [...all.filter(named), ...all.filter(f => !named(f))];
 }
 export function turnBody(lang, msg, files, todos = []) {
   return [String(msg || '').slice(0, 1500),

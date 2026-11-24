@@ -2673,7 +2673,10 @@ function renderCanvas() {
   const ths = viewLines();
   const selT = selThreadId();
   sameClock(cardsEl);
+  // The rebuild takes the focused card out of the page: keyboard focus goes back to the same line's new card.
+  const ae = document.activeElement, held = ae && cardsEl.contains(ae) && ae.closest('.card[data-tid]');
   cardsEl.innerHTML = ths.map(th => cardHTML(th, by.get(th.id) || [], selT)).join('');
+  if (held) { const again = [...cardsEl.children].find(el => el.dataset.tid === held.dataset.tid); if (again) again.focus({ preventScroll: true }); }
   drawGroups();
   drawEdges();
   applyCam();
@@ -2754,7 +2757,9 @@ $('#multi-banner').addEventListener('click', e => {
   if (b.dataset.multi === 'group') {
     const name = S.multiGroup.trim(), ids = [...S.multi];
     if (!name) { toast(t('tGroupNeedName')); return; }
-    setGroup(ids, name); S.multiGroup = ''; clearMulti(); toast(t('tGrouped', ids.length, name));
+    const was = ids.map(id => [id, getThread(id).group || '']); // Undo: each line back in the group it had (or none)
+    setGroup(ids, name); S.multiGroup = ''; clearMulti();
+    toast(t('tGrouped', ids.length, name), { label: t('tUndo'), run: () => { for (const [id, g] of was) if (S.threads.has(id)) setGroup([id], g); } });
     return;
   }
   mergeMany(S.multiTarget);

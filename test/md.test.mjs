@@ -175,3 +175,29 @@ test('a changed file opens when the session started above its repository: by the
   assert.equal(readLinkedMd(d, 'talk/OUT.md', 'lost', env).error, 'missing');
   assert.equal(readLinkedMd(d, 'talk/secret.md', 'told', env).error, 'unlinked', 'still only the files the record lists');
 });
+
+// 2026-11-24 (Codex's audit): one turn wrote in two repositories and the record kept only the second one's file.
+test('a turn that writes in two repositories lists both files, and both open', async () => {
+  const { handleHook } = await import('../src/hook.mjs'); const { readData } = await import('../src/store.mjs');
+  const { execFileSync } = await import('node:child_process');
+  const top = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'tc-two-')));
+  const env = { ...process.env, TRACE_CANVAS_HOME: path.join(top, 'tc'), TRACE_CANVAS_MACHINE: 'here' };
+  fs.mkdirSync(env.TRACE_CANVAS_HOME); fs.writeFileSync(path.join(env.TRACE_CANVAS_HOME, 'config.json'), JSON.stringify({ turns: 'changes' }));
+  const turn = (sid, writes) => {
+    handleHook({ session_id: sid, cwd: top, hook_event_name: 'UserPromptSubmit', prompt: 'Write the notes' }, env);
+    for (const [repo, name] of writes) {
+      const dir = path.join(top, repo);
+      if (!fs.existsSync(dir)) { fs.mkdirSync(dir); execFileSync('git', ['init', '-q', dir]); }
+      fs.writeFileSync(path.join(dir, name), '# ' + name);
+      handleHook({ session_id: sid, cwd: dir, hook_event_name: 'PostToolUse', tool_name: 'Write', tool_input: { file_path: path.join(dir, name) }, tool_response: {} }, env);
+    }
+    handleHook({ session_id: sid, cwd: top, hook_event_name: 'Stop', last_assistant_message: 'Wrote them.' }, env);
+    const d = readData(env); return [d, Object.values(d.commits).find(c => c.session === sid && c.files)];
+  };
+  const [d, two] = turn('s-two', [['north', 'first.md'], ['south', 'second.md']]);
+  assert.deepEqual(two.files, ['first.md', path.join(top, 'south', 'second.md')]);
+  assert.deepEqual(two.files.map(f => readLinkedMd(d, f, two.id, env).text), ['# first.md', '# second.md']);
+  const [d1, one] = turn('s-one', [['north', 'only.md']]);
+  assert.deepEqual([one.files, one.root], [['only.md'], path.join(top, 'north')], 'one repository: as before');
+  assert.equal(readLinkedMd(d1, 'only.md', one.id, env).text, '# only.md');
+});

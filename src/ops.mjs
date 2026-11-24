@@ -608,7 +608,9 @@ export function unmergeThread(d, ref) {
   delete t.mergedPrev;
   // What followed a source onto the target (open to-dos, settleMerged) goes back with it, so it does not count as the target's own.
   const stays = c => c.thread === into.id && !(d.threads[c.movedFrom] && leadsTo(d, d.threads[c.movedFrom]).id !== into.id);
-  if (into && into.madeByMerge && !Object.values(d.commits).some(stays) && !Object.values(d.threads).some(x => x.mergedInto === into.id || x.parent === into.id)) delete d.threads[into.id];
+  // A goal or a note the person wrote on the target is theirs: the line stays for it.
+  const written = into && [into.goal, into.note].some(v => String(v || '').trim());
+  if (into && into.madeByMerge && !written && !Object.values(d.commits).some(stays) && !Object.values(d.threads).some(x => x.mergedInto === into.id || x.parent === into.id)) delete d.threads[into.id];
   return { thread: t, from: into && d.threads[into.id] ? into : null };
 }
 

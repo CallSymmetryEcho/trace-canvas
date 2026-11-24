@@ -400,7 +400,8 @@ body.history-open .hist-btn span { display: inline; }
 .card.ap-evo { box-shadow: 0 0 18px -6px color-mix(in srgb, #f472b6 65%, transparent); }
 .card.ap-evo:not(.ap-burst)::before { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; box-shadow: 0 0 22px -5px color-mix(in srgb, #22d3ee 65%, transparent); opacity: 0; animation: ap-fade 3s ease-in-out var(--ph0, 0s) infinite; }
 .ap-evo.ap-burst::before, .is-evo.ap-burst::before { background-image: linear-gradient(100deg, transparent 25%, rgba(34,211,238,.3) 40%, rgba(244,114,182,.35) 55%, rgba(245,158,11,.3) 68%, transparent 80%); box-shadow: inset 0 0 0 1px #f472b6; }
-.chip-evo { color: #db2777; border-color: color-mix(in srgb, #f472b6 60%, transparent); background: linear-gradient(90deg, rgba(34,211,238,.1), rgba(244,114,182,.12), rgba(245,158,11,.1)); }
+.chip-evo { color: #db2777; border-color: color-mix(in srgb, #f472b6 60%, transparent); background: linear-gradient(90deg, rgba(34,211,238,.1), rgba(244,114,182,.12), rgba(245,158,11,.1)); animation: ap-evo-chip 3s linear var(--ph0, 0s) infinite; }
+@keyframes ap-evo-chip { 33% { border-color: color-mix(in srgb, #22d3ee 60%, transparent); } 66% { border-color: color-mix(in srgb, #f59e0b 60%, transparent); } }
 .ap-tick { overflow: hidden; margin: -2px 12px 6px; height: 18px; border-radius: 999px; background: color-mix(in srgb, var(--ok) 9%, transparent); font-size: 12px; line-height: 18px; color: var(--ok); white-space: nowrap;
   -webkit-mask: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); mask: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
 .ap-tick span { display: inline-block; padding-left: 100%; animation: ap-tick 14s linear var(--ph0, 0s) infinite; }
@@ -408,7 +409,7 @@ body.history-open .hist-btn span { display: inline; }
 .chip-wait { color: var(--ok); border: 1px dashed var(--ok); opacity: .75; }
 @keyframes ap-wait { 50% { opacity: .55; } }
 @media (prefers-reduced-motion: reduce), (hover: none) { .chip-auto { animation: none; } .ap-burst::before { animation: none; display: none; } .ap-fill, .ap-knob, .ap-v, .ap-dot, .ap-row, .ap-row > span em { transition: none; }
-  .ap-ring > i, .is-run .ap-v::before, .is-run .ap-v::after, .is-wait .ap-knob::after, .is-evo .ap-v, .is-evo .ap-v::before, .is-evo .ap-v::after, .is-evo .ap-knob::after, .is-evo .ap-knob::before, .ap-row.is-evo > span em, .card.ap-evo:not(.ap-burst)::before { animation: none; } .ap-tick span { animation: none; padding-left: 8px; } }
+  .ap-ring > i, .is-run .ap-v::before, .is-run .ap-v::after, .is-wait .ap-knob::after, .is-evo .ap-v, .is-evo .ap-v::before, .is-evo .ap-v::after, .is-evo .ap-knob::after, .is-evo .ap-knob::before, .ap-row.is-evo > span em, .card.ap-evo:not(.ap-burst)::before, .chip-evo { animation: none; } .ap-tick span { animation: none; padding-left: 8px; } }
 .chip-done { background: var(--surface-2); }
 .chip-merged { background: var(--surface-2); }
 .strip { list-style: none; margin: 0; padding: 2px 10px 4px 4px; position: relative; }
@@ -2676,7 +2677,7 @@ function renderCanvas() {
   drawGroups();
   drawEdges();
   applyCam();
-  if (!S.fitted && loaded() && (S.threads.size || S.commits.size)) { S.fitted = true; fit(true, true); }
+  if (!S.fitted && loaded() && (S.threads.size || S.commits.size)) { S.fitted = true; fit(true); }
   vp.classList.toggle('connecting', !!S.connect);
   $('#connect-btn').setAttribute('aria-pressed', S.connect ? 'true' : 'false');
   const cb = $('#connect-banner');
@@ -2946,7 +2947,7 @@ function apTickHTML(th, cs) {
   if (!apRun(th)) return '';
   const since = Math.max(0, ...cs.filter(c => /^Autopilot (summary|小结)/i.test(c.title || '')).map(c => c.ts));
   const now = cs.find(c => isTodo(c) && !c.done && c.ts > since);
-  return `<div class="ap-tick${apEvo(th) ? ' is-evo' : ''}"><span>${evLabel(th) ? esc(evLabel(th, 'evChip')) + ' · ' : ''}${esc(now ? t('apTick', now.title) : t('apTickIdle'))}</span></div>`;
+  return `<div class="ap-tick"><span>${esc(now ? t('apTick', now.title) : t('apTickIdle'))}</span></div>`;
 }
 function cardHTML(th, cs, selT) {
   const isInbox = th.id === INBOX;
@@ -2962,8 +2963,7 @@ function cardHTML(th, cs, selT) {
     ? recent.map(c => `<li data-cid="${esc(c.id)}" class="${c.id === selC ? 'is-sel' : ''} ${filtering() && matches(c) ? 'hit' : ''} ${c.kind === 'decision' || c.starred ? 'key' : ''}"${c.id === selC ? ` style="--ph:${phase(2400)}"` : ''}>${mini(c.kind, stationColor(c, th), c.done)}<span class="s-title" title="${esc(c.title)}">${starMark(c)}${esc(c.title)}</span><time class="s-time">${fmtShort(c.ts)}</time></li>`).join('')
       + (more > 0 ? `<li class="s-more"><span></span><span>${esc(t('moreEarlier', more))}</span><span></span></li>` : '')
     : `<li class="s-empty"><span></span><span>${esc(isInbox ? t('inboxEmpty') : t('noRecords'))}</span><span></span></li>`;
-  // A running line's ticker row says Autopilot (and the round), so its chip stays out of the head: the name gets the row.
-  const chip = (apRun(th) && !shut ? '' : apChip(th)) + (isInbox ? `<span class="chip">${esc(t('unsorted'))}</span>` : `<span class="chip chip-${th.status || 'active'}">${esc(statusLabel(th.status))}</span>`);
+  const chip = apChip(th) + (isInbox ? `<span class="chip">${esc(t('unsorted'))}</span>` : `<span class="chip chip-${th.status || 'active'}">${esc(statusLabel(th.status))}</span>`);
   const agents = cs.filter(c => c.kind === 'agent').length;
   return `<div class="${cls}${apD(th.id) != null ? ' ap-burst' : ''}" data-tid="${esc(th.id)}" tabindex="0" data-kb aria-label="${esc(th.name)}" style="left:${th.x || 0}px;top:${th.y || 0}px;--c:${th.color}${apD(th.id) != null ? `;--apd:${apD(th.id)}ms` : ''}">
     <div class="card-head">${apRun(th) ? AP_RING : ''}${isFolded(th) ? `<span class="grp-tog" data-park-tog="1" title="${esc(t(peeking ? 'peekClose' : th.status === 'done' ? 'peekOpen' : 'peekOpenParked'))}">${peeking ? '▾' : '▸'}</span>` : ''}<span class="roundel"></span><span class="card-name">${esc(th.name)}</span>${liveBadge(th.id)}${chip}</div>
@@ -3023,7 +3023,7 @@ function drawEdges() {
 function zoomAt(cx, cy, f, fly) {
   const r = vp.getBoundingClientRect(), from = fly && camGoal ? camGoal : S.cam;
   const px = cx - r.left, py = cy - r.top;
-  const z = clamp(from.z * f, Math.min(0.25, zTop * 0.6, from.z), 2), k = z / from.z; // never pushed in from where Fit left it
+  const z = clamp(from.z * f, Math.min(0.25, zTop * 0.6), 2), k = z / from.z;
   const to = { x: px - (px - from.x) * k, y: py - (py - from.y) * k, z };
   if (fly) camTo(to); else { stopCam(); Object.assign(S.cam, to); applyCam(); }
 }
@@ -3082,9 +3082,7 @@ function reveal(tid) {
   const z = Math.max(S.cam.z, 0.8);
   camTo({ z, x: v.width / 2 - (el.offsetLeft + el.offsetWidth / 2) * z, y: v.height / 2 - (el.offsetTop + el.offsetHeight / 2) * z });
 }
-// first: the view the page opens with. A phone opens on readable cards at the top (60%) and is panned from there;
-// the Fit button always shows every line, however small that makes them.
-function fit(instant, first) {
+function fit(instant) {
   const els = [...cardsEl.children, ...groupsEl.querySelectorAll('.grp-folded')]; // folded groups' chips count too
   if (!els.length) return;
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -3092,9 +3090,8 @@ function fit(instant, first) {
   const r = vp.getBoundingClientRect();
   const padX = 24, padTop = 24, padBottom = 70;
   const availW = r.width - padX * 2, availH = r.height - padTop - padBottom;
-  const z = clamp(Math.min(availW / (x1 - x0), availH / (y1 - y0)), first ? (r.width < 600 ? 0.6 : 0.3) : 0.12, 1.1);
-  // See zoomK. Under 40% whole cards cannot be read, so there Fit shows them as names: heads grown back to that size.
-  zTop = Math.min(0.62, Math.max(z * 0.98, 0.4));
+  const z = clamp(Math.min(availW / (x1 - x0), availH / (y1 - y0)), r.width < 600 || matchMedia('(hover: none)').matches ? 0.6 : 0.3, 1.1); // a tablet: readable cards, pan for the rest
+  zTop = Math.min(0.62, z * 0.98); // see zoomK
   const w = (x1 - x0) * z, hgt = (y1 - y0) * z;
   const to = {
     z,

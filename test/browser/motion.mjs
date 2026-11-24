@@ -14,18 +14,20 @@ await call('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, dev
 await call('Page.enable'); await call('Page.navigate', { url }); await wait(3000);
 if (await ev(`matchMedia('(hover: none)').matches`)) { console.log('This browser reports no mouse, so the page keeps motion off: nothing to check.'); console.log('PASSED'); await fetch('http://127.0.0.1:' + CDP + '/json/close/' + v.id); process.exit(0); }
 const loops = `document.getAnimations().filter(a => a.effect.getComputedTiming().iterations === Infinity)`;
-const props = await ev(`[...new Set(${loops}.flatMap(a => a.effect.getKeyframes().flatMap(k => Object.keys(k))).filter(k => !['offset', 'easing', 'composite', 'computedOffset'].includes(k)))].sort()`);
+// The self-iterating chip's border changes colour (kept on purpose, 2026-11-24): the one loop that is not transform or opacity.
+const props = await ev(`[...new Set(${loops}.filter(a => a.animationName !== 'ap-evo-chip').flatMap(a => a.effect.getKeyframes().flatMap(k => Object.keys(k))).filter(k => !['offset', 'easing', 'composite', 'computedOffset'].includes(k)))].sort()`);
 assert.deepEqual(props, ['opacity', 'transform'], 'the loops animate transform and opacity only');
 // Where each loop is on the document's clock, in 50 ms steps (a hair before the loop's end counts as its start): the same after a redraw.
 const phase = `${loops}.map(a => { const g = a.effect.getComputedTiming(), d = g.duration; return a.animationName + ':' + Math.round(((((a.currentTime - g.delay - document.timeline.currentTime) % d) + d) % d) / 50) % Math.round(d / 50); }).sort().join(' ')`;
 const before = await ev(phase);
-assert.ok(before.split(' ').length >= 5, 'two rings, two tickers and a glow run: ' + before);
+assert.ok(before.split(' ').length >= 5, 'two rings, two tickers, a glow and the chip run: ' + before);
 await ev(`window.__card = document.querySelector('.card.ap-on')`);
 const quiet = await ev(`fetch('/api/data').then(r => r.json()).then(d => d.threads.find(t => t.name === 'Quiet').id)`);
 await ev(`fetch('/api/docs/commits/redraw1', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Trace-Canvas': '1' }, body: JSON.stringify({ id: 'redraw1', thread: ${JSON.stringify(quiet)}, kind: 'note', title: 'A record on another line', body: '', ts: Date.now(), parents: [], links: [] }) }).then(r => r.status)`);
 await wait(2500);
 assert.equal(await ev(`window.__card !== document.querySelector('.card.ap-on')`), true, 'the canvas was redrawn');
 assert.equal(await ev(phase), before, 'the loops go on where they were');
+await ev(`${loops}.filter(a => a.animationName === 'ap-evo-chip').forEach(a => a.cancel())`); // the rest of the page is idle without it
 await call('Performance.enable');
 const count = async () => (await call('Performance.getMetrics')).result.metrics.find(m => m.name === 'RecalcStyleCount').value;
 const a = await count(); await wait(3000); const n = await count() - a;

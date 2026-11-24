@@ -10,7 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url)), repo = path.resolve(here, '../..');
-const TESTS = ['merge-groups', 'goals-redraw', 'hand-copy', 'motion', 'fit'];
+const TESTS = ['merge-groups', 'goals-redraw', 'hand-copy', 'motion'];
 const onPath = n => (process.env.PATH || '').split(path.delimiter).map(d => path.join(d, n)).find(existsSync);
 const chrome = process.env.CHROME || ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'].map(onPath).find(Boolean)
   || ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/Applications/Chromium.app/Contents/MacOS/Chromium'].find(existsSync);

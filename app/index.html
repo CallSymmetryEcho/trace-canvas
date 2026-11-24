@@ -355,8 +355,8 @@ body.history-open .hist-btn span { display: inline; }
 .ap-dot { position: absolute; top: 50%; left: calc(var(--d) * (100% - var(--k)) / var(--n) + var(--k) / 2); width: 5px; height: 5px; margin: -2.5px; border-radius: 2px; background: var(--muted); opacity: .55; transition: opacity .3s; }
 .is-wait .ap-dot.d1, .is-run .ap-dot.d1, .is-run .ap-dot.d2, .is-evo .ap-dot { opacity: 0; }
 .ap-knob { position: absolute; top: -2px; left: calc(var(--i) * (100% - var(--k)) / var(--n) - 2px); width: calc(var(--k) + 4px); height: calc(var(--k) + 4px); border-radius: 6px; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.22), 0 0 0 .5px rgba(0,0,0,.06); transition: left .5s var(--ap-ease); pointer-events: none; }
-.is-wait .ap-knob { animation: ap-halo 1.6s ease-in-out infinite; }
-@keyframes ap-halo { 50% { box-shadow: 0 1px 4px rgba(0,0,0,.22), 0 0 0 5px color-mix(in srgb, var(--ok) 25%, transparent); } }
+.is-wait .ap-knob::after, .is-evo .ap-knob::after { content: ''; position: absolute; border-radius: inherit; z-index: -1; opacity: 0; }
+.is-wait .ap-knob::after { inset: -5px; border-radius: 11px; background: color-mix(in srgb, var(--ok) 25%, transparent); animation: ap-fade 1.6s ease-in-out var(--ph0, 0s) infinite; }
 /* Self-iterating, the fourth step: an aurora flows along the whole bar, its comets race faster, and a ring of colour
    turns round the knob; the line's card and panel get two comets of different colours and a breathing glow. */
 .ap-row.is-evo { border-color: color-mix(in srgb, #f472b6 40%, var(--rule)); background-color: color-mix(in srgb, #f472b6 4%, var(--surface)); }
@@ -365,10 +365,10 @@ body.history-open .hist-btn span { display: inline; }
 .is-evo .ap-v::before { animation: ap-px1 .32s steps(12) infinite; }
 .is-evo .ap-v::after { animation: ap-px2 .4s steps(10) infinite; }
 @keyframes ap-aurora { to { background-position: -200% 0; } }
-.is-evo .ap-knob { box-shadow: 0 0 12px 1px color-mix(in srgb, #f472b6 55%, transparent); animation: ap-evo-glow 2.4s ease-in-out infinite; }
+.is-evo .ap-knob { box-shadow: 0 0 12px 1px color-mix(in srgb, #f472b6 55%, transparent); }
+.is-evo .ap-knob::after { inset: 0; box-shadow: 0 0 14px 2px color-mix(in srgb, #22d3ee 60%, transparent); animation: ap-fade 2.4s ease-in-out var(--ph0, 0s) infinite; }
 .is-evo .ap-knob::before { content: ''; position: absolute; inset: -3px; padding: 3px; border-radius: 8px; background: conic-gradient(from var(--ap-a), #22d3ee, #8b5cf6, #f472b6, #f59e0b, #22d3ee); animation: ap-run 1.4s linear infinite;
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
-@keyframes ap-evo-glow { 50% { box-shadow: 0 0 14px 2px color-mix(in srgb, #22d3ee 60%, transparent); } }
 .ap-track button { position: absolute; top: 0; bottom: 0; width: 25%; left: calc(var(--b) * 25%); border: 0; padding: 0; background: none; cursor: pointer; border-radius: 999px; z-index: 1; }
 .ap-track button[aria-pressed="true"] { cursor: default; }
 .ap-track button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
@@ -377,30 +377,38 @@ body.history-open .hist-btn span { display: inline; }
   background-size: 250% 100%; animation: ap-sweep .9s ease-out var(--apd, 0s) forwards; box-shadow: inset 0 0 0 1px var(--ok); }
 @keyframes ap-sweep { from { background-position: 120% 0; } to { background-position: -20% 0; opacity: 0; } }
 /* While a round runs: a light runs round the card's border, a ticker under its head names the to-do in hand,
-   and stars twinkle on the selector's track. Compositor-friendly (one rotating angle, one translate); off when motion is reduced. */
+   and stars twinkle on the selector's track. The light is a layer of its own (.ap-ring: the border's shape as a mask,
+   and inside it a still gradient that only turns), and a glow breathes by fading a second shadow: transform and opacity
+   alone, so the compositor runs them and the page's own thread stays idle. Every loop starts from one clock (--ph0, set
+   where its container is rebuilt), so a redraw goes on where the last one was. Off when motion is reduced. */
 @property --ap-a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
-.card.ap-on::after, .detail.ap-on::after, .far .card.ap-on:not(.is-shut) .card-head::after { content: ''; position: absolute; inset: -1px; padding: 2px; border-radius: inherit; pointer-events: none; z-index: 2;
-  background: conic-gradient(from var(--ap-a), transparent 0 50%, color-mix(in srgb, #8b5cf6 35%, transparent) 72%, #a78bfa 88%, #8b5cf6 92%, transparent 97%);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: ap-run 3.2s linear infinite; }
+.ap-ring { position: absolute; inset: -1px; padding: 2px; border-radius: inherit; pointer-events: none; z-index: 2; overflow: hidden;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+/* A square three times the ring's width, centred on it: it covers the corners of a box up to 2.8 times as tall as wide. */
+.ap-ring > i { position: absolute; left: 50%; top: 50%; width: 300%; aspect-ratio: 1; margin: -150% 0 0 -150%; will-change: transform;
+  background: conic-gradient(transparent 0 50%, color-mix(in srgb, #8b5cf6 35%, transparent) 72%, #a78bfa 88%, #8b5cf6 92%, transparent 97%);
+  animation: ap-spin 3.2s linear var(--ph0, 0s) infinite; }
+@keyframes ap-spin { to { transform: rotate(360deg); } }
 @keyframes ap-run { to { --ap-a: 360deg; } }
+@keyframes ap-fade { 50% { opacity: 1; } }
+.card-head > .ap-ring { display: none; }
 .card.ap-on { box-shadow: 0 0 16px -6px color-mix(in srgb, #8b5cf6 50%, transparent); }
 /* The line panel of a running line: the same light, slower and softer, just inside its border (the panel clips overflow). */
-.detail.ap-on::after { inset: 0; padding: 1.5px; z-index: 5; opacity: .8; animation-duration: 6s; }
-.card.ap-evo::after, .detail.ap-evo::after, .far .card.ap-evo:not(.is-shut) .card-head::after { background: conic-gradient(from var(--ap-a), transparent 0 8%, color-mix(in srgb, #22d3ee 40%, transparent) 20%, #22d3ee 30%, transparent 36% 52%, color-mix(in srgb, #f472b6 40%, transparent) 66%, #f472b6 76%, #f59e0b 82%, transparent 88%); animation-duration: 2.2s; }
-.detail.ap-evo::after { animation-duration: 4s; }
-.card.ap-evo { animation: ap-evo-card 3s ease-in-out infinite; }
-@keyframes ap-evo-card { 0%, 100% { box-shadow: 0 0 18px -6px color-mix(in srgb, #f472b6 65%, transparent); } 50% { box-shadow: 0 0 22px -5px color-mix(in srgb, #22d3ee 65%, transparent); } }
+.detail > .ap-ring { inset: 0; padding: 1.5px; z-index: 5; opacity: .8; } .detail > .ap-ring > i { animation-duration: 6s; }
+.ap-evo .ap-ring > i { background: conic-gradient(transparent 0 8%, color-mix(in srgb, #22d3ee 40%, transparent) 20%, #22d3ee 30%, transparent 36% 52%, color-mix(in srgb, #f472b6 40%, transparent) 66%, #f472b6 76%, #f59e0b 82%, transparent 88%); animation-duration: 2.2s; }
+.detail.ap-evo > .ap-ring > i { animation-duration: 4s; }
+.card.ap-evo { box-shadow: 0 0 18px -6px color-mix(in srgb, #f472b6 65%, transparent); }
+.card.ap-evo:not(.ap-burst)::before { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; box-shadow: 0 0 22px -5px color-mix(in srgb, #22d3ee 65%, transparent); opacity: 0; animation: ap-fade 3s ease-in-out var(--ph0, 0s) infinite; }
 .ap-evo.ap-burst::before, .is-evo.ap-burst::before { background-image: linear-gradient(100deg, transparent 25%, rgba(34,211,238,.3) 40%, rgba(244,114,182,.35) 55%, rgba(245,158,11,.3) 68%, transparent 80%); box-shadow: inset 0 0 0 1px #f472b6; }
-.chip-evo { color: #db2777; border-color: color-mix(in srgb, #f472b6 60%, transparent); background: linear-gradient(90deg, rgba(34,211,238,.1), rgba(244,114,182,.12), rgba(245,158,11,.1)); animation: ap-evo-chip 3s linear infinite; }
-@keyframes ap-evo-chip { 33% { border-color: color-mix(in srgb, #22d3ee 60%, transparent); } 66% { border-color: color-mix(in srgb, #f59e0b 60%, transparent); } }
+.chip-evo { color: #db2777; border-color: color-mix(in srgb, #f472b6 60%, transparent); background: linear-gradient(90deg, rgba(34,211,238,.1), rgba(244,114,182,.12), rgba(245,158,11,.1)); }
 .ap-tick { overflow: hidden; margin: -2px 12px 6px; height: 18px; border-radius: 999px; background: color-mix(in srgb, var(--ok) 9%, transparent); font-size: 12px; line-height: 18px; color: var(--ok); white-space: nowrap;
   -webkit-mask: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); mask: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
-.ap-tick span { display: inline-block; padding-left: 100%; animation: ap-tick 14s linear infinite; }
+.ap-tick span { display: inline-block; padding-left: 100%; animation: ap-tick 14s linear var(--ph0, 0s) infinite; }
 @keyframes ap-tick { to { transform: translateX(-100%); } }
 .chip-wait { color: var(--ok); border: 1px dashed var(--ok); opacity: .75; }
 @keyframes ap-wait { 50% { opacity: .55; } }
 @media (prefers-reduced-motion: reduce), (hover: none) { .chip-auto { animation: none; } .ap-burst::before { animation: none; display: none; } .ap-fill, .ap-knob, .ap-v, .ap-dot, .ap-row, .ap-row > span em { transition: none; }
-  .card.ap-on::after, .detail.ap-on::after, .card.ap-on .card-head::after, .is-run .ap-v::before, .is-run .ap-v::after, .is-wait .ap-knob, .is-evo .ap-v, .is-evo .ap-v::before, .is-evo .ap-v::after, .is-evo .ap-knob, .is-evo .ap-knob::before, .ap-row.is-evo > span em, .card.ap-evo, .chip-evo { animation: none; } .ap-tick span { animation: none; padding-left: 8px; } }
+  .ap-ring > i, .is-run .ap-v::before, .is-run .ap-v::after, .is-wait .ap-knob::after, .is-evo .ap-v, .is-evo .ap-v::before, .is-evo .ap-v::after, .is-evo .ap-knob::after, .is-evo .ap-knob::before, .ap-row.is-evo > span em, .card.ap-evo:not(.ap-burst)::before { animation: none; } .ap-tick span { animation: none; padding-left: 8px; } }
 .chip-done { background: var(--surface-2); }
 .chip-merged { background: var(--surface-2); }
 .strip { list-style: none; margin: 0; padding: 2px 10px 4px 4px; position: relative; }
@@ -435,8 +443,8 @@ body.history-open .hist-btn span { display: inline; }
 .far .card:not(.is-shut):hover .card-head { box-shadow: 0 0 0 .5px color-mix(in srgb, var(--ink) 18%, transparent), 0 4px 14px -2px rgba(20, 24, 28, .22); }
 .far .card.is-sel:not(.is-shut) { outline-color: transparent; }
 /* A running line's light goes round its capsule, not the emptied card (the transformed head holds the light's absolute box). */
-.far .card.ap-on:not(.is-shut)::after { display: none; }
-.far .card.ap-evo:not(.is-shut) { animation: none; }
+.far .card:not(.is-shut) > .ap-ring, .far .card.ap-evo:not(.is-shut)::before { display: none; }
+.far .card:not(.is-shut) .card-head > .ap-ring { display: block; }
 .far .card.is-sel:not(.is-shut) .card-head { box-shadow: 0 0 0 2px var(--accent), 0 2px 10px -2px rgba(20, 24, 28, .14); }
 .far .card:not(.is-shut) .strip { pointer-events: none; }
 .far .card:not(.is-shut) .card-head { flex-wrap: wrap; row-gap: 4px; }
@@ -2555,6 +2563,10 @@ function keepMoving() {
 }
 // A looping animation restarts when render() rebuilds its element: a negative delay tied to the clock keeps it in step.
 const phase = period => `-${Date.now() % period}ms`;
+// The light round a running line (see .ap-ring), and the one clock its loops start from: set on a container just before
+// its contents are rebuilt, so the new nodes' animations go on where the old ones were instead of from their start.
+const AP_RING = '<i class="ap-ring" aria-hidden="true"><i></i></i>';
+const sameClock = el => el.style.setProperty('--ph0', `-${Math.round(performance.now())}ms`);
 const POP = [{ transform: 'scale(0)' }, { transform: 'scale(1)' }], GROW = [{ transform: 'scaleY(0)' }, { transform: 'scaleY(1)' }];
 const liOf = id => cardsEl.querySelector(`li[data-cid="${CSS.escape(id)}"]`);
 // Records already drawn: a render after a data refresh animates only the ones that arrived since (null until the first load).
@@ -2655,6 +2667,7 @@ function renderCanvas() {
   // In focus mode, a canvas of its own: without the inbox and the other lines.
   const ths = viewLines();
   const selT = selThreadId();
+  sameClock(cardsEl);
   cardsEl.innerHTML = ths.map(th => cardHTML(th, by.get(th.id) || [], selT)).join('');
   drawGroups();
   drawEdges();
@@ -2948,8 +2961,8 @@ function cardHTML(th, cs, selT) {
   const chip = apChip(th) + (isInbox ? `<span class="chip">${esc(t('unsorted'))}</span>` : `<span class="chip chip-${th.status || 'active'}">${esc(statusLabel(th.status))}</span>`);
   const agents = cs.filter(c => c.kind === 'agent').length;
   return `<div class="${cls}${apD(th.id) != null ? ' ap-burst' : ''}" data-tid="${esc(th.id)}" tabindex="0" data-kb aria-label="${esc(th.name)}" style="left:${th.x || 0}px;top:${th.y || 0}px;--c:${th.color}${apD(th.id) != null ? `;--apd:${apD(th.id)}ms` : ''}">
-    <div class="card-head">${isFolded(th) ? `<span class="grp-tog" data-park-tog="1" title="${esc(t(peeking ? 'peekClose' : th.status === 'done' ? 'peekOpen' : 'peekOpenParked'))}">${peeking ? '▾' : '▸'}</span>` : ''}<span class="roundel"></span><span class="card-name">${esc(th.name)}</span>${liveBadge(th.id)}${chip}</div>
-    ${shut ? '' : apTickHTML(th, cs)}
+    <div class="card-head">${apRun(th) ? AP_RING : ''}${isFolded(th) ? `<span class="grp-tog" data-park-tog="1" title="${esc(t(peeking ? 'peekClose' : th.status === 'done' ? 'peekOpen' : 'peekOpenParked'))}">${peeking ? '▾' : '▸'}</span>` : ''}<span class="roundel"></span><span class="card-name">${esc(th.name)}</span>${liveBadge(th.id)}${chip}</div>
+    ${shut ? '' : apTickHTML(th, cs)}${apRun(th) ? AP_RING : ''}
     <ol class="strip" style="--ph:${phase(2800)}">${items}</ol>
     <div class="card-foot"><span>${esc(t('countRecords', cs.length))}${agents ? esc(t('countAgent', agents)) : ''}${mergedIn(th.id).length && !S.showMerged ? `<button class="linkish mi-tog" data-merged-tog="1" title="${esc(t(S.mergedOpen.has(th.id) ? 'mergedClose' : 'mergedOpen'))}">${esc(t('mergedInCount', mergedIn(th.id).length))} ${S.mergedOpen.has(th.id) ? '▾' : '▸'}</button>` : ''}</span><span>${last ? esc(t('updated', fmtRel(last.ts))) : ''}</span></div>
   </div>`;
@@ -4414,7 +4427,8 @@ function renderDetail() {
   const opening = detail.hidden, other = !opening && lastSelKey !== sel.type + ':' + sel.id;
   lastSelKey = sel.type + ':' + sel.id;
   detail.hidden = false;
-  detail.innerHTML = html;
+  sameClock(detail);
+  detail.innerHTML = html + (detail.classList.contains('ap-on') ? AP_RING : '');
   // Opening, the panel springs in from its side; another record in an open panel fades its contents in.
   if (!CALM.matches && opening) detail.animate([{ transform: PHONE.matches ? 'translateX(40px)' : 'translateX(28px)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 380, easing: SPRING });
   else if (!CALM.matches && other) $('.d-scroll', detail)?.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: EASE_OUT });

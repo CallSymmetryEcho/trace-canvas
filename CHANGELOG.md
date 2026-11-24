@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Autopilot's motion no longer restarts on every redraw, and no longer keeps the page busy.** The canvas rebuilds its cards on any change, and each rebuild started the light round an Autopilot card, its glow and its ticker from the beginning. They now start from one clock, so they go on where they were. The light is a still gradient that turns inside the border's shape, and the glow fades a second shadow: transform and opacity only. With four Autopilot lines and nothing happening, 4 seconds went from 240 style recalculations to 1. The self-iterating chip's border no longer changes colour. The pixel comets and the aurora in an open Autopilot panel are as before.
+
 - **Failures that were swallowed are either explained or shown.** Every empty `catch` in the server, the command line and the page now says on its line why it can be ignored, and a test fails when a new one has no reason. Five that mattered are reported instead: no browser could be opened (`serve`, `trace_open`: it used to say "opened"); a hook that failed (kept in `hook-errors.log`, shown by `trace-canvas doctor`: the turn still goes on); the skill not updated by `trace-canvas update`; a long reply that could not be saved beside its to-do; `server.json` not written, so `update` cannot restart the server.
 
 - **Merging, three small things.** A line already merged into the target is not merged a second time (it added a duplicate merge record); the banner says how many were left as they are. The flow hint under the multi-select banner follows the new line's name as you type it. A line's "Merge into…" starts on "Pick a line…" unless the line was forked from one that is still open, and Merge is off until a line is picked.

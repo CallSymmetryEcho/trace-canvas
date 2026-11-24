@@ -10,7 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url)), repo = path.resolve(here, '../..');
-const TESTS = ['merge-groups', 'goals-redraw', 'hand-copy'];
+const TESTS = ['merge-groups', 'goals-redraw', 'hand-copy', 'motion'];
 const onPath = n => (process.env.PATH || '').split(path.delimiter).map(d => path.join(d, n)).find(existsSync);
 const chrome = process.env.CHROME || ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'].map(onPath).find(Boolean)
   || ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/Applications/Chromium.app/Contents/MacOS/Chromium'].find(existsSync);
@@ -30,7 +30,9 @@ const finish = async code => { await Promise.all(kids.map(gone));
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => finish(130));
 
 const cdp = await freePort();
-kids.push(spawn(chrome, ['--headless=new', `--remote-debugging-port=${cdp}`, `--user-data-dir=${path.join(tmp, 'chrome')}`, '--no-first-run', '--no-default-browser-check', '--disable-gpu', 'about:blank'], { stdio: 'ignore' }));
+kids.push(spawn(chrome, ['--headless=new', `--remote-debugging-port=${cdp}`, `--user-data-dir=${path.join(tmp, 'chrome')}`, '--no-first-run', '--no-default-browser-check', '--disable-gpu',
+  // A headless Chrome on a machine with no mouse reports hover: none, and the page keeps its motion off there (as on a tablet).
+  '--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4', 'about:blank'], { stdio: 'ignore' }));
 if (!await up(`http://127.0.0.1:${cdp}/json/version`)) { console.error(`FAILED: Chrome did not start (${chrome})`); await finish(1); }
 
 let failed = 0;

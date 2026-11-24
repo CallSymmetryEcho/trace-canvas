@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Branches keeps merged lines when finished threads are hidden.** With **Hide finished threads** on, a merged line was taken out of Branches as well: the merge row stood alone and the line looked deleted. A merged line is now drawn whenever the line it went into is.
+
 - **Four findings from Codex's audit.** Undoing the last merge into a line the merge made no longer deletes that line when a goal or a note was written on it (the goal went with it, with no warning). A turn that writes files in two repositories lists both: the second repository's files keep their full path, and both open in the reader (only the last repository's files were kept). A canvas card with keyboard focus keeps it when a record from another tab or an agent redraws the canvas. Grouping lines picked on the canvas has Undo in its toast: each line goes back to the group it had, or to none.
 
 - **Four display fixes.** In Branches the list ends with room for the floating All / Milestones / Starred, so the last rows scroll clear of it. On the Timeline a line's latest title sits beside the line's end, past the "now" rule, instead of on top of the band. On touch screens the view tabs, the canvas tools, the top bar's buttons and the capture bar are at least 40 px high, and History's icon is a clock instead of a tick (which read as "done" where the label is hidden). On a phone the Goals tab's count sits after the word instead of on it.

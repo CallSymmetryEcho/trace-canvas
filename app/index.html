@@ -3256,7 +3256,10 @@ const gitSub = (c, lvl) => lvl === 1 && isTodo(c) && !!c.done && !c.starred && !
 const gitKeep = (c, lvl) => !lvl || !!c.starred || (lvl === 1 && (c.kind === 'decision' || c.kind === 'fork' || c.kind === 'merge' || (isTodo(c) && !!c.done))) || (S.sel && S.sel.type === 'commit' && S.sel.id === c.id);
 function renderGit() {
   const by = byThread();
-  const visible = new Set(viewLines(th => !isFolded(th) && (!isHidden(th) || (th.status === 'merged' && !S.hideDone))).map(th => th.id));
+  // A merged line is part of the history of the line it went into: it is drawn whenever that line is, also with
+  // "Hide finished threads" on (which used to take it out, and the merge row was left with nothing leading to it).
+  const shown = (th, n = 0) => (th.status === 'merged' && S.threads.has(th.mergedInto) && n < 20 ? shown(getThread(th.mergedInto), n + 1) : !isHidden(th));
+  const visible = new Set(viewLines(th => !isFolded(th) && shown(th)).map(th => th.id));
   // The kind filter drops rows here (forks and merges stay so lines keep their shape); search only dims.
   const kindOk = c => !S.kinds.size || S.kinds.has(c.kind) || c.kind === 'fork' || c.kind === 'merge';
   const lvl = S.gitLevel, inView = [...S.commits.values()].filter(c => visible.has(tidOf(c)) && kindOk(c));

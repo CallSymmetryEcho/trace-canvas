@@ -482,7 +482,7 @@ edges/<id>    from, to, label
 
 服务只监听 127.0.0.1，校验 `Host` 头，所有写操作都要带 `X-Trace-Canvas` 头，所以浏览器里打开的其他网站改不了你的数据。
 
-在这个文件夹里运行 `npm test` 跑测试。
+在这个文件夹里运行 `npm test` 跑测试。发版前、以及改过页面之后，再跑一遍 `npm run test:browser`：它在无头 Chrome 里用自己的临时数据把页面点一遍（自己起、自己关页面服务和 Chrome；没装 Chrome 时会打印 `SKIPPED`）。
 
 ## 许可
 

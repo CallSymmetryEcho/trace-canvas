@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Merging, three small things.** A line already merged into the target is not merged a second time (it added a duplicate merge record); the banner says how many were left as they are. The flow hint under the multi-select banner follows the new line's name as you type it. A line's "Merge into…" starts on "Pick a line…" unless the line was forked from one that is still open, and Merge is off until a line is picked.
+
+- **Copying a hand-over command says when it fails.** With a page server, the command comes from the server only; when the server cannot write it, the page shows the reason and copies nothing, instead of silently copying its own version, which may start in another folder. The page's own version stays for a page with no server and for the phone.
+
+- **`npm run test:browser`.** The browser regressions run with one command: it seeds a temporary data folder, starts a page server and a headless Chrome on free ports, runs each script and stops what it started. Without Chrome it prints `SKIPPED`.
+
 - **An archived line's outputs can be found again.** On the History wall a plaque now lists its archived lines and, under each, its key records: the ones you starred, its wrap-up, and records an agent logged with links to files. A line's name opens its panel (with "Put back on the canvas"), a record opens with its links and Read. For agents, `trace_list_threads` marks an archived line and gives the same key records with their links.
 
 - **What a to-do was ticked with stays after Pass.** The result and how it was checked showed only while a to-do waited for review; after Pass they were shown nowhere. The to-do's record now keeps them: who ticked it and when, the result, the check, and when it was passed.

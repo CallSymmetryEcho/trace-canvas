@@ -1,14 +1,11 @@
-// Browser regression, not part of npm test (it needs a Chrome with --remote-debugging-port=9333 and a page server on
-// data of its own). Run it after changing merging, groups or the multi-select banner:
-//   export TRACE_CANVAS_HOME=$(mktemp -d) TRACE_CANVAS_MAP= TRACE_CANVAS_MACHINE=verify
-//   node test/browser/merge-groups.seed.mjs && trace-canvas serve --no-open --port 4799 &
-//   node test/browser/merge-groups.mjs http://localhost:4799/
+// Browser regression: run with `npm run test:browser` (test/browser/run.mjs seeds data of its own, starts a page server
+// and a headless Chrome, and stops both). Run it after changing merging, groups or the multi-select banner.
 // It clicks through the six cases of the 2026-11-23 report: the banner over the first row, lines of one group merged
 // into a new line, a merge that would make a circle, the panel's default target, undoing a merge, a group renamed
 // onto another group's name (asked first, undone from the toast) and dissolved (undone too).
 import assert from 'node:assert/strict';
-const [url, shot] = process.argv.slice(2);
-const v = await (await fetch('http://127.0.0.1:9333/json/new?about:blank', { method: 'PUT' })).json();
+const [url, shot] = process.argv.slice(2), CDP = process.env.CDP_PORT || 9333;
+const v = await (await fetch('http://127.0.0.1:' + CDP + '/json/new?about:blank', { method: 'PUT' })).json();
 const ws = new WebSocket(v.webSocketDebuggerUrl); let id = 0; const pend = new Map();
 ws.onmessage = e => { const m = JSON.parse(e.data); if (m.id && pend.has(m.id)) { pend.get(m.id)(m); pend.delete(m.id); } };
 await new Promise(r => ws.onopen = r);
@@ -45,6 +42,8 @@ assert.equal(out.bannerOver, 0, 'no card under the banner');
 await click(card('B'), 0.2); // the top of a first-row card can be clicked now
 await setVal('#multi-target', '__new', 'change'); await wait(300);
 await setVal('#multi-name', 'N', 'input');
+out.flow = await ev(`document.querySelector('.mb-flow').textContent`);
+assert.equal(out.flow, 'A、B → N', 'the flow hint follows the typed name');
 await ev(`document.querySelector('[data-multi="merge"]').click()`); await wait(1200);
 L = await data(); out.newLine = ['N', 'A', 'B', 'F'].map(L.st);
 assert.deepEqual(out.newLine, ['active/G1/', 'merged/G1/N', 'merged/G1/N', 'active/G1/']);
@@ -52,10 +51,20 @@ assert.deepEqual(out.newLine, ['active/G1/', 'merged/G1/N', 'merged/G1/N', 'acti
 out.circle = (await post('/api/merge', { sources: [L.line.N.id], target: L.line.A.id })).error;
 assert.match(out.circle, /circle/);
 L = await data(); assert.deepEqual(['N', 'A'].map(L.st), ['active/G1/', 'merged/G1/N']);
+// A is merged into N already: a second merge is refused and leaves one merge record.
+out.again = (await post('/api/merge', { sources: [L.line.A.id], target: L.line.N.id })).error;
+assert.match(out.again, /already merged/);
+L = await data(); assert.equal(L.d.commits.filter(c => c.mergeOf === L.line.A.id).length, 1);
 // 2. The panel's "Merge into…" offers no inbox.
 await click(card('H'), 0.1); await ev(`document.querySelector('[data-act="merge-open"]').click()`); await wait(300);
 out.panelTargets = await ev(`[...document.querySelectorAll('#t-merge option')].map(o => o.value)`);
-assert.ok(out.panelTargets.length && !out.panelTargets.includes('inbox'), 'the inbox is not offered');
+assert.ok(out.panelTargets.length > 1 && !out.panelTargets.includes('inbox'), 'the inbox is not offered');
+// It starts on no line: Merge is off, and clicking it does nothing.
+out.panelStart = await ev(`[document.querySelector('#t-merge').value, document.querySelector('[data-act="merge"]').disabled]`);
+assert.deepEqual(out.panelStart, ['', true]);
+await ev(`(() => { const b = document.querySelector('[data-act="merge"]'); b.disabled = false; b.click(); })()`); await wait(800);
+L = await data(); assert.equal(L.st('H'), 'active//', 'H is merged into nothing');
+await ev(`document.querySelector('[data-act="merge-cancel"]').click()`); await wait(200);
 // 4. D (G2, with an open to-do) into E, then undone from D's panel: as before.
 const todoOn = () => { const c = L.d.commits.find(x => x.title === 'D open to-do'); return L.d.threads.find(t => t.id === c.thread).name; };
 const recs = () => L.d.commits.filter(c => c.kind === 'merge' && c.mergeOf === L.line.D.id).length;
@@ -88,6 +97,6 @@ L = await data(); out.dissolveUndone = [L.count('G1'), L.count('G2')]; assert.de
 
 console.log(JSON.stringify(out, null, 1));
 if (shot) { const s = await call('Page.captureScreenshot'); (await import('node:fs')).writeFileSync(shot, Buffer.from(s.result.data, 'base64')); }
-await fetch('http://127.0.0.1:9333/json/close/' + v.id);
+await fetch('http://127.0.0.1:' + CDP + '/json/close/' + v.id);
 console.log('PASSED');
 process.exit(0);

@@ -451,7 +451,7 @@ edges/<id>    from, to, label
 
 The server only listens on 127.0.0.1, checks the `Host` header, and requires an `X-Trace-Canvas` header on every write, so other websites open in your browser cannot change your data.
 
-Run the tests with `npm test` in this folder.
+Run the tests with `npm test` in this folder. Before a release, and after changing the page, also run `npm run test:browser`: it clicks through the page in a headless Chrome on data of its own (it starts and stops its own page server and Chrome, and says `SKIPPED` when no Chrome is installed).
 
 ## License
 

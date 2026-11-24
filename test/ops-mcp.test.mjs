@@ -249,6 +249,18 @@ test('a merge is refused when it would make a circle, or goes into the inbox or 
   assert.deepEqual(d, before, 'a refused merge changes nothing');
 });
 
+test('a line already merged into the target is not merged a second time', () => {
+  const d = emptyData();
+  const [a, b, n] = ['A', 'B', 'N'].map(name => createThread(d, { name }));
+  mergeThreads(d, { sources: [a.id], target: n.id }, env);
+  const before = structuredClone(d), records = () => Object.values(d.commits).filter(c => c.mergeOf === a.id).length;
+  assert.throws(() => mergeThreads(d, { sources: [a.id], target: n.id }, env), /already merged into "N"/);
+  assert.deepEqual(d, before);
+  const r = mergeThreads(d, { sources: [a.id, b.id], target: n.id }, env);
+  assert.deepEqual([r.sources, r.already], [['B'], ['A']]);
+  assert.equal(records(), 1);
+});
+
 test('lines of one group merged into a new line: the new line is in that group, and so are they', () => {
   const d = emptyData();
   const [a, b, c] = ['A', 'B', 'C'].map(name => createThread(d, { name, extra: { group: 'G1' } }));

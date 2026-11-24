@@ -1360,7 +1360,7 @@ apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent 
     multiClear: 'Clear', multiNeedMore: 'Pick at least two threads, or one thread and an existing target',
     multiPick: 'Click the lines to merge or group', multiPickMore: 'Click one more line, or choose another line to merge into', multiInGroup: 'Picked', multiOthers: 'Other lines',
     multiMakeTarget: 'Merge the others into this line', multiTargetMark: 'kept', multiDrop: 'Unselect',
-    tMergedMany: (n, name) => `Merged ${n} thread${n === 1 ? '' : 's'} into “${name}”`,
+    tMergedMany: (n, name) => `Merged ${n} thread${n === 1 ? '' : 's'} into “${name}”`, tAlreadyMerged: name => `Already merged into “${name}”: nothing to do`, tAlreadyMergedN: n => `${n} already merged, left as ${n === 1 ? 'it is' : 'they are'}`, mergePick: 'Pick a line…',
     tlDay: 'Day', tlWeek: 'Week', tlMonth: 'Month', tlNow: 'Now', tlHint: 'One row per thread. The band shows when it was active; dashed curves are forks and merges.',
     detailAria: 'Details', capThreadAria: 'Thread to log to', kindsAria: 'Record type',
     capPh: 'Log an idea, a task or what an agent produced…  Enter to save. Start with #thread to file it. Paste JSON to import.',
@@ -1477,7 +1477,7 @@ apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent 
     goalsNoGoal: 'No goal yet. Tap to write one.', goalsAdd: '+ Add a to-do', goalsOpenLine: 'Open line',
     goalsOthers: n => `${n} more line${n === 1 ? ' has' : 's have'} no goal or to-do yet.`, goalsEmpty: 'No goals or to-dos yet. Open a line, write its goal, and add to-dos here or with the □ kind below.',
     goalsBy: name => `ticked by ${name}`, tTaskAdded: 'To-do added',
-    handNeedsLine: 'Move the to-do onto a line first', goalsWho: 'Who does it', goalsAnyone: 'Anyone', goalsHand: 'Hand to it', openInTerminal: 'Open in Terminal', tOpenedTerminal: 'Opened in Terminal: the agent starts on this line', tHandCopied: 'Command copied: paste it in a terminal to start the agent on this line',
+    handNeedsLine: 'Move the to-do onto a line first', goalsWho: 'Who does it', goalsAnyone: 'Anyone', goalsHand: 'Hand to it', openInTerminal: 'Open in Terminal', tOpenedTerminal: 'Opened in Terminal: the agent starts on this line', tHandCopied: 'Command copied: paste it in a terminal to start the agent on this line', tHandFailed: why => `No command copied: ${why || 'the page server did not answer'}`,
     handPrompt: (name, tid, title) => `You are taking over the Trace Canvas line "${name}" (thread ${tid}). First call the MCP tool trace_bind with thread "${tid}". Then call trace_tasks with mine: true for the goal and your to-dos, work through them, and tick each one with trace_task_done when it is done. Log decisions and results with trace_log.${title ? ` Start with: ${title}` : ''}`,
     tabAgents: 'Agents', agHint: 'Who started whom: each session starts the sessions to its right; the small dashed cards are its subagents.',
     agEmpty: 'No agents are running right now. Claude Code sessions appear here as soon as they run with the Trace Canvas hooks.',
@@ -1542,7 +1542,7 @@ apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的
     multiClear: '取消', multiNeedMore: '至少选两条线程，或选一条并指定一条已有的目标线程',
     multiPick: '点卡片选中要合并或编组的线', multiPickMore: '再点一条线，或在「合并到」里选另一条线', multiInGroup: '已选', multiOthers: '其他线',
     multiMakeTarget: '把其余的线并进这条', multiTargetMark: '保留', multiDrop: '取消选中',
-    tMergedMany: (n, name) => `已把 ${n} 条线程合并到「${name}」`,
+    tMergedMany: (n, name) => `已把 ${n} 条线程合并到「${name}」`, tAlreadyMerged: name => `已经合并到「${name}」了，没有再合并`, tAlreadyMergedN: n => `另有 ${n} 条已经合并过，没有动`, mergePick: '选一条线…',
     tlDay: '日', tlWeek: '周', tlMonth: '月', tlNow: '回到现在', tlHint: '每一行是一条线程，色带是它活跃的时段，虚线是分叉与合并',
     detailAria: '详情', capThreadAria: '记到哪条线程', kindsAria: '记录类型',
     capPh: '记下一个想法、任务或 agent 的产出…  回车留痕，#线程名 开头可直接归类，粘贴 JSON 可批量导入',
@@ -1658,7 +1658,7 @@ apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的
     goalsNoGoal: '还没写目标，点这里填写。', goalsAdd: '+ 添加待办', goalsOpenLine: '打开这条线',
     goalsOthers: n => `另外 ${n} 条线还没有目标或待办。`, goalsEmpty: '还没有目标或待办。打开一条线写下目标，再在这里或用下方的 □ 类型添加待办。',
     goalsBy: name => `由 ${name} 勾选`, tTaskAdded: '已添加待办',
-    handNeedsLine: '先把这项待办放到一条线上', goalsWho: '由谁做', goalsAnyone: '任何人', goalsHand: '交给它', openInTerminal: '在终端打开', tOpenedTerminal: '已在终端打开：agent 会在这条线上开工', tHandCopied: '命令已复制：粘贴到终端运行，agent 就会在这条线上开工',
+    handNeedsLine: '先把这项待办放到一条线上', goalsWho: '由谁做', goalsAnyone: '任何人', goalsHand: '交给它', openInTerminal: '在终端打开', tOpenedTerminal: '已在终端打开：agent 会在这条线上开工', tHandCopied: '命令已复制：粘贴到终端运行，agent 就会在这条线上开工', tHandFailed: why => `没有复制命令：${why || '页面服务没有回应'}`,
     handPrompt: (name, tid, title) => `你接手 Trace Canvas 上的线「${name}」（thread ${tid}）。先调用 MCP 工具 trace_bind，thread 填 "${tid}"；再用 trace_tasks（mine: true）读取目标和分给你的待办，逐项完成，每做完一项就用 trace_task_done 勾上；决定和结果用 trace_log 记下来。${title ? `先从这一项开始：${title}` : ''}`,
     tabAgents: 'Agent', agHint: '谁启动了谁：每个会话启动它右边的会话，虚线小卡片是它的子 agent。',
     agEmpty: '现在没有运行中的 agent。装好 Trace Canvas hooks 的 Claude Code 会话一运行就会出现在这里。',
@@ -2684,6 +2684,11 @@ function renderMulti() {
   if (!by) return;
   mbShift += by; S.cam.y += by; applyCam();
 }
+// "A、B → N" under the banner: which lines go into which (also redrawn as the new line's name is typed).
+function multiFlow() {
+  const tgt = S.multiTarget, srcs = [...S.multi].map(id => S.threads.get(id)).filter(th => th && th.id !== tgt);
+  return !srcs.length ? t('multiPickMore') : `${srcs.map(th => th.name).join('、')} → ${tgt === '__new' ? S.multiName.trim() || t('multiNew') : (S.threads.get(tgt) || {}).name || ''}`;
+}
 function drawMulti() {
   for (const id of [...S.multi]) if (!S.threads.has(id)) S.multi.delete(id);
   const mb = $('#multi-banner');
@@ -2702,7 +2707,7 @@ function drawMulti() {
   const tgt = S.multiTarget, srcs = picked.filter(th => th.id !== tgt);
   const chip = th => `<span class="mb-chip${th.id === tgt ? ' is-target' : ''}" style="--c:${th.color}"><button data-multi-target="${esc(th.id)}" title="${esc(t('multiMakeTarget'))}"><i></i><span>${esc(th.name)}</span>${th.id === tgt ? `<em>${esc(t('multiTargetMark'))}</em>` : ''}</button><button class="mb-x" data-multi-drop="${esc(th.id)}" aria-label="${esc(t('multiDrop'))}">×</button></span>`;
   const opt = th => `<option value="${esc(th.id)}" ${th.id === tgt ? 'selected' : ''}>${esc(th.name)}</option>`;
-  const flow = !srcs.length ? esc(t('multiPickMore')) : `${srcs.map(th => esc(th.name)).join('、')} → ${tgt === '__new' ? esc(S.multiName.trim() || t('multiNew')) : esc(S.threads.get(tgt).name)}`;
+  const flow = esc(multiFlow());
   mb.innerHTML = `<div class="mb-chips">${picked.map(chip).join('')}</div>
     ${SERVER ? `<span>${esc(t('multiInto'))}</span>
     <select id="multi-target"><optgroup label="${esc(t('multiInGroup'))}">${open.map(opt).join('')}</optgroup><option value="__new" ${tgt === '__new' ? 'selected' : ''}>${esc(t('multiNew'))}</option>${others.length ? `<optgroup label="${esc(t('multiOthers'))}">${others.map(opt).join('')}</optgroup>` : ''}</select>
@@ -2719,7 +2724,7 @@ function toggleMulti(id) {
   render();
 }
 function clearMulti() { S.multi.clear(); S.multiTarget = null; S.selectMode = false; S.multiName = ''; render(); }
-$('#multi-banner').addEventListener('input', e => { if (e.target.id === 'multi-name') S.multiName = e.target.value; if (e.target.id === 'multi-group') S.multiGroup = e.target.value; });
+$('#multi-banner').addEventListener('input', e => { if (e.target.id === 'multi-name') { S.multiName = e.target.value; const f = $('.mb-flow', $('#multi-banner')); if (f) f.textContent = multiFlow(); } if (e.target.id === 'multi-group') S.multiGroup = e.target.value; });
 $('#multi-banner').addEventListener('change', e => { if (e.target.id === 'multi-target') { S.multiTarget = e.target.value; render(); } });
 $('#multi-banner').addEventListener('click', e => {
   const pick = e.target.closest('[data-multi-target]'), drop = e.target.closest('[data-multi-drop]');
@@ -2739,14 +2744,16 @@ $('#multi-banner').addEventListener('click', e => {
 $('#select-btn').onclick = () => { S.selectMode = !S.selectMode; if (!S.selectMode && !S.multi.size) S.multiName = ''; S.connect = null; render(); };
 
 async function mergeMany(targetVal) {
-  const sources = [...S.multi].filter(id => S.threads.has(id) && id !== targetVal);
-  const isNew = targetVal === '__new';
+  const picked = [...S.multi].filter(id => S.threads.has(id) && id !== targetVal), isNew = targetVal === '__new';
+  // A line already merged into the target is left out (merging it again only added a second merge record).
+  const sources = picked.filter(id => isNew || S.threads.get(id).mergedInto !== targetVal), again = picked.length - sources.length;
+  if (again && !sources.length) { toast(t('tAlreadyMerged', S.threads.get(targetVal).name)); return; }
   if (sources.length < (isNew ? 2 : 1)) { toast(t('multiNeedMore')); return; }
   const th = await serverMerge('/api/merge', { sources, ...(isNew ? { newName: S.multiName.trim() || sources.map(id => S.threads.get(id).name).join(' + ') } : { target: targetVal }) });
   if (!th) return;
   S.multi.clear(); S.multiTarget = null; S.selectMode = false; S.multiName = '';
   select({ type: 'thread', id: th.id });
-  toast(t('tMergedMany', sources.length, th.name));
+  toast(t('tMergedMany', sources.length, th.name) + (again ? ' · ' + t('tAlreadyMergedN', again) : ''));
 }
 /* ---- groups ---- */
 // A group is a name on its lines (th.group); its frame wraps their cards as drawn, under them.
@@ -3640,6 +3647,9 @@ window.addEventListener('popstate', () => {
   if (S.sel) { S.sel = null; S.ui = {}; render(); }
   try { history.replaceState(null, '', location.pathname + location.search + '#' + S.view); } catch {} // the entry gone back to may name an older view
 });
+// "Merge into…" starts on the line this one was forked from when that is still open; otherwise on nothing, so one
+// click cannot merge it into a line nobody picked.
+const mergePre = th => { const P = S.threads.get(th.parent); return P && P.id !== th.id && ['active', 'parked'].includes(P.status || 'active') ? P.id : ''; };
 function threadOptions(selected, { excludeId, onlyOpen, noInbox } = {}) {
   // In focus mode only the group's lines, and the one already chosen.
   const opts = [...(noInbox || (S.focusGroup && selected !== INBOX) ? [] : [{ id: INBOX, name: t('inbox') }]), ...orderedThreads().filter(th => th.id !== excludeId && (inFocus(th) || th.id === selected) && (!onlyOpen || th.status === 'active' || th.status === 'parked' || th.id === selected))];
@@ -4353,7 +4363,7 @@ function threadDetail(th) {
         ${!isInbox ? `<button class="btn" data-act="agent-prompt" title="${esc(t('agentPromptTitle'))}">${esc(t('agentAsk'))}</button>` : ''}
         ${!isInbox && SERVER && !S.remote ? (S.ui.retro ? retroRangeForm(th.id) : `<button class="btn" data-act="retro" title="${esc(t('retroTitle'))}" ${S.retroBusy ? 'disabled' : ''}>${esc(S.retroBusy === th.id ? t('retroRunning') : t('retro'))}</button>`) : ''}
         ${!isInbox && SERVER && th.status !== 'merged' ? (S.ui.merge
-          ? `<div class="inline-form"><select id="t-merge">${threadOptions(th.parent && th.parent !== th.id ? th.parent : '', { excludeId: th.id, onlyOpen: true, noInbox: true })}</select><button class="btn btn-primary" data-act="merge">${esc(t('merge'))}</button><button class="btn" data-act="merge-cancel">${esc(t('cancel'))}</button></div>`
+          ? `<div class="inline-form"><select id="t-merge"><option value="">${esc(t('mergePick'))}</option>${threadOptions(mergePre(th), { excludeId: th.id, onlyOpen: true, noInbox: true })}</select><button class="btn btn-primary" data-act="merge" ${mergePre(th) ? '' : 'disabled'}>${esc(t('merge'))}</button><button class="btn" data-act="merge-cancel">${esc(t('cancel'))}</button></div>`
           : `<button class="btn" data-act="merge-open">${esc(t('mergeTo'))}</button>`) : ''}
         ${!isInbox ? `<span class="spacer"></span>${S.ui.del ? delUI(t('delThreadQ')) : `<button class="btn btn-quiet-danger" data-act="del-open">${esc(t('delThread'))}</button>`}` : ''}
       </div>
@@ -4428,6 +4438,7 @@ detail.addEventListener('input', e => {
   } else if (s.type === 'edge' && el.id === 'e-label') patchDoc('edges', s.id, { label: el.value }, 600);
 });
 detail.addEventListener('change', e => {
+  if (e.target.id === 't-merge') { const b = $('[data-act="merge"]', detail); if (b) b.disabled = !e.target.value; return; }
   if (e.target.classList.contains('rt-layer')) { (S.ui.rt ||= {})[e.target.dataset.n] = e.target.value; return; }
   if (e.target.classList.contains('gx-only')) { ls.set('tc.gxOnly', e.target.checked); render(); return; } // kept in this browser, for every diff
   if (e.target.classList.contains('gx-against')) { GX.against.set(e.target.dataset.cid, e.target.value); e.target.blur(); render(); return; }
@@ -4551,7 +4562,7 @@ detail.addEventListener('click', e => {
     case 'color': patchDoc('threads', s.id, { color: b.dataset.color }, 0); break;
     case 'capture-here': setCaptureThread(s.id); $('#cap-text').focus(); break;
     case 'merge-open': S.ui = { merge: true }; render(); break;
-    case 'merge': if ($('#t-merge').value) mergeThread(s.id, $('#t-merge').value); S.ui = {}; render(); break;
+    case 'merge': if (!$('#t-merge').value) break; mergeThread(s.id, $('#t-merge').value); S.ui = {}; render(); break;
     case 'label': patchDoc('edges', s.id, { label: b.dataset.label }, 0); lastKey = ''; render(); break;
     case 'flip': { const ed = S.edges.get(s.id); if (ed) patchDoc('edges', s.id, { from: ed.to, to: ed.from }, 0); break; }
   }
@@ -5302,8 +5313,15 @@ function handClick(e) {
   const start = e.target.closest('[data-start]');
   if (start) { startOn({ todo: start.dataset.start }); return true; }
   const hand = e.target.closest('[data-hand]');
-  // The server writes the command (the folder it starts in, the agent's own flags); the page's own is for a page with no server.
-  if (hand) { const c = S.commits.get(hand.dataset.hand); (SERVER && c && c.assignee ? postJSON('/api/hand?copy=1', { todo: c.id, to: c.assignee }).then(r => r.command || handCommand(c), () => handCommand(c)) : Promise.resolve(handCommand(c))).then(cmd => { if (cmd) copyText(cmd, t('tHandCopied')); }); return true; }
+  // The server writes the command (the folder it starts in, the agent's own flags). When it cannot, the page says why and
+  // copies nothing: its own handCommand picks the folder another way, so a silent fallback could start the agent somewhere
+  // else. The page's own is for a page with no server, and for the phone, where the server keeps /api/hand shut.
+  if (hand) {
+    const c = S.commits.get(hand.dataset.hand), own = () => { const cmd = handCommand(c); if (cmd) copyText(cmd, t('tHandCopied')); };
+    if (SERVER && !S.remote && c && c.assignee) postJSON('/api/hand?copy=1', { todo: c.id, to: c.assignee }).then(r => (r.command ? copyText(r.command, t('tHandCopied')) : toast(t('tHandFailed', r.error || ''))));
+    else own();
+    return true;
+  }
   return false;
 }
 // Who does an open to-do, and the buttons that hand it over: in Goals' rows and in the to-do's own panel.

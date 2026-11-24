@@ -535,8 +535,12 @@ export function mergeThreads(d, { sources = [], target, newName, mode = 'merge' 
   if (missing.length) throw new Error(`No thread named ${missing.map(m => `"${m}"`).join(', ')}`);
   let tid = target ? resolveThreadRef(d, target) : null;
   if (tid === INBOX) throw new Error('The inbox cannot be a merge target');
-  const sids = srcIds.filter(id => id !== tid);
-  if (!sids.length) throw new Error('Pick at least one thread other than the target');
+  const others = srcIds.filter(id => id !== tid);
+  if (!others.length) throw new Error('Pick at least one thread other than the target');
+  // A line already merged into the target is left out: merging it again only added a second merge record.
+  const again = mode === 'combine' ? [] : others.filter(id => d.threads[id].status === 'merged' && d.threads[id].mergedInto === tid);
+  const sids = others.filter(id => !again.includes(id));
+  if (!sids.length) throw new Error(`${again.map(id => `"${d.threads[id].name}"`).join(', ')} ${again.length === 1 ? 'is' : 'are'} already merged into "${d.threads[tid].name}"`);
   if (tid && mode !== 'combine' && d.threads[tid].status === 'merged') {
     // A merged line is drawn inside the line it leads to: merged into, it would vanish with everything in it,
     // and when it leads to one of the sources the two would point at each other.
@@ -582,7 +586,7 @@ export function mergeThreads(d, { sources = [], target, newName, mode = 'merge' 
       src.status = 'merged'; src.mergedInto = tid;
     }
   }
-  return { target: d.threads[tid], sources: names, mode };
+  return { target: d.threads[tid], sources: names, mode, ...(again.length ? { already: again.map(id => d.threads[id].name) } : {}) };
 }
 
 /**

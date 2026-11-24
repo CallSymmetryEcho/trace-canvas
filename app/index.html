@@ -2672,7 +2672,7 @@ function renderCanvas() {
   drawGroups();
   drawEdges();
   applyCam();
-  if (!S.fitted && loaded() && (S.threads.size || S.commits.size)) { S.fitted = true; fit(true); }
+  if (!S.fitted && loaded() && (S.threads.size || S.commits.size)) { S.fitted = true; fit(true, true); }
   vp.classList.toggle('connecting', !!S.connect);
   $('#connect-btn').setAttribute('aria-pressed', S.connect ? 'true' : 'false');
   const cb = $('#connect-banner');
@@ -3018,7 +3018,7 @@ function drawEdges() {
 function zoomAt(cx, cy, f, fly) {
   const r = vp.getBoundingClientRect(), from = fly && camGoal ? camGoal : S.cam;
   const px = cx - r.left, py = cy - r.top;
-  const z = clamp(from.z * f, Math.min(0.25, zTop * 0.6), 2), k = z / from.z;
+  const z = clamp(from.z * f, Math.min(0.25, zTop * 0.6, from.z), 2), k = z / from.z; // never pushed in from where Fit left it
   const to = { x: px - (px - from.x) * k, y: py - (py - from.y) * k, z };
   if (fly) camTo(to); else { stopCam(); Object.assign(S.cam, to); applyCam(); }
 }
@@ -3077,7 +3077,9 @@ function reveal(tid) {
   const z = Math.max(S.cam.z, 0.8);
   camTo({ z, x: v.width / 2 - (el.offsetLeft + el.offsetWidth / 2) * z, y: v.height / 2 - (el.offsetTop + el.offsetHeight / 2) * z });
 }
-function fit(instant) {
+// first: the view the page opens with. A phone opens on readable cards at the top (60%) and is panned from there;
+// the Fit button always shows every line, however small that makes them.
+function fit(instant, first) {
   const els = [...cardsEl.children, ...groupsEl.querySelectorAll('.grp-folded')]; // folded groups' chips count too
   if (!els.length) return;
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -3085,8 +3087,9 @@ function fit(instant) {
   const r = vp.getBoundingClientRect();
   const padX = 24, padTop = 24, padBottom = 70;
   const availW = r.width - padX * 2, availH = r.height - padTop - padBottom;
-  const z = clamp(Math.min(availW / (x1 - x0), availH / (y1 - y0)), r.width < 600 || matchMedia('(hover: none)').matches ? 0.6 : 0.3, 1.1); // a tablet: readable cards, pan for the rest
-  zTop = Math.min(0.62, z * 0.98); // see zoomK
+  const z = clamp(Math.min(availW / (x1 - x0), availH / (y1 - y0)), first ? (r.width < 600 ? 0.6 : 0.3) : 0.12, 1.1);
+  // See zoomK. Under 40% whole cards cannot be read, so there Fit shows them as names: heads grown back to that size.
+  zTop = Math.min(0.62, Math.max(z * 0.98, 0.4));
   const w = (x1 - x0) * z, hgt = (y1 - y0) * z;
   const to = {
     z,

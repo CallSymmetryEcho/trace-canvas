@@ -337,3 +337,12 @@ test('a session whose conversation file is gone gets a new session in its folder
   assert.equal(conversationGone({ ...d.sessions.lost, machine: 'mac' }, env2), false);
   assert.equal(conversationGone({ ...d.sessions.lost, cwd: path.join(top, 'elsewhere') }, env2), false);
 });
+
+test('a failed resume from another folder does not move the session there', async () => {
+  const { sessionDir } = await import('../src/hook.mjs');
+  const top = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'tc-dir-'))), enc = p => p.replace(/[^a-zA-Z0-9]/g, '-');
+  const proj = path.join(top, 'proj'), file = path.join(top, 'projects', enc(top), 's1.jsonl');
+  assert.equal(sessionDir(top, proj, file), proj, 'the file it names is not there: it stays');
+  fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, '{}\n');
+  assert.equal(sessionDir(top, proj, file), top, 'a conversation that is there is followed');
+});

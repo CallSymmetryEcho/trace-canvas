@@ -95,6 +95,7 @@ test('a session resumes from the folder it started in, not one it cd-ed into lat
   fs.mkdirSync(drafts, { recursive: true });
   // Claude Code keeps the conversation under the folder it started in, whatever the session cd-s into afterwards.
   const transcript = path.join(s.root, 'projects', s.repo.replace(/[^a-zA-Z0-9]/g, '-'), 's7.jsonl');
+  fs.mkdirSync(path.dirname(transcript), { recursive: true }); fs.writeFileSync(transcript, '{}\n'); // it is there, as for any session that runs
   const fire = (ev, cwd, extra = {}) => handleHook({ session_id: 's7', cwd, transcript_path: transcript, hook_event_name: ev, ...extra }, env);
   fire('UserPromptSubmit', drafts, { prompt: 'Draft the email' }); // first seen already inside: found by the transcript
   assert.equal(readData(env).sessions.s7.cwd, s.repo);

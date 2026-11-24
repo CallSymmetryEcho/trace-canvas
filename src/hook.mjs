@@ -170,6 +170,9 @@ const NUDGE = { test: isNudge };
 export function sessionDir(cwd, prev, transcript = '') {
   const want = path.basename(path.dirname(String(transcript || ''))), enc = p => p.replace(/[^a-zA-Z0-9]/g, '-');
   if (prev && enc(prev) === want) return prev;
+  // `claude --resume <id>` run somewhere the conversation is not ("No conversation found") still fires a hook, naming a
+  // file that does not exist under that folder: the session stays where it was (2026-11-24: one moved to the home folder).
+  if (prev && transcript && !fs.existsSync(String(transcript))) return prev;
   for (let p = cwd; p; p = path.dirname(p) === p ? '' : path.dirname(p)) if (enc(p) === want) return p;
   return prev || cwd;
 }

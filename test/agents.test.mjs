@@ -123,6 +123,11 @@ test('an Antigravity (agy) session is recorded from its own payloads: the first 
   const sum = Object.values(readData(s.env).commits).find(c => c.title === 'Summarize the video in detail');
   assert.equal(sum.result.length, 1501);
   assert.ok(!Object.values(readData(s.env).commits).some(c => c.kind === 'agent' && c.title.startsWith('Summary.'))); // no card of its own
+  // A later turn that only talked (a short reply, nothing changed) is conversation: no to-do.
+  fire('PreInvocation', { invocationNum: 0, lastUserInput: 'Which browser are you using' });
+  fs.appendFileSync(at.transcriptPath, JSON.stringify({ source: 'MODEL', type: 'PLANNER_RESPONSE', content: 'Chrome, not Edge. ' + 'x'.repeat(150) }) + '\n');
+  fire('Stop', {});
+  assert.ok(!Object.values(readData(s.env).commits).some(c => c.title === 'Which browser are you using'));
   assert.equal(fs.readFileSync(sum.links.find(l => l.endsWith('.md')), 'utf8').trim(), long);
   // Not kept: a turn that logged its result itself (trace_log), or a reply under 100 characters.
   fire('PreInvocation', { invocationNum: 0, lastUserInput: 'Log the summary yourself' });

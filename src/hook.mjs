@@ -306,9 +306,13 @@ export function handleHook(input, env = process.env) {
       // the to-do and the whole reply into a .md file it links (the reader opens it), so data.json stays small. A prompt
       // that was not a to-do (a command, "ok") or a reply under 100 characters is not kept.
       const keep = (input._agent || 'claude') !== 'claude' && !state.turnLogged && msg.length >= 100;
-      // Only a session's first prompt is a to-do by default: a later one that got a real answer becomes one now.
+      // Only a session's first prompt is a to-do by default: a later one becomes one now when its turn did work (changed a
+      // file, ran a writing command, committed) or its reply is a report (over 1500 characters, the length that gets a
+      // file). A later turn that only talked ("which browser?", "ok, logged in") is conversation, not a to-do: every
+      // sentence of a chat would otherwise sit on the line as a ticked to-do.
+      // ponytail: length stands in for "a report"; ask the agent's own verdict if short results start going missing.
       let task = keep && d.commits[state.turnTask];
-      if (keep && !task && state.turnPrompt) task = addCommit(d, { thread: thread(state.turnPrompt).id, kind: 'task', title: firstLine(state.turnPrompt, 120), body: state.turnPrompt.slice(0, 3000), agent: ag.name, links: [ag.resume(sid)], extra: { session: sid, actor: 'human' } });
+      if (keep && !task && state.turnPrompt && (acted || msg.length > 1500)) task = addCommit(d, { thread: thread(state.turnPrompt).id, kind: 'task', title: firstLine(state.turnPrompt, 120), body: state.turnPrompt.slice(0, 3000), agent: ag.name, links: [ag.resume(sid)], extra: { session: sid, actor: 'human' } });
       if (task && !task.done) {
         task.result = msg.length > 1500 ? msg.slice(0, 1500) + '…' : msg;
         if (msg.length > 1500) {

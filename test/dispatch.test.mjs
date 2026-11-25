@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { emptyData, addCommit, createThread, machineName } from '../src/store.mjs';
-import { dispatch } from '../src/ops.mjs';
+import { dispatch, listTasks } from '../src/ops.mjs';
 
 test('dispatch hands each line\'s new to-dos to the agent working on it, and says how to wake it', () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-dispatch-'));
@@ -53,7 +53,13 @@ test('dispatch hands each line\'s new to-dos to the agent working on it, and say
   assert.equal(by.Thesis.command, `cd '${tmp}' && claude --resume s1 --remote-control='Thesis' '${by.Thesis.prompt}'`);
   assert.deepEqual([by.Thesis.tmux.machine, by.Thesis.tmux.name, by.Thesis.tmux.cmd === by.Thesis.command], ['', 'tc-s1', true]); // here too: detached, in tmux
   assert.equal(by.Promo.tmux.name, `tc-${cut.id}`);
-  assert.match(by.Thesis.prompt, new RegExp(`are yours: 1\\) Redo figure 3 \\[${fig.id}\\]; 2\\) Cite`));
+  // The message names the to-dos by id only: the agent reads each one's title and full text with trace_tasks (ids), so a
+  // long to-do is not typed into a terminal (cut twice: f54d9ba, 621d513) and its evidence and conditions are read too.
+  assert.match(by.Thesis.prompt, new RegExp(`are yours: \\[${fig.id}\\] \\[\\w+\\]\\. Read their titles and full text with trace_tasks \\(ids: \\["${fig.id}",`));
+  assert.ok(!/Redo figure 3|Cite the 2024/.test(by.Thesis.prompt));
+  d.commits[fig.id].body = 'Use the March data. '.repeat(200);
+  const read = listTasks(d, { ids: [fig.id] });
+  assert.deepEqual(read.map(r => [r.name, r.tasks.map(c => [c.title, c.body.length])]), [['Thesis', [['Redo figure 3', 4000]]]]);
   assert.match(by.Scripts.command, /&& codex resume c1 'New to-dos/);
   assert.match(by.Promo.command, new RegExp(`TRACE_CANVAS_THREAD=${promo} claude --remote-control='Promo' `));
   assert.equal(by.App.session.status, 'idle');

@@ -41,24 +41,25 @@ export { goalOf } from './store.mjs';
  * Goals and to-dos per thread: the thread's goal and its tasks (open ones only unless includeDone).
  * Threads that are done or merged show up only while they still have open tasks.
  */
-export function listTasks(d, { thread, includeDone = false, assignee } = {}) {
+export function listTasks(d, { thread, includeDone = false, assignee, ids = null } = {}) {
   const only = thread ? findThreadLoose(d, thread) : null;
   if (thread && !only) throw new Error(`No thread "${thread}"`);
   const by = {};
-  for (const c of Object.values(d.commits)) if (isTodo(c) && (!assignee || c.assignee === assignee)) (by[threadIdOf(d, c)] ||= []).push(c);
+  // ids: only these to-dos, open or done, each with its full text (what a dispatch message names and leaves out).
+  for (const c of Object.values(d.commits)) if (isTodo(c) && (!assignee || c.assignee === assignee) && (!ids || ids.includes(c.id))) (by[threadIdOf(d, c)] ||= []).push(c);
   // An archived project's lines (on the History wall) are out of the list unless asked for by name.
-  const ids = only ? [only] : [INBOX, ...Object.keys(d.threads).filter(id => !d.threads[id].archived)];
-  return ids.map(id => {
+  const tids = only ? [only] : [INBOX, ...Object.keys(d.threads).filter(id => ids || !d.threads[id].archived)];
+  return tids.map(id => {
     const th = id === INBOX ? { name: 'Inbox', status: 'active' } : d.threads[id];
     const tasks = (by[id] || []).sort((a, b) => a.ts - b.ts);
     const open = tasks.filter(c => !c.done).sort((a, b) => !!b.returned - !!a.returned), review = tasks.filter(c => c.done && c.toReview).length; // a returned one first
     return {
       id, name: th.name, ...(th.group ? { group: th.group } : {}), goal: goalOf(th), status: th.status || 'active', ...(th.autopilot && th.autopilot.session ? { autopilot: true } : {}), done: tasks.length - open.length, total: tasks.length, ...(review ? { toReview: review } : {}),
-      tasks: (includeDone ? [...open, ...tasks.filter(c => c.done)] : open).map(c => ({ id: c.id, title: c.title, ...(c.assignee ? { assignee: c.assignee } : {}), ...(c.on ? { on: c.on } : {}),
+      tasks: (includeDone || ids ? [...open, ...tasks.filter(c => c.done)] : open).map(c => ({ id: c.id, title: c.title, ...(ids ? { body: c.body || '', ...((c.links || []).length ? { links: c.links } : {}) } : {}), ...(c.assignee ? { assignee: c.assignee } : {}), ...(c.on ? { on: c.on } : {}),
         ...(c.returned && !c.done ? { returned: c.returned.note || '(no reason given)', ...(c.returned.n > 1 ? { returns: c.returned.n } : {}) } : {}),
         ...(c.done ? { done: true, doneBy: c.doneBy || null, doneAt: c.doneAt ? new Date(c.doneAt).toISOString() : null, ...(c.toReview ? { toReview: true } : {}) } : {}) })),
     };
-  }).filter(r => r.total || r.goal).filter(r => only || !['done', 'merged'].includes(r.status) || r.total > r.done);
+  }).filter(r => (ids ? r.tasks.length : r.total || r.goal)).filter(r => only || ids || !['done', 'merged'].includes(r.status) || r.total > r.done);
 }
 
 /**
@@ -123,7 +124,7 @@ export function handTo(d, { ref, to, thread, remote = false, here = true, on = '
   const far = !here && on ? startDir(d, th, env, on) : ''; // there: where that machine's sessions on the line worked, if the folder is still there
   // A prompt of the caller's own (trace_fork's) still opens as a hand-over: the hooks know it by that (it is never a
   // to-do) and put the new session on the line from it, where TRACE_CANVAS_THREAD does not reach (Codex's shared daemon).
-  const prompt = own ? oneLine(isHandoff(own) ? own : `${HEADS.hand} "${th.name}" (thread ${tid}). First call the MCP tool trace_bind with thread "${tid}". ${own}`) : oneLine(`${HEADS.hand} "${th.name}" (thread ${tid}). First call the MCP tool trace_bind with thread "${tid}". Then read the line with trace_read_thread (ideas logged on it are there) and call trace_tasks with mine: true for the goal and your to-dos, work through them, and tick each one with trace_task_done when it is done. Log decisions and results with trace_log.${todo ? ` Start with: ${todo.title}` : ''}`);
+  const prompt = own ? oneLine(isHandoff(own) ? own : `${HEADS.hand} "${th.name}" (thread ${tid}). First call the MCP tool trace_bind with thread "${tid}". ${own}`) : oneLine(`${HEADS.hand} "${th.name}" (thread ${tid}). First call the MCP tool trace_bind with thread "${tid}". Then read the line with trace_read_thread (ideas logged on it are there) and call trace_tasks with mine: true for the goal and your to-dos, work through them, and tick each one with trace_task_done when it is done. Log decisions and results with trace_log.${todo ? ` Start with the to-do [${todo.id}]: trace_tasks with ids ["${todo.id}"] gives its title and full text.` : ''}`);
   const run = remote && ag.remote ? ag.remote(oneLine(th.name), prompt) : ag.launch(prompt);
   return { thread: th, todo, live, command: `${dir ? `cd ${q(dir)} && ` : far ? `cd ${q(far)} 2>/dev/null; ` : ''}TRACE_CANVAS_THREAD=${tid} ${run}` };
 }
@@ -234,7 +235,7 @@ export function dispatch(d, { refs = [], all = false, self = null, on = '', away
         rows.push({ ...row, action: 'start', ...(away ? { machine: away, ...awayRun(away, cmd, todos[0].id) } : hereRun(cmd, todos[0].id)) });
         continue;
       }
-      const prompt = promptFor ? oneLine(promptFor(th, tid, todos)) : oneLine(`${HEADS.todos} "${th.name}" (thread ${tid}) are yours: ${todos.map((c, i) => `${i + 1}) ${c.title} [${c.id}]`).join('; ')}. Do them in order; read the line with trace_read_thread for context, tick each with trace_task_done when it is done, and log results with trace_log.`);
+      const prompt = promptFor ? oneLine(promptFor(th, tid, todos)) : oneLine(`${HEADS.todos} "${th.name}" (thread ${tid}) are yours: ${todos.map(c => `[${c.id}]`).join(' ')}. Read their titles and full text with trace_tasks (ids: ${JSON.stringify(todos.map(c => c.id))}) and do them in order; read the line with trace_read_thread for context, tick each with trace_task_done when it is done, and log results with trace_log.`);
       const session = { id: sid, title: s.title || (run && (run.title || run.prompt)) || '', status: run ? run.status : 'off', ...(away ? { machine: away } : {}), ...(run && run.desktopId ? { desktopId: run.desktopId } : {}), ...(run && run.name ? { name: run.name } : {}) };
       const action = sid === self ? 'self' : away ? (run ? 'busy' : 'resume') : run && key === 'claude' ? 'message' : run && run.status === 'working' ? 'busy' : 'resume';
       const freshCmd = () => handTo(d, { ref: todos[0].id, to: key, remote: key === 'claude', here: !away, on: away, prompt: promptFor && promptFor(th, tid, todos) }, env).command;

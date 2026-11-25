@@ -171,7 +171,7 @@ Capturing is safe to repeat: records already on the canvas are skipped. If the h
 | `trace_import_data` | Merges another data set: an export, `data.json` from another computer, or JSON lines |
 | `trace_live` | Lists the sessions running now, with status, activity and thread |
 | `trace_bind` | Puts a running session (the current one by default) on a thread |
-| `trace_tasks` | Returns the goal and the to-dos of the line the session works on (`thread` for another, `all: true` for every line), with how many are done |
+| `trace_tasks` | Returns the goal and the to-dos of the line the session works on (`thread` for another, `all: true` for every line, `ids` for the to-dos named, with their full text), with how many are done |
 | `trace_task_done` | Ticks a to-do (or reopens it) and records who ticked it |
 | `trace_where` | Looks things up in the location map (`~/agent-map`): repositories, data folders, NAS paths, and which machine has them where |
 | `trace_open` | Starts the page if needed and returns its address |

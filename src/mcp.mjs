@@ -145,7 +145,7 @@ const TOOLS = [
     name: 'trace_tasks',
     title: 'Goals and to-dos',
     description: 'Returns the goal and the to-dos of the thread this session works on (or of another thread, or of all), with how many are done. Read it before working on a thread; tick to-dos with trace_task_done when they are finished.',
-    inputSchema: { type: 'object', properties: { thread: { type: 'string', description: 'Thread id or name; omit for the thread this session works on.' }, all: { type: 'boolean', description: 'Every thread instead of this session\'s.' }, include_done: { type: 'boolean', description: 'Also list finished to-dos (default false).' }, mine: { type: 'boolean', description: 'Only the to-dos assigned to you.' }, assignee: { type: 'string', enum: ['claude', 'codex', 'gemini', 'agy'] } } },
+    inputSchema: { type: 'object', properties: { thread: { type: 'string', description: 'Thread id or name; omit for the thread this session works on.' }, all: { type: 'boolean', description: 'Every thread instead of this session\'s.' }, include_done: { type: 'boolean', description: 'Also list finished to-dos (default false).' }, mine: { type: 'boolean', description: 'Only the to-dos assigned to you.' }, ids: { type: 'array', items: { type: 'string' }, description: 'Only these to-dos (ids as a dispatch or hand-over message gives them), on any thread, each with its full text.' }, assignee: { type: 'string', enum: ['claude', 'codex', 'gemini', 'agy'] } } },
     annotations: { readOnlyHint: true },
   },
   {
@@ -356,11 +356,12 @@ async function callTool(name, a = {}) {
     case 'trace_tasks': {
       const d = readData();
       const handed = handedThread();
-      let thread = a.thread || (handed && threadById(d, handed) ? handed : undefined);
+      const ids = Array.isArray(a.ids) && a.ids.length ? a.ids.map(String) : null;
+      let thread = ids ? undefined : a.thread || (handed && threadById(d, handed) ? handed : undefined);
       // Without a thread: the line this session works on, so the answer stays small as the canvas grows; every line
       // with all: true, for mine or an assignee, or when the session's line is not known.
-      if (!thread && !a.all && !a.mine && !a.assignee) try { const sid = currentSessionId({ sessionId: a.session_id, projectDir: projectDir() }); thread = (sid && sessionThread(d, { id: sid }).threadId) || undefined; } catch {} // no session: every line is listed
-      const rows = listTasks(d, { thread, includeDone: !!a.include_done, assignee: a.mine ? agentKey() : a.assignee });
+      if (!thread && !a.all && !a.mine && !a.assignee && !ids) try { const sid = currentSessionId({ sessionId: a.session_id, projectDir: projectDir() }); thread = (sid && sessionThread(d, { id: sid }).threadId) || undefined; } catch {} // no session: every line is listed
+      const rows = listTasks(d, { thread, includeDone: !!a.include_done, assignee: a.mine ? agentKey() : a.assignee, ids });
       const open = rows.reduce((n, r) => n + (r.total - r.done), 0);
       // This MCP server lives as long as its session and does not restart when the clone is updated: said here, where every agent looks.
       const behind = staleAgainst(MCP_HEAD);

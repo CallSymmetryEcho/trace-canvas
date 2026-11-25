@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Dispatch names to-dos by id only.** The message typed into a session listed every to-do's title; a long one was cut in the terminal, and the to-do's text (evidence, how to check, what waits for the person) was never sent. It now carries the line, its thread id and the to-dos' ids, and the agent reads each one's title and full text with `trace_tasks` (`ids`), which returns the to-dos named, on any line, with their text. A hand-over names its first to-do the same way. A session whose Trace Canvas tools are older ignores `ids` and gets its line's open to-dos, ids included.
+
 - **A session started by `trace_fork` with a prompt of its own lands on the forked line.** The new session was bound by `TRACE_CANVAS_THREAD` alone. Codex runs its hooks under a shared daemon that never sees the variable, so the session went to a line made for its folder's branch and the prompt became a to-do there. The caller's prompt now opens as a hand-over (line name, thread id, "call trace_bind"), and a new session whose first prompt is a hand-over is put on that line by the prompt hook, for every agent.
 
 - **Goals: to-dos finished over 15 days ago fold.** With a line's finished to-dos shown, the ones done more than 15 days ago sit behind one row ("55 finished over 15 days ago"); a click opens them. Nothing is hidden for good: the count in the line's head still includes them.

@@ -171,7 +171,7 @@ node bin/trace-canvas.mjs setup --user
 | `trace_import_data` | 合并另一份数据：导出文件、另一台电脑的 `data.json`、或 JSON 行 |
 | `trace_live` | 列出正在运行的会话：状态、当前动作、所属线 |
 | `trace_bind` | 把一个运行中的会话（默认是当前会话）放到某条线上 |
-| `trace_tasks` | 返回会话所在这条线的目标和待办，以及完成了几项（`thread` 指定别的线，`all: true` 返回所有线） |
+| `trace_tasks` | 返回会话所在这条线的目标和待办，以及完成了几项（`thread` 指定别的线，`all: true` 返回所有线，`ids` 只返回点名的待办并带上正文） |
 | `trace_task_done` | 勾选一项待办（或重新打开），并记下是谁勾的 |
 | `trace_where` | 在位置地图（`~/agent-map`）里查东西：仓库、数据目录、NAS 路径，以及它们在每台机器上的位置 |
 | `trace_open` | 必要时启动页面，返回地址 |

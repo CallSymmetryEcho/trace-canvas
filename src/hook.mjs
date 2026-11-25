@@ -165,7 +165,7 @@ const MACHINE = /^<([a-z][\w-]*)>(?:[\s\S]*<\/\1>)?$/i;
 export const notTask = prompt => { const p = String(prompt || '').trim(); return p.length < 3 || MACHINE.test(p) || (!/\s/.test(p) && (/^:/.test(p) || /^(login|logout|exit|quit|clear|yes|no|ok|okay)$/i.test(p))); };
 // autopilotStop's own push. Gemini CLI fires BeforeAgent again with it as the prompt: that is not the person speaking.
 const NUDGE = { test: isNudge };
-const HANDED = new RegExp(`(?:${HEADS.hand}|${HEADS.handZh})[^\\n]*?[(（]thread ([\\w-]+)[)）]`);
+const HANDED = new RegExp(`(?:${HEADS.hand}|${HEADS.handZh}|${HEADS.todos}|${HEADS.autopilot.replace(/[()]/g, '\\$&')})[^\\n]*?[(（]thread ([\\w-]+)[)）]`);
 
 // The folder a session resumes from. Claude Code keeps a conversation under the folder it started in
 // (~/.claude/projects/<that path, each character other than a letter or digit as ->), and a later cd does not move it,

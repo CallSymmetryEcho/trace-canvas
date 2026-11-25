@@ -57,6 +57,10 @@ test('dispatch hands each line\'s new to-dos to the agent working on it, and say
   // tools and for the person to read, never long enough to be cut in a terminal (f54d9ba, 621d513). The rest, and the
   // to-do's text (evidence, how to check), is read with trace_tasks (ids).
   assert.match(by.Thesis.prompt, new RegExp(`are yours: 1\\) Redo figure 3 \\[${fig.id}\\]; 2\\) Cite the 2024 survey \\[\\w+\\]\\. .*trace_tasks \\(ids: \\["${fig.id}",`));
+  // After the new ones the agent goes on with the line's other written to-dos that are ready, and leaves the parked ones.
+  assert.match(by.Thesis.prompt, new RegExp(`Then call trace_tasks with thread "${thesis}" for the other open to-dos .* Leave as it is a to-do that waits for the person, is to be discussed first, is shelved`));
+  // A new session gets the same message as a resumed one (not the one-to-do hand-over), and the hooks bind it by it.
+  assert.match(by.Promo.command, /claude --remote-control='Promo' 'New to-dos on the Trace Canvas line "Promo" \(thread \w+\) are yours: 1\) Cut a 30 s version \[/);
   const long = todo(promo, 'Check every figure caption against the journal style guide, panel by panel, and list each mismatch');
   const cutMsg = dispatch(d, { refs: [long.id], print: true }, env)[0];
   assert.ok(cutMsg.command.includes(`Check every figure caption against the j… [${long.id}]`) && !cutMsg.command.includes('panel by panel'));

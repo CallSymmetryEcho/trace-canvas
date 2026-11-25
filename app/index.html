@@ -1499,7 +1499,7 @@ apOn: 'On: working through this line\'s to-dos', apWait: 'Waiting for the agent 
     goalsOthers: n => `${n} more line${n === 1 ? ' has' : 's have'} no goal or to-do yet.`, goalsEmpty: 'No goals or to-dos yet. Open a line, write its goal, and add to-dos here or with the □ kind below.',
     goalsBy: name => `ticked by ${name}`, tTaskAdded: 'To-do added',
     handNeedsLine: 'Move the to-do onto a line first', goalsWho: 'Who does it', goalsAnyone: 'Anyone', goalsHand: 'Hand to it', openInTerminal: 'Open in Terminal', tOpenedTerminal: 'Opened in Terminal: the agent starts on this line', tHandCopied: 'Command copied: paste it in a terminal to start the agent on this line', tHandFailed: why => `No command copied: ${why || 'the page server did not answer'}`,
-    handPrompt: (name, tid, title) => `You are taking over the Trace Canvas line "${name}" (thread ${tid}). First call the MCP tool trace_bind with thread "${tid}". Then call trace_tasks with mine: true for the goal and your to-dos, work through them, and tick each one with trace_task_done when it is done. Log decisions and results with trace_log.${title ? ` Start with: ${title}` : ''}`,
+    handPrompt: (name, tid, title, id) => `You are taking over the Trace Canvas line "${name}" (thread ${tid}) for one to-do: ${title} [${id}]. First call the MCP tool trace_bind with thread "${tid}". Read the to-do in full with trace_tasks (ids ["${id}"]) and the line with trace_read_thread for context. Do this one, tick it with trace_task_done and give the result, and log decisions and results with trace_log. The other to-dos on the line are not part of this hand-over.`,
     tabAgents: 'Agents', agHint: 'Who started whom: each session starts the sessions to its right; the small dashed cards are its subagents.',
     agEmpty: 'No agents are running right now. Claude Code sessions appear here as soon as they run with the Trace Canvas hooks.',
     agLocalOnly: 'The agent view needs the local page (trace-canvas serve), which can see the sessions running on this computer.',
@@ -1680,7 +1680,7 @@ apOn: '开着：正在做这条线的待办', apWait: '等 agent 接手：它的
     goalsOthers: n => `另外 ${n} 条线还没有目标或待办。`, goalsEmpty: '还没有目标或待办。打开一条线写下目标，再在这里或用下方的 □ 类型添加待办。',
     goalsBy: name => `由 ${name} 勾选`, tTaskAdded: '已添加待办',
     handNeedsLine: '先把这项待办放到一条线上', goalsWho: '由谁做', goalsAnyone: '任何人', goalsHand: '交给它', openInTerminal: '在终端打开', tOpenedTerminal: '已在终端打开：agent 会在这条线上开工', tHandCopied: '命令已复制：粘贴到终端运行，agent 就会在这条线上开工', tHandFailed: why => `没有复制命令：${why || '页面服务没有回应'}`,
-    handPrompt: (name, tid, title) => `你接手 Trace Canvas 上的线「${name}」（thread ${tid}）。先调用 MCP 工具 trace_bind，thread 填 "${tid}"；再用 trace_tasks（mine: true）读取目标和分给你的待办，逐项完成，每做完一项就用 trace_task_done 勾上；决定和结果用 trace_log 记下来。${title ? `先从这一项开始：${title}` : ''}`,
+    handPrompt: (name, tid, title, id) => `你接手 Trace Canvas 上的线「${name}」（thread ${tid}）的一条待办：${title} [${id}]。先调用 MCP 工具 trace_bind，thread 填 "${tid}"；用 trace_tasks（ids 填 ["${id}"]）读这条待办的全文，用 trace_read_thread 读这条线了解背景。只做这一条，做完用 trace_task_done 勾上并写结果，决定和结果用 trace_log 记下来。这条线上的其他待办不在这次交接里。`,
     tabAgents: 'Agent', agHint: '谁启动了谁：每个会话启动它右边的会话，虚线小卡片是它的子 agent。',
     agEmpty: '现在没有运行中的 agent。装好 Trace Canvas hooks 的 Claude Code 会话一运行就会出现在这里。',
     agLocalOnly: 'Agent 视图需要本地页面（trace-canvas serve），它才能看到这台电脑上正在运行的会话。',
@@ -5406,7 +5406,7 @@ function handCommand(c) {
   if (!th) { toast(t('handNeedsLine')); return ''; }
   const note = String(th.note || '').trim(), live = liveOn(tid).sort((a, b) => b.lastSeen - a.lastSeen)[0];
   const dir = /^\/\S*$/.test(note) ? note : live ? live.cwd : '';
-  return `${dir ? `cd ${shq(dir)} && ` : ''}TRACE_CANVAS_THREAD=${tid} ${AGENT_LAUNCH[c.assignee](t('handPrompt', th.name, tid, c.title))}`;
+  return `${dir ? `cd ${shq(dir)} && ` : ''}TRACE_CANVAS_THREAD=${tid} ${AGENT_LAUNCH[c.assignee](t('handPrompt', th.name, tid, [...c.title].length > 40 ? [...c.title].slice(0, 40).join('') + '…' : c.title, c.id))}`;
 }
 const sheetBody = $('#sheet-body');
 // In the reader on a commit's file, ‹ and › turn the page, and so does a swipe mostly sideways: left to the next file, right to the previous one.

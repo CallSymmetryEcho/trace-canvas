@@ -124,7 +124,10 @@ export function handTo(d, { ref, to, thread, remote = false, here = true, on = '
   const far = !here && on ? startDir(d, th, env, on) : ''; // there: where that machine's sessions on the line worked, if the folder is still there
   // A prompt of the caller's own (trace_fork's) still opens as a hand-over: the hooks know it by that (it is never a
   // to-do) and put the new session on the line from it, where TRACE_CANVAS_THREAD does not reach (Codex's shared daemon).
-  const prompt = own ? oneLine(isHandoff(own) ? own : `${HEADS.hand} "${th.name}" (thread ${tid}). First call the MCP tool trace_bind with thread "${tid}". ${own}`) : oneLine(`${HEADS.hand} "${th.name}" (thread ${tid}). First call the MCP tool trace_bind with thread "${tid}". Then read the line with trace_read_thread (ideas logged on it are there) and call trace_tasks with mine: true for the goal and your to-dos, work through them, and tick each one with trace_task_done when it is done. Log decisions and results with trace_log.${todo ? ` Start with: ${brief(todo.title)} [${todo.id}] (trace_tasks with ids ["${todo.id}"] gives its full title and text).` : ''}`);
+  const prompt = own ? oneLine(isHandoff(own) ? own : `${HEADS.hand} "${th.name}" (thread ${tid}). First call the MCP tool trace_bind with thread "${tid}". ${own}`)
+    // A to-do handed over is that one to-do: the person picked it. A line handed over is all of the agent's to-dos on it.
+    : oneLine(todo ? `${HEADS.hand} "${th.name}" (thread ${tid}) for one to-do: ${brief(todo.title)} [${todo.id}]. First call the MCP tool trace_bind with thread "${tid}". Read the to-do in full with trace_tasks (ids ["${todo.id}"]) and the line with trace_read_thread for context (ideas logged on it are there). Do this one, tick it with trace_task_done and give the result, and log decisions and results with trace_log. The other to-dos on the line are not part of this hand-over.`
+      : `${HEADS.hand} "${th.name}" (thread ${tid}). First call the MCP tool trace_bind with thread "${tid}". Then read the line with trace_read_thread (ideas logged on it are there) and call trace_tasks with mine: true for the goal and your to-dos, work through them, and tick each one with trace_task_done when it is done. Log decisions and results with trace_log.`);
   const run = remote && ag.remote ? ag.remote(oneLine(th.name), prompt) : ag.launch(prompt);
   return { thread: th, todo, live, command: `${dir ? `cd ${q(dir)} && ` : far ? `cd ${q(far)} 2>/dev/null; ` : ''}TRACE_CANVAS_THREAD=${tid} ${run}` };
 }
@@ -228,17 +231,20 @@ export function dispatch(d, { refs = [], all = false, self = null, on = '', away
       const run = sid && runOf(sid);
       const key = agent || (s ? Object.keys(AGENTS).find(k => AGENTS[k].name === s.agent) || 'claude' : 'claude');
       for (const c of todos) c.assignee ||= key; // an assignee someone set stays
+      // What the agent is told: the new to-dos by id and the start of their titles (cut, so a terminal never cuts the
+      // message; the id reads the rest), to do first; then the line's other written to-dos that are ready. One that waits
+      // for the person, is to be discussed first or is shelved is left alone, without a question each time someone dispatches.
+      const prompt = oneLine(promptFor ? promptFor(th, tid, todos) : `${HEADS.todos} "${th.name}" (thread ${tid}) are yours: ${todos.map((c, i) => `${i + 1}) ${brief(c.title)} [${c.id}]`).join('; ')}. The titles are cut short here: read the full title and text of each with trace_tasks (ids: ${JSON.stringify(todos.map(c => c.id))}) and do them in order; read the line with trace_read_thread for context, tick each with trace_task_done when it is done (give the result), and log results with trace_log. Then call trace_tasks with thread "${tid}" for the other open to-dos on the line and do the ones that are ready to be done and that nobody else has. Leave as it is a to-do that waits for the person, is to be discussed first, is shelved, or is assigned to another agent; one you cannot decide, do not guess: log its question with trace_log (kind "note", title "Question: <the question> [<its id>]") and go on.`);
       const row = { thread: { id: tid, name: th.name }, agent: key, todos: todos.map(c => ({ id: c.id, title: c.title })), ...(machine ? { on: machine } : {}) };
       if (!s) {
         // A new session; on another machine over ssh, from its home folder (the line's folder is this machine's).
-        const cmd = handTo(d, { ref: todos[0].id, to: key, remote: key === 'claude', here: !away, on: away, prompt: promptFor && promptFor(th, tid, todos) }, env).command;
+        const cmd = handTo(d, { ref: todos[0].id, to: key, remote: key === 'claude', here: !away, on: away, prompt }, env).command;
         rows.push({ ...row, action: 'start', ...(away ? { machine: away, ...awayRun(away, cmd, todos[0].id) } : hereRun(cmd, todos[0].id)) });
         continue;
       }
-      const prompt = promptFor ? oneLine(promptFor(th, tid, todos)) : oneLine(`${HEADS.todos} "${th.name}" (thread ${tid}) are yours: ${todos.map((c, i) => `${i + 1}) ${brief(c.title)} [${c.id}]`).join('; ')}. The titles are cut short here: read the full title and text of each with trace_tasks (ids: ${JSON.stringify(todos.map(c => c.id))}) and do them in order; read the line with trace_read_thread for context, tick each with trace_task_done when it is done, and log results with trace_log.`);
       const session = { id: sid, title: s.title || (run && (run.title || run.prompt)) || '', status: run ? run.status : 'off', ...(away ? { machine: away } : {}), ...(run && run.desktopId ? { desktopId: run.desktopId } : {}), ...(run && run.name ? { name: run.name } : {}) };
       const action = sid === self ? 'self' : away ? (run ? 'busy' : 'resume') : run && key === 'claude' ? 'message' : run && run.status === 'working' ? 'busy' : 'resume';
-      const freshCmd = () => handTo(d, { ref: todos[0].id, to: key, remote: key === 'claude', here: !away, on: away, prompt: promptFor && promptFor(th, tid, todos) }, env).command;
+      const freshCmd = () => handTo(d, { ref: todos[0].id, to: key, remote: key === 'claude', here: !away, on: away, prompt }, env).command;
       const fresh = () => (away ? remote(away, freshCmd()) : freshCmd());
       // On another machine the session's folder may be gone (its transcript sits under it): then a new session.
       const name = oneLine(th.name), wake = !s.cwd ? AGENTS[key].wake(sid, prompt, name) : away

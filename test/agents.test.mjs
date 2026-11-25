@@ -177,7 +177,8 @@ test('to-dos are assigned to an agent and handed over with a command that starts
   const r = handTo(d, { ref: 'CSV export', to: 'codex' }, { ...process.env, TRACE_CANVAS_HOME: fs.mkdtempSync(path.join(os.tmpdir(), 'tc-hand-')) });
   assert.equal(r.todo.assignee, 'codex');
   assert.ok(r.command.startsWith(`cd '${os.tmpdir()}' && TRACE_CANVAS_THREAD=${th.id} codex '`));
-  assert.ok(r.command.includes('trace_bind') && /Start with: Add a CSV export \[\w+\] \(trace_tasks with ids/.test(r.command));
+  assert.ok(r.command.includes('trace_bind') && /for one to-do: Add a CSV export \[\w+\]\. .*trace_tasks \(ids \["\w+"\]\).*The other to-dos on the line are not part of this hand-over\./.test(r.command) && !r.command.includes('mine: true')); // the to-do the person picked, not the line's list
+  assert.ok(handTo(d, { ref: th.id, to: 'codex' }, process.env).command.includes('trace_tasks with mine: true'));
   assert.deepEqual(listTasks(d, { assignee: 'codex' })[0].tasks.map(t => t.title), ['Add a CSV export']);
   assert.deepEqual(listTasks(d, { assignee: 'gemini' })[0].tasks.map(t => t.assignee), ['gemini']);
   assert.throws(() => handTo(d, { ref: 'Dark mode', to: 'copilot' }), /Hand to whom/);

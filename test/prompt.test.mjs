@@ -90,3 +90,26 @@ test('a prompt Trace Canvas wrote itself is never logged as a new to-do: either 
   assert.equal(Object.values(readData(env).commits).filter(c => c.kind === 'task').length, 2);
   assert.equal(typeof autopilotStop, 'function');
 });
+
+// warden, 2026-11-24: trace_fork started Codex with a prompt of its own in a new worktree. Codex's hooks ran under its
+// shared daemon, so TRACE_CANVAS_THREAD never reached them: the session landed on a line made for the worktree's
+// branch, and the prompt became a to-do there.
+test('a session started with the caller\'s own prompt lands on the handed line, with no to-do and no line of its folder', async () => {
+  const { handTo } = await import('../src/ops.mjs'), { createThread } = await import('../src/store.mjs');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tc-own-'));
+  const env = { ...process.env, TRACE_CANVAS_HOME: path.join(root, 'home'), TRACE_CANVAS_DESKTOP_DIR: path.join(root, 'desk'), TRACE_CANVAS_MAP: '' };
+  delete env.TRACE_CANVAS_DISABLE; delete env.TRACE_CANVAS_THREAD;
+  const repo = path.join(root, 'warden-codex');
+  fs.mkdirSync(repo);
+  execFileSync('git', ['-C', repo, 'init', '-q', '-b', 'warden-codex']);
+  const { tid, command } = mutate(d => { const t = createThread(d, { name: 'Independent review' }); return { tid: t.id, command: handTo(d, { ref: t.id, to: 'codex', prompt: 'You are a second, independent warden. Review the diff and say what you would block.' }, env).command }; }, env);
+  const prompt = /codex '(.*)'$/.exec(command)[1];
+  for (const [agent, sid] of [['codex', 'cx1'], [undefined, 'cc1']]) {
+    handleHook({ session_id: sid, cwd: repo, hook_event_name: 'UserPromptSubmit', prompt, _agent: agent }, env);
+    handleHook({ session_id: sid, cwd: repo, hook_event_name: 'Stop', last_assistant_message: 'I would block two things. '.repeat(80), _agent: agent }, env);
+  }
+  const d = readData(env);
+  assert.deepEqual(['cx1', 'cc1'].map(s => [d.sessions[s].thread, d.sessions[s].bound]), [[tid, true], [tid, true]]);
+  assert.deepEqual(Object.values(d.threads).map(t => t.name), ['Independent review']);
+  assert.deepEqual(Object.values(d.commits).filter(c => c.kind === 'task').map(c => c.title), []);
+});

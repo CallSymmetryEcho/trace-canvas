@@ -1,4 +1,4 @@
-import { HEADS } from './prompts.mjs';
+import { HEADS, isHandoff } from './prompts.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 // Operations shared by the MCP server and the command line:
@@ -121,7 +121,9 @@ export function handTo(d, { ref, to, thread, remote = false, here = true, on = '
   const live = listLive(env).filter(s => sessionThreadOf(d, s, env) === tid).sort((a, b) => b.lastSeen - a.lastSeen);
   const dir = here ? lineDir(th) || (live[0] ? live[0].cwd : '') || startDir(d, th, env) : ''; // here: false for a command run on another machine
   const far = !here && on ? startDir(d, th, env, on) : ''; // there: where that machine's sessions on the line worked, if the folder is still there
-  const prompt = own ? oneLine(own) : oneLine(`${HEADS.hand} "${th.name}" (thread ${tid}). First call the MCP tool trace_bind with thread "${tid}". Then read the line with trace_read_thread (ideas logged on it are there) and call trace_tasks with mine: true for the goal and your to-dos, work through them, and tick each one with trace_task_done when it is done. Log decisions and results with trace_log.${todo ? ` Start with: ${todo.title}` : ''}`);
+  // A prompt of the caller's own (trace_fork's) still opens as a hand-over: the hooks know it by that (it is never a
+  // to-do) and put the new session on the line from it, where TRACE_CANVAS_THREAD does not reach (Codex's shared daemon).
+  const prompt = own ? oneLine(isHandoff(own) ? own : `${HEADS.hand} "${th.name}" (thread ${tid}). First call the MCP tool trace_bind with thread "${tid}". ${own}`) : oneLine(`${HEADS.hand} "${th.name}" (thread ${tid}). First call the MCP tool trace_bind with thread "${tid}". Then read the line with trace_read_thread (ideas logged on it are there) and call trace_tasks with mine: true for the goal and your to-dos, work through them, and tick each one with trace_task_done when it is done. Log decisions and results with trace_log.${todo ? ` Start with: ${todo.title}` : ''}`);
   const run = remote && ag.remote ? ag.remote(oneLine(th.name), prompt) : ag.launch(prompt);
   return { thread: th, todo, live, command: `${dir ? `cd ${q(dir)} && ` : far ? `cd ${q(far)} 2>/dev/null; ` : ''}TRACE_CANVAS_THREAD=${tid} ${run}` };
 }

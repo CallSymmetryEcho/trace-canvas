@@ -165,6 +165,7 @@ const MACHINE = /^<([a-z][\w-]*)>(?:[\s\S]*<\/\1>)?$/i;
 export const notTask = prompt => { const p = String(prompt || '').trim(); return p.length < 3 || MACHINE.test(p) || (!/\s/.test(p) && (/^:/.test(p) || /^(login|logout|exit|quit|clear|yes|no|ok|okay)$/i.test(p))); };
 // autopilotStop's own push. Gemini CLI fires BeforeAgent again with it as the prompt: that is not the person speaking.
 const NUDGE = { test: isNudge };
+const HANDED = new RegExp(`(?:${HEADS.hand}|${HEADS.handZh})[^\\n]*?[(（]thread ([\\w-]+)[)）]`);
 
 // The folder a session resumes from. Claude Code keeps a conversation under the folder it started in
 // (~/.claude/projects/<that path, each character other than a letter or digit as ->), and a later cd does not move it,
@@ -243,6 +244,10 @@ export function handleHook(input, env = process.env) {
       const isCommand = prompt.startsWith('/');
       // A hand-off prompt written by dispatch, hand or the page restates to-dos that are already on the line: not a new one.
       const handoff = isHandoff(input.prompt);
+      // A new session whose first prompt is a hand-over is on that line from here on. The start hook binds by
+      // TRACE_CANVAS_THREAD, which a Codex session under the shared daemon never sees: it was put on a line made for its folder.
+      const took = handoff && !s.prompted && !s.bound && HANDED.exec(String(input.prompt || ''));
+      if (took && threadById(d, took[1])) { s.thread = took[1]; s.bound = true; touch(); }
       if (handoff) s.prompted = true;
       // An Autopilot round counts as running only once its prompt reaches a session: the switch lights here, not on the click.
       // Looked for in the raw prompt: pasted in with a word or two of the person's own, the paste is shortened in `prompt`.

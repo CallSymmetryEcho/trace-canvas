@@ -222,7 +222,7 @@ test('trace_fork start: the new line gets its own agent through the canvas launc
     const { thread, started } = r.result.structuredContent;
     assert.equal(started.failed, undefined);
     assert.match(r.result.content[0].text, /Claude Code started on it in a new terminal tab\./);
-    assert.equal(started.command, `cd '${path.resolve(project)}' && TRACE_CANVAS_THREAD=${thread.id} claude 'Write the reading list.'`);
+    assert.equal(started.command, `cd '${path.resolve(project)}' && TRACE_CANVAS_THREAD=${thread.id} claude 'You are taking over the Trace Canvas line "${thread.name}" (thread ${thread.id}). First call the MCP tool trace_bind with thread "${thread.id}". Write the reading list.'`); // the caller's prompt, opened as a hand-over (the hooks bind by it)
     assert.match(fs.readFileSync(said, 'utf8'), /tell application "iTerm"[\s\S]*create tab[\s\S]*TRACE_CANVAS_THREAD=/);
   } finally {
     child.stdin.end();

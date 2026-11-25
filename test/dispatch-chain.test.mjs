@@ -105,3 +105,28 @@ test('what cannot be handed over is refused, and trace_tasks by id never answers
   assert.ok(printed.includes('On the other line') && !printed.includes('Open one'), printed);
   assert.ok(tmp && tid);
 });
+
+test('to-dos picked by name are those and no more; a machine name or an id never reaches a shell unchecked', () => {
+  const { tmp, env } = scratch();
+  const r = mutate(d => {
+    const t = createThread(d, { name: 'Lab' });
+    d.sessions.s1 = { id: 's1', thread: t.id, agent: 'Claude Code', cwd: tmp, last: 1 };
+    const a = addCommit(d, { thread: t.id, kind: 'task', title: 'Named one' }), b = addCommit(d, { thread: t.id, kind: 'task', title: '' });
+    const named = dispatch(d, { refs: [a.id], print: true }, env)[0].prompt;
+    addCommit(d, { thread: t.id, kind: 'task', title: 'For the lab box', extra: { on: 'lab' } });
+    const rows = dispatch(d, { refs: [t.id], awayLive: m => ({ machine: m, sessions: [] }) }, env);
+    return { named, rows, tid: t.id, b: b.id };
+  }, env);
+  assert.match(r.named, /Only these: the other to-dos on the line are not part of this\./);
+  assert.ok(!r.named.includes('Then call trace_tasks'));
+  // The line's own agent goes on with the rest; the group sent to one machine does not (two agents would both take them).
+  const [own, lab] = [r.rows.find(x => !x.on), r.rows.find(x => x.on === 'lab')];
+  assert.match(own.prompt, /1\) \(no title\) \[\w+\]\. .*Then call trace_tasks with thread/);
+  assert.ok(lab.command.includes('Only these') && !lab.command.includes('Then call trace_tasks'));
+  // Names that would run something are refused before any command is built.
+  const d = readData(env);
+  for (const on of ['x; touch PWNED', '-oProxyCommand=touch PWNED', '$(id)']) assert.throws(() => dispatch(d, { refs: [r.b], all: true, on, awayLive: m => ({ machine: m, sessions: [] }) }, env), /not a machine name/, on);
+  assert.throws(() => handTo(d, { ref: r.tid, to: 'constructor' }, env), /Hand to whom/);
+  d.threads['t1;id'] = { ...d.threads[r.tid], id: 't1;id', name: 'Imported' };
+  assert.throws(() => handTo(d, { ref: 't1;id', to: 'codex' }, env), /not an id this can start a session with/);
+});

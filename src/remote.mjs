@@ -2,7 +2,7 @@
 // trace-canvas in their login shell. One shared connection per machine (ControlMaster), so polling stays cheap.
 import { execFile, execFileSync } from 'node:child_process';
 import { readConfig } from './store.mjs';
-import { q, tmuxAttach } from './agents.mjs';
+import { isMachine, q, tmuxAttach } from './agents.mjs';
 
 export const ARGS = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5', '-o', 'ControlMaster=auto', '-o', 'ControlPath=/tmp/tc-ssh-%C', '-o', 'ControlPersist=120'];
 const CMD = `exec "$SHELL" -lc 'trace-canvas live --json'`;
@@ -13,11 +13,13 @@ const parse = (machine, out) => {
 
 /** A machine's running sessions: { machine, sessions } or { machine, error }. */
 export function remoteLive(machine) {
+  if (!isMachine(machine)) return Promise.resolve({ machine, sessions: [], error: 'not a machine name' });
   return new Promise(resolve => execFile('ssh', [...ARGS, machine, CMD], { timeout: 12000, maxBuffer: 1 << 20 }, (err, out) => {
     try { if (err) throw err; resolve(parse(machine, out)); } catch (e) { resolve({ machine, sessions: [], error: String(e.message || e).split('\n')[0].slice(0, 160) }); }
   }));
 }
 export function remoteLiveSync(machine) {
+  if (!isMachine(machine)) return { machine, sessions: [], error: 'not a machine name' };
   try { return parse(machine, execFileSync('ssh', [...ARGS, machine, CMD], { encoding: 'utf8', timeout: 12000, stdio: ['ignore', 'pipe', 'ignore'] })); }
   catch (e) { return { machine, sessions: [], error: String(e.message || e).split('\n')[0].slice(0, 160) }; }
 }
@@ -33,6 +35,7 @@ export function otherMachines(d, env = process.env) {
 
 /** What the person typed in these sessions, read on that machine by its own trace-canvas (Retro): { prompts } or { error }. */
 export function remotePrompts(machine, ids) {
+  if (!isMachine(machine)) return { error: 'not a machine name' };
   const cmd = `exec "$SHELL" -lc ${q(`trace-canvas prompts ${ids.map(q).join(' ')}`)}`;
   try { return { prompts: JSON.parse(execFileSync('ssh', [...ARGS, machine, cmd], { encoding: 'utf8', timeout: 60000, maxBuffer: 32 << 20, stdio: ['ignore', 'pipe', 'pipe'] })) }; }
   catch (e) {

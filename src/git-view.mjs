@@ -5,7 +5,7 @@ import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { q } from './agents.mjs';
+import { isMachine, q } from './agents.mjs';
 import { ARGS, otherMachines } from './remote.mjs';
 import { home as dataHome, readConfig } from './store.mjs';
 import { findCopy } from './places.mjs';
@@ -18,6 +18,7 @@ const PLAIN = ['--no-color', '--no-ext-diff', '--no-textconv', '--no-renames'];
 
 // at: { repo } here, or { repo, machine } on another machine over ssh (the same git command, quoted for its shell).
 function git(at, args, maxBuffer = 4 * CAP) {
+  if (at.machine && !isMachine(at.machine)) return Promise.resolve(null); // as a git that failed
   const cmd = ['git', '-C', at.repo, '-c', 'core.quotepath=off', ...args];
   const [bin, argv, timeout] = at.machine ? ['ssh', [...ARGS, at.machine, cmd.map(q).join(' ')], 15000] : [cmd[0], cmd.slice(1), 5000];
   return new Promise(resolve => execFile(bin, argv, { timeout, maxBuffer, encoding: 'utf8' }, (e, out) => {
@@ -274,6 +275,7 @@ function imgCopy(a, src) {
 export function pullFile(d, want, rec, env = process.env, run = execFile) {
   const p = String(want || '').trim(), at = place(d, p, rec, env), a = at.away, cap = 10 << 20;
   if (!a) return Promise.resolve(at.error ? { error: at.error } : { ok: true });
+  if (!isMachine(a.machine)) return Promise.resolve({ error: 'pull', machine: String(a.machine).slice(0, 60) });
   const f = v => (v.startsWith('~/') ? `"$HOME"/${q(v.slice(2))}` : q(v));
   // $f: the report on that machine; a relative one is looked for from the session's folder upward, as here.
   const find = a.abs ? `f=${f(p)}; [ -f "$f" ] || exit 3; `

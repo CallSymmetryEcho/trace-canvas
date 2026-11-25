@@ -161,7 +161,12 @@ export function startProbe(file, args, opts = {}, { wait = 1000, stay = false } 
 }
 // A command run on another machine over ssh, in its login shell. A login shell that is not interactive skips .zshrc
 // and .bashrc, where ~/.local/bin (claude's and codex's own installers) is usually put on PATH, so it is put first here.
-export const remote = (machine, cmd) => `ssh -t ${machine} ${q(`exec "$SHELL" -lc ${q(`PATH="$HOME/.local/bin:$PATH"; ${cmd}`)}`)}`;
+// A machine as ssh takes it: a host or user@host. Names reach here from synced data (a session's machine) and from callers
+// (a to-do's `on`, trace_log's `on`), and go into ssh commands: anything else (`x; rm …`, `-oProxyCommand=…`) is refused.
+export const isMachine = m => /^[A-Za-z0-9_][\w.@-]*$/.test(String(m || ''));
+const badMachine = m => `"${String(m).slice(0, 60)}" is not a machine name`;
+export const remote = (machine, cmd) => { if (!isMachine(machine)) throw new Error(badMachine(machine)); return remoteCmd(machine, cmd); };
+const remoteCmd = (machine, cmd) => `ssh -t ${machine} ${q(`exec "$SHELL" -lc ${q(`PATH="$HOME/.local/bin:$PATH"; ${cmd}`)}`)}`;
 // Resuming another machine's session from here: over ssh, in tmux session tc-<id> there, so it keeps going when this
 // window closes or the network drops. A tmux session of that name (a dispatch started it, or an earlier resume) is
 // attached to instead of running the session twice. No tmux there: the plain resume over ssh. tmux runs the command
@@ -187,6 +192,7 @@ export function tmuxAttach(s) {
 // The tmux server a new-session starts keeps the fds it was handed: zsh holds a copy of stderr on fd 6 (the ssh
 // channel), so ssh waited for the agent to end and timed out after 30 s with the agent running. Fds 3-9 are closed.
 export function startDetached({ machine, name, cmd }, run = execFile, wait = 3) {
+  if (machine && !isMachine(machine)) return Promise.resolve(badMachine(machine));
   const n = q(name);
   const script = `command -v tmux >/dev/null || exit 3; tmux has-session -t ${n} 2>/dev/null && exit 4; `
     + `tmux new-session -d -s ${n} ${q(`exec "$SHELL" -lc ${q(`PATH="$HOME/.local/bin:$PATH"; ${cmd}`)}`)} \\; set-option -t ${n} remain-on-exit on 3>&- 4>&- 5>&- 6>&- 7>&- 8>&- 9>&-; sleep ${wait}; `
@@ -217,7 +223,7 @@ export async function launchRow(r, { open = openTerminal, start = startDetached,
  * idle sessions only: Enter in a session that waits at a permission prompt would answer the prompt.
  */
 export function typeInto({ machine = '', socket = '', pane = '', tty = '' }, text, exec = execFile) {
-  if (!/^%\d+$/.test(pane) || !tty) return Promise.resolve(false);
+  if (!/^%\d+$/.test(pane) || !tty || (machine && !isMachine(machine))) return Promise.resolve(false);
   const t = `${machine ? 'tmux' : q(tmuxBin())}${socket ? ` -S ${q(socket)}` : ''}`, p = q(pane);
   const script = `[ "$(${t} display-message -p -t ${p} '#{pane_tty}')" = ${q(tty)} ] || exit 1; [ "$(${t} display-message -p -t ${p} '#{pane_in_mode}')" = 1 ] && ${t} send-keys -t ${p} -X cancel; ${t} send-keys -t ${p} -l -- ${q(text)} && sleep 1 && ${t} send-keys -t ${p} Enter`;
   const [file, args] = machine ? ['ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', machine, `exec "$SHELL" -lc ${q(script)}`]] : ['/bin/sh', ['-c', script]];

@@ -115,12 +115,14 @@ function startDir(d, th, env, on = '') {
 // By id, findTodo gives any task record: a done to-do, or the first prompt of a session the hooks logged (not on the list).
 const openTodo = c => { if (!isTodo(c)) throw new Error(`"${c.title}" is a session's first prompt, not a to-do on the list`); if (c.done) throw new Error(`"${c.title}" is already done`); return c; };
 export function handTo(d, { ref, to, thread, remote = false, here = true, on = '', prompt: own = null }, env = process.env) {
-  const ag = AGENTS[to];
+  const ag = Object.hasOwn(AGENTS, to) ? AGENTS[to] : null;
   if (!ag) throw new Error(`Hand to whom? One of ${Object.keys(AGENTS).join(', ')}`);
   let todo = null, tid = d.commits[ref] && d.commits[ref].kind !== 'task' ? null : resolveThreadRef(d, ref);
   if (!tid || tid === INBOX) { todo = openTodo(findTodo(d, { task: ref, thread })); tid = threadIdOf(d, todo); todo.assignee = to; }
   const th = tid === INBOX ? null : d.threads[tid];
   if (!th) throw new Error('Put the to-do on a line first; the inbox has no folder or goal to hand over');
+  // Ids go into shell commands as they are (TRACE_CANVAS_THREAD=…, a tmux session's name), and imported data may carry any id.
+  for (const id of [tid, todo && todo.id]) if (id && !/^[\w-]+$/.test(id)) throw new Error(`"${String(id).slice(0, 40)}" is not an id this can start a session with`);
   const live = listLive(env).filter(s => sessionThreadOf(d, s, env) === tid).sort((a, b) => b.lastSeen - a.lastSeen);
   const dir = here ? lineDir(th) || (live[0] ? live[0].cwd : '') || startDir(d, th, env) : ''; // here: false for a command run on another machine
   const far = !here && on ? startDir(d, th, env, on) : ''; // there: where that machine's sessions on the line worked, if the folder is still there
@@ -239,7 +241,10 @@ export function dispatch(d, { refs = [], all = false, self = null, on = '', away
       // More than 20 are not all listed (a message typed into tmux is cut off past 16 KB): the rest are the agent's on the line.
       const shown = todos.slice(0, 20), ids = JSON.stringify(shown.map(c => c.id));
       // fresh: a new session, which is also told to bind (hooks bind it by this prompt; where they do not run, this does).
-      const say = fresh => oneLine(promptFor ? promptFor(th, tid, todos) : `${HEADS.todos} "${th.name}" (thread ${tid}) are yours: ${shown.map((c, i) => `${i + 1}) ${brief(c.title)} [${c.id}]`).join('; ')}${todos.length > shown.length ? `; and ${todos.length - shown.length} more, assigned to you on the line` : ''}. ${fresh ? `First call the MCP tool trace_bind with thread "${tid}". ` : ''}Titles may be cut short here: read each in full with trace_tasks (ids: ${ids}) and do them in order; read the line with trace_read_thread for context. Tick each with trace_task_done (task: its id, result: what you did and where it is) when it is done; use trace_log (thread "${tid}") only for a decision you made or a question. Then call trace_tasks with thread "${tid}" for the other open to-dos on the line and do the ones that are ready to be done and are yours or unassigned, reading each in full (ids) before you start it. Leave as it is a to-do that waits for the person, is to be discussed first, is shelved, or is assigned to another agent. Ask before anything outward or hard to undo (publishing, email or messages to people, a force-push, deleting, permissions or credentials): get it ready, leave the to-do open and log its question with trace_log (kind "note", title "Question: <the question> [<its id>]"); the same for a to-do you cannot decide: do not guess, go on with the next.`);
+      // whole: the line was dispatched as a line, to its own agent. To-dos picked by name, or a group for one machine or one
+      // kind of agent (two agents told to go on with the rest would both take the same to-do), are those and no more.
+      const whole = lines.has(tid) && (ownSession || g === '\t');
+      const say = fresh => oneLine(promptFor ? promptFor(th, tid, todos) : `${HEADS.todos} "${brief(th.name, 80)}" (thread ${tid}) are yours: ${shown.map((c, i) => `${i + 1}) ${brief(c.title)} [${c.id}]`).join('; ')}${todos.length > shown.length ? `; and ${todos.length - shown.length} more, assigned to you on the line` : ''}. ${fresh ? `First call the MCP tool trace_bind with thread "${tid}". ` : ''}Titles may be cut short here: read each in full with trace_tasks (ids: ${ids}) and do them in order; read the line with trace_read_thread for context. Tick each with trace_task_done (task: its id, result: what you did and where it is) when it is done; use trace_log (thread "${tid}") only for a decision you made or a question. ${whole ? `Then call trace_tasks with thread "${tid}" for the other open to-dos on the line and do the ones that are ready to be done and are yours or unassigned, reading each in full (ids) before you start it. Leave as it is a to-do that waits for the person, is to be discussed first, is shelved, or is assigned to another agent.` : 'Only these: the other to-dos on the line are not part of this.'} Ask before anything outward or hard to undo (publishing, email or messages to people, a force-push, deleting, permissions or credentials): get it ready, leave the to-do open and log its question with trace_log (kind "note", title "Question: <the question> [<its id>]"); the same for a to-do you cannot decide: do not guess, go on with the next.`);
       const prompt = say(false);
       const row = { thread: { id: tid, name: th.name }, agent: key, todos: todos.map(c => ({ id: c.id, title: c.title })), ...(machine ? { on: machine } : {}) };
       if (!s) {
@@ -329,10 +334,11 @@ export function stopAutopilot(d, { thread }) {
 }
 
 // The command is typed into a terminal, so a name or to-do with a line break must not end it early.
-const oneLine = s => String(s).replace(/[\x00-\x1f\x7f]+/g, ' ');
+// One line of plain text: no control characters (C0, C1), line separators or bidi overrides, which a terminal may act on.
+const oneLine = s => String(s).replace(/[\x00-\x1f\x7f-\x9f\u2028\u2029\u202a-\u202e\u2066-\u2069]+/g, ' ');
 // A to-do in a message typed into a session: enough of its title to know it by (the agent works without the tools, the
 // person reads the terminal), short enough that the line is not cut; the id reads the rest (trace_tasks, ids).
-const brief = (t, n = 40) => { const a = [...oneLine(t).trim()]; return a.length > n ? `${a.slice(0, n).join('')}…` : a.join(''); };
+const brief = (t, n = 40) => { const a = [...(oneLine(t == null ? '' : t).trim() || '(no title)')]; return a.length > n ? `${a.slice(0, n).join('')}…` : a.join(''); };
 const sessionThreadOf = (d, s, env) => sessionThread(d, s, env).threadId;
 // The folder a line works in: the repository path the hooks keep in its note.
 export const lineDir = th => { const n = String((th && th.note) || '').trim(); return /^\/\S*$/.test(n) && fs.existsSync(n) ? n : ''; };

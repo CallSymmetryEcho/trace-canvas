@@ -158,7 +158,10 @@ const LIVE_EVENTS = [...LOG_EVENTS, 'SessionStart', 'PreToolUse', 'Notification'
 
 // The openings of the prompts Trace Canvas itself writes to hand a line over (src/ops.mjs, app/index.html).
 // Keystrokes typed into the session rather than asked of it (":q", "login", "ok"): never a to-do.
-export const notTask = prompt => { const p = String(prompt || '').trim(); return p.length < 3 || (!/\s/.test(p) && (/^:/.test(p) || /^(login|logout|exit|quit|clear|yes|no|ok|okay)$/i.test(p))); };
+// Nor is a message a program sent in the person's place: the whole prompt is one tag or one wrapped block
+// (<heartbeat>, <side-sessions-event>…</side-sessions-event>).
+const MACHINE = /^<([a-z][\w-]*)>(?:[\s\S]*<\/\1>)?$/i;
+export const notTask = prompt => { const p = String(prompt || '').trim(); return p.length < 3 || MACHINE.test(p) || (!/\s/.test(p) && (/^:/.test(p) || /^(login|logout|exit|quit|clear|yes|no|ok|okay)$/i.test(p))); };
 // autopilotStop's own push. Gemini CLI fires BeforeAgent again with it as the prompt: that is not the person speaking.
 const NUDGE = { test: isNudge };
 

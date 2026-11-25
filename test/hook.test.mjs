@@ -431,3 +431,9 @@ test('what a turn produced: files still there at its end, in the project, not ig
   s.fire('Stop', { last_assistant_message: 'The reading list is in reading_list.md.', prompt_id: 'p1' });
   assert.deepEqual(s.commits().find(c => c.kind === 'agent').files, ['reading_list.md']);
 });
+
+test('a message a program sent in the person\'s place (one tag, one wrapped block) is not a to-do', async () => {
+  const { notTask } = await import('../src/hook.mjs');
+  for (const p of ['<heartbeat>', '<side-sessions-event>None of the sessions\nx</side-sessions-event>']) assert.ok(notTask(p), p);
+  for (const p of ['<div> why is this tag not centred', 'Fix the login page']) assert.ok(!notTask(p), p);
+});

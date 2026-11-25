@@ -225,6 +225,8 @@ Agents use the same list. At the start of work they read the goal and the open t
 
 *Agents tick to-dos off on the shared list, one by Claude Code and one by Codex, and the line's progress bar moves forward. Made-up data.*
 
+**Talk is not a to-do.** In Codex, Gemini CLI and Antigravity a later prompt becomes a to-do (ticked, for you to look over) only when the turn did something (changed a file, ran a writing command, committed) or its reply is a report of more than 1000 characters; a turn that only talked leaves nothing on the line, and neither does a machine-sent prompt such as `<heartbeat>`. On a research line you can keep the talk: type `/qa` in the page's box (or `trace-canvas qa <line> on`) and every talking turn with an answer of 300 characters or more is appended, as said, to one file, `notes/qa-<line>.md` in the line's project (the canvas's own folder when the line has none). The line shows a single record that links the file; `/qa` again turns it off.
+
 **Lines that have gone quiet.** A line nobody has touched for three times its usual gap (at least three days), with no session on it, gets a small dot on **Goals** and a chip under **Gone quiet** at the top of the list; nothing pops up. Click the chip for one sentence and three answers: a line with no open to-dos is asked whether it is finished (**Done**, **Parked**, **Still on it**), one with open to-dos whether to park it. **Still on it** counts as activity, so it asks again only after another quiet spell.
 
 ## Quest: one long piece of work as one card

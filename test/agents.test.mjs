@@ -330,5 +330,5 @@ test('a line that keeps Q&A notes: talk that got a real answer goes into its fil
   assert.deepEqual([rec.qa, rec.kind, cs.filter(c => c.qa).length], [2, 'note', 1]);
   assert.ok(!cs.some(c => c.kind === 'task' && /Ga-In|copper/.test(c.title)));
   const md = fs.readFileSync(rec.links[0], 'utf8');
-  assert.ok(rec.links[0].startsWith(path.join(s.repo, 'notes', 'qa-')) && /Ga-In make an ohmic[\s\S]*It wets the oxide[\s\S]*copper tape/.test(md) && !/ok thanks/.test(md));
+  assert.ok(fs.realpathSync(rec.links[0]).startsWith(path.join(fs.realpathSync(s.repo), 'notes', 'qa-')) && /Ga-In make an ohmic[\s\S]*It wets the oxide[\s\S]*copper tape/.test(md) && !/ok thanks/.test(md));
 });

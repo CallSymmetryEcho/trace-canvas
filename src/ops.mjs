@@ -112,11 +112,13 @@ function startDir(d, th, env, on = '') {
   }
   return '';
 }
+// By id, findTodo gives any task record: a done to-do, or the first prompt of a session the hooks logged (not on the list).
+const openTodo = c => { if (!isTodo(c)) throw new Error(`"${c.title}" is a session's first prompt, not a to-do on the list`); if (c.done) throw new Error(`"${c.title}" is already done`); return c; };
 export function handTo(d, { ref, to, thread, remote = false, here = true, on = '', prompt: own = null }, env = process.env) {
   const ag = AGENTS[to];
   if (!ag) throw new Error(`Hand to whom? One of ${Object.keys(AGENTS).join(', ')}`);
   let todo = null, tid = d.commits[ref] && d.commits[ref].kind !== 'task' ? null : resolveThreadRef(d, ref);
-  if (!tid || tid === INBOX) { todo = findTodo(d, { task: ref, thread }); tid = threadIdOf(d, todo); todo.assignee = to; }
+  if (!tid || tid === INBOX) { todo = openTodo(findTodo(d, { task: ref, thread })); tid = threadIdOf(d, todo); todo.assignee = to; }
   const th = tid === INBOX ? null : d.threads[tid];
   if (!th) throw new Error('Put the to-do on a line first; the inbox has no folder or goal to hand over');
   const live = listLive(env).filter(s => sessionThreadOf(d, s, env) === tid).sort((a, b) => b.lastSeen - a.lastSeen);
@@ -202,7 +204,7 @@ export function dispatch(d, { refs = [], all = false, self = null, on = '', away
     const id = d.commits[ref] ? null : findThreadLoose(d, ref);
     if (id && id !== INBOX) { lines.add(id); continue; }
     let c;
-    try { c = findTodo(d, { task: ref }); } catch (e) { throw /^No /.test(e.message) ? new Error(`No line or open to-do "${ref}"`) : e; }
+    try { c = openTodo(findTodo(d, { task: ref })); } catch (e) { throw /^No /.test(e.message) ? new Error(`No line or open to-do "${ref}"`) : e; }
     if (threadIdOf(d, c) === INBOX) throw new Error(`"${c.title}" is in the inbox: put it on a line first`);
     named.add(c.id);
   }
@@ -234,17 +236,21 @@ export function dispatch(d, { refs = [], all = false, self = null, on = '', away
       // What the agent is told: the new to-dos by id and the start of their titles (cut, so a terminal never cuts the
       // message; the id reads the rest), to do first; then the line's other written to-dos that are ready. One that waits
       // for the person, is to be discussed first or is shelved is left alone, without a question each time someone dispatches.
-      const prompt = oneLine(promptFor ? promptFor(th, tid, todos) : `${HEADS.todos} "${th.name}" (thread ${tid}) are yours: ${todos.map((c, i) => `${i + 1}) ${brief(c.title)} [${c.id}]`).join('; ')}. The titles are cut short here: read the full title and text of each with trace_tasks (ids: ${JSON.stringify(todos.map(c => c.id))}) and do them in order; read the line with trace_read_thread for context, tick each with trace_task_done when it is done (give the result), and log results with trace_log. Then call trace_tasks with thread "${tid}" for the other open to-dos on the line and do the ones that are ready to be done and that nobody else has. Leave as it is a to-do that waits for the person, is to be discussed first, is shelved, or is assigned to another agent; one you cannot decide, do not guess: log its question with trace_log (kind "note", title "Question: <the question> [<its id>]") and go on.`);
+      // More than 20 are not all listed (a message typed into tmux is cut off past 16 KB): the rest are the agent's on the line.
+      const shown = todos.slice(0, 20), ids = JSON.stringify(shown.map(c => c.id));
+      // fresh: a new session, which is also told to bind (hooks bind it by this prompt; where they do not run, this does).
+      const say = fresh => oneLine(promptFor ? promptFor(th, tid, todos) : `${HEADS.todos} "${th.name}" (thread ${tid}) are yours: ${shown.map((c, i) => `${i + 1}) ${brief(c.title)} [${c.id}]`).join('; ')}${todos.length > shown.length ? `; and ${todos.length - shown.length} more, assigned to you on the line` : ''}. ${fresh ? `First call the MCP tool trace_bind with thread "${tid}". ` : ''}Titles may be cut short here: read each in full with trace_tasks (ids: ${ids}) and do them in order; read the line with trace_read_thread for context. Tick each with trace_task_done (task: its id, result: what you did and where it is) when it is done; use trace_log (thread "${tid}") only for a decision you made or a question. Then call trace_tasks with thread "${tid}" for the other open to-dos on the line and do the ones that are ready to be done and are yours or unassigned, reading each in full (ids) before you start it. Leave as it is a to-do that waits for the person, is to be discussed first, is shelved, or is assigned to another agent. Ask before anything outward or hard to undo (publishing, email or messages to people, a force-push, deleting, permissions or credentials): get it ready, leave the to-do open and log its question with trace_log (kind "note", title "Question: <the question> [<its id>]"); the same for a to-do you cannot decide: do not guess, go on with the next.`);
+      const prompt = say(false);
       const row = { thread: { id: tid, name: th.name }, agent: key, todos: todos.map(c => ({ id: c.id, title: c.title })), ...(machine ? { on: machine } : {}) };
       if (!s) {
         // A new session; on another machine over ssh, from its home folder (the line's folder is this machine's).
-        const cmd = handTo(d, { ref: todos[0].id, to: key, remote: key === 'claude', here: !away, on: away, prompt }, env).command;
+        const cmd = handTo(d, { ref: todos[0].id, to: key, remote: key === 'claude', here: !away, on: away, prompt: say(true) }, env).command;
         rows.push({ ...row, action: 'start', ...(away ? { machine: away, ...awayRun(away, cmd, todos[0].id) } : hereRun(cmd, todos[0].id)) });
         continue;
       }
       const session = { id: sid, title: s.title || (run && (run.title || run.prompt)) || '', status: run ? run.status : 'off', ...(away ? { machine: away } : {}), ...(run && run.desktopId ? { desktopId: run.desktopId } : {}), ...(run && run.name ? { name: run.name } : {}) };
-      const action = sid === self ? 'self' : away ? (run ? 'busy' : 'resume') : run && key === 'claude' ? 'message' : run && run.status === 'working' ? 'busy' : 'resume';
-      const freshCmd = () => handTo(d, { ref: todos[0].id, to: key, remote: key === 'claude', here: !away, on: away, prompt }, env).command;
+      const action = sid === self ? 'self' : away ? (run ? 'busy' : 'resume') : run && key === 'claude' ? 'message' : run ? 'busy' : 'resume'; // a running session is never resumed in a second window: idle in tmux it is typed into (pane), else a note waits for its turn to end
+      const freshCmd = () => handTo(d, { ref: todos[0].id, to: key, remote: key === 'claude', here: !away, on: away, prompt: say(true) }, env).command;
       const fresh = () => (away ? remote(away, freshCmd()) : freshCmd());
       // On another machine the session's folder may be gone (its transcript sits under it): then a new session.
       const name = oneLine(th.name), wake = !s.cwd ? AGENTS[key].wake(sid, prompt, name) : away
@@ -257,7 +263,9 @@ export function dispatch(d, { refs = [], all = false, self = null, on = '', away
       const there = run && sid !== self;
       const pane = there && run.status === 'idle' && run.pane && run.tty ? { pane: { machine: away, socket: run.tmux || '', pane: run.pane, tty: run.tty } } : {};
       const noted = there && !away && d.sessions && d.sessions[sid];
-      if (noted) d.sessions[sid].handed = { prompt, ids: [tid, ...todos.map(c => c.id)], at: Date.now() };
+      // A note already waiting (an earlier dispatch, or another of the session's lines in this one) is added to, not replaced.
+      const was = noted && d.sessions[sid].handed;
+      if (noted) d.sessions[sid].handed = { prompt: was && !was.prompt.includes(prompt) ? `${was.prompt}\n${prompt}` : prompt, ids: [...new Set([tid, ...todos.map(c => c.id), ...((was && was.ids) || [])])], at: Date.now() };
       rows.push({ ...row, action, session, prompt, ...pane, ...(noted ? { noted: true } : {}), ...(action === 'resume' ? (away ? awayRun(away, wake, sid.slice(0, 8)) : hereRun(wake, sid.slice(0, 8))) : action === 'busy' ? { command: fresh() } : {}) });
     }
   }

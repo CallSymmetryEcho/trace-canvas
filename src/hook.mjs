@@ -165,7 +165,8 @@ const MACHINE = /^<([a-z][\w-]*)>(?:[\s\S]*<\/\1>)?$/i;
 export const notTask = prompt => { const p = String(prompt || '').trim(); return p.length < 3 || MACHINE.test(p) || (!/\s/.test(p) && (/^:/.test(p) || /^(login|logout|exit|quit|clear|yes|no|ok|okay)$/i.test(p))); };
 // autopilotStop's own push. Gemini CLI fires BeforeAgent again with it as the prompt: that is not the person speaking.
 const NUDGE = { test: isNudge };
-const HANDED = new RegExp(`(?:${HEADS.hand}|${HEADS.handZh}|${HEADS.todos}|${HEADS.autopilot.replace(/[()]/g, '\\$&')})[^\\n]*?[(（]thread ([\\w-]+)[)）]`);
+// The id right after the line's name (its closing quote): a name may itself hold "(thread …)", and so may a to-do's title further on.
+const HANDED = new RegExp(`(?:${HEADS.hand}|${HEADS.handZh}|${HEADS.todos}|${HEADS.autopilot.replace(/[()]/g, '\\$&')}) ?["「][^\\n]*?["」] ?[(（]thread ([\\w-]+)[)）]`);
 
 // The folder a session resumes from. Claude Code keeps a conversation under the folder it started in
 // (~/.claude/projects/<that path, each character other than a letter or digit as ->), and a later cd does not move it,
@@ -247,7 +248,8 @@ export function handleHook(input, env = process.env) {
       // A new session whose first prompt is a hand-over is on that line from here on. The start hook binds by
       // TRACE_CANVAS_THREAD, which a Codex session under the shared daemon never sees: it was put on a line made for its folder.
       const took = handoff && !s.prompted && !s.bound && HANDED.exec(String(input.prompt || ''));
-      if (took && threadById(d, took[1])) { s.thread = took[1]; s.bound = true; touch(); }
+      const takes = took && threadById(d, took[1]);
+      if (takes) { s.thread = takes.id; s.bound = true; touch(); }
       if (handoff) s.prompted = true;
       // An Autopilot round counts as running only once its prompt reaches a session: the switch lights here, not on the click.
       // Looked for in the raw prompt: pasted in with a word or two of the person's own, the paste is shortened in `prompt`.
@@ -257,7 +259,7 @@ export function handleHook(input, env = process.env) {
       // Or left for this session as a reply (trace_log to:) when nothing could type it in: taken up at its next turn, where the
       // reply reaches it (promptContext, after this). Only an undelivered one, so an old round is not taken up again.
       const left = Object.values(d.commits).filter(c => c.to && !c.deliveredAt && sid.startsWith(c.to)).map(c => `${c.title}\n${c.body || ''}`);
-      const raw = [String(input.prompt || ''), ...left].join('\n'), ap = /^Autopilot \(beta\) on the Trace Canvas line .*?\(thread ([\w-]+)\)/m.exec(raw);
+      const raw = [String(input.prompt || ''), ...left].join('\n'), ap = /^Autopilot \(beta\) on the Trace Canvas line ".*?" \(thread ([\w-]+)\)/m.exec(raw);
       const apTh = ap ? d.threads[ap[1]] : /autopilot/i.test(raw) ? Object.values(d.threads).find(t => t.autopilot && !t.autopilot.session && raw.includes(t.id)) : null;
       // A round another session already holds stays with it (a prompt pasted twice): two agents on one line, one of them ungated.
       if (apTh && apTh.autopilot && (!apTh.autopilot.session || apTh.autopilot.session === sid)) { apTh.autopilot = { ...apTh.autopilot, session: sid, on: Date.now() }; changed = true; }
@@ -581,7 +583,11 @@ const takeHanded = (sid, env, got = '') => {
     delete d.sessions[sid].handed;
     for (const t of Object.values(d.threads)) if (AUTOPILOT_PROMPT.test(h.prompt) && t.autopilot && !t.autopilot.session && h.prompt.includes(t.id)) t.autopilot = { ...t.autopilot, session: sid, on: Date.now() };
   }, env);
-  return got.includes(h.prompt.slice(0, 60)) || (h.ids || []).some(id => got.includes(id)) ? '' : h.prompt;
+  // ids: the line, then its to-dos. Stale when every to-do named was ticked or deleted since. Already here when the prompt
+  // carries the note's opening or one of its to-dos (the line's id alone is also in a person's own question about the line).
+  const todos = (h.ids || []).slice(1), d = readData(env);
+  if (todos.length && todos.every(id => !d.commits[id] || d.commits[id].done)) return '';
+  return got.includes(h.prompt.slice(0, 60)) || (todos.length ? todos : h.ids || []).some(id => got.includes(id)) ? '' : h.prompt;
 };
 // Replies other sessions left while this one worked come with it: read as soon as its turn ends, not at the person's next message.
 export const handedStop = (input, env = process.env) => (input.session_id ? [takeHanded(input.session_id, env), takeReplies(input.session_id, env)].filter(Boolean).join('\n') : '');

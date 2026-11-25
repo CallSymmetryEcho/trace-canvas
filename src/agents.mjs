@@ -219,7 +219,7 @@ export async function launchRow(r, { open = openTerminal, start = startDetached,
 export function typeInto({ machine = '', socket = '', pane = '', tty = '' }, text, exec = execFile) {
   if (!/^%\d+$/.test(pane) || !tty) return Promise.resolve(false);
   const t = `${machine ? 'tmux' : q(tmuxBin())}${socket ? ` -S ${q(socket)}` : ''}`, p = q(pane);
-  const script = `[ "$(${t} display-message -p -t ${p} '#{pane_tty}')" = ${q(tty)} ] || exit 1; ${t} send-keys -t ${p} -l -- ${q(text)} && sleep 1 && ${t} send-keys -t ${p} Enter`;
+  const script = `[ "$(${t} display-message -p -t ${p} '#{pane_tty}')" = ${q(tty)} ] || exit 1; [ "$(${t} display-message -p -t ${p} '#{pane_in_mode}')" = 1 ] && ${t} send-keys -t ${p} -X cancel; ${t} send-keys -t ${p} -l -- ${q(text)} && sleep 1 && ${t} send-keys -t ${p} Enter`;
   const [file, args] = machine ? ['ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', machine, `exec "$SHELL" -lc ${q(script)}`]] : ['/bin/sh', ['-c', script]];
   return new Promise(done => exec(file, args, { timeout: 20e3 }, err => done(!err)));
 }

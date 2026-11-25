@@ -356,16 +356,18 @@ async function callTool(name, a = {}) {
     case 'trace_tasks': {
       const d = readData();
       const handed = handedThread();
-      const ids = Array.isArray(a.ids) && a.ids.length ? a.ids.map(String) : null;
+      // Given at all, ids is a filter: [] or a wrong type lists nothing (it used to list the whole line, or every line); one id as a string is that id.
+      const ids = a.ids == null ? null : [].concat(a.ids).filter(x => typeof x === 'string' || typeof x === 'number').map(String);
       let thread = ids ? undefined : a.thread || (handed && threadById(d, handed) ? handed : undefined);
       // Without a thread: the line this session works on, so the answer stays small as the canvas grows; every line
       // with all: true, for mine or an assignee, or when the session's line is not known.
       if (!thread && !a.all && !a.mine && !a.assignee && !ids) try { const sid = currentSessionId({ sessionId: a.session_id, projectDir: projectDir() }); thread = (sid && sessionThread(d, { id: sid }).threadId) || undefined; } catch {} // no session: every line is listed
       const rows = listTasks(d, { thread, includeDone: !!a.include_done, assignee: a.mine ? agentKey() : a.assignee, ids });
       const open = rows.reduce((n, r) => n + (r.total - r.done), 0);
+      const found = new Set(rows.flatMap(r => r.tasks.map(c => c.id))), missing = ids ? ids.filter(id => !found.has(id)) : [];
       // This MCP server lives as long as its session and does not restart when the clone is updated: said here, where every agent looks.
       const behind = staleAgainst(MCP_HEAD);
-      return { text: `${open} open to-do${open === 1 ? '' : 's'} on ${rows.length} thread${rows.length === 1 ? '' : 's'}.${behind ? ` Note: this session's Trace Canvas tools run older code (${MCP_HEAD.slice(0, 7)}; the clone is at ${behind.slice(0, 7)}), so a tool or fix added since is not in them: start a new session to get it.` : ''}`, data: { threads: rows, ...(behind ? { stale: true, head: MCP_HEAD.slice(0, 7), repoHead: behind.slice(0, 7) } : {}) } };
+      return { text: `${ids ? `${found.size} of ${ids.length} to-do${ids.length === 1 ? '' : 's'} found by id${missing.length ? ` (not a to-do, or deleted: ${missing.slice(0, 10).join(', ')})` : ''}` : `${open} open to-do${open === 1 ? '' : 's'} on ${rows.length} thread${rows.length === 1 ? '' : 's'}`}.${behind ? ` Note: this session's Trace Canvas tools run older code (${MCP_HEAD.slice(0, 7)}; the clone is at ${behind.slice(0, 7)}), so a tool or fix added since is not in them: start a new session to get it.` : ''}`, data: { threads: rows, ...(missing.length ? { missing } : {}), ...(behind ? { stale: true, head: MCP_HEAD.slice(0, 7), repoHead: behind.slice(0, 7) } : {}) } };
     }
     case 'trace_task_done': {
       const done = a.done !== false;

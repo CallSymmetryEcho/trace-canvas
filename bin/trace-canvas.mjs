@@ -44,7 +44,9 @@ const cmd = argv.includes('--help') || argv.includes('-h') ? 'help' : argv[0] &&
 function flag(name, fallback) {
   const i = argv.indexOf(`--${name}`);
   if (i === -1) return fallback;
-  const v = argv[i + 1];
+  // A switch (fallback false) takes no value: `dispatch --print Thesis` keeps Thesis as the line. It was taken as
+  // --print's value, no line was left, and every line was dispatched.
+  const v = fallback === false ? null : argv[i + 1];
   argv.splice(i, v && !v.startsWith('--') ? 2 : 1);
   return v && !v.startsWith('--') ? v : true;
 }
@@ -162,7 +164,7 @@ async function runRows(rows, { run, json }) {
     else if (r.woken) console.log(`  → Running session ${name}${s.machine ? ` on ${s.machine}` : ''} was idle in tmux: the to-dos were typed into it, and it has started on them.`);
     else if (r.noted && s.status === 'working') console.log(`  → Session ${name} is working: a note is left, and it takes them up when its turn ends. Nothing to paste.${r.command ? `\n    Not to wait, start a new session for them:\n    ${r.command}` : ''}`);
     else if (r.action === 'message') console.log(`  → Running session ${name} (${s.status}${s.name ? `, messaged as ${s.name}` : ''}${s.desktopId ? `, ${s.desktopId}` : ''}): send it this message:\n    ${r.prompt}`);
-    else if (r.action === 'busy') console.log(`  → ${who} session ${name} is busy. Choose:\n    A) paste this into it when it stops:\n       ${r.prompt}\n    B) or start a new session for them:\n       ${r.command}`);
+    else if (r.action === 'busy') console.log(`  → ${who} session ${name} is ${s.status === 'working' ? 'busy' : `running (${s.status}) in its own window`}. Choose:\n    A) paste this into it when it stops:\n       ${r.prompt}\n    B) or start a new session for them:\n       ${r.command}`);
     else if (r.failed) console.log(`  → No terminal window opened: ${r.failed}\n    Run it yourself:\n    ${r.command}`);
     else if (r.detached) console.log(`  → ${r.already ? `Already running${r.tmux.machine ? ` on ${r.tmux.machine}` : ''} in tmux session ${r.tmux.name}` : `${r.action === 'start' ? `A new ${who} session` : `Session ${name} resumed`}${r.tmux.machine ? ` on ${r.tmux.machine}` : ''}, in tmux session ${r.tmux.name}: it keeps running if the window closes or the network drops`}.${r.noWatch ? ` No window opened to watch it (${r.noWatch}).` : ''}\n    Watch it:  ${r.tmux.attach}\n    By hand, without tmux:  ${r.command}`);
     else console.log(`  → ${r.action === 'start' ? `A new ${who} session` : `Session ${name} resumed`}${run ? ' in a new terminal window' : '; run'}:\n    ${r.command}${r.noTmux && r.tmux.machine ? `\n    ${r.tmux.machine} has no tmux: install it there, and agents sent to it keep running when the window closes.` : ''}`);

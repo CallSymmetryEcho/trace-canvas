@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **More → Hide → Merged also takes the "N merged in" tag off the cards.** The switch hid merged lines in Branches and the Timeline while every card they went into kept its tag; with it off the canvas now shows neither the tag nor merged lines opened from it. The line's panel still lists them.
+
 - **Handing over one to-do hands over that one; a dispatch does the new to-dos, then the line's other ready ones.** **Hand to it** on a to-do (and `trace-canvas hand <to-do>`) told the agent to work through all of its to-dos on the line, starting with that one; it now names the one to-do and says the others are not part of it. A dispatch message names the new to-dos by id with the first 40 characters of each title (at most 20; a long message was cut in the terminal twice, and tmux refuses one past 16 KB) and the agent reads each in full, with its text, through `trace_tasks` (`ids`). After those it goes on with the line's other open to-dos that are ready and its own or unassigned, leaves the ones that wait for the person, are to be discussed first, are shelved or are another agent's, and asks in a Question record before anything outward or hard to undo (in a test a Codex session force-pushed because the message said only "do them in order").
 - **The chain from a dispatch to the agent, at its edges.** Found by test agents feeding it extreme cases:
   - `trace-canvas dispatch --print <line>` took the line's name as the switch's value and dispatched every line; a switch no longer takes a value, in any command.

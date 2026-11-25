@@ -1818,6 +1818,8 @@ function byThread() {
 function orderedThreads() { return [...S.threads.values()].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)); }
 // A merged line folds into the line it merged into: hidden unless More → Show merged lines; its records stay where they are.
 // A merged line has no card of its own: the canvas shows it only while the line it went into has "N merged in" opened.
+// More → Hide → Merged takes that tag off the cards too, and with it any merged lines opened from it (the line's panel
+// still lists them).
 // Branches and the Timeline, the views of history, draw it or not by More → Hide → Merged (mergedShown), nothing else.
 // The lines merged into a line, in its panel: one cell each (its colour, name, how much is on it and when it came in),
 // which opens that line; the merge can be undone from the cell.
@@ -1829,7 +1831,7 @@ function mergedCells(id) {
   }).join('');
   return `<div class="sec-label">${esc(t('mergedInLabel'))} · ${ins.length}</div><div class="mi-list">${cells}</div>`;
 }
-function isHidden(th) { if (th.archived) return true; return th.status === 'merged' ? !S.mergedOpen.has(th.mergedInto) : S.hideDone && th.status === 'done'; }
+function isHidden(th) { if (th.archived) return true; return th.status === 'merged' ? !(S.showMerged && S.mergedOpen.has(th.mergedInto)) : S.hideDone && th.status === 'done'; }
 const mergedShown = (th, n = 0) => (th.status === 'merged' ? S.showMerged && S.threads.has(th.mergedInto) && n < 20 && mergedShown(getThread(th.mergedInto), n + 1) : !isHidden(th));
 const mergedIn = id => orderedThreads().filter(x => x.status === 'merged' && x.mergedInto === id);
 // Focus mode: every view shows only one group's lines (More → Focus on a group, or the group's panel). Kept per device.
@@ -2995,7 +2997,7 @@ function cardHTML(th, cs, selT) {
     <div class="card-head">${apRun(th) ? AP_RING : ''}${isFolded(th) ? `<span class="grp-tog" data-park-tog="1" title="${esc(t(peeking ? 'peekClose' : th.status === 'done' ? 'peekOpen' : 'peekOpenParked'))}">${peeking ? '▾' : '▸'}</span>` : ''}<span class="roundel"></span><span class="card-name">${esc(th.name)}</span>${liveBadge(th.id)}${chip}</div>
     ${shut ? '' : apTickHTML(th, cs)}${apRun(th) ? AP_RING : ''}
     <ol class="strip" style="--ph:${phase(2800)}">${items}</ol>
-    <div class="card-foot"><span>${esc(t('countRecords', cs.length))}${agents ? esc(t('countAgent', agents)) : ''}${mergedIn(th.id).length ? ` <button class="mi-tog" data-merged-tog="1" aria-expanded="${S.mergedOpen.has(th.id)}" title="${esc(t(S.mergedOpen.has(th.id) ? 'mergedClose' : 'mergedOpen'))}">${esc(t('mergedInCount', mergedIn(th.id).length))} · ${esc(t(S.mergedOpen.has(th.id) ? 'mergedFold' : 'mergedUnfold'))} ${S.mergedOpen.has(th.id) ? '▾' : '▸'}</button>` : ''}</span><span>${last ? esc(t('updated', fmtRel(last.ts))) : ''}</span></div>
+    <div class="card-foot"><span>${esc(t('countRecords', cs.length))}${agents ? esc(t('countAgent', agents)) : ''}${S.showMerged && mergedIn(th.id).length ? ` <button class="mi-tog" data-merged-tog="1" aria-expanded="${S.mergedOpen.has(th.id)}" title="${esc(t(S.mergedOpen.has(th.id) ? 'mergedClose' : 'mergedOpen'))}">${esc(t('mergedInCount', mergedIn(th.id).length))} · ${esc(t(S.mergedOpen.has(th.id) ? 'mergedFold' : 'mergedUnfold'))} ${S.mergedOpen.has(th.id) ? '▾' : '▸'}</button>` : ''}</span><span>${last ? esc(t('updated', fmtRel(last.ts))) : ''}</span></div>
   </div>`;
 }
 function border(R, c, toward, gap) {

@@ -120,10 +120,13 @@ await ev(`localStorage.setItem('tc.hideDone', 'true')`); await call('Page.reload
 await ev(`document.querySelector('#tab-git').click()`); await wait(800);
 out.mergedInBranches = await ev(`!!document.querySelector('#git-body [data-cid="kept1"]')`);
 assert.equal(out.mergedInBranches, true, 'the merged line has its rows in Branches');
-// More → Hide → Merged is what takes it out of Branches; the canvas keeps "N merged in" on the target's card either way.
-await ev(`localStorage.setItem('tc.showMerged', 'false')`); await call('Page.reload'); await wait(2500);
+// The canvas offers "N merged in" on the target's card while merged lines are shown...
 await ev(`document.querySelector('#tab-canvas').click()`); await wait(800);
 assert.equal(await ev(`!!document.querySelector('#cv-cards .card[data-tid="${picks[1].id}"] [data-merged-tog]')`), true, 'the card offers its merged lines');
+// ...and More → Hide → Merged takes it out of Branches and takes that tag off the card (Bin, 2026-11-25).
+await ev(`localStorage.setItem('tc.showMerged', 'false')`); await call('Page.reload'); await wait(2500);
+await ev(`document.querySelector('#tab-canvas').click()`); await wait(800);
+assert.equal(await ev(`!!document.querySelector('#cv-cards .card[data-tid="${picks[1].id}"] [data-merged-tog]')`), false, 'no merged tag on the card while merged lines are hidden');
 assert.equal(await ev(`!!document.querySelector('#cv-cards .card[data-tid="${picks[0].id}"]')`), false, 'a merged line has no card until they are opened');
 await ev(`document.querySelector('#tab-git').click()`); await wait(800);
 assert.equal(await ev(`!!document.querySelector('#git-body [data-cid="kept1"]')`), false, 'hidden with the switch');

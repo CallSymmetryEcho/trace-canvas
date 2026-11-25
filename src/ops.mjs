@@ -124,7 +124,7 @@ export function handTo(d, { ref, to, thread, remote = false, here = true, on = '
   const far = !here && on ? startDir(d, th, env, on) : ''; // there: where that machine's sessions on the line worked, if the folder is still there
   // A prompt of the caller's own (trace_fork's) still opens as a hand-over: the hooks know it by that (it is never a
   // to-do) and put the new session on the line from it, where TRACE_CANVAS_THREAD does not reach (Codex's shared daemon).
-  const prompt = own ? oneLine(isHandoff(own) ? own : `${HEADS.hand} "${th.name}" (thread ${tid}). First call the MCP tool trace_bind with thread "${tid}". ${own}`) : oneLine(`${HEADS.hand} "${th.name}" (thread ${tid}). First call the MCP tool trace_bind with thread "${tid}". Then read the line with trace_read_thread (ideas logged on it are there) and call trace_tasks with mine: true for the goal and your to-dos, work through them, and tick each one with trace_task_done when it is done. Log decisions and results with trace_log.${todo ? ` Start with the to-do [${todo.id}]: trace_tasks with ids ["${todo.id}"] gives its title and full text.` : ''}`);
+  const prompt = own ? oneLine(isHandoff(own) ? own : `${HEADS.hand} "${th.name}" (thread ${tid}). First call the MCP tool trace_bind with thread "${tid}". ${own}`) : oneLine(`${HEADS.hand} "${th.name}" (thread ${tid}). First call the MCP tool trace_bind with thread "${tid}". Then read the line with trace_read_thread (ideas logged on it are there) and call trace_tasks with mine: true for the goal and your to-dos, work through them, and tick each one with trace_task_done when it is done. Log decisions and results with trace_log.${todo ? ` Start with: ${brief(todo.title)} [${todo.id}] (trace_tasks with ids ["${todo.id}"] gives its full title and text).` : ''}`);
   const run = remote && ag.remote ? ag.remote(oneLine(th.name), prompt) : ag.launch(prompt);
   return { thread: th, todo, live, command: `${dir ? `cd ${q(dir)} && ` : far ? `cd ${q(far)} 2>/dev/null; ` : ''}TRACE_CANVAS_THREAD=${tid} ${run}` };
 }
@@ -235,7 +235,7 @@ export function dispatch(d, { refs = [], all = false, self = null, on = '', away
         rows.push({ ...row, action: 'start', ...(away ? { machine: away, ...awayRun(away, cmd, todos[0].id) } : hereRun(cmd, todos[0].id)) });
         continue;
       }
-      const prompt = promptFor ? oneLine(promptFor(th, tid, todos)) : oneLine(`${HEADS.todos} "${th.name}" (thread ${tid}) are yours: ${todos.map(c => `[${c.id}]`).join(' ')}. Read their titles and full text with trace_tasks (ids: ${JSON.stringify(todos.map(c => c.id))}) and do them in order; read the line with trace_read_thread for context, tick each with trace_task_done when it is done, and log results with trace_log.`);
+      const prompt = promptFor ? oneLine(promptFor(th, tid, todos)) : oneLine(`${HEADS.todos} "${th.name}" (thread ${tid}) are yours: ${todos.map((c, i) => `${i + 1}) ${brief(c.title)} [${c.id}]`).join('; ')}. The titles are cut short here: read the full title and text of each with trace_tasks (ids: ${JSON.stringify(todos.map(c => c.id))}) and do them in order; read the line with trace_read_thread for context, tick each with trace_task_done when it is done, and log results with trace_log.`);
       const session = { id: sid, title: s.title || (run && (run.title || run.prompt)) || '', status: run ? run.status : 'off', ...(away ? { machine: away } : {}), ...(run && run.desktopId ? { desktopId: run.desktopId } : {}), ...(run && run.name ? { name: run.name } : {}) };
       const action = sid === self ? 'self' : away ? (run ? 'busy' : 'resume') : run && key === 'claude' ? 'message' : run && run.status === 'working' ? 'busy' : 'resume';
       const freshCmd = () => handTo(d, { ref: todos[0].id, to: key, remote: key === 'claude', here: !away, on: away, prompt: promptFor && promptFor(th, tid, todos) }, env).command;
@@ -316,6 +316,9 @@ export function stopAutopilot(d, { thread }) {
 
 // The command is typed into a terminal, so a name or to-do with a line break must not end it early.
 const oneLine = s => String(s).replace(/[\x00-\x1f\x7f]+/g, ' ');
+// A to-do in a message typed into a session: enough of its title to know it by (the agent works without the tools, the
+// person reads the terminal), short enough that the line is not cut; the id reads the rest (trace_tasks, ids).
+const brief = (t, n = 40) => { const a = [...oneLine(t).trim()]; return a.length > n ? `${a.slice(0, n).join('')}…` : a.join(''); };
 const sessionThreadOf = (d, s, env) => sessionThread(d, s, env).threadId;
 // The folder a line works in: the repository path the hooks keep in its note.
 export const lineDir = th => { const n = String((th && th.note) || '').trim(); return /^\/\S*$/.test(n) && fs.existsSync(n) ? n : ''; };

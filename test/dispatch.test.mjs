@@ -53,10 +53,14 @@ test('dispatch hands each line\'s new to-dos to the agent working on it, and say
   assert.equal(by.Thesis.command, `cd '${tmp}' && claude --resume s1 --remote-control='Thesis' '${by.Thesis.prompt}'`);
   assert.deepEqual([by.Thesis.tmux.machine, by.Thesis.tmux.name, by.Thesis.tmux.cmd === by.Thesis.command], ['', 'tc-s1', true]); // here too: detached, in tmux
   assert.equal(by.Promo.tmux.name, `tc-${cut.id}`);
-  // The message names the to-dos by id only: the agent reads each one's title and full text with trace_tasks (ids), so a
-  // long to-do is not typed into a terminal (cut twice: f54d9ba, 621d513) and its evidence and conditions are read too.
-  assert.match(by.Thesis.prompt, new RegExp(`are yours: \\[${fig.id}\\] \\[\\w+\\]\\. Read their titles and full text with trace_tasks \\(ids: \\["${fig.id}",`));
-  assert.ok(!/Redo figure 3|Cite the 2024/.test(by.Thesis.prompt));
+  // The message carries each to-do's id and the start of its title (40 characters): enough to start on without the
+  // tools and for the person to read, never long enough to be cut in a terminal (f54d9ba, 621d513). The rest, and the
+  // to-do's text (evidence, how to check), is read with trace_tasks (ids).
+  assert.match(by.Thesis.prompt, new RegExp(`are yours: 1\\) Redo figure 3 \\[${fig.id}\\]; 2\\) Cite the 2024 survey \\[\\w+\\]\\. .*trace_tasks \\(ids: \\["${fig.id}",`));
+  const long = todo(promo, 'Check every figure caption against the journal style guide, panel by panel, and list each mismatch');
+  const cutMsg = dispatch(d, { refs: [long.id], print: true }, env)[0];
+  assert.ok(cutMsg.command.includes(`Check every figure caption against the j… [${long.id}]`) && !cutMsg.command.includes('panel by panel'));
+  d.commits[long.id].done = true;
   d.commits[fig.id].body = 'Use the March data. '.repeat(200);
   const read = listTasks(d, { ids: [fig.id] });
   assert.deepEqual(read.map(r => [r.name, r.tasks.map(c => [c.title, c.body.length])]), [['Thesis', [['Redo figure 3', 4000]]]]);

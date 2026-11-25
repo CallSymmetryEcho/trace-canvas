@@ -434,6 +434,7 @@ node bin/trace-canvas.mjs log "文献对比表完成" \
   trace-canvas lang <en|zh>     hooks 写入记录的语言
   trace-canvas terminal [iterm|terminal]   macOS：agent 开在 iTerm2 标签页，还是「终端」新窗口（默认：装了 iTerm2 就用它）
   trace-canvas autopilot <线> [--stop]   Autopilot（beta）：按决策画像做这条线的待办，直到你关掉
+  trace-canvas qa <线> [on|off]    研究线开问答记录：只是讨论、回答有内容的一轮写进一个 .md 文件
   trace-canvas backup-fix [线…]   列出记录里提到、但本机已找不到的文件，以及哪里有副本；
                                 --moved <目录> / --backup <目录> 登记项目搬到了哪、备份在哪；
                                 --restore 从备份把缺失的文件复制回来，先问你再做

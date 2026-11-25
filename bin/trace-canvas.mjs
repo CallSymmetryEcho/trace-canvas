@@ -135,6 +135,7 @@ Setup (pass --user for every project, or --project dir for one)
   trace-canvas sync             Sync the canvas with your other machines through the location map
                 [--allow-deletes]      (more than 50 deletions in one sync are refused without it)
                 [--adopt]              (this data folder takes over a sync file another folder wrote under the same machine name)
+  trace-canvas qa <line> [on|off]  A research line keeps Q&A notes: talk that got a real answer goes into one .md file
   trace-canvas backup-fix [line…]  Files this machine's records name that are missing, and where a copy is
                                 --moved <dir> / --backup <dir> [--project <dir>]: note where the project went / is backed up
                                 --restore: copy the missing files back from a backup (asks first; --yes once the person agreed)
@@ -774,6 +775,20 @@ async function main() {
       if (r.busy) { console.log('Another sync is running.'); break; }
       console.log(`${r.machine}: ${r.imported} change${r.imported === 1 ? '' : 's'} from other machines, ${r.changed} here${r.moved ? `; ${r.moved} lines got stable ids` : ''}. ${r.offline ? 'Offline: pushes next time.' : r.unpushed ? `${r.unpushed} commit${r.unpushed === 1 ? '' : 's'} not pushed yet: the other machines do not have them.` : r.pushed ? 'Pushed.' : r.committed ? 'Committed.' : 'Up to date.'}`);
       if (r.offline || r.unpushed) process.exitCode = 1;
+      break;
+    }
+    case 'qa': {
+      // trace-canvas qa <line> [on|off]: the line keeps Q&A notes (src/qa.mjs); with no on/off, says which it is.
+      const { findThreadLoose } = await import('../src/ops.mjs');
+      const { qaFile } = await import('../src/qa.mjs');
+      const { projectRoot } = await import('../src/places.mjs');
+      const want = /^(on|off)$/.test(argv[argv.length - 1] || '') ? argv.pop() : '', ref = argv.join(' ');
+      const tid = ref && findThreadLoose(readData(), ref);
+      if (!tid || tid === INBOX) throw new Error(ref ? `No line named "${ref}"` : 'Which line? trace-canvas qa <line> [on|off]');
+      const th = mutate(d => { const t = d.threads[tid]; if (want === 'on') t.qa = true; else if (want === 'off') delete t.qa; return want ? t : false; }) || readData().threads[tid];
+      const zh = readConfig().lang === 'zh';
+      console.log(th.qa ? (zh ? `「${th.name}」开着问答记录：只是讨论、回答有内容的一轮写进\n  ${qaFile(th, projectRoot(readData(), th))}` : `"${th.name}" keeps Q&A notes: a turn that only talked and got a real answer goes into\n  ${qaFile(th, projectRoot(readData(), th))}`)
+        : (zh ? `「${th.name}」没开问答记录。打开：trace-canvas qa "${th.name}" on` : `"${th.name}" keeps no Q&A notes. Turn them on: trace-canvas qa "${th.name}" on`));
       break;
     }
     case 'backup-fix': {

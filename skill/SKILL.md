@@ -106,6 +106,10 @@ Call `trace_live` and show a short table: status (working, needs you, idle), tit
 
 Call `trace_bind` with the thread the user named (a new name creates the thread). Leave `session_id` empty for the current session. `unbind: true` goes back to the repository/branch line. Report the thread in one line.
 
+## qa <line> [on|off]: a research line keeps Q&A notes
+
+On a line where the person discusses research, not every sentence belongs on the line. Run `trace-canvas qa "<line>" on` when they ask for it (off to stop; without on/off it says which it is). From then on a turn that only talked and got an answer of 300 characters or more is appended, as said, to one file: `notes/qa-<line>.md` in the line's project, or the canvas's own folder when the line has no project folder here. The line shows one record that links the file. You may tidy an entry into its points (the conclusion, why, the sources) by editing the file; keep its heading and the session line under it. When the person says "keep this" about an answer that was too short to be appended, add it to the file yourself in the same form. Lines without the switch keep a later talking turn only when its reply is over 1000 characters.
+
 ## backup-fix [lines…]: a project moved, was backed up, or lost files
 
 A record names its files by their path on the machine that wrote it. When a project moves or a file is lost, the canvas finds it again only through **places** noted on the line: where the project went, and where copies of it are kept.

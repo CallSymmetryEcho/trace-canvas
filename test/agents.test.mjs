@@ -313,3 +313,22 @@ test('a start says whether the program really started: not when it fails at once
   assert.deepEqual(await deliverRow({ command: 'claude x', action: 'start' }, { open: async () => 'no display' }), { failed: 'no display', started: false, why: 'no display' });
   assert.deepEqual(await deliverRow({ command: 'claude x', action: 'start' }, { open: async () => null }), { failed: null, started: true, why: '' });
 });
+
+test('a line that keeps Q&A notes: talk that got a real answer goes into its file, one record on the line, no to-do', () => {
+  const s = sandbox();
+  const fire = (ev, extra = {}) => handleHook(normalize('codex', { session_id: 'cq1', cwd: s.repo, transcript_path: path.join(s.root, 'cq1.jsonl'), hook_event_name: ev, ...extra }), s.env);
+  fire('SessionStart', { source: 'startup' });
+  fire('UserPromptSubmit', { prompt: 'Read the paper', turn_id: 't1' });
+  fire('Stop', { last_assistant_message: 'Read.' });
+  const tid = readData(s.env).sessions.cq1.thread;
+  mutate(d => { d.threads[tid].qa = true; }, s.env);
+  const ask = (q, a) => { fire('UserPromptSubmit', { prompt: q, turn_id: q }); fire('Stop', { last_assistant_message: a }); };
+  ask('Why does Ga-In make an ohmic contact?', 'It wets the oxide. ' + 'x'.repeat(400));
+  ask('And copper tape?', 'It works too. ' + 'y'.repeat(1200)); // long enough to have been a to-do on another line
+  ask('ok thanks', 'You are welcome.'); // too short: nowhere
+  const d = readData(s.env), cs = Object.values(d.commits), rec = cs.find(c => c.qa);
+  assert.deepEqual([rec.qa, rec.kind, cs.filter(c => c.qa).length], [2, 'note', 1]);
+  assert.ok(!cs.some(c => c.kind === 'task' && /Ga-In|copper/.test(c.title)));
+  const md = fs.readFileSync(rec.links[0], 'utf8');
+  assert.ok(rec.links[0].startsWith(path.join(s.repo, 'notes', 'qa-')) && /Ga-In make an ohmic[\s\S]*It wets the oxide[\s\S]*copper tape/.test(md) && !/ok thanks/.test(md));
+});

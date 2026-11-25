@@ -19,6 +19,7 @@ import { execFileSync } from 'node:child_process';
 import { RETURN_LIMIT, samePlace, dataFile, home, mutate, readConfig, readData, createThread, addCommit, lastCommit, goalOf, hashId, threadById, threadByKey, leadsTo, isTodo, AUTOPILOT_ASK, AUTOPILOT_WORKER, AUTOPILOT_END, EVOLVE_ROUND } from './store.mjs';
 import { gitEvents, redirectTargets, BASH_WRITES, EDIT_TOOLS, GIT_COMMIT, commandDir, commitMessage, headline, firstLine, cleanPrompt } from './git-events.mjs';
 import { tr } from './i18n.mjs';
+import { QA_MIN, appendQa } from './qa.mjs';
 const threadIdOfLocal = (d, c) => (c && c.thread && d.threads[c.thread] ? c.thread : 'inbox');
 import { dropLive, readLive, terminalOf, updateLive, listLive as listLiveLocal } from './live.mjs';
 import { agentOf } from './agents.mjs';
@@ -310,12 +311,17 @@ export function handleHook(input, env = process.env) {
       // that was not a to-do (a command, "ok") or a reply under 100 characters is not kept.
       const keep = (input._agent || 'claude') !== 'claude' && !state.turnLogged && msg.length >= 100;
       // Only a session's first prompt is a to-do by default: a later one becomes one now when its turn did work (changed a
-      // file, ran a writing command, committed) or its reply is a report (over 1500 characters, the length that gets a
-      // file). A later turn that only talked ("which browser?", "ok, logged in") is conversation, not a to-do: every
+      // file, ran a writing command, committed) or its reply is a report (over 1000 characters). A later turn that only talked ("which browser?", "ok, logged in") is conversation, not a to-do: every
       // sentence of a chat would otherwise sit on the line as a ticked to-do.
       // ponytail: length stands in for "a report"; ask the agent's own verdict if short results start going missing.
+      // On a line that keeps Q&A notes (qa.mjs), a turn of any agent that only talked and got a real answer goes into
+      // the line's file, not onto the line.
+      const qth = state.turnPrompt && !acted && !state.turnLogged && msg.length >= QA_MIN && s.thread ? threadById(d, s.thread) : null;
+      if (qth && qth.qa) {
+        try { appendQa(d, qth, { prompt: state.turnPrompt, reply: msg, agent: ag.name, resume: ag.resume(sid), root: info ? info.root : cwd, lang: cfg.lang }, env); changed = true; } catch (e) { process.stderr.write(`trace-canvas: the Q&A notes were not written: ${e.code || e.message}\n`); }
+      }
       let task = keep && d.commits[state.turnTask];
-      if (keep && !task && state.turnPrompt && (acted || msg.length > 1500)) task = addCommit(d, { thread: thread(state.turnPrompt).id, kind: 'task', title: firstLine(state.turnPrompt, 120), body: state.turnPrompt.slice(0, 3000), agent: ag.name, links: [ag.resume(sid)], extra: { session: sid, actor: 'human' } });
+      if (keep && !task && state.turnPrompt && !(qth && qth.qa) && (acted || msg.length > 1000)) task = addCommit(d, { thread: thread(state.turnPrompt).id, kind: 'task', title: firstLine(state.turnPrompt, 120), body: state.turnPrompt.slice(0, 3000), agent: ag.name, links: [ag.resume(sid)], extra: { session: sid, actor: 'human' } });
       if (task && !task.done) {
         task.result = msg.length > 1500 ? msg.slice(0, 1500) + '…' : msg;
         if (msg.length > 1500) {

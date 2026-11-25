@@ -247,7 +247,8 @@ export function handleHook(input, env = process.env) {
       const handoff = isHandoff(input.prompt);
       // A new session whose first prompt is a hand-over is on that line from here on. The start hook binds by
       // TRACE_CANVAS_THREAD, which a Codex session under the shared daemon never sees: it was put on a line made for its folder.
-      const took = handoff && !s.prompted && !s.bound && HANDED.exec(String(input.prompt || ''));
+      // Only its first prompt: a session that has taken one stays where it is (the prompt itself asks for trace_bind).
+      const took = handoff && state.prompts === 1 && !s.prompted && !s.bound && HANDED.exec(String(input.prompt || ''));
       const takes = took && threadById(d, took[1]);
       if (takes) { s.thread = takes.id; s.bound = true; touch(); }
       if (handoff) s.prompted = true;
@@ -454,6 +455,8 @@ function underSharedDaemon(pid = process.ppid) {
 }
 /** The line this process was handed with TRACE_CANVAS_THREAD (`hand`), '' when the variable is a shared daemon's. */
 export const handedThread = (env = process.env, shared = env === process.env ? underSharedDaemon : () => false) => (env.TRACE_CANVAS_THREAD && !shared() ? env.TRACE_CANVAS_THREAD : '');
+/** The one to-do this process was handed with it (TRACE_CANVAS_TODO), '' when a whole line was. */
+const handedTodo = env => (handedThread(env) && /^[\w-]+$/.test(env.TRACE_CANVAS_TODO || '') ? env.TRACE_CANVAS_TODO : '');
 
 /**
  * What a new session should know first: its line and goal, the open to-dos for this agent, who else
@@ -485,9 +488,14 @@ export function sessionStartContext(input, env = process.env) {
       const ls = lessonsFor([th.name, th.group, goal].filter(Boolean).join(' '));
       if (ls.length) out.push('Lessons from finished projects that may fit this line (Theatrum; memory_recall reads them in full):', ...ls.map(l => `- ${l.title} [${l.id}]`));
     }
+    // Handed one to-do (the person picked it on the page or with `hand <to-do>`): that one is named, not the agent's list here.
+    const one = handed && handedTodo(env) && d.commits[handedTodo(env)], only = one && !one.done && threadIdOfLocal(d, one) === tid ? one : null;
+    if (only) out.push(`You were handed one to-do: ${firstLine(only.title, 120)} [${only.id}]. The other to-dos on the line are not part of this hand-over.`);
+    else {
     // A to-do the person sent back comes first, with their reason.
     if (mine.length) out.push(`Open to-dos for you (${ag.name}):`, ...mine.sort((a, b) => !!b.returned - !!a.returned).slice(0, 10).map(c => `- ${c.title} [${c.id}]${!c.returned ? '' : c.returned.n >= RETURN_LIMIT ? ` (sent back ${c.returned.n} times, last: ${c.returned.note || 'no reason given'}; do not try again: ask the person how to change it)` : ` (sent back by the person: ${c.returned.note || 'no reason given'}; do this first)`}`));
     if (free.length) out.push(`${free.length} open to-do${free.length === 1 ? ' is' : 's are'} not assigned to anyone yet.`);
+    }
     const others = listLiveLocal(env).filter(s => s.id !== sid && sessionThread(d, s, env).threadId === tid);
     if (others.length) out.push(`Also working on this line now: ${others.map(s => `${s.agent || 'Claude Code'} (${s.status}${s.activity ? `: ${s.activity}` : ''})`).join('; ')}.`);
   }
@@ -497,7 +505,7 @@ export function sessionStartContext(input, env = process.env) {
     for (const r of places) out.push(`- ${r.title}: ${(r.where || []).filter(w => w.local).slice(0, 4).map(w => `${w.role ? w.role + ' ' : ''}${w.local}`).join('; ')}${r.notes ? ` — ${String(r.notes).split('\n')[0]}` : ''}`);
   }
   if (!out.length) return '';
-  out.push('Use the MCP tool trace_tasks with mine: true to read your to-dos, trace_task_done when one is finished, trace_log with kind "task" for new goals and next steps the person gives, and trace_log for decisions and results.');
+  out.push(`Use the MCP tool trace_tasks ${handedTodo(env) ? `with ids ["${handedTodo(env)}"] to read it in full` : 'with mine: true to read your to-dos'}, trace_task_done when one is finished, trace_log with kind "task" for new goals and next steps the person gives, and trace_log for decisions and results.`);
   return out.join('\n');
 }
 

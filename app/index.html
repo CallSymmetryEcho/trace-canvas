@@ -5408,7 +5408,7 @@ function handCommand(c) {
   if (!th) { toast(t('handNeedsLine')); return ''; }
   const note = String(th.note || '').trim(), live = liveOn(tid).sort((a, b) => b.lastSeen - a.lastSeen)[0];
   const dir = /^\/\S*$/.test(note) ? note : live ? live.cwd : '';
-  return `${dir ? `cd ${shq(dir)} && ` : ''}TRACE_CANVAS_THREAD=${tid} ${AGENT_LAUNCH[c.assignee](t('handPrompt', flat(th.name), tid, [...flat(c.title)].length > 40 ? [...flat(c.title)].slice(0, 40).join('') + '…' : flat(c.title), c.id))}`;
+  return `${dir ? `cd ${shq(dir)} && ` : ''}TRACE_CANVAS_THREAD=${tid} TRACE_CANVAS_TODO=${c.id} ${AGENT_LAUNCH[c.assignee](t('handPrompt', flat(th.name), tid, [...flat(c.title)].length > 40 ? [...flat(c.title)].slice(0, 40).join('') + '…' : flat(c.title), c.id))}`;
 }
 const sheetBody = $('#sheet-body');
 // In the reader on a commit's file, ‹ and › turn the page, and so does a swipe mostly sideways: left to the next file, right to the previous one.

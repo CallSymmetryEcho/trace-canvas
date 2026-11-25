@@ -128,12 +128,12 @@ export function handTo(d, { ref, to, thread, remote = false, here = true, on = '
   const far = !here && on ? startDir(d, th, env, on) : ''; // there: where that machine's sessions on the line worked, if the folder is still there
   // A prompt of the caller's own (trace_fork's) still opens as a hand-over: the hooks know it by that (it is never a
   // to-do) and put the new session on the line from it, where TRACE_CANVAS_THREAD does not reach (Codex's shared daemon).
-  const prompt = own ? oneLine(isHandoff(own) ? own : `${HEADS.hand} "${th.name}" (thread ${tid}). First call the MCP tool trace_bind with thread "${tid}". ${own}`)
+  const prompt = own ? oneLine(isHandoff(own) ? own : `${HEADS.hand} "${brief(th.name, 80)}" (thread ${tid}). First call the MCP tool trace_bind with thread "${tid}". ${own}`)
     // A to-do handed over is that one to-do: the person picked it. A line handed over is all of the agent's to-dos on it.
-    : oneLine(todo ? `${HEADS.hand} "${th.name}" (thread ${tid}) for one to-do: ${brief(todo.title)} [${todo.id}]. First call the MCP tool trace_bind with thread "${tid}". Read the to-do in full with trace_tasks (ids ["${todo.id}"]) and the line with trace_read_thread for context (ideas logged on it are there). Do this one, tick it with trace_task_done and give the result, and log decisions and results with trace_log. The other to-dos on the line are not part of this hand-over.`
-      : `${HEADS.hand} "${th.name}" (thread ${tid}). First call the MCP tool trace_bind with thread "${tid}". Then read the line with trace_read_thread (ideas logged on it are there) and call trace_tasks with mine: true for the goal and your to-dos, work through them, and tick each one with trace_task_done when it is done. Log decisions and results with trace_log.`);
+    : oneLine(todo ? `${HEADS.hand} "${brief(th.name, 80)}" (thread ${tid}) for one to-do: ${brief(todo.title)} [${todo.id}]. First call the MCP tool trace_bind with thread "${tid}". Read the to-do in full with trace_tasks (ids ["${todo.id}"]) and the line with trace_read_thread for context (ideas logged on it are there). Do this one, tick it with trace_task_done and give the result, and log decisions and results with trace_log. The other to-dos on the line are not part of this hand-over.`
+      : `${HEADS.hand} "${brief(th.name, 80)}" (thread ${tid}). First call the MCP tool trace_bind with thread "${tid}". Then read the line with trace_read_thread (ideas logged on it are there) and call trace_tasks with mine: true for the goal and your to-dos, work through them, and tick each one with trace_task_done when it is done. Log decisions and results with trace_log.`);
   const run = remote && ag.remote ? ag.remote(oneLine(th.name), prompt) : ag.launch(prompt);
-  return { thread: th, todo, live, command: `${dir ? `cd ${q(dir)} && ` : far ? `cd ${q(far)} 2>/dev/null; ` : ''}TRACE_CANVAS_THREAD=${tid} ${run}` };
+  return { thread: th, todo, live, command: `${dir ? `cd ${q(dir)} && ` : far ? `cd ${q(far)} 2>/dev/null; ` : ''}TRACE_CANVAS_THREAD=${tid}${todo && !own ? ` TRACE_CANVAS_TODO=${todo.id}` : ''} ${run}` };
 }
 // What deciding a line's agent needs, read once: every session the canvas knows, and which of them run now (here from
 // the live files; on another machine from its own, read once per machine, over ssh by default).
@@ -203,10 +203,15 @@ export function lineAgent(d, tid, { machine = '', agent = '' } = {}, ctx = agent
 export function dispatch(d, { refs = [], all = false, self = null, on = '', awayLive = remoteLiveSync, prompt: promptFor = null, ownSession = false } = {}, env = process.env) {
   const lines = new Set(), named = new Set();
   for (const ref of refs) {
-    const id = d.commits[ref] ? null : findThreadLoose(d, ref);
+    // What a ref names, the exact first: a record's id, a line's id or whole name, an open to-do's whole title; only then
+    // a line or a to-do whose name contains the words ("Fix login" was taken for the line "Fix login flow" while a to-do
+    // was titled exactly that).
+    const want = norm(ref), exact = d.commits[ref] ? [d.commits[ref]] : want ? Object.values(d.commits).filter(x => isTodo(x) && !x.done && norm(x.title) === want) : [];
+    let id = d.commits[ref] ? null : resolveThreadRef(d, ref), several = null;
+    if (!id && exact.length !== 1) try { id = findThreadLoose(d, ref); } catch (e) { several = e; }
     if (id && id !== INBOX) { lines.add(id); continue; }
     let c;
-    try { c = openTodo(findTodo(d, { task: ref })); } catch (e) { throw /^No /.test(e.message) ? new Error(`No line or open to-do "${ref}"`) : e; }
+    try { c = openTodo(exact.length === 1 ? exact[0] : findTodo(d, { task: ref })); } catch (e) { throw several || (/^No /.test(e.message) ? new Error(`No line or open to-do "${ref}"`) : e); }
     if (threadIdOf(d, c) === INBOX) throw new Error(`"${c.title}" is in the inbox: put it on a line first`);
     named.add(c.id);
   }

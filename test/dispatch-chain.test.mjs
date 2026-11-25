@@ -130,3 +130,32 @@ test('to-dos picked by name are those and no more; a machine name or an id never
   d.threads['t1;id'] = { ...d.threads[r.tid], id: 't1;id', name: 'Imported' };
   assert.throws(() => handTo(d, { ref: 't1;id', to: 'codex' }, env), /not an id this can start a session with/);
 });
+
+test('a session handed one to-do is told about that one at its start; a ref names the exact thing before a similar name', async () => {
+  const { sessionStartContext } = await import('../src/hook.mjs'), { typeInto } = await import('../src/agents.mjs');
+  const { tmp, env } = scratch();
+  const r = mutate(d => {
+    const t = createThread(d, { name: 'Trio' }), ids = ['One', 'Two', 'Three'].map(title => addCommit(d, { thread: t.id, kind: 'task', title, extra: { assignee: 'codex' } }).id);
+    const flow = createThread(d, { name: 'Fix login flow' }), other = createThread(d, { name: 'Auth' });
+    addCommit(d, { thread: flow.id, kind: 'task', title: 'Something on the flow line' });
+    const exact = addCommit(d, { thread: other.id, kind: 'task', title: 'Fix login' });
+    return { tid: t.id, ids, cmd: handTo(d, { ref: ids[1], to: 'codex' }, env).command, exact: exact.id, auth: other.id };
+  }, env);
+  // The start hook sees what the command sets: the line and the one to-do.
+  const [, thread, todo] = /TRACE_CANVAS_THREAD=(\S+) TRACE_CANVAS_TODO=(\S+) codex /.exec(r.cmd);
+  const ctx = sessionStartContext({ session_id: 'h1', cwd: tmp, _agent: 'codex' }, { ...env, TRACE_CANVAS_THREAD: thread, TRACE_CANVAS_TODO: todo });
+  assert.match(ctx, /You were handed one to-do: Two \[\w+\]\. The other to-dos on the line are not part of this hand-over\./);
+  assert.ok(!ctx.includes('Open to-dos for you') && !ctx.includes('- One') && !ctx.includes('mine: true'), ctx);
+  // A whole line handed over still lists them.
+  assert.match(sessionStartContext({ session_id: 'h2', cwd: tmp, _agent: 'codex' }, { ...env, TRACE_CANVAS_THREAD: thread }), /Open to-dos for you \(Codex\):\n- One/);
+  // "Fix login" is the to-do titled exactly that, not the line "Fix login flow"; a hand-over pasted as a later prompt does not move a session.
+  const rows = dispatch(readData(env), { refs: ['Fix login'], print: true }, env);
+  assert.deepEqual(rows.map(x => [x.thread.id, x.todos.map(c => c.id)]), [[r.auth, [r.exact]]]);
+  handleHook({ session_id: 'late', cwd: tmp, hook_event_name: 'UserPromptSubmit', prompt: 'ok' }, env);
+  handleHook({ session_id: 'late', cwd: tmp, hook_event_name: 'UserPromptSubmit', prompt: / codex '(.*)'$/.exec(r.cmd)[1] }, env);
+  assert.ok(!(readData(env).sessions.late || {}).bound);
+  // What is typed into a pane: no control characters, and a closing `;` that tmux would take as its own separator gets a space.
+  let script = '';
+  await typeInto({ pane: '%1', tty: '/dev/pts/9' }, 'stop\x03 here\x1b[2J; then finish this;', (file, args, opts, cb) => { script = args.join(' '); cb(null); });
+  assert.ok(script.includes(`'stop  here [2J; then finish this; '`), script);
+});

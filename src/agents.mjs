@@ -56,7 +56,7 @@ export const macTerminal = (env = process.env, has = p => fs.existsSync(p)) => {
 // pane would hand them to every tab, which then looked to be in that pane (tmuxOf). TRACE_CANVAS_THREAD is the caller's
 // line: a session resumed by a dispatch run from an agent would bind itself to that line (a new one names its own line
 // in its command). TERM_PROGRAM is the caller's terminal (tmux), not the new tab's.
-const SESSION_VAR = /^(TMUX|TMUX_PANE|TERM_PROGRAM|TERM_PROGRAM_VERSION|TRACE_CANVAS_THREAD|CLAUDECODE|CLAUDE_PID|CLAUDE_EFFORT|CLAUDE_CODE_(SESSION_\w+|CHILD_\w+|ENTRYPOINT|EXECPATH|MESSAGING_\w+|BRIDGE_\w+|SSE_PORT))$/;
+const SESSION_VAR = /^(TMUX|TMUX_PANE|TERM_PROGRAM|TERM_PROGRAM_VERSION|TRACE_CANVAS_THREAD|TRACE_CANVAS_TODO|CLAUDECODE|CLAUDE_PID|CLAUDE_EFFORT|CLAUDE_CODE_(SESSION_\w+|CHILD_\w+|ENTRYPOINT|EXECPATH|MESSAGING_\w+|BRIDGE_\w+|SSE_PORT))$/;
 export const agentEnv = env => Object.fromEntries(Object.entries(env).filter(([k]) => !SESSION_VAR.test(k)));
 /**
  * Starts an agent's own program (claude, codex, gemini, agy, or a shell that runs one). The one way to do it: the
@@ -225,17 +225,24 @@ export async function launchRow(r, { open = openTerminal, start = startDetached,
 export function typeInto({ machine = '', socket = '', pane = '', tty = '' }, text, exec = execFile) {
   if (!/^%\d+$/.test(pane) || !tty || (machine && !isMachine(machine))) return Promise.resolve(false);
   const t = `${machine ? 'tmux' : q(tmuxBin())}${socket ? ` -S ${q(socket)}` : ''}`, p = q(pane);
+  // One line of plain text is typed, then Enter: a control character in it would be a keypress (Ctrl-C, Escape). tmux
+  // takes a `;` that ends the argument as its own command separator (and eats a backslash before it): a space follows it.
+  text = String(text).replace(/[\x00-\x1f\x7f-\x9f]+/g, ' ').replace(/;$/, '; ');
   const script = `[ "$(${t} display-message -p -t ${p} '#{pane_tty}')" = ${q(tty)} ] || exit 1; [ "$(${t} display-message -p -t ${p} '#{pane_in_mode}')" = 1 ] && ${t} send-keys -t ${p} -X cancel; ${t} send-keys -t ${p} -l -- ${q(text)} && sleep 1 && ${t} send-keys -t ${p} Enter`;
   const [file, args] = machine ? ['ssh', ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', machine, `exec "$SHELL" -lc ${q(script)}`]] : ['/bin/sh', ['-c', script]];
   return new Promise(done => exec(file, args, { timeout: 20e3 }, err => done(!err)));
 }
 /** What a dispatch or Autopilot row needs done: typed into the idle session's tmux pane (row.pane), else its window opened. */
 export async function deliverRow(r, { type = typeInto, ...deps } = {}) {
-  if (r.pane && await type(r.pane, r.prompt)) return { woken: true, started: true, why: '' };
-  if (!r.command || r.action === 'busy') return {};
-  // One shape for every way of starting: started (it really runs: the window opened, the tmux session is up), and why not.
-  const res = await launchRow(r, deps);
-  return { ...res, started: !res.failed, why: res.failed || '' };
+  // A command the system refuses to run at all (E2BIG: an argument past 128 KB) is this row's failure, not the end of the run:
+  // the rows after it are still delivered.
+  try {
+    if (r.pane && await type(r.pane, r.prompt)) return { woken: true, started: true, why: '' };
+    if (!r.command || r.action === 'busy') return {};
+    // One shape for every way of starting: started (it really runs: the window opened, the tmux session is up), and why not.
+    const res = await launchRow(r, deps);
+    return { ...res, started: !res.failed, why: res.failed || '' };
+  } catch (e) { const why = String(e.code || e.message || e); return { failed: why, started: false, why }; }
 }
 // tmux is often not on the page server's PATH (a login item, a systemd service).
 // A process's environment: /proc on Linux, ps -E on a Mac (values cut at the first space, enough for these keys).

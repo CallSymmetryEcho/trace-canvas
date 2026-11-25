@@ -159,7 +159,7 @@ async function runRows(rows, { run, json }) {
   for (const r of rows) {
     const who = AGENTS[r.agent].name, s = r.session, name = s && `"${s.title.slice(0, 50) || s.id.slice(0, 8)}"`;
     console.log(`\n${r.thread.name}: ${r.todos.length} to-do${r.todos.length === 1 ? '' : 's'} for ${who}${r.on ? ` on ${r.on}` : ''}`);
-    for (const c of r.todos) console.log(`  □ ${c.title}  [${c.id}]`);
+    for (const c of r.todos) console.log(`  □ ${String(c.title).replace(/[\x00-\x1f\x7f-\x9f]+/g, ' ')}  [${c.id}]`); // a title is data: its escape sequences are not for this terminal
     if (r.action === 'self') console.log(`  → Your own line: they are yours.${r.prompt ? ` Work them by this:\n    ${r.prompt}` : ''}`); // Autopilot's rules reach the caller too
     else if (r.woken) console.log(`  → Running session ${name}${s.machine ? ` on ${s.machine}` : ''} was idle in tmux: the to-dos were typed into it, and it has started on them.`);
     else if (r.noted && s.status === 'working') console.log(`  → Session ${name} is working: a note is left, and it takes them up when its turn ends. Nothing to paste.${r.command ? `\n    Not to wait, start a new session for them:\n    ${r.command}` : ''}`);

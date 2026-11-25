@@ -24,7 +24,13 @@ const before = await ev(snap);
 for (let i = 0; i < 3; i++) execFileSync('node', [repo + '/bin/trace-canvas.mjs', 'log', 'Added while typing ' + i, '--thread', 'Trip', '--kind', 'task'], { stdio: 'ignore' });
 await wait(3000);
 const after = await ev(snap);
-console.log(JSON.stringify({ before, after }, null, 1));
-const ok = after.rows === before.rows + 3 && after.value === before.value && after.focused && String(after.caret) === String(before.caret) && after.row === before.row && Math.abs(after.rowTop - before.rowTop) <= 1;
+// Show done: a to-do finished over 15 days ago stays behind one row until it is clicked.
+const dones = `[...document.querySelectorAll('#sheet-body li.done')].map(e => e.textContent.includes('Done 20')).join()`;
+await ev(`document.querySelector('[data-gl-done]').click()`); await wait(400);
+const folded = await ev(dones);
+await ev(`document.querySelector('[data-gl-old]').click()`); await wait(400);
+const old = { folded, opened: await ev(dones) };
+console.log(JSON.stringify({ before, after, old }, null, 1));
+const ok = old.folded === 'false' && old.opened.includes('true') && after.rows === before.rows + 3 && after.value === before.value && after.focused && String(after.caret) === String(before.caret) && after.row === before.row && Math.abs(after.rowTop - before.rowTop) <= 1;
 console.log(ok ? 'PASS' : 'FAIL');
 await fetch('http://127.0.0.1:' + CDP + '/json/close/' + v.id); process.exit(ok ? 0 : 1);

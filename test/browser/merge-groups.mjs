@@ -131,6 +131,15 @@ assert.equal(await ev(`!!document.querySelector('#cv-cards .card[data-tid="${pic
 await ev(`document.querySelector('#tab-git').click()`); await wait(800);
 assert.equal(await ev(`!!document.querySelector('#git-body [data-cid="kept1"]')`), false, 'hidden with the switch');
 
+// In focus on a group, New thread makes a line of that group (it came out ungrouped, and so out of the focused view).
+await ev(`localStorage.setItem('tc.focusGroup', JSON.stringify('G2')); localStorage.setItem('tc.showMerged', 'true')`); await call('Page.reload'); await wait(2500);
+await ev(`document.querySelector('#tab-canvas').click()`); await wait(600);
+const before = Object.keys((await data()).line).length;
+await ev(`document.querySelector('#new-thread-btn').click()`); await wait(1200);
+const made = await ev(`fetch('/api/data').then(r => r.json()).then(d => Object.values(d.threads).sort((a, b) => b.createdAt - a.createdAt)[0])`);
+out.newInFocus = [made.group, Object.keys((await data()).line).length - before];
+assert.deepEqual(out.newInFocus, ['G2', 1], 'the new line is in the focused group');
+
 console.log(JSON.stringify(out, null, 1));
 if (shot) { const s = await call('Page.captureScreenshot'); (await import('node:fs')).writeFileSync(shot, Buffer.from(s.result.data, 'base64')); }
 await fetch('http://127.0.0.1:' + CDP + '/json/close/' + v.id);

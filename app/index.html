@@ -2351,7 +2351,9 @@ function freeSpot(near) {
 function newThread({ name, parent = null, forkOf = null, near = null, group = '' }) {
   const used = new Set([...S.threads.values()].map(th => th.color));
   const color = LINE_COLORS.find(c => !used.has(c)) || LINE_COLORS[S.threads.size % LINE_COLORS.length];
-  const pos = freeSpot(near);
+  // In focus on a group, a new line is one of that group's (it came out ungrouped, and so out of view), placed by its lines.
+  group = group || S.focusGroup || '';
+  const pos = freeSpot(near || (S.focusGroup && orderedThreads().find(x => x.group === S.focusGroup)) || null);
   const th = { id: uid('t'), name: name || t('newThreadName', S.threads.size + 1), color, status: 'active', createdAt: Date.now(), parent, forkOf, mergedInto: null, x: pos.x, y: pos.y, note: '', ...(group ? { group } : {}) };
   putDoc('threads', th, 0);
   return th;

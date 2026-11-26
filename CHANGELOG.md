@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **A new line made while focused on a group joins that group.** It came out ungrouped, so it was not in the focused view it was made in.
+
 - **`trace-canvas log` takes every `--link`.** Only the first was kept; a second `--link /b` ended up in the title ("t --link /b").
 
 - **Grok Build is an agent on the canvas.** xAI's `grok` runs Claude Code's hooks as they are, so its sessions were recorded as Claude Code's, with a `claude --resume` command that could not open them. A hook now knows a Grok session (its payload and `GROK_SESSION_ID`), names it Grok Build, resumes it with `grok -r <id>`, counts its `write` and `search_replace` tools as edits, and ignores the second Stop it fires on exit. The tools know Grok by their parent process. To-dos can be assigned and handed to it (`--to grok`, and in the page's list). Not yet: Grok does not take the context the hooks print at a session's start and with each prompt.

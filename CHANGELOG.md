@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **`trace_read_thread` says when a record's text was cut, and reads it in full.** A text over 600 characters was cut without a word, so an agent read 'Per datase' where an evaluator's scores were. The cut text now ends with how much is left and how to get it, and `ids` returns the records named with their whole text.
+
 - **Go to the terminal raises the Konsole window.** The page server runs as a service without `DISPLAY`, so the tab was selected over D-Bus but `wmctrl` could not raise its window: it stayed behind the browser. The window tools now run with the desktop's display, as opening a terminal already did.
 
 - **A new line made while focused on a group joins that group.** It came out ungrouped, so it was not in the focused view it was made in.

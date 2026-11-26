@@ -755,16 +755,20 @@ export function threadSessions(d, tid, env = process.env) {
   });
 }
 
-export function readThread(d, ref, { limit = 50 } = {}, env = process.env) {
+// A record's text in a line's listing: its first 600 characters, and when more was cut, how much and how to read it all
+// (it was cut silently: an agent read "Per datase" where the scores were, and had no way to the rest).
+const cutBody = c => { const a = [...c.body]; return a.length > 600 ? `${a.slice(0, 600).join('')}… [cut: ${a.length - 600} more characters; read it in full with trace_read_thread, ids ["${c.id}"]]` : c.body; };
+/** ids: only these records of the line, each with its whole text (limit does not apply). */
+export function readThread(d, ref, { limit = 50, ids = null } = {}, env = process.env) {
   const id = findThreadLoose(d, ref);
   if (!id) throw new Error(`No thread named "${ref}"`);
   const t = id === INBOX ? { id: INBOX, name: 'Inbox', status: 'active' } : d.threads[id];
-  const cs = Object.values(d.commits).filter(c => threadIdOf(d, c) === id).sort((a, b) => a.ts - b.ts), recs = cs.slice(-limit);
+  const cs = Object.values(d.commits).filter(c => threadIdOf(d, c) === id).sort((a, b) => a.ts - b.ts), recs = ids ? cs.filter(c => ids.includes(c.id)) : cs.slice(-limit);
   // The session a record was logged in, with the command that resumes it (it may work on another line).
   const resume = recs.some(c => c.fromSession) ? new Map(threadSessions(d, null, env).map(s => [s.id, s.command])) : null;
   return {
     id: t.id, name: t.name, ...(t.group ? { group: t.group } : {}), status: t.status, goal: goalOf(t), note: t.note || '', total: cs.length,
     sessions: threadSessions(d, id, env).slice(0, 10).map(s => ({ id: s.id, agent: s.agent, title: s.title, status: s.status, last: new Date(s.last).toISOString(), resume: s.command })),
-    records: recs.map(c => ({ id: c.id, at: new Date(c.ts).toISOString(), kind: c.kind, title: c.title, ...(c.body ? { body: c.body.slice(0, 600) } : {}), ...(c.agent ? { agent: c.agent } : {}), ...(c.session ? { session: c.session } : {}), ...(c.fromSession ? { from: { session: c.fromSession, ...(resume.get(c.fromSession) ? { resume: resume.get(c.fromSession) } : {}) } } : {}), ...(c.gitCommit ? { commit: c.gitCommit, ...(c.repo ? { repo: c.repo } : {}) } : {}), ...(c.links && c.links.length ? { links: c.links } : {}) })),
+    records: recs.map(c => ({ id: c.id, at: new Date(c.ts).toISOString(), kind: c.kind, title: c.title, ...(c.body ? { body: ids ? c.body : cutBody(c) } : {}), ...(c.agent ? { agent: c.agent } : {}), ...(c.session ? { session: c.session } : {}), ...(c.fromSession ? { from: { session: c.fromSession, ...(resume.get(c.fromSession) ? { resume: resume.get(c.fromSession) } : {}) } } : {}), ...(c.gitCommit ? { commit: c.gitCommit, ...(c.repo ? { repo: c.repo } : {}) } : {}), ...(c.links && c.links.length ? { links: c.links } : {}) })),
   };
 }

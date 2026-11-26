@@ -86,8 +86,8 @@ const TOOLS = [
   {
     name: 'trace_read_thread',
     title: 'Read a thread',
-    description: 'Returns the records on one thread, oldest first, and the sessions on it (newest first) with the command that resumes each. To continue work on a line, resume its session rather than starting a new one.',
-    inputSchema: { type: 'object', properties: { thread: { type: 'string', description: 'Thread id or name; "inbox" for the inbox.' }, limit: { type: 'number', description: 'Most recent records to return (default 50).' } }, required: ['thread'] },
+    description: 'Returns the records on one thread, oldest first, and the sessions on it (newest first) with the command that resumes each. A record\'s text is cut at 600 characters and says so; pass ids to read those records in full. To continue work on a line, resume its session rather than starting a new one.',
+    inputSchema: { type: 'object', properties: { thread: { type: 'string', description: 'Thread id or name; "inbox" for the inbox.' }, limit: { type: 'number', description: 'Most recent records to return (default 50).' }, ids: { type: 'array', items: { type: 'string' }, description: 'Only these records of the thread, each with its whole text.' } }, required: ['thread'] },
     annotations: { readOnlyHint: true },
   },
   {
@@ -241,7 +241,8 @@ async function callTool(name, a = {}) {
       return { text: `${rows.length} thread${rows.length === 1 ? '' : 's'}.`, data: { threads: rows } };
     }
     case 'trace_read_thread': {
-      const t = readThread(readData(), a.thread, { limit: Math.max(1, Math.min(200, Number(a.limit) || 50)) });
+      const ids = a.ids == null ? null : [].concat(a.ids).filter(x => typeof x === 'string').map(String);
+      const t = readThread(readData(), a.thread, { limit: Math.max(1, Math.min(200, Number(a.limit) || 50)), ids });
       return { text: `"${t.name}": ${t.total} record${t.total === 1 ? '' : 's'}.`, data: t };
     }
     case 'trace_merge': {

@@ -86,3 +86,13 @@ test('Autopilot is told not to stop for to-dos waiting for review, to give a res
   assert.match(p, /returned: was sent back by the person/);
   assert.match(p, /returns: 3 or more has failed that often: do not try it again, log its Question/);
 });
+
+test('a line\'s listing says when a record\'s text was cut, and ids read it in full', async () => {
+  const { readThread } = await import('../src/ops.mjs');
+  const d = emptyData(), t = createThread(d, { name: 'Runs' }), long = 'x'.repeat(650) + ' Per dataset: A 0.91, B 0.88';
+  const c = addCommit(d, { thread: t.id, kind: 'note', title: 'Evaluator log', body: long }); addCommit(d, { thread: t.id, kind: 'note', title: 'Short', body: 'ok' });
+  const [cut, short] = readThread(d, t.id).records;
+  assert.ok(cut.body.endsWith(`… [cut: ${long.length - 600} more characters; read it in full with trace_read_thread, ids ["${c.id}"]]`) && !cut.body.includes('Per dataset'));
+  assert.equal(short.body, 'ok');
+  assert.deepEqual(readThread(d, t.id, { ids: [c.id] }).records.map(r => r.body), [long]);
+});

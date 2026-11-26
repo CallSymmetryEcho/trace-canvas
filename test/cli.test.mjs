@@ -37,3 +37,14 @@ test('update: says whether there is a newer version, fast-forwards to it, and re
   assert.match(fs.readFileSync(path.join(skill, 'SKILL.md'), 'utf8'), /A new line\./);
   assert.match(run(), /^Up to date/);
 });
+
+test('log takes every --link, and none of them ends up in the title', async () => {
+  const fs = await import('node:fs'), os = await import('node:os'), path = await import('node:path'), { execFileSync } = await import('node:child_process'), { fileURLToPath } = await import('node:url');
+  const assert = (await import('node:assert/strict')).default;
+  const bin = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'trace-canvas.mjs');
+  const env = { ...process.env, TRACE_CANVAS_HOME: fs.mkdtempSync(path.join(os.tmpdir(), 'tc-links-')) };
+  execFileSync(process.execPath, [bin, 'log', 't', '--thread', 'x', '--link', '/a', '--link', '/b'], { env });
+  execFileSync(process.execPath, [bin, 'log', 'no links', '--thread', 'x'], { env });
+  const cs = Object.values(JSON.parse(fs.readFileSync(path.join(env.TRACE_CANVAS_HOME, 'data.json'), 'utf8')).commits).map(c => [c.title, c.links]);
+  assert.deepEqual(cs, [['t', ['/a', '/b']], ['no links', []]]);
+});

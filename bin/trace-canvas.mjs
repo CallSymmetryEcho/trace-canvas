@@ -259,10 +259,12 @@ async function main() {
       break;
     }
     case 'log': {
-      const thread = flag('thread', null), assignee = str(flag('assignee', '')), on = str(flag('on', '')), kind = flag('kind', assignee || on ? 'task' : 'agent'), body = flag('body', ''), link = flag('link', null), agent = flag('agent', '');
+      const thread = flag('thread', null), assignee = str(flag('assignee', '')), on = str(flag('on', '')), kind = flag('kind', assignee || on ? 'task' : 'agent'), body = flag('body', ''), agent = flag('agent', '');
+      // --link may be given several times: only the first was taken, and the rest ended up in the title.
+      const links = []; for (let l; (l = flag('link', null)) != null;) if (str(l)) links.push(str(l));
       const title = argv.join(' ').trim();
       if (!title) { console.error('Usage: trace-canvas log "title" [--thread name] [--kind agent] [--assignee codex] [--on machine]'); process.exit(1); }
-      const c = mutate(d => addCommit(d, { thread: thread && thread !== true ? ensureThread(d, thread) : INBOX, kind: str(kind) || 'agent', title, body: str(body), links: str(link) ? [str(link)] : [], agent: str(agent), extra: { ...(assignee ? { assignee } : {}), ...(on ? { on } : {}) } }));
+      const c = mutate(d => addCommit(d, { thread: thread && thread !== true ? ensureThread(d, thread) : INBOX, kind: str(kind) || 'agent', title, body: str(body), links, agent: str(agent), extra: { ...(assignee ? { assignee } : {}), ...(on ? { on } : {}) } }));
       console.log(`Logged ${c.id}`);
       break;
     }

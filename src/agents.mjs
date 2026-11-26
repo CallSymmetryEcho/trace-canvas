@@ -281,7 +281,10 @@ export function focusScript({ tty = '', term = '' } = {}) {
   if (term === 'iTerm.app') return `tell application "iTerm2"\n  repeat with w in windows\n    repeat with t in tabs of w\n      repeat with s in sessions of t\n        if tty of s is "${tty}" then\n          tell w to select\n          tell t to select\n          tell s to select\n          activate\n          return "ok"\n        end if\n      end repeat\n    end repeat\n  end repeat\nend tell`;
   return null;
 }
-const run = (file, args) => new Promise(done => execFile(file, args, { timeout: 5000 }, (err, out) => done(err ? null : String(out))));
+// With the desktop's display: the page server runs as a service, without DISPLAY, so wmctrl could not reach the X server
+// and a Konsole tab was selected while its window stayed behind the browser.
+let shown;
+const run = (file, args) => new Promise(done => execFile(file, args, { timeout: 5000, env: (shown ??= desktopEnv(process.env) || process.env) }, (err, out) => done(err ? null : String(out))));
 const dbus = (dest, obj, method, ...args) => run('gdbus', ['call', '--session', '--dest', dest, '--object-path', obj, '--method', method, ...args]);
 const SEARCH = ['org.gnome.Terminal', '/org/gnome/Terminal/SearchProvider', 'org.gnome.Shell.SearchProvider2.'];
 /**

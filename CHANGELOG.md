@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Go to the terminal raises the Konsole window.** The page server runs as a service without `DISPLAY`, so the tab was selected over D-Bus but `wmctrl` could not raise its window: it stayed behind the browser. The window tools now run with the desktop's display, as opening a terminal already did.
+
 - **A new line made while focused on a group joins that group.** It came out ungrouped, so it was not in the focused view it was made in.
 
 - **`trace-canvas log` takes every `--link`.** Only the first was kept; a second `--link /b` ended up in the title ("t --link /b").

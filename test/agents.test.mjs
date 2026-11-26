@@ -333,3 +333,27 @@ test('a line that keeps Q&A notes: talk that got a real answer goes into its fil
   const md = fs.readFileSync(rec.links[0], 'utf8');
   assert.ok(fs.realpathSync(rec.links[0]).startsWith(path.join(fs.realpathSync(s.repo), 'notes', 'qa-')) && /Ga-In make an ohmic[\s\S]*It wets the oxide[\s\S]*copper tape/.test(md) && !/ok thanks/.test(md));
 });
+
+// Grok Build 1.0.92, a real session recorded 2026-11-25 (test/fixtures/grok/session.jsonl; paths made generic). It runs
+// Claude Code's own hook command, with no --agent: the phone showed its session as Claude Code, with `claude --resume`.
+test('a Grok Build session, which runs Claude Code\'s hooks as they are, is Grok\'s: its name, resume command and files', async () => {
+  const { execFileSync } = await import('node:child_process'), { fileURLToPath } = await import('node:url');
+  const { readData } = await import('../src/store.mjs');
+  const BIN = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'trace-canvas.mjs');
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'tc-grok-'))), work = path.join(root, 'demo');
+  fs.mkdirSync(work); execFileSync('git', ['-C', work, 'init', '-q', '-b', 'main']); fs.writeFileSync(path.join(work, 'notes.txt'), 'ALPHA');
+  const env = { ...process.env, TRACE_CANVAS_HOME: path.join(root, 'home'), TRACE_CANVAS_DESKTOP_DIR: path.join(root, 'desk'), TRACE_CANVAS_MAP: '', TRACE_CANVAS_LANG: 'en' };
+  for (const k of ['TRACE_CANVAS_THREAD', 'TRACE_CANVAS_TODO', 'TRACE_CANVAS_DISABLE', 'TRACE_CANVAS_AGENT', 'GROK_SESSION_ID']) delete env[k];
+  const lines = fs.readFileSync(new URL('./fixtures/grok/session.jsonl', import.meta.url), 'utf8').trim().split('\n').map(l => l.replaceAll('/tmp/work/demo', work));
+  for (const l of lines) execFileSync(process.execPath, [BIN, 'hook'], { input: l, env, encoding: 'utf8' }); // as ~/.claude/settings.json has it
+  const d = readData(env), s = Object.values(d.sessions)[0], recs = Object.values(d.commits);
+  assert.deepEqual([s.agent, s.agentKey, s.resume], ['Grok Build', 'grok', `grok -r ${s.id}`]);
+  assert.ok(recs.every(c => c.agent === 'Grok Build'), JSON.stringify(recs.map(c => c.agent)));
+  assert.deepEqual(recs.find(c => c.kind === 'agent').files, ['notes.txt']); // its `write` tool is an edit
+  assert.equal(recs.filter(c => c.kind === 'note').length, 1); // the Stop it fires after SessionEnd is not a second ending
+  // Claude Code's own payload is still Claude Code's, and a to-do can be handed to Grok.
+  execFileSync(process.execPath, [BIN, 'hook'], { input: JSON.stringify({ session_id: 'cc1', cwd: work, hook_event_name: 'UserPromptSubmit', prompt: 'Add a title to the notes' }), env, encoding: 'utf8' });
+  assert.equal(readData(env).sessions.cc1.agent, 'Claude Code');
+  const t = createThread(d, { name: 'Notes', note: work }); addCommit(d, { thread: t.id, kind: 'task', title: 'Sort the notes' });
+  assert.match(handTo(d, { ref: 'Sort the notes', to: 'grok' }, env).command, / grok 'You are taking over the Trace Canvas line "Notes"/);
+});

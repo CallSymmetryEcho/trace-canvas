@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Trace Canvas — A map both people and agents can read</title>
-<meta name="description" content="One map both you and your agents can read: every Claude Code and Codex session, on any of your machines, becomes a line. You see what each agent is doing and what it changed; your agents read the same map to pick up where another left off. Runs locally, needs only Node.js, MIT.">
+<meta name="description" content="One map both you and your agents can read: every Claude Code, Codex and Grok Build session, on any of your machines, becomes a line. You see what each agent is doing and what it changed; your agents read the same map to pick up where another left off. Runs locally, needs only Node.js, MIT.">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Trace Canvas — A map both people and agents can read">
-<meta property="og:description" content="One map both you and your agents can read: every Claude Code and Codex session, on any of your machines, becomes a line. You see what each agent is doing and what it changed; your agents read the same map to pick up where another left off. Runs locally, needs only Node.js, MIT.">
+<meta property="og:description" content="One map both you and your agents can read: every Claude Code, Codex and Grok Build session, on any of your machines, becomes a line. You see what each agent is doing and what it changed; your agents read the same map to pick up where another left off. Runs locally, needs only Node.js, MIT.">
 <meta property="og:url" content="https://trace-canvas.bin-lian.com/">
 <meta property="og:image" content="https://trace-canvas.bin-lian.com/media/cover-tutorial.en.jpg">
 <link rel="canonical" href="https://trace-canvas.bin-lian.com/">
@@ -318,7 +318,7 @@ footer a { color: inherit; }
         <svg class="mark" viewBox="0 0 1000 240" role="img" aria-label="Trace Canvas mark"><g fill="none" stroke-width="22" stroke-linecap="round"><path pathLength="1" d="M60 120 H940" stroke="#E4002B"/><path pathLength="1" d="M220 120 C300 120 300 40 380 40 H640 C720 40 720 120 800 120" stroke="#0072CE"/><path pathLength="1" d="M380 120 C440 120 430 200 470 200 H940" stroke="#00A651"/></g><g fill="#fff" stroke-width="11"><circle style="--x:.11" cx="110" cy="120" r="21" stroke="#E4002B"/><circle style="--x:.3" cx="300" cy="120" r="21" stroke="#E4002B"/><circle style="--x:.52" cx="520" cy="120" r="21" stroke="#E4002B"/><circle style="--x:.74" cx="740" cy="120" r="21" stroke="#E4002B"/><circle style="--x:.89" cx="890" cy="120" r="21" stroke="#E4002B"/><circle style="--x:.38" cx="380" cy="40" r="21" stroke="#0072CE"/><circle style="--x:.64" cx="640" cy="40" r="21" stroke="#0072CE"/><circle style="--x:.47" cx="470" cy="200" r="21" stroke="#00A651"/><circle style="--x:.72" cx="720" cy="200" r="21" stroke="#00A651"/></g></svg>
         <p class="wordmark">Trace Canvas</p>
       </div>
-      <p class="tagline"><span data-l="en">Claude Code · Codex · every machine you work on</span><span data-l="zh">Claude Code · Codex · 你的每台电脑</span></p>
+      <p class="tagline"><span data-l="en">Claude Code · Codex · Grok Build · every machine you work on</span><span data-l="zh">Claude Code · Codex · Grok Build · 你的每台电脑</span></p>
       <h1><span data-l="en">One map both you and your agents can read</span><span data-l="zh">人和 agent 都看得懂的一张地图</span></h1>
       <p class="lead" data-l="en">Every project is a line on one transit map, and every session lands on it.</p>
       <p class="lead" data-l="zh">每个项目一条线，画在同一张地铁图上；每个会话都记在线上。</p>
@@ -421,8 +421,8 @@ footer a { color: inherit; }
         <span class="num" aria-hidden="true">03</span>
         <p class="kicker"><span data-l="en">For agents</span><span data-l="zh">给 agent 读</span></p>
         <h3><i class="dot"></i><span data-l="en">A new agent catches up in seconds</span><span data-l="zh">新开的 agent，几秒接上进度</span></h3>
-        <p data-l="en">Over MCP, Claude Code and Codex read the same line you see: the goal, the to-dos, every result. No more explaining it all again.</p>
-        <p data-l="zh">Claude Code、Codex 通过 MCP 读你看到的同一条线：目标、待办、每个结果。不用你再讲一遍。</p>
+        <p data-l="en">Over MCP, Claude Code, Codex and Grok Build read the same line you see: the goal, the to-dos, every result. No more explaining it all again.</p>
+        <p data-l="zh">Claude Code、Codex、Grok Build 通过 MCP 读你看到的同一条线：目标、待办、每个结果。不用你再讲一遍。</p>
       </div>
       <figure class="st-media panel">
         <div class="frame"><video data-clip="sessions" width="1000" height="562" muted loop playsinline preload="none"></video></div>
@@ -590,18 +590,19 @@ footer a { color: inherit; }
   <section id="install" class="install panel">
     <p class="kicker"><span data-l="en">End of the line</span><span data-l="zh">终点站</span></p>
     <h2><i class="dot end"></i><span data-l="en">Install</span><span data-l="zh">安装</span></h2>
-    <p><span data-l="en">Paste this into Claude Code (or Codex):</span><span data-l="zh">把这句话贴给 Claude Code（或 Codex）：</span></p>
+    <p><span data-l="en">Paste this into Claude Code, Codex or Grok Build:</span><span data-l="zh">把这句话贴给 Claude Code、Codex 或 Grok Build：</span></p>
     <div class="paste" data-l="en"><p>Install Trace Canvas: clone https://github.com/CallSymmetryEcho/trace-canvas.git into ~/trace-canvas, then run <code>node ~/trace-canvas/bin/trace-canvas.mjs setup --user</code> (add <code>--agents codex</code> if Codex is installed).</p><button class="pill copy" type="button" data-done="Copied">Copy</button></div>
     <div class="paste" data-l="zh"><p>安装 Trace Canvas：把 https://github.com/CallSymmetryEcho/trace-canvas.git 克隆到 ~/trace-canvas，然后运行 <code>node ~/trace-canvas/bin/trace-canvas.mjs setup --user</code>（装了 Codex 的话加上 <code>--agents codex</code>）。</p><button class="pill copy" type="button" data-done="已复制">复制</button></div>
     <p><span data-l="en">Or by hand:</span><span data-l="zh">或者手动：</span></p>
     <pre><code>git clone https://github.com/CallSymmetryEcho/trace-canvas.git ~/trace-canvas
 node ~/trace-canvas/bin/trace-canvas.mjs setup --user</code></pre>
-    <p data-l="en">Then start a new Claude Code session and type <code>/trace-canvas put all my sessions on the canvas</code>. It puts this project's past sessions on the map and opens it at <code>http://localhost:4777/</code>; from then on every new session lands on it by itself.</p>
-    <p data-l="zh">然后新开一个 Claude Code 会话，输入 <code>/trace-canvas 把现在所有的会话展示在画布上</code>。它会把这个项目过去的会话放上地图，并在 <code>http://localhost:4777/</code> 打开；之后每个新会话都会自动出现在上面。</p>
+    <p data-l="en">Then start a new Claude Code session and type <code>/trace-canvas put all my sessions on the canvas</code>. It puts this project's past sessions on the map and opens it at <code>http://localhost:4777/</code>; from then on every new session lands on it by itself. Grok Build uses that same setup: it reads Claude Code's hooks and MCP, so a new session lands on the map too.</p>
+    <p data-l="zh">然后新开一个 Claude Code 会话，输入 <code>/trace-canvas 把现在所有的会话展示在画布上</code>。它会把这个项目过去的会话放上地图，并在 <code>http://localhost:4777/</code> 打开；之后每个新会话都会自动出现在上面。Grok Build 用的就是这一套：它会读 Claude Code 的 hooks 和 MCP，新会话同样会出现在地图上。</p>
     <h3 class="sub"><span data-l="en">Which agents</span><span data-l="zh">支持哪些 agent</span></h3>
     <dl class="support">
       <div><dt>Claude Code</dt><dd><b class="ok"><span data-l="en">Tested</span><span data-l="zh">已实测</span></b> <span data-l="en">Tested with real sessions.</span><span data-l="zh">用真实会话测过。</span></dd></div>
       <div><dt>Codex</dt><dd><b class="ok"><span data-l="en">Tested</span><span data-l="zh">已实测</span></b> <span data-l="en">Tested with real sessions; add <code>--agents codex</code>.</span><span data-l="zh">用真实会话测过；安装时加 <code>--agents codex</code>。</span></dd></div>
+      <div><dt>Grok Build</dt><dd><b class="ok"><span data-l="en">Tested</span><span data-l="zh">已实测</span></b> <span data-l="en">A real session lands on the map and uses the tools. No extra flag: it reads the Claude Code setup.</span><span data-l="zh">真实会话会上地图，也能用这些工具。不用另加参数，它读的是 Claude Code 那套安装。</span></dd></div>
       <div><dt>Gemini CLI</dt><dd><b class="pre"><span data-l="en">Supported, not yet tested</span><span data-l="zh">已支持，待实测</span></b> <span data-l="en">Built in (<code>--agents gemini</code>), following its documented hooks.</span><span data-l="zh">已内置（<code>--agents gemini</code>），按官方 hook 接好。</span></dd></div>
       <div><dt><span data-l="en">Other coding CLIs: Qwen Code, Qoder, TRAE, Kimi Code…</span><span data-l="zh">其他编程 CLI：Qwen Code、Qoder、TRAE、Kimi Code……</span></dt><dd><b class="plan"><span data-l="en">Not tested yet</span><span data-l="zh">待测试</span></b> <span data-l="en">Next on the list.</span><span data-l="zh">排在下一批。</span></dd></div>
     </dl>

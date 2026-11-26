@@ -2,7 +2,7 @@
 // Code shape the rest of the code reads. Codex hooks are nearly Claude's (no Notification event:
 // a PermissionRequest is what "needs you" looks like); Gemini CLI names its events differently.
 // Tools are recognised by the shape of their input, since each CLI names them its own way.
-import { execFile, spawn } from 'node:child_process';
+import { execFile, execFileSync, spawn } from 'node:child_process';
 
 // Opens an address in the person's browser. Resolves to '' once the opener has started, else to why it did not
 // (no xdg-open on a server, say), so the caller can say so instead of "opened".
@@ -32,6 +32,9 @@ export const AGENTS = {
   // ponytail: Gemini's resume flag is unverified until a current gemini-cli is installed.
   gemini: { name: 'Gemini CLI', resume: id => `gemini --resume ${id}`, wake: (id, p) => `gemini --resume ${id} -i ${q(p)}`, launch: p => `gemini -i ${q(p)}` },
   // Antigravity CLI (agy, 1.5): its conversation id is the session id.
+  // Grok Build (grok, 1.0): it runs Claude Code's own hooks and MCP config (its Claude compatibility, on by default), so it
+  // needs no setup of its own; a hook knows it by GROK_SESSION_ID, the tools by their parent process (grokCalls).
+  grok: { name: 'Grok Build', resume: id => `grok -r ${id}`, wake: (id, p) => `grok -r ${id} ${q(p)}`, launch: p => `grok ${q(p)}` },
   agy: { name: 'Antigravity', resume: id => `agy --conversation ${id}`, wake: (id, p) => `agy --conversation ${id} -i ${q(p)}`, launch: p => `agy -i ${q(p)}` },
 };
 export const agentOf = key => AGENTS[key] || AGENTS.claude;
@@ -311,6 +314,20 @@ export async function focusTab({ tty = '', term = '', tab = '', tmux = '', pane 
 }
 // Which agent the current process serves: set in each CLI's MCP config; Claude Code needs none.
 export const agentKey = (env = process.env) => (AGENTS[env.TRACE_CANVAS_AGENT] ? env.TRACE_CANVAS_AGENT : 'claude');
+/** Whether a hook payload and its environment are Grok Build's: it runs Claude Code's hook command as written, with no --agent. */
+export const isGrokHook = (payload, env = process.env) => !!env.GROK_SESSION_ID || !!(payload && payload.workspaceRoot && payload.sessionId && /^[a-z_]+$/.test(String(payload.hookEventName || '')));
+/** Whether this process (an MCP server from Claude's config, which names no agent) was started by Grok Build. */
+export function grokCalls(pid = process.ppid) {
+  try {
+    for (let i = 0; i < 4 && pid > 1; i++) {
+      const [, ppid, comm] = /^\s*(\d+)\s+(.*)$/.exec(execFileSync('ps', ['-o', 'ppid=,comm=', '-p', String(pid)], { encoding: 'utf8', timeout: 1500, stdio: ['ignore', 'pipe', 'ignore'] })) || [];
+      if (!ppid) break;
+      if (/(^|\/)grok$/.test(comm.trim())) return true;
+      pid = Number(ppid);
+    }
+  } catch {} // ps failed: taken as Claude Code's
+  return false;
+}
 
 const GEMINI_EVENTS = { BeforeAgent: 'UserPromptSubmit', AfterAgent: 'Stop', BeforeTool: 'PreToolUse', AfterTool: 'PostToolUse' };
 const PATCH_FILE = /^\*\*\* (?:Add|Update|Delete) File: (.+)$/gm;
@@ -359,6 +376,14 @@ export function normalize(key, input) {
   const out = { ...input, _agent: k };
   if (k === 'claude') return out;
   if (k === 'agy') return fromAgy(out);
+  if (k === 'grok') {
+    // Claude Code's payload, with Grok's own tool names (their inputs keep Claude's keys: command, file_path).
+    if (out.tool_name === 'run_terminal_command') out.tool_name = 'Bash';
+    else if (/^(write|search_replace|hashline_edit)$/.test(out.tool_name || '')) out.tool_name = 'Edit';
+    // On exit Grok fires a second Stop after SessionEnd (reason: shutdown, no reply): not a turn ending.
+    if (out.hook_event_name === 'Stop' && out.reason === 'shutdown' && !out.last_assistant_message) out.hook_event_name = 'StopShutdown';
+    return out;
+  }
   let ev = input.hook_event_name;
   if (k === 'gemini') {
     ev = GEMINI_EVENTS[ev] || ev;

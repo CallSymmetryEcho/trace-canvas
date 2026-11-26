@@ -266,6 +266,8 @@ For Codex, setup also links the skill into `~/.agents/skills/trace-canvas`. Invo
 
 Codex has no notification event, so a permission request stands in for "needs you". Checked against real Codex 0.164 sessions (`test/fixtures/codex/`): prompts, shell commands, `apply_patch` edits, commits, permission requests, the context at session start and ticking a to-do over MCP. Gemini CLI support follows its documented hook events and will be checked against a current `@google/gemini-cli`.
 
+**Grok Build** (xAI's terminal agent, `grok`) needs no setup of its own: it runs Claude Code's hooks and MCP config by default, so with Claude Code set up a Grok session shows on the canvas as Grok Build, resumes with `grok -r <id>`, and can be given to-dos (`--to grok`). Checked against real Grok Build 1.0.92 sessions: a prompt, a file edit, a turn's end, a session's end. It does not take the context the hooks print at a session's start and with each prompt (its line, the to-dos already there); it reads them itself with `trace_tasks`.
+
 ## Several machines, one canvas
 
 Your laptop, a workstation and a lab PC can share one canvas through a private git repository all of them can reach. Give each machine a name and the repository's clone:

@@ -5370,8 +5370,8 @@ function returnTodo(id) {
 }
 // The command `trace-canvas hand` prints, built here too: start the assigned agent on the to-do's
 // line, in the line's folder (its repository path, else where a session on it works now).
-const AGENT_NAMES = { claude: 'Claude Code', codex: 'Codex', gemini: 'Gemini CLI' };
-const AGENT_LAUNCH = { claude: p => `claude ${shq(p)}`, codex: p => `codex ${shq(p)}`, gemini: p => `gemini -i ${shq(p)}`, agy: p => `agy -i ${shq(p)}` };
+const AGENT_NAMES = { claude: 'Claude Code', codex: 'Codex', gemini: 'Gemini CLI', grok: 'Grok Build' };
+const AGENT_LAUNCH = { claude: p => `claude ${shq(p)}`, codex: p => `codex ${shq(p)}`, gemini: p => `gemini -i ${shq(p)}`, grok: p => `grok ${shq(p)}`, agy: p => `agy -i ${shq(p)}` };
 const shq = v => `'${String(v).replace(/'/g, `'\\''`)}'`;
 // A command on another machine, as the server's remote() (src/agents.mjs) writes it: its login shell, with ~/.local/bin
 // first on PATH, where claude's and codex's installers put them and a non-interactive login shell does not look.

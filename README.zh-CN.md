@@ -297,6 +297,8 @@ node bin/trace-canvas.mjs setup --user --agents codex,gemini
 
 Codex 没有通知事件，所以用权限请求来表示"等你"。这些已经用真实的 Codex 0.164 会话核对过（`test/fixtures/codex/`）：指令、shell 命令、`apply_patch` 改文件、提交、权限请求、会话开始时的上下文，以及通过 MCP 勾掉待办。Gemini CLI 的支持按它文档里的 hook 事件实现，还要用最新的 `@google/gemini-cli` 实际核对。
 
+**Grok Build**（xAI 的终端 agent，`grok`）不用另外设置：它默认会运行 Claude Code 的 hooks 和 MCP 配置，所以装了 Claude Code 这一套之后，Grok 的会话就会出现在画布上，记成 Grok Build，恢复命令是 `grok -r <id>`，待办也可以指给它（`--to grok`）。已用真实的 Grok Build 1.0.92 会话核对过：指令、改文件、一轮结束、会话结束。它不接收 hook 在会话开头和每条指令时给的提示（所在的线、已有的待办），要靠它自己调用 `trace_tasks`。
+
 ## 多台电脑，同一张画布
 
 笔记本、工作站和实验室电脑可以通过一个它们都能访问的私有 git 仓库共用一张画布。给每台机器起个名字，并指向这个仓库的克隆：

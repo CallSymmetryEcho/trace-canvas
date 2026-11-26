@@ -92,7 +92,7 @@ Goals and to-dos
   trace-canvas tasks [--thread T] [--all]          Each thread's goal and open to-dos (--all: finished too)
   trace-canvas done <task> [--thread T] [--agent A] [--undo]
                                                    Tick a to-do by id or title (--undo reopens it)
-  trace-canvas hand <to-do|thread> --to claude|codex|gemini|agy
+  trace-canvas hand <to-do|thread> --to claude|codex|gemini|grok|agy
                                                    Assign it and print the command that starts the agent on it
   trace-canvas autopilot <line> [--stop] [--print]   Autopilot (beta): until you stop it, the line's agent works every open
                                                    to-do by the decision profile and asks only what it must
@@ -207,12 +207,15 @@ async function main() {
       // --agent codex|gemini: that CLI's payload is turned into Claude's shape first. On SessionStart
       // the hook prints the context the session starts with, and on each instruction a reminder to
       // add new goals as to-dos; for anything else it prints nothing.
-      const agent = str(flag('agent', '')) || 'claude';
+      let agent = str(flag('agent', '')) || 'claude';
       let raw = '', outcome, context = '', event = '';
       try {
         raw = await readStdin();
         if (raw.trim()) {
-          const payload = JSON.parse(raw), input = normalize(agent, payload);
+          const payload = JSON.parse(raw);
+          // Grok Build runs Claude Code's hooks as they are: the same command, so the session was taken for Claude Code's.
+          if (agent === 'claude' && (await import('../src/agents.mjs')).isGrokHook(payload)) agent = 'grok';
+          const input = normalize(agent, payload);
           event = payload.hook_event_name || payload.hookEventName; // the CLI's own name for it, which its output must repeat
           // The switch lit (or let go) here reaches the other machines at once, also where no page server runs (an ssh or tmux box).
           const apSig = input.hook_event_name === 'UserPromptSubmit' && process.env.TRACE_CANVAS_DISABLE !== '1' && (await import('../src/sync.mjs')).autopilotSig;
@@ -251,6 +254,7 @@ async function main() {
     }
     case 'mcp': {
       const { runMcp } = await import('../src/mcp.mjs');
+      if (!process.env.TRACE_CANVAS_AGENT && (await import('../src/agents.mjs')).grokCalls()) process.env.TRACE_CANVAS_AGENT = 'grok'; // from Claude's MCP config, which names no agent
       runMcp();
       break;
     }
@@ -344,7 +348,7 @@ async function main() {
       const { handTo } = await import('../src/ops.mjs');
       const to = str(flag('to', '')), thread = str(flag('thread', ''));
       const ref = argv.join(' ').trim();
-      if (!ref || !to) { console.error('Usage: trace-canvas hand <to-do or thread> --to claude|codex|gemini|agy [--thread T]'); process.exit(1); }
+      if (!ref || !to) { console.error('Usage: trace-canvas hand <to-do or thread> --to claude|codex|gemini|grok|agy [--thread T]'); process.exit(1); }
       const r = mutate(d => handTo(d, { ref, to, thread: thread || undefined }));
       console.error(r.todo ? `"${r.todo.title}" is assigned to ${to}. Run this to start it:` : `Run this to start ${to} on "${r.thread.name}":`);
       console.log(r.command);
